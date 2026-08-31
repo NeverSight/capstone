@@ -1559,6 +1559,39 @@ static bool is_x86_segment_override(uint8_t prefix)
 	       prefix == 0x3e || prefix == 0x64 || prefix == 0x65;
 }
 
+static bool scan_x86_evex_prefix(const uint8_t *code, size_t code_len,
+				 bool is_64_bit, size_t *evex_offset,
+				 unsigned int *segment_count,
+				 unsigned int *address_size_count,
+				 bool *invalid_prefix)
+{
+	size_t offset = 0;
+
+	*segment_count = 0;
+	*address_size_count = 0;
+	*invalid_prefix = false;
+	while (offset < code_len) {
+		const uint8_t prefix = code[offset];
+
+		if (prefix == 0x62) {
+			*evex_offset = offset;
+			return true;
+		}
+		if (is_x86_segment_override(prefix))
+			++*segment_count;
+		else if (prefix == 0x67)
+			++*address_size_count;
+		else if (prefix == 0x66 || prefix == 0xf0 ||
+			 prefix == 0xf2 || prefix == 0xf3 ||
+			 (is_64_bit && prefix >= 0x40 && prefix <= 0x4f))
+			*invalid_prefix = true;
+		else
+			return false;
+		++offset;
+	}
+	return false;
+}
+
 // Public interface for the disassembler
 bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 			MCInst *instr, uint16_t *size, uint64_t address,
@@ -1677,17 +1710,12 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 		size_t evex_offset = 0;
 		unsigned int segment_count = 0, address_size_count = 0;
 		bool invalid_prefix = false;
+		const bool has_evex = scan_x86_evex_prefix(
+			code, code_len, (handle->mode & CS_MODE_64) != 0,
+			&evex_offset, &segment_count, &address_size_count,
+			&invalid_prefix);
 
-		while (evex_offset < code_len && code[evex_offset] != 0x62) {
-			const uint8_t prefix = code[evex_offset++];
-			if (is_x86_segment_override(prefix))
-				++segment_count;
-			else if (prefix == 0x67)
-				++address_size_count;
-			else
-				invalid_prefix = true;
-		}
-		if (code_len - evex_offset >= 6 &&
+		if (has_evex && code_len - evex_offset >= 6 &&
 		    code_len <= sizeof(normalized_code) &&
 		    code[evex_offset] == 0x62 &&
 		    (code[evex_offset + 1] & 7) == 2 &&
@@ -1723,19 +1751,12 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 					     code_len : sizeof(normalized_code);
 		unsigned int segment_count = 0, address_size_count = 0;
 		bool invalid_prefix = false;
+		const bool has_evex = scan_x86_evex_prefix(
+			code, limit, (handle->mode & CS_MODE_64) != 0,
+			&apx_evex_offset, &segment_count, &address_size_count,
+			&invalid_prefix);
 
-		while (apx_evex_offset < limit &&
-		       code[apx_evex_offset] != 0x62) {
-			const uint8_t prefix = code[apx_evex_offset++];
-
-			if (is_x86_segment_override(prefix))
-				++segment_count;
-			else if (prefix == 0x67)
-				++address_size_count;
-			else
-				invalid_prefix = true;
-		}
-		if (limit - apx_evex_offset >= 6 &&
+		if (has_evex && limit - apx_evex_offset >= 6 &&
 		    code[apx_evex_offset] == 0x62 &&
 		    (code[apx_evex_offset + 1] & 7) >= 1 &&
 		    (code[apx_evex_offset + 1] & 7) <= 3 &&

@@ -3039,6 +3039,28 @@ static bool is_rex2_leading_prefix(uint8_t byte)
 	}
 }
 
+static bool starts_with_legacy_inc_dec(csh handle, const uint8_t *code,
+				       size_t code_len)
+{
+	const cs_struct *arch = (const cs_struct *)(uintptr_t)handle;
+	size_t offset = 0;
+
+	if (arch->mode & CS_MODE_64)
+		return false;
+	while (offset < code_len) {
+		const uint8_t byte = code[offset];
+
+		if (byte >= 0x40 && byte <= 0x4f)
+			return true;
+		if (!is_apx_evex_segment_prefix(byte) && byte != 0x66 &&
+		    byte != 0x67 && byte != 0xf0 && byte != 0xf2 &&
+		    byte != 0xf3)
+			return false;
+		++offset;
+	}
+	return false;
+}
+
 static x86_reg rex2_register(unsigned int number, uint8_t width)
 {
 	static const x86_reg registers_8[] = {
@@ -3200,6 +3222,11 @@ x86_feature_decode_result
 X86_decodeFeatureExtension(csh handle, const uint8_t *code, size_t code_len,
 			   MCInst *instr, uint16_t *size)
 {
+	/* In 16/32-bit modes 0x40..0x4f are INC/DEC opcodes, not REX
+	 * prefixes.  Do not let a later EVEX-looking byte sequence make a
+	 * feature decoder reinterpret the current legacy instruction. */
+	if (starts_with_legacy_inc_dec(handle, code, code_len))
+		return X86_FEATURE_NOT_HANDLED;
 	if (has_duplicate_feature_evex_prefixes(code, code_len))
 		return X86_FEATURE_INVALID;
 
