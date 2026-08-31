@@ -44,6 +44,7 @@
 #include "../../MCRegisterInfo.h"
 
 #include "X86InstPrinter.h"
+#include "X86FeatureExtension.h"
 #include "X86Mapping.h"
 #include "X86InstPrinterCommon.h"
 
@@ -289,7 +290,11 @@ static void printf512mem(MCInst *MI, unsigned OpNo, SStream *O)
 static const char *getRegisterName(unsigned RegNo);
 static void printRegName(SStream *OS, unsigned RegNo)
 {
-	SStream_concat0(OS, getRegisterName(RegNo));
+	const char *extension_name =
+		X86_featureExtensionMCRegisterName(RegNo);
+
+	SStream_concat0(OS, extension_name ? extension_name :
+					 getRegisterName(RegNo));
 }
 
 // for MASM syntax, 0x123 = 123h, 0xA123 = 0A123h
@@ -781,6 +786,9 @@ void X86_Intel_printInst(MCInst *MI, SStream *O, void *Info)
 {
 	x86_reg reg = X86_REG_INVALID, reg2;
 	enum cs_ac_type access1, access2;
+
+	if (X86_printFeatureExtension(MI, O, false))
+		return;
 
 	// printf("opcode = %u\n", MCInst_getOpcode(MI));
 

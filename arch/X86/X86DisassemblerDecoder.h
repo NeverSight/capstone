@@ -41,6 +41,15 @@
 #define xFromREX(rex) (((rex) & 0x2) >> 1)
 #define bFromREX(rex) ((rex) & 0x1)
 
+#define m0FromREX2(rex2) (((rex2) & 0x80) >> 7)
+#define r4FromREX2(rex2) (((rex2) & 0x40) >> 6)
+#define x4FromREX2(rex2) (((rex2) & 0x20) >> 5)
+#define b4FromREX2(rex2) (((rex2) & 0x10) >> 4)
+#define wFromREX2(rex2) (((rex2) & 0x08) >> 3)
+#define r3FromREX2(rex2) (((rex2) & 0x04) >> 2)
+#define x3FromREX2(rex2) (((rex2) & 0x02) >> 1)
+#define b3FromREX2(rex2) ((rex2) & 0x01)
+
 #define rFromEVEX2of4(evex) (((~(evex)) & 0x80) >> 7)
 #define xFromEVEX2of4(evex) (((~(evex)) & 0x40) >> 6)
 #define bFromEVEX2of4(evex) (((~(evex)) & 0x20) >> 5)
@@ -554,6 +563,13 @@ typedef struct InternalInstruction {
 	uint8_t prefix0, prefix1, prefix2, prefix3;
 	/* The value of the REX prefix, if present */
 	uint8_t rexPrefix;
+	/* APX REX2 is decoded through the legacy map-0/map-1 tables. */
+	bool hasRex2;
+	uint8_t rex2Prefix;
+	/* APX extension bits normalized only for the generated EVEX decoder. */
+	bool apxEvexB4;
+	bool apxEvexX4;
+	bool apxEvexGprIndex;
 	/* The segment override type */
 	SegmentOverride segmentOverride;
 	bool consumedModRM;

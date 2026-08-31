@@ -45,6 +45,7 @@
 #include "../../MCInst.h"
 #include "../../SStream.h"
 #include "../../MCRegisterInfo.h"
+#include "X86FeatureExtension.h"
 #include "X86Mapping.h"
 #include "X86BaseInfo.h"
 #include "X86InstPrinterCommon.h"
@@ -997,7 +998,11 @@ static void printanymem(MCInst *MI, unsigned OpNo, SStream *O)
 
 static void printRegName(SStream *OS, unsigned RegNo)
 {
-	SStream_concat(OS, "%%%s", getRegisterName(RegNo));
+	const char *extension_name =
+		X86_featureExtensionMCRegisterName(RegNo);
+
+	SStream_concat(OS, "%%%s", extension_name ? extension_name :
+					 getRegisterName(RegNo));
 }
 
 void X86_ATT_printInst(MCInst *MI, SStream *OS, void *info)
@@ -1005,6 +1010,9 @@ void X86_ATT_printInst(MCInst *MI, SStream *OS, void *info)
 	x86_reg reg, reg2;
 	enum cs_ac_type access1, access2;
 	int i;
+
+	if (X86_printFeatureExtension(MI, OS, true))
+		return;
 
 	// perhaps this instruction does not need printer
 	if (MI->assembly[0]) {

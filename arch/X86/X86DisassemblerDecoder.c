@@ -425,6 +425,8 @@ static void setSegmentOverride(struct InternalInstruction *insn,
 static int readPrefixes(struct InternalInstruction *insn)
 {
 	bool isPrefix = true;
+	unsigned int segmentPrefixCount = 0;
+	unsigned int addressSizePrefixCount = 0;
 	uint8_t byte = 0;
 	uint8_t nextByte;
 
@@ -470,6 +472,7 @@ static int readPrefixes(struct InternalInstruction *insn)
 		case 0x26: /* ES segment override */
 		case 0x64: /* FS segment override */
 		case 0x65: /* GS segment override */
+			++segmentPrefixCount;
 			switch (byte) {
 			case 0x2e:
 				setSegmentOverride(insn, SEG_OVERRIDE_CS, byte);
@@ -503,6 +506,7 @@ static int readPrefixes(struct InternalInstruction *insn)
 			break;
 
 		case 0x67: /* Address-size override */
+			++addressSizePrefixCount;
 			insn->hasAdSize = true;
 			insn->prefix3 = byte;
 			insn->rexPrefix = 0;
@@ -521,7 +525,23 @@ static int readPrefixes(struct InternalInstruction *insn)
 
 	insn->vectorExtensionType = TYPE_NO_VEX_XOP;
 
-	if (byte == 0x62) {
+	if (byte == 0xd5 && insn->mode == MODE_64BIT) {
+		uint8_t payload;
+
+		/* A legacy REX immediately before REX2 is invalid.  A later legacy
+		 * prefix clears an earlier REX in the normal way.  Repeated segment
+		 * and address-size prefixes have architecturally undefined behavior,
+		 * so accept only the canonical single-prefix spelling. */
+		if (insn->rexPrefix || segmentPrefixCount > 1 ||
+		    addressSizePrefixCount > 1 || consumeByte(insn, &payload))
+			return -1;
+		insn->hasRex2 = true;
+		insn->rex2Prefix = payload;
+		/* Reuse the generated legacy tables for W/R3/X3/B3.  R4/X4/B4
+		 * remain separate until operand translation because the generated
+		 * register enums stop at R15. */
+		insn->rexPrefix = 0x40 | (payload & 0x0f);
+	} else if (byte == 0x62) {
 		uint8_t byte1, byte2;
 
 		if (consumeByte(insn, &byte1)) {
@@ -770,6 +790,29 @@ static int readPrefixes(struct InternalInstruction *insn)
 
 static int readModRM(struct InternalInstruction *insn);
 
+static bool isRex2Map0PrefixByte(uint8_t byte)
+{
+	if ((byte >= 0x40 && byte <= 0x4f) || byte == 0xc4 || byte == 0xc5 ||
+	    byte == 0xd5 || byte == 0x62)
+		return true;
+	switch (byte) {
+	default:
+		return false;
+	case 0x26:
+	case 0x2e:
+	case 0x36:
+	case 0x3e:
+	case 0x64:
+	case 0x65:
+	case 0x66:
+	case 0x67:
+	case 0xf0:
+	case 0xf2:
+	case 0xf3:
+		return true;
+	}
+}
+
 /*
  * readOpcode - Reads the opcode (excepting the ModR/M byte in the case of
  *   extended or escape opcodes).
@@ -784,6 +827,33 @@ static int readOpcode(struct InternalInstruction *insn)
 	// dbgprintf(insn, "readOpcode()");
 
 	insn->opcodeType = ONEBYTE;
+	if (insn->hasRex2) {
+		if (consumeByte(insn, &current))
+			return -1;
+		/* The map is carried by REX2.M0.  An explicit 0F is never an
+		 * escape after REX2. */
+		if (current == 0x0f)
+			return -1;
+		if (m0FromREX2(insn->rex2Prefix)) {
+			const uint8_t row = current >> 4;
+
+			if (row == 0x3 || row == 0x8)
+				return -1;
+			insn->opcodeType = TWOBYTE;
+			insn->twoByteEscape = 0x0f;
+			insn->firstByte = 0x0f;
+		} else {
+			const uint8_t row = current >> 4;
+
+			if (isRex2Map0PrefixByte(current) || row == 0x4 ||
+			    row == 0x7 || row == 0xe ||
+			    (row == 0xa && current != 0xa1))
+				return -1;
+			insn->firstByte = current;
+		}
+		insn->opcode = current;
+		return 0;
+	}
 
 	if (insn->vectorExtensionType == TYPE_EVEX) {
 		switch (mmFromEVEX2of4(insn->vectorExtensionPrefix[1])) {
@@ -1419,7 +1489,8 @@ static int getID(struct InternalInstruction *insn)
 	}
 
 	if (insn->opcodeType == ONEBYTE && insn->opcode == 0x90 &&
-	    insn->rexPrefix & 0x01) {
+	    ((insn->rexPrefix & 0x01) ||
+	     (insn->hasRex2 && b4FromREX2(insn->rex2Prefix)))) {
 		/*
 		 * NOOP shouldn't decode as NOOP if REX.b is set. Instead
 		 * it should decode as XCHG %r8, %eax.
@@ -1496,7 +1567,8 @@ static int readSIB(struct InternalInstruction *insn)
 	if (consumeByte(insn, &insn->sib))
 		return -1;
 
-	index = indexFromSIB(insn->sib) | (xFromREX(insn->rexPrefix) << 3);
+	index = indexFromSIB(insn->sib) |
+		(xFromREX(insn->rexPrefix) << 3);
 
 	if (index == 0x4) {
 		insn->sibIndex = SIB_INDEX_NONE;
@@ -2263,10 +2335,35 @@ CASE_ENCODING_RM:
 	return 0;
 }
 
+static bool isRex2ForbiddenExtendedStateInstruction(uint16_t instructionID)
+{
+	switch (instructionID) {
+	default:
+		return false;
+	case X86_XRSTOR:
+	case X86_XRSTOR64:
+	case X86_XRSTORS:
+	case X86_XRSTORS64:
+	case X86_XSAVE:
+	case X86_XSAVE64:
+	case X86_XSAVEC:
+	case X86_XSAVEC64:
+	case X86_XSAVEOPT:
+	case X86_XSAVEOPT64:
+	case X86_XSAVES:
+	case X86_XSAVES64:
+		return true;
+	}
+}
+
 // return True if instruction is illegal to use with prefixes
 // This also check & fix the isPrefixNN when a prefix is irrelevant.
 static bool checkPrefix(struct InternalInstruction *insn)
 {
+	if (insn->hasRex2 &&
+	    isRex2ForbiddenExtendedStateInstruction(insn->instructionID))
+		return true;
+
 	// LOCK prefix
 	if (insn->hasLockPrefix) {
 		switch (insn->instructionID) {

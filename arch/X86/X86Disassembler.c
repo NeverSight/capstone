@@ -101,6 +101,7 @@
 #include "X86DisassemblerDecoder.h"
 #include "../../MCInst.h"
 #include "../../utils.h"
+#include "X86FeatureExtension.h"
 #include "X86Mapping.h"
 
 #define GET_REGINFO_ENUM
@@ -143,6 +144,120 @@ static void translateRegister(MCInst *mcInst, Reg reg)
 
 	uint16_t llvmRegnum = llvmRegnums[reg];
 	MCOperand_CreateReg0(mcInst, llvmRegnum);
+}
+
+static uint8_t gprOperandWidth(const InternalInstruction *insn,
+			       OperandType type)
+{
+	switch (type) {
+	default:
+		return 0;
+	case TYPE_R8:
+		return 1;
+	case TYPE_R16:
+		return 2;
+	case TYPE_R32:
+		return 4;
+	case TYPE_R64:
+		return 8;
+	case TYPE_Rv:
+		return insn->registerSize;
+	}
+}
+
+static bool appendFeatureGpr(MCInst *mcInst, unsigned int number,
+			     uint8_t width)
+{
+	const unsigned int reg = X86_featureExtensionMCGPR(number, width);
+
+	if (reg == 0)
+		return true;
+	MCOperand_CreateReg0(mcInst, reg);
+	return false;
+}
+
+static bool rex2ControlRegisterIsValid(unsigned int number)
+{
+	return number == 0 || number == 2 || number == 3 || number == 4 ||
+	       number == 8;
+}
+
+static bool rex2DebugRegisterIsValid(unsigned int number)
+{
+	/* DR4/DR5 retain their architectural alias/CR4.DE behavior. */
+	return number <= 7;
+}
+
+static bool translateRegRegister(MCInst *mcInst,
+				 const OperandSpecifier *operand,
+				 InternalInstruction *insn)
+{
+	const OperandType type = (OperandType)operand->type;
+	const uint8_t width = gprOperandWidth(insn, type);
+	unsigned int number;
+
+	if (insn->hasRex2) {
+		/* Segment-register selectors remain three bits wide.  Both R4 and
+		 * R3 are architecturally ignored for this operand class.  The
+		 * generated fixup has already normalized insn->reg to those three
+		 * raw ModR/M bits. */
+		if (type == TYPE_SEGMENTREG) {
+			translateRegister(mcInst, insn->reg);
+			return false;
+		}
+		number = (r4FromREX2(insn->rex2Prefix) << 4) |
+			 (r3FromREX2(insn->rex2Prefix) << 3) |
+			 regFromModRM(insn->orgModRM);
+
+		if (type == TYPE_CONTROLREG &&
+		    !rex2ControlRegisterIsValid(number))
+			return true;
+		if (type == TYPE_DEBUGREG && !rex2DebugRegisterIsValid(number))
+			return true;
+		if (width != 0 && r4FromREX2(insn->rex2Prefix))
+			return appendFeatureGpr(mcInst, number, width);
+	}
+	translateRegister(mcInst, insn->reg);
+	return false;
+}
+
+static bool translateOpcodeRegister(MCInst *mcInst,
+				    const OperandSpecifier *operand,
+				    InternalInstruction *insn)
+{
+	uint8_t width = gprOperandWidth(insn, (OperandType)operand->type);
+
+	if (width == 0) {
+		switch ((OperandEncoding)operand->encoding) {
+		default:
+			break;
+		case ENCODING_RB:
+			width = 1;
+			break;
+		case ENCODING_RW:
+			width = 2;
+			break;
+		case ENCODING_RD:
+			width = 4;
+			break;
+		case ENCODING_RO:
+			width = 8;
+			break;
+		case ENCODING_Rv:
+			width = insn->registerSize;
+			break;
+		}
+	}
+	if (insn->hasRex2 && width != 0 &&
+	    b4FromREX2(insn->rex2Prefix)) {
+		const unsigned int number =
+			16 | (b3FromREX2(insn->rex2Prefix) << 3) |
+			(insn->opcode & 7);
+
+		return appendFeatureGpr(mcInst, number, width);
+	}
+	translateRegister(mcInst, insn->opcodeRegister);
+	return false;
 }
 
 static const uint8_t segmentRegnums[SEG_OVERRIDE_max] = {
@@ -878,11 +993,41 @@ static void translateImmediate(MCInst *mcInst, uint64_t immediate,
 /// @param insn         - The internal instruction to extract the R/M field
 ///                       from.
 /// @return             - 0 on success; -1 otherwise
-static bool translateRMRegister(MCInst *mcInst, InternalInstruction *insn)
+static bool translateRMRegister(MCInst *mcInst, InternalInstruction *insn,
+				OperandType type)
 {
+	const uint8_t width = gprOperandWidth(insn, type);
+
 	if (insn->eaBase == EA_BASE_sib || insn->eaBase == EA_BASE_sib64) {
 		//debug("A R/M register operand may not have a SIB byte");
 		return true;
+	}
+
+	if (insn->hasRex2) {
+		const unsigned int number =
+			(b4FromREX2(insn->rex2Prefix) << 4) |
+			(b3FromREX2(insn->rex2Prefix) << 3) |
+			rmFromModRM(insn->orgModRM);
+
+		if (type == TYPE_CONTROLREG &&
+		    !rex2ControlRegisterIsValid(number))
+			return true;
+		if (type == TYPE_DEBUGREG && !rex2DebugRegisterIsValid(number))
+			return true;
+		if (width != 0 && b4FromREX2(insn->rex2Prefix))
+			return appendFeatureGpr(mcInst, number, width);
+	}
+	if (insn->apxEvexB4 && width != 0) {
+		const unsigned int number =
+			16 | (bFromEVEX2of4(insn->vectorExtensionPrefix[1]) << 3) |
+			(insn->orgModRM & 7);
+		const unsigned int reg =
+			X86_featureExtensionMCGPR(number, width);
+
+		if (reg == 0)
+			return true;
+		MCOperand_CreateReg0(mcInst, reg);
+		return false;
 	}
 
 	switch (insn->eaBase) {
@@ -917,7 +1062,8 @@ static bool translateRMRegister(MCInst *mcInst, InternalInstruction *insn)
 /// @param insn         - The instruction to extract Mod, R/M, and SIB fields
 ///                       from.
 /// @return             - 0 on success; nonzero otherwise
-static bool translateRMMemory(MCInst *mcInst, InternalInstruction *insn)
+static bool translateRMMemory(MCInst *mcInst, InternalInstruction *insn,
+			      OperandType type)
 {
 	// Addresses in an MCInst are represented as five operands:
 	//   1. basereg       (register)  The R/M base, or (if there is a SIB) the
@@ -934,22 +1080,54 @@ static bool translateRMMemory(MCInst *mcInst, InternalInstruction *insn)
 
 	if (insn->eaBase == EA_BASE_sib || insn->eaBase == EA_BASE_sib64) {
 		if (insn->sibBase != SIB_BASE_NONE) {
-			switch (insn->sibBase) {
+			if (insn->apxEvexB4 ||
+			    (insn->hasRex2 &&
+			     b4FromREX2(insn->rex2Prefix))) {
+				const unsigned int extension = insn->hasRex2 ?
+					b3FromREX2(insn->rex2Prefix) :
+					bFromEVEX2of4(
+						insn->vectorExtensionPrefix[1]);
+				const unsigned int number =
+					16 | (extension << 3) |
+					(insn->sib & 7);
+
+				if (appendFeatureGpr(mcInst, number,
+						     insn->addressSize))
+					return true;
+			} else {
+				switch (insn->sibBase) {
 #define ENTRY(x) \
 	case SIB_BASE_##x: \
 		MCOperand_CreateReg0(mcInst, X86_##x); \
 		break;
-				ALL_SIB_BASES
+					ALL_SIB_BASES
 #undef ENTRY
-			default:
-				//debug("Unexpected sibBase");
-				return true;
+				default:
+					//debug("Unexpected sibBase");
+					return true;
+				}
 			}
 		} else {
 			MCOperand_CreateReg0(mcInst, 0);
 		}
 
-		if (insn->sibIndex != SIB_INDEX_NONE) {
+		if (type == TYPE_M &&
+		    (insn->apxEvexX4 ||
+		     (insn->hasRex2 && x4FromREX2(insn->rex2Prefix)))) {
+			const unsigned int extension = insn->hasRex2 ?
+				x3FromREX2(insn->rex2Prefix) :
+				xFromEVEX2of4(insn->vectorExtensionPrefix[1]);
+			const unsigned int number =
+				16 | (extension << 3) |
+				((insn->sib >> 3) & 7);
+
+			indexReg = (int)X86_featureExtensionMCGPR(
+				number, insn->addressSize);
+			if (indexReg == 0)
+				return true;
+			if (!insn->hasRex2)
+				insn->apxEvexGprIndex = true;
+		} else if (insn->sibIndex != SIB_INDEX_NONE) {
 			switch (insn->sibIndex) {
 			default:
 				//debug("Unexpected sibIndex");
@@ -989,7 +1167,22 @@ static bool translateRMMemory(MCInst *mcInst, InternalInstruction *insn)
 
 		scaleAmount = insn->sibScale;
 	} else {
-		switch (insn->eaBase) {
+		if ((insn->apxEvexB4 ||
+		     (insn->hasRex2 && b4FromREX2(insn->rex2Prefix))) &&
+		    insn->eaBase != EA_BASE_NONE) {
+			const unsigned int extension = insn->hasRex2 ?
+				b3FromREX2(insn->rex2Prefix) :
+				bFromEVEX2of4(insn->vectorExtensionPrefix[1]);
+			const unsigned int number =
+				16 | (extension << 3) |
+				(insn->orgModRM & 7);
+
+			if (appendFeatureGpr(mcInst, number,
+					     insn->addressSize))
+				return true;
+			indexReg = 0;
+		} else {
+			switch (insn->eaBase) {
 		case EA_BASE_NONE:
 			if (insn->eaDisplacement == EA_DISP_NONE) {
 				//debug("EA_BASE_NONE and EA_DISP_NONE for ModR/M base");
@@ -1050,6 +1243,7 @@ static bool translateRMMemory(MCInst *mcInst, InternalInstruction *insn)
 				//      "the base field must be a base.");
 				return true;
 			}
+			}
 		}
 
 		scaleAmount = 1;
@@ -1092,12 +1286,14 @@ static bool translateRM(MCInst *mcInst, const OperandSpecifier *operand,
 	case TYPE_DEBUGREG:
 	case TYPE_CONTROLREG:
 	case TYPE_BNDR:
-		return translateRMRegister(mcInst, insn);
+		return translateRMRegister(mcInst, insn,
+					   (OperandType)operand->type);
 	case TYPE_M:
 	case TYPE_MVSIBX:
 	case TYPE_MVSIBY:
 	case TYPE_MVSIBZ:
-		return translateRMMemory(mcInst, insn);
+		return translateRMMemory(mcInst, insn,
+					 (OperandType)operand->type);
 	}
 }
 
@@ -1141,8 +1337,7 @@ static bool translateOperand(MCInst *mcInst, const OperandSpecifier *operand,
 {
 	switch (operand->encoding) {
 	case ENCODING_REG:
-		translateRegister(mcInst, insn->reg);
-		return false;
+		return translateRegRegister(mcInst, operand, insn);
 	case ENCODING_WRITEMASK:
 		return translateMaskRegister(mcInst, insn->writemask);
 CASE_ENCODING_RM:
@@ -1171,8 +1366,7 @@ CASE_ENCODING_VSIB:
 	case ENCODING_RD:
 	case ENCODING_RO:
 	case ENCODING_Rv:
-		translateRegister(mcInst, insn->opcodeRegister);
-		return false;
+		return translateOpcodeRegister(mcInst, operand, insn);
 	case ENCODING_FP:
 		translateFPRegister(mcInst, insn->modRM & 7);
 		return false;
@@ -1242,7 +1436,11 @@ static int reader(const struct reader_info *info, uint8_t *byte,
 // copy x86 detail information from internal structure to public structure
 static void update_pub_insn(cs_insn *pub, InternalInstruction *inter)
 {
-	if (inter->vectorExtensionType != 0) {
+	if (inter->hasRex2) {
+		/* REX2.M0 selects the generated map internally; 0F is not present
+		 * in the architectural encoding. */
+		pub->detail->x86.opcode[0] = inter->opcode;
+	} else if (inter->vectorExtensionType != 0) {
 		memcpy(pub->detail->x86.opcode, inter->vectorExtensionPrefix,
 		       sizeof(pub->detail->x86.opcode));
 	} else {
@@ -1263,7 +1461,9 @@ static void update_pub_insn(cs_insn *pub, InternalInstruction *inter)
 		}
 	}
 
-	pub->detail->x86.rex = inter->rexPrefix;
+	/* rexPrefix carries a synthetic low REX nibble while decoding REX2. */
+	pub->detail->x86.rex = inter->hasRex2 ? 0 : inter->rexPrefix;
+	pub->detail->x86.rex2 = inter->hasRex2 ? inter->rex2Prefix : 0;
 
 	pub->detail->x86.addr_size = inter->addressSize;
 
@@ -1274,6 +1474,46 @@ static void update_pub_insn(cs_insn *pub, InternalInstruction *inter)
 	pub->detail->x86.sib_index = x86_map_sib_index(inter->sibIndex);
 	pub->detail->x86.sib_scale = inter->sibScale;
 	pub->detail->x86.sib_base = x86_map_sib_base(inter->sibBase);
+	if (inter->apxEvexB4 && inter->sibBase != SIB_BASE_NONE) {
+		const unsigned int number =
+			16 |
+			(bFromEVEX2of4(inter->vectorExtensionPrefix[1]) << 3) |
+			(inter->sib & 7);
+
+		pub->detail->x86.sib_base = X86_register_map(
+			(unsigned short)X86_featureExtensionMCGPR(
+					number, inter->addressSize));
+	}
+	if (inter->hasRex2 && b4FromREX2(inter->rex2Prefix) &&
+	    inter->sibBase != SIB_BASE_NONE) {
+		const unsigned int number =
+			16 | (b3FromREX2(inter->rex2Prefix) << 3) |
+			(inter->sib & 7);
+
+		pub->detail->x86.sib_base = X86_register_map(
+			(unsigned short)X86_featureExtensionMCGPR(
+				number, inter->addressSize));
+	}
+	if (inter->apxEvexGprIndex) {
+		const unsigned int number =
+			16 |
+			(xFromEVEX2of4(inter->vectorExtensionPrefix[1]) << 3) |
+			((inter->sib >> 3) & 7);
+
+		pub->detail->x86.sib_index = X86_register_map(
+			(unsigned short)X86_featureExtensionMCGPR(
+					number, inter->addressSize));
+	}
+	if (inter->hasRex2 && x4FromREX2(inter->rex2Prefix) &&
+	    inter->consumedSIB) {
+		const unsigned int number =
+			16 | (x3FromREX2(inter->rex2Prefix) << 3) |
+			((inter->sib >> 3) & 7);
+
+		pub->detail->x86.sib_index = X86_register_map(
+			(unsigned short)X86_featureExtensionMCGPR(
+				number, inter->addressSize));
+	}
 
 	pub->detail->x86.disp = inter->displacement;
 	if (inter->consumedDisplacement) {
@@ -1313,6 +1553,12 @@ void X86_init(MCRegisterInfo *MRI)
 					  9, 0);
 }
 
+static bool is_x86_segment_override(uint8_t prefix)
+{
+	return prefix == 0x26 || prefix == 0x2e || prefix == 0x36 ||
+	       prefix == 0x3e || prefix == 0x64 || prefix == 0x65;
+}
+
 // Public interface for the disassembler
 bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 			MCInst *instr, uint16_t *size, uint64_t address,
@@ -1321,6 +1567,12 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
 	InternalInstruction insn = { 0 };
 	struct reader_info info;
+	uint8_t normalized_code[15];
+	size_t apx_evex_offset = 0;
+	uint8_t apx_evex_p0 = 0, apx_evex_p1 = 0;
+	bool apx_evex_normalized = false;
+	bool apx_evex_b4 = false, apx_evex_x4 = false;
+	x86_feature_decode_result extension_result;
 	int ret;
 	bool result;
 
@@ -1347,6 +1599,168 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 		//memset(instr->flat_insn->detail, 0, offsetof(cs_detail, x86)+offsetof(cs_x86, operands));
 	}
 
+	extension_result =
+		X86_decodeFeatureExtension(ud, code, code_len, instr, size);
+	if (extension_result == X86_FEATURE_DECODED) {
+		return true;
+	}
+	if (extension_result == X86_FEATURE_INVALID)
+		return false;
+
+	/* AVX512ER uses EVEX.L'L as LLIG for scalar register/memory forms
+	 * without EVEX.b.  The generated decoder only has the LL=0 spelling,
+	 * so canonicalize the other legal spellings after rejecting reserved
+	 * combinations.  Packed forms remain fixed at 512 bits; EVEX.b means
+	 * SAE for a register source and broadcast for a memory source. */
+	if (code_len >= 6 && code_len <= sizeof(normalized_code) &&
+	    code[0] == 0x62 && (code[1] & 7) == 2 &&
+	    (code[2] & 3) == 1 &&
+	    (code[4] == 0xc8 || (code[4] >= 0xca && code[4] <= 0xcd))) {
+		const uint8_t ll = (code[3] >> 5) & 3;
+		const bool b = (code[3] & 0x10) != 0;
+		const bool memory = (code[5] & 0xc0) != 0xc0;
+		const bool scalar = code[4] == 0xcb || code[4] == 0xcd;
+
+		if (scalar) {
+			if ((memory && b) || (!b && ll == 3))
+				return false;
+			if (!b && ll != 0) {
+				memcpy(normalized_code, code, code_len);
+				normalized_code[3] &= ~0x60;
+				info.code = normalized_code;
+			}
+		} else if (!(b && !memory) && ll != 2) {
+			return false;
+		}
+	}
+	/* VRCP14/VRSQRT14 scalar forms are LLIG when EVEX.b is clear;
+	 * packed forms use LL as their actual vector length.  EVEX.b is only
+	 * defined for packed memory broadcast and is reserved for registers and
+	 * all scalar forms. */
+	if (code_len >= 6 && code_len <= sizeof(normalized_code) &&
+	    code[0] == 0x62 && (code[1] & 7) == 2 &&
+	    (code[2] & 3) == 1 && code[4] >= 0x4c && code[4] <= 0x4f) {
+		const uint8_t ll = (code[3] >> 5) & 3;
+		const bool b = (code[3] & 0x10) != 0;
+		const bool memory = (code[5] & 0xc0) != 0xc0;
+		const bool scalar = (code[4] & 1) != 0;
+
+		if (ll == 3 || (b && (!memory || scalar)))
+			return false;
+		if (scalar && ll != 0) {
+			memcpy(normalized_code, code, code_len);
+			normalized_code[3] &= ~0x60;
+			info.code = normalized_code;
+		}
+	}
+	/* Scalar VFPCLASSSS/SD treats EVEX.L'L as LLIG for its register and
+	 * m32/m64 source forms.  The generated tables only contain LL=0. */
+	if (code_len >= 7 && code_len <= sizeof(normalized_code) &&
+	    code[0] == 0x62 && (code[1] & 7) == 3 &&
+	    (code[2] & 3) == 1 && code[4] == 0x67) {
+		const uint8_t ll = (code[3] >> 5) & 3;
+		const bool b = (code[3] & 0x10) != 0;
+
+		if (ll == 3 || b)
+			return false;
+		if (ll != 0) {
+			memcpy(normalized_code, code, code_len);
+			normalized_code[3] &= ~0x60;
+			info.code = normalized_code;
+		}
+	}
+	/* Scalar AVX512_4FMAPS encodings are EVEX.LLIG.  LLVM's generated
+	 * decoder contains only the LL=0 spelling, so canonicalize LL without
+	 * changing EVEX.b, z, aaa, or any operand bits.  Packed PS opcodes are
+	 * deliberately excluded because their vector length remains fixed. */
+	{
+		size_t evex_offset = 0;
+		unsigned int segment_count = 0, address_size_count = 0;
+		bool invalid_prefix = false;
+
+		while (evex_offset < code_len && code[evex_offset] != 0x62) {
+			const uint8_t prefix = code[evex_offset++];
+			if (is_x86_segment_override(prefix))
+				++segment_count;
+			else if (prefix == 0x67)
+				++address_size_count;
+			else
+				invalid_prefix = true;
+		}
+		if (code_len - evex_offset >= 6 &&
+		    code_len <= sizeof(normalized_code) &&
+		    code[evex_offset] == 0x62 &&
+		    (code[evex_offset + 1] & 7) == 2 &&
+		    (code[evex_offset + 2] & 3) == 3 &&
+		    (code[evex_offset + 4] == 0x9b ||
+		     code[evex_offset + 4] == 0xab)) {
+			const uint8_t p2 = code[evex_offset + 3];
+			const uint8_t ll = (p2 >> 5) & 3;
+			const uint8_t mask = p2 & 7;
+			const bool broadcast = (p2 & 0x10) != 0;
+			const bool zeroing = (p2 & 0x80) != 0;
+
+			if (invalid_prefix || segment_count > 1 ||
+			    address_size_count > 1 || broadcast ||
+			    (zeroing && mask == 0))
+				return false;
+			if (ll != 0) {
+				memcpy(normalized_code, code, code_len);
+				normalized_code[evex_offset + 3] &= ~0x60;
+				info.code = normalized_code;
+			}
+		}
+	}
+
+	/* Intel APX extends every existing EVEX instruction so a GPR r/m,
+	 * memory base, or ordinary SIB index can address R16-R31.  The generated
+	 * decoder predates APX and treats B4=1 or U=0 (X4=1) as a malformed EVEX
+	 * prefix.  Normalize only those two bits for table lookup, then retain the
+	 * architectural values for operand translation and public raw detail.
+	 * VSIB continues to use V4 for its vector index; X4 is ignored there. */
+	{
+		const size_t limit = code_len < sizeof(normalized_code) ?
+					     code_len : sizeof(normalized_code);
+		unsigned int segment_count = 0, address_size_count = 0;
+		bool invalid_prefix = false;
+
+		while (apx_evex_offset < limit &&
+		       code[apx_evex_offset] != 0x62) {
+			const uint8_t prefix = code[apx_evex_offset++];
+
+			if (is_x86_segment_override(prefix))
+				++segment_count;
+			else if (prefix == 0x67)
+				++address_size_count;
+			else
+				invalid_prefix = true;
+		}
+		if (limit - apx_evex_offset >= 6 &&
+		    code[apx_evex_offset] == 0x62 &&
+		    (code[apx_evex_offset + 1] & 7) >= 1 &&
+		    (code[apx_evex_offset + 1] & 7) <= 3 &&
+		    ((code[apx_evex_offset + 1] & 0x08) != 0 ||
+		     (code[apx_evex_offset + 2] & 0x04) == 0)) {
+			const uint8_t modrm = code[apx_evex_offset + 5];
+
+			if (!(handle->mode & CS_MODE_64) || invalid_prefix ||
+			    segment_count > 1 || address_size_count > 1)
+				return false;
+			apx_evex_p0 = code[apx_evex_offset + 1];
+			apx_evex_p1 = code[apx_evex_offset + 2];
+			apx_evex_b4 = (apx_evex_p0 & 0x08) != 0;
+			apx_evex_x4 = (modrm & 0xc0) != 0xc0 &&
+				      (apx_evex_p1 & 0x04) == 0;
+			if (info.code != normalized_code)
+				memcpy(normalized_code, info.code, limit);
+			normalized_code[apx_evex_offset + 1] &= ~0x08;
+			normalized_code[apx_evex_offset + 2] |= 0x04;
+			info.code = normalized_code;
+			info.size = limit;
+			apx_evex_normalized = true;
+		}
+	}
+
 	if (handle->mode & CS_MODE_16)
 		ret = decodeInstruction(&insn, reader, &info, address,
 					MODE_16BIT);
@@ -1362,6 +1776,12 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 		return false;
 	} else {
 		*size = (uint16_t)insn.length;
+		if (apx_evex_normalized) {
+			insn.apxEvexB4 = apx_evex_b4;
+			insn.apxEvexX4 = apx_evex_x4;
+			insn.vectorExtensionPrefix[1] = apx_evex_p0;
+			insn.vectorExtensionPrefix[2] = apx_evex_p1;
+		}
 
 		result = (!translateInstruction(instr, &insn)) ? true : false;
 		if (result) {
