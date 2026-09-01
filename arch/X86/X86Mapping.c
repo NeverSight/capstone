@@ -2315,6 +2315,73 @@ decode_user_msr_legacy_vex(csh handle, const uint8_t *code, size_t code_len,
 }
 
 static x86_feature_decode_result
+decode_sha512_vex(csh handle, const uint8_t *code, size_t code_len,
+		  MCInst *instr, uint16_t *size)
+{
+	const cs_struct *arch = (const cs_struct *)(uintptr_t)handle;
+	uint8_t p0, p1, opcode, modrm;
+	unsigned int destination_number, source1_number, source2_number = 0;
+	x86_reg destination, source1, source2 = X86_REG_INVALID;
+
+	if (code_len < 4 || code[0] != 0xc4 || (code[1] & 0x1f) != 2 ||
+	    (code[3] != 0xcb && code[3] != 0xcc && code[3] != 0xcd))
+		return X86_FEATURE_NOT_HANDLED;
+	if (code_len < 5)
+		return X86_FEATURE_INVALID;
+	p0 = code[1];
+	p1 = code[2];
+	opcode = code[3];
+	modrm = code[4];
+	/* The SDM 11:rrr:bbb opcode forms are register-only. */
+	if (!(arch->mode & (CS_MODE_32 | CS_MODE_64)) ||
+	    (opcode == 0xcb ? (p1 & 0x87) != 0x07 : p1 != 0x7f) ||
+	    (modrm & 0xc0) != 0xc0)
+		return X86_FEATURE_INVALID;
+
+	destination_number = ((~p0 & 0x80) >> 4) | ((modrm >> 3) & 7);
+	source1_number = ((~p0 & 0x20) >> 2) | (modrm & 7);
+	if (opcode == 0xcb) {
+		source2_number = source1_number;
+		source1_number = (~(p1 >> 3)) & 0xf;
+	}
+	/* VEX.X is unused in 64-bit register forms; 32-bit mode has no
+	 * corresponding extended register bank. */
+	if (!(arch->mode & CS_MODE_64) &&
+	    ((p0 & 0x40) == 0 || destination_number >= 8 ||
+	     source1_number >= 8 || source2_number >= 8))
+		return X86_FEATURE_INVALID;
+	destination = (x86_reg)(X86_REG_YMM0 + destination_number);
+	if (opcode == 0xcb) {
+		source1 = (x86_reg)(X86_REG_YMM0 + source1_number);
+		source2 = (x86_reg)(X86_REG_XMM0 + source2_number);
+	} else {
+		source1 = (x86_reg)((opcode == 0xcc ? X86_REG_XMM0 :
+						      X86_REG_YMM0) +
+				    source1_number);
+	}
+
+	MCInst_clear(instr);
+	MCInst_setOpcode(instr, opcode == 0xcb ? X86_FEATURE_VSHA512RNDS2 :
+				opcode == 0xcc ? X86_FEATURE_VSHA512MSG1 :
+						 X86_FEATURE_VSHA512MSG2);
+	MCOperand_CreateImm0(instr, destination);
+	MCOperand_CreateImm0(instr, source1);
+	if (source2 != X86_REG_INVALID)
+		MCOperand_CreateImm0(instr, source2);
+	*size = 5;
+	set_amx_tile_encoding_detail(instr, code, 0, 3, 0, false, 4, NULL);
+	if (instr->flat_insn->detail) {
+		cs_x86 *x86 = &instr->flat_insn->detail->x86;
+
+		x86->addr_size = (arch->mode & CS_MODE_64) ? 8 : 4;
+		x86->rex = (uint8_t)((arch->mode & CS_MODE_64) ?
+					     0x40 | ((~p0 & 0xe0) >> 5) :
+					     0);
+	}
+	return X86_FEATURE_DECODED;
+}
+
+static x86_feature_decode_result
 decode_apx_msr(csh handle, const uint8_t *code, size_t code_len,
 	       MCInst *instr, uint16_t *size)
 {
@@ -3238,6 +3305,9 @@ X86_decodeFeatureExtension(csh handle, const uint8_t *code, size_t code_len,
 	if (result != X86_FEATURE_NOT_HANDLED)
 		return result;
 	result = decode_user_msr_legacy_vex(handle, code, code_len, instr, size);
+	if (result != X86_FEATURE_NOT_HANDLED)
+		return result;
+	result = decode_sha512_vex(handle, code, code_len, instr, size);
 	if (result != X86_FEATURE_NOT_HANDLED)
 		return result;
 	result = decode_apx_evex_vector_gpr(handle, code, code_len, instr, size);
@@ -6321,9 +6391,114 @@ static bool print_apx_msr(MCInst *instr, SStream *stream, bool att_syntax)
 	return true;
 }
 
+static bool print_sha512_vex(MCInst *instr, SStream *stream, bool att_syntax)
+{
+	const MCOperand *destination_operand, *source1_operand,
+		*source2_operand;
+	x86_reg destination, source1, source2 = X86_REG_INVALID;
+	const char *destination_name, *source1_name, *source2_name = NULL;
+	const char *mnemonic;
+	uint8_t source_size;
+	bool rounds;
+	cs_x86 *x86;
+
+	switch (MCInst_getOpcode(instr)) {
+	default:
+		return false;
+	case X86_FEATURE_VSHA512MSG1:
+		mnemonic = "vsha512msg1";
+		source_size = 16;
+		rounds = false;
+		break;
+	case X86_FEATURE_VSHA512MSG2:
+		mnemonic = "vsha512msg2";
+		source_size = 32;
+		rounds = false;
+		break;
+	case X86_FEATURE_VSHA512RNDS2:
+		mnemonic = "vsha512rnds2";
+		source_size = 32;
+		rounds = true;
+		break;
+	}
+	if (MCInst_getNumOperands(instr) != (rounds ? 3 : 2))
+		return false;
+	destination_operand = MCInst_getOperand(instr, 0);
+	source1_operand = MCInst_getOperand(instr, 1);
+	source2_operand = rounds ? MCInst_getOperand(instr, 2) : NULL;
+	if (!MCOperand_isImm(destination_operand) ||
+	    !MCOperand_isImm(source1_operand) ||
+	    (rounds && !MCOperand_isImm(source2_operand)))
+		return false;
+	destination = (x86_reg)MCOperand_getImm(destination_operand);
+	source1 = (x86_reg)MCOperand_getImm(source1_operand);
+	if (rounds)
+		source2 = (x86_reg)MCOperand_getImm(source2_operand);
+	if (destination < X86_REG_YMM0 || destination > X86_REG_YMM15 ||
+	    (source_size == 16 &&
+	     (source1 < X86_REG_XMM0 || source1 > X86_REG_XMM15)) ||
+	    (source_size == 32 &&
+	     (source1 < X86_REG_YMM0 || source1 > X86_REG_YMM15)) ||
+	    (rounds && (source2 < X86_REG_XMM0 || source2 > X86_REG_XMM15)))
+		return false;
+	destination_name = X86_reg_name((csh)instr->csh, destination);
+	source1_name = X86_reg_name((csh)instr->csh, source1);
+	if (rounds)
+		source2_name = X86_reg_name((csh)instr->csh, source2);
+	if (!destination_name || !source1_name || (rounds && !source2_name))
+		return false;
+
+	if (rounds) {
+		SStream_concat(
+			stream,
+			att_syntax ? "%s\t%%%s, %%%s, %%%s" : "%s\t%s, %s, %s",
+			mnemonic, att_syntax ? source2_name : destination_name,
+			source1_name,
+			att_syntax ? destination_name : source2_name);
+	} else {
+		SStream_concat(stream,
+			       att_syntax ? "%s\t%%%s, %%%s" : "%s\t%s, %s",
+			       mnemonic,
+			       att_syntax ? source1_name : destination_name,
+			       att_syntax ? destination_name : source1_name);
+	}
+	if (!instr->flat_insn->detail)
+		return true;
+
+	x86 = &instr->flat_insn->detail->x86;
+	if (att_syntax) {
+		if (rounds) {
+			set_feature_register_operand(&x86->operands[0], source2,
+						     16, CS_AC_READ);
+			set_feature_register_operand(&x86->operands[1], source1,
+						     32, CS_AC_READ);
+			set_feature_register_operand(&x86->operands[2],
+						     destination, 32,
+						     CS_AC_READ | CS_AC_WRITE);
+		} else {
+			set_feature_register_operand(&x86->operands[0], source1,
+						     source_size, CS_AC_READ);
+			set_feature_register_operand(&x86->operands[1],
+						     destination, 32,
+						     CS_AC_READ | CS_AC_WRITE);
+		}
+	} else {
+		set_feature_register_operand(&x86->operands[0], destination, 32,
+					     CS_AC_READ | CS_AC_WRITE);
+		set_feature_register_operand(&x86->operands[1], source1,
+					     source_size, CS_AC_READ);
+		if (rounds)
+			set_feature_register_operand(&x86->operands[2], source2,
+						     16, CS_AC_READ);
+	}
+	x86->op_count = rounds ? 3 : 2;
+	return true;
+}
+
 bool X86_printFeatureExtension(MCInst *instr, SStream *stream, bool att_syntax)
 {
-	return print_apx_msr(instr, stream, att_syntax) ||
+	return print_sha512_vex(instr, stream, att_syntax) ||
+	       print_apx_msr(instr, stream, att_syntax) ||
 	       print_apx_evex_vector_gpr(instr, stream, att_syntax) ||
 	       print_tile_control(instr, stream, att_syntax) ||
 	       print_tilezero(instr, stream, att_syntax) ||
@@ -6465,6 +6640,27 @@ bool X86_mapFeatureExtension(cs_insn *insn, unsigned int opcode)
 	switch (opcode) {
 	default:
 		return false;
+	case X86_FEATURE_VSHA512MSG1:
+		insn->id = X86_INS_VSHA512MSG1;
+		if (insn->detail) {
+			insn->detail->groups[0] = X86_GRP_SHA;
+			insn->detail->groups_count = 1;
+		}
+		return true;
+	case X86_FEATURE_VSHA512MSG2:
+		insn->id = X86_INS_VSHA512MSG2;
+		if (insn->detail) {
+			insn->detail->groups[0] = X86_GRP_SHA;
+			insn->detail->groups_count = 1;
+		}
+		return true;
+	case X86_FEATURE_VSHA512RNDS2:
+		insn->id = X86_INS_VSHA512RNDS2;
+		if (insn->detail) {
+			insn->detail->groups[0] = X86_GRP_SHA;
+			insn->detail->groups_count = 1;
+		}
+		return true;
 	case X86_FEATURE_LDTILECFG:
 		insn->id = X86_INS_LDTILECFG;
 		return true;
@@ -6941,6 +7137,12 @@ const char *X86_featureExtensionInstructionName(unsigned int id)
 		return "uwrmsr";
 	case X86_INS_WRMSRNS:
 		return "wrmsrns";
+	case X86_INS_VSHA512MSG1:
+		return "vsha512msg1";
+	case X86_INS_VSHA512MSG2:
+		return "vsha512msg2";
+	case X86_INS_VSHA512RNDS2:
+		return "vsha512rnds2";
 	case X86_INS_LDTILECFG:
 		return "ldtilecfg";
 	case X86_INS_STTILECFG:
