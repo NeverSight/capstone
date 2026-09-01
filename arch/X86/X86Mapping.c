@@ -9781,6 +9781,8 @@ static uint8_t vector_dot_product_destination_element_size(unsigned int id)
 	switch (id) {
 	default:
 		return 0;
+	case X86_INS_VP4DPWSSD:
+	case X86_INS_VP4DPWSSDS:
 	case X86_INS_VPDPBUSDS:
 	case X86_INS_VPDPBUSD:
 	case X86_INS_VPDPWSSDS:

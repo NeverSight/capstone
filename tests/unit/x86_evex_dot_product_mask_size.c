@@ -58,6 +58,48 @@ done:
 	return success;
 }
 
+static bool check_vp4_mask_size(csh handle, const dot_product_family *family,
+				uint8_t p2)
+{
+	/* VP4DPWSSD/SSDS always writes a ZMM destination.  Its writemask
+	 * therefore covers sixteen dword lanes even though the memory tuple is
+	 * only 128 bits. */
+	const uint8_t code[] = {
+		0x62, 0xf2, 0x5f, p2, family->opcode, 0x08,
+	};
+	cs_insn *insn = NULL;
+	const cs_x86_op *mask = NULL;
+	bool success = true;
+	size_t count = cs_disasm(handle, code, sizeof(code), 0x1000, 1, &insn);
+
+	if (count != 1) {
+		fprintf(stderr, "%s did not decode\n", family->name);
+		return false;
+	}
+	if (insn[0].id != family->id || insn[0].detail == NULL) {
+		fprintf(stderr, "%s decoded with wrong id/detail\n",
+			family->name);
+		success = false;
+		goto done;
+	}
+	for (uint8_t i = 0; i < insn[0].detail->x86.op_count; ++i) {
+		const cs_x86_op *operand = &insn[0].detail->x86.operands[i];
+		if (operand->type == X86_OP_REG && operand->reg == X86_REG_K2) {
+			mask = operand;
+			break;
+		}
+	}
+	if (mask == NULL || mask->size != 2) {
+		fprintf(stderr, "%s mask size was %u, expected 2\n",
+			family->name, mask ? mask->size : 0);
+		success = false;
+	}
+
+done:
+	cs_free(insn, count);
+	return success;
+}
+
 static bool check_unused_address_extensions(csh handle)
 {
 	/* vpdpbusd zmm0 {k1}{z}, zmm2, zmm3.  EVEX.B4 and X4 are set,
@@ -104,6 +146,11 @@ int main(void)
 		{ "vpdpwssds", X86_INS_VPDPWSSDS, 0x53 },
 	};
 	static const uint8_t vector_sizes[] = { 16, 32, 64 };
+	static const uint8_t vp4_mask_forms[] = { 0x42, 0xc2 };
+	static const dot_product_family vp4_families[] = {
+		{ "vp4dpwssd", X86_INS_VP4DPWSSD, 0x52 },
+		{ "vp4dpwssds", X86_INS_VP4DPWSSDS, 0x53 },
+	};
 	csh handle = 0;
 	bool success = true;
 
@@ -125,6 +172,16 @@ int main(void)
 						   vector_sizes[size_index]);
 		}
 	}
+	for (size_t family_index = 0;
+	     family_index < sizeof(vp4_families) / sizeof(vp4_families[0]);
+	     ++family_index)
+		for (size_t form_index = 0;
+		     form_index <
+		     sizeof(vp4_mask_forms) / sizeof(vp4_mask_forms[0]);
+		     ++form_index)
+			success &= check_vp4_mask_size(
+				handle, &vp4_families[family_index],
+				vp4_mask_forms[form_index]);
 	success &= check_unused_address_extensions(handle);
 
 	cs_close(&handle);
