@@ -1665,8 +1665,9 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 		&evex_invalid_prefix);
 
 	/* Packed VCMPPS/PD uses EVEX.L'L as its vector length unless EVEX.b
-	 * selects embedded rounding for a register source.  The generated
-	 * decoder accepts reserved LL=3 memory and non-rounding register forms. */
+	 * selects SAE and a fixed 512-bit length for a register source.  The
+	 * generated decoder accepts reserved LL=3 memory and non-SAE register
+	 * forms. */
 	if (has_evex_normalization_prefix &&
 	    evex_normalization_limit - evex_normalization_offset >= 7 &&
 	    (code[evex_normalization_offset + 1] & 7) == 1 &&

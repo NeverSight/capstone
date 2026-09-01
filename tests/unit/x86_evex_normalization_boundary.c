@@ -103,7 +103,8 @@ static bool check_evex_p2(csh handle, const char *name, const uint8_t *code,
 static bool check_packed_compare_length(csh handle, const char *name,
 					const uint8_t *code, size_t code_size,
 					x86_reg expected_left,
-					x86_reg expected_right)
+					x86_reg expected_right,
+					bool expected_sae)
 {
 	cs_insn *instruction = NULL;
 	const size_t count =
@@ -122,7 +123,9 @@ static bool check_packed_compare_length(csh handle, const char *name,
 		     x86->operands[1].type == X86_OP_REG &&
 		     x86->operands[1].reg == expected_left &&
 		     x86->operands[2].type == X86_OP_REG &&
-		     x86->operands[2].reg == expected_right;
+		     x86->operands[2].reg == expected_right &&
+		     x86->avx_sae == expected_sae &&
+		     x86->avx_rm == X86_AVX_RM_INVALID;
 	}
 	if (!ok)
 		fprintf(stderr,
@@ -226,9 +229,13 @@ static bool check_scalar_compare_llig(csh handle)
 	for (size_t family = 0;
 	     family < sizeof(packed_families) / sizeof(packed_families[0]);
 	     ++family) {
-		uint8_t rounded_register[] = {
+		uint8_t sae_register[] = {
 			0x62, 0xf1, packed_families[family].p1, 0x78, 0xc2,
 			0xcb, 0x00
+		};
+		uint8_t reserved_memory[] = {
+			0x62, 0xf1, packed_families[family].p1, 0x68, 0xc2,
+			0x0b, 0x00
 		};
 		uint8_t reserved_broadcast[] = {
 			0x62, 0xf1, packed_families[family].p1, 0x78, 0xc2,
@@ -256,13 +263,18 @@ static bool check_scalar_compare_llig(csh handle)
 				ok &= check_packed_compare_length(
 					handle, name, code, sizeof(code),
 					packed_left[length],
-					packed_right[length]);
+					packed_right[length], false);
 		}
-		snprintf(name, sizeof(name), "%s-rounded-ll3",
+		snprintf(name, sizeof(name), "%s-sae-ll3",
 			 packed_families[family].name);
-		ok &= check_evex_p2(handle, name, rounded_register,
-				    sizeof(rounded_register),
-				    packed_families[family].id);
+		ok &= check_packed_compare_length(handle, name, sae_register,
+						  sizeof(sae_register),
+						  X86_REG_ZMM2, X86_REG_ZMM3,
+						  true);
+		snprintf(name, sizeof(name), "%s-memory-ll3",
+			 packed_families[family].name);
+		ok &= check_rejected(handle, name, reserved_memory,
+				     sizeof(reserved_memory));
 		snprintf(name, sizeof(name), "%s-broadcast-ll3",
 			 packed_families[family].name);
 		ok &= check_rejected(handle, name, reserved_broadcast,
