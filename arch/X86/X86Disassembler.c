@@ -1615,7 +1615,7 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 	unsigned int evex_address_size_count = 0;
 	bool evex_invalid_prefix = false;
 	bool has_evex_normalization_prefix = false;
-	bool evex_p2_normalized = false;
+	bool scalar_compare_p2_normalized = false;
 	size_t apx_evex_offset = 0;
 	uint8_t apx_evex_p0 = 0, apx_evex_p1 = 0;
 	bool apx_evex_normalized = false;
@@ -1664,6 +1664,27 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 		&evex_segment_count, &evex_address_size_count,
 		&evex_invalid_prefix);
 
+	/* Packed VCMPPS/PD uses EVEX.L'L as its vector length unless EVEX.b
+	 * selects embedded rounding for a register source.  The generated
+	 * decoder accepts reserved LL=3 memory and non-rounding register forms. */
+	if (has_evex_normalization_prefix &&
+	    evex_normalization_limit - evex_normalization_offset >= 7 &&
+	    (code[evex_normalization_offset + 1] & 7) == 1 &&
+	    ((code[evex_normalization_offset + 2] & 0x83) == 0x00 ||
+	     (code[evex_normalization_offset + 2] & 0x83) == 0x81) &&
+	    code[evex_normalization_offset + 4] == 0xc2) {
+		const uint8_t p2 = code[evex_normalization_offset + 3];
+		const uint8_t ll = (p2 >> 5) & 3;
+		const bool b = (p2 & 0x10) != 0;
+		const bool memory =
+			(code[evex_normalization_offset + 5] & 0xc0) != 0xc0;
+
+		if (evex_invalid_prefix || evex_segment_count > 1 ||
+		    evex_address_size_count > 1 ||
+		    (ll == 3 && !(b && !memory)))
+			return false;
+	}
+
 	/* Scalar VCMPSS/SD treats EVEX.L'L as LLIG when EVEX.b is clear.
 	 * The generated decoder only contains the LL=0 spelling.  EVEX.b is
 	 * SAE for a register source and remains reserved for a memory source. */
@@ -1689,6 +1710,7 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 			normalized_code[evex_normalization_offset + 3] &= ~0x60;
 			info.code = normalized_code;
 			info.size = evex_normalization_limit;
+			scalar_compare_p2_normalized = true;
 		}
 	}
 
@@ -1824,11 +1846,6 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 		}
 	}
 
-	evex_p2_normalized = has_evex_normalization_prefix &&
-			     info.code == normalized_code &&
-			     normalized_code[evex_normalization_offset + 3] !=
-				     code[evex_normalization_offset + 3];
-
 	/* Intel APX extends every existing EVEX instruction so a GPR r/m,
 	 * memory base, or ordinary SIB index can address R16-R31.  The generated
 	 * decoder predates APX and treats B4=1 or U=0 (X4=1) as a malformed EVEX
@@ -1896,7 +1913,7 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 		result = (!translateInstruction(instr, &insn)) ? true : false;
 		if (result) {
 			unsigned Flags = X86_IP_NO_PREFIX;
-			if (evex_p2_normalized)
+			if (scalar_compare_p2_normalized)
 				insn.vectorExtensionPrefix[3] =
 					code[evex_normalization_offset + 3];
 			instr->imm_size = insn.immSize;

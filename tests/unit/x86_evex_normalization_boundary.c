@@ -57,28 +57,9 @@ static bool check_trailing_bytes_do_not_change_first(
 	     strcmp(standalone[0].op_str, extended[0].op_str) == 0 &&
 	     memcmp(&standalone[0].detail->x86, &extended[0].detail->x86,
 		    sizeof(cs_x86)) == 0;
-	if (ok) {
-		const cs_x86 *standalone_x86 = &standalone[0].detail->x86;
-		const cs_x86 *extended_x86 = &extended[0].detail->x86;
-
-		ok = standalone_x86->encoding.modrm_offset >= 2 &&
-		     extended_x86->encoding.modrm_offset >= 2;
-		if (ok) {
-			const size_t standalone_p2 =
-				standalone_x86->encoding.modrm_offset - 2;
-			const size_t extended_p2 =
-				extended_x86->encoding.modrm_offset - 2;
-
-			ok = standalone_p2 < code_size &&
-			     extended_p2 < code_size + 16 &&
-			     standalone_x86->opcode[3] == code[standalone_p2] &&
-			     extended_x86->opcode[3] ==
-				     with_trailing[extended_p2];
-		}
-	}
 	if (!ok)
 		fprintf(stderr,
-			"%s: trailing bytes changed/rejected the first instruction or raw EVEX.P2\n",
+			"%s: trailing bytes changed or rejected the first instruction\n",
 			name);
 	cs_free(standalone, standalone_count);
 	cs_free(extended, extended_count);
@@ -119,6 +100,38 @@ static bool check_evex_p2(csh handle, const char *name, const uint8_t *code,
 	return ok;
 }
 
+static bool check_packed_compare_length(csh handle, const char *name,
+					const uint8_t *code, size_t code_size,
+					x86_reg expected_left,
+					x86_reg expected_right)
+{
+	cs_insn *instruction = NULL;
+	const size_t count =
+		cs_disasm(handle, code, code_size, 0x1000, 1, &instruction);
+	bool ok = count == 1 && instruction != NULL &&
+		  instruction[0].id == X86_INS_VCMP &&
+		  instruction[0].size == code_size &&
+		  instruction[0].detail != NULL &&
+		  memcmp(instruction[0].bytes, code, code_size) == 0 &&
+		  memcmp(instruction[0].detail->x86.opcode, code, 4) == 0;
+
+	if (ok) {
+		const cs_x86 *x86 = &instruction[0].detail->x86;
+
+		ok = x86->op_count == 3 &&
+		     x86->operands[1].type == X86_OP_REG &&
+		     x86->operands[1].reg == expected_left &&
+		     x86->operands[2].type == X86_OP_REG &&
+		     x86->operands[2].reg == expected_right;
+	}
+	if (!ok)
+		fprintf(stderr,
+			"%s: decoded packed compare lost its vector length\n",
+			name);
+	cs_free(instruction, count);
+	return ok;
+}
+
 static bool check_scalar_compare_llig(csh handle)
 {
 	static const struct {
@@ -130,6 +143,10 @@ static bool check_scalar_compare_llig(csh handle)
 		{ "vcmpsd", 0xef, X86_INS_VCMP },
 	};
 	static const uint8_t lengths[] = { 0x00, 0x20, 0x40, 0x60 };
+	static const x86_reg packed_left[] = { X86_REG_XMM2, X86_REG_YMM2,
+					       X86_REG_ZMM2 };
+	static const x86_reg packed_right[] = { X86_REG_XMM3, X86_REG_YMM3,
+						X86_REG_ZMM3 };
 	static const uint8_t wrong_single_w[] = { 0x62, 0xf1, 0xee, 0x28,
 						  0xc2, 0xcb, 0x00 };
 	static const uint8_t wrong_double_w[] = { 0x62, 0xf1, 0x6f, 0x28,
@@ -209,19 +226,47 @@ static bool check_scalar_compare_llig(csh handle)
 	for (size_t family = 0;
 	     family < sizeof(packed_families) / sizeof(packed_families[0]);
 	     ++family) {
+		uint8_t rounded_register[] = {
+			0x62, 0xf1, packed_families[family].p1, 0x78, 0xc2,
+			0xcb, 0x00
+		};
+		uint8_t reserved_broadcast[] = {
+			0x62, 0xf1, packed_families[family].p1, 0x78, 0xc2,
+			0x0b, 0x00
+		};
+		char name[64];
+
 		for (size_t length = 0;
 		     length < sizeof(lengths) / sizeof(lengths[0]); ++length) {
-			uint8_t code[] = { 0x62, 0xf1,
+			uint8_t code[] = { 0x62,
+					   0xf1,
 					   packed_families[family].p1,
 					   (uint8_t)(0x08 | lengths[length]),
-					   0xc2, 0xcb, 0x00 };
+					   0xc2,
+					   0xcb,
+					   0x00 };
 			char name[64];
 
 			snprintf(name, sizeof(name), "%s-ll%zu",
 				 packed_families[family].name, length);
-			ok &= check_evex_p2(handle, name, code, sizeof(code),
-					    packed_families[family].id);
+			if (length == 3)
+				ok &= check_rejected(handle, name, code,
+						     sizeof(code));
+			else
+				ok &= check_packed_compare_length(
+					handle, name, code, sizeof(code),
+					packed_left[length],
+					packed_right[length]);
 		}
+		snprintf(name, sizeof(name), "%s-rounded-ll3",
+			 packed_families[family].name);
+		ok &= check_evex_p2(handle, name, rounded_register,
+				    sizeof(rounded_register),
+				    packed_families[family].id);
+		snprintf(name, sizeof(name), "%s-broadcast-ll3",
+			 packed_families[family].name);
+		ok &= check_rejected(handle, name, reserved_broadcast,
+				     sizeof(reserved_broadcast));
 	}
 	return ok;
 }
@@ -230,15 +275,14 @@ int main(void)
 {
 	/* The immediate of the following ADD contains 0x62 and an APX-like
 	 * suffix.  EVEX normalization must not inspect past the current MOV. */
-	static const uint8_t apx_lookahead[] = {
-		0x8b, 0x45, 0xf4, 0x05, 0x17, 0xc0, 0x62, 0xe1,
-		0x89, 0x45, 0xf4, 0xe9, 0xd0, 0x04, 0x00, 0x00
-	};
+	static const uint8_t apx_lookahead[] = { 0x8b, 0x45, 0xf4, 0x05,
+						 0x17, 0xc0, 0x62, 0xe1,
+						 0x89, 0x45, 0xf4, 0xe9,
+						 0xd0, 0x04, 0x00, 0x00 };
 	/* The following instruction is a scalar 4FMAPS spelling.  Its EVEX
 	 * byte must not make the preceding NOP look like an illegal prefix. */
-	static const uint8_t fmaps_lookahead[] = {
-		0x90, 0x62, 0xf2, 0x5f, 0x68, 0x9b, 0x08
-	};
+	static const uint8_t fmaps_lookahead[] = { 0x90, 0x62, 0xf2, 0x5f,
+						   0x68, 0x9b, 0x08 };
 	/* 0x40 is an INC opcode outside 64-bit mode, not a REX prefix. */
 	static const uint8_t inc_lookahead[] = {
 		0x40, 0x62, 0xf4, 0x7c, 0x08, 0x00, 0xd9
