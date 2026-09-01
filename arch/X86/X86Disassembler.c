@@ -1574,6 +1574,14 @@ static bool scan_x86_evex_prefix(const uint8_t *code, size_t code_len,
 		const uint8_t prefix = code[offset];
 
 		if (prefix == 0x62) {
+			/* Outside 64-bit mode, 62 /r remains the BOUND opcode unless
+			 * the next two bytes have the fixed EVEX structure. */
+			if (!is_64_bit &&
+			    (code_len - offset < 3 ||
+			     (code[offset + 1] & 0xc0) != 0xc0 ||
+			     (code[offset + 1] & 0x0c) != 0 ||
+			     (code[offset + 2] & 0x04) == 0))
+				return false;
 			*evex_offset = offset;
 			return true;
 		}
@@ -1601,6 +1609,12 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 	InternalInstruction insn = { 0 };
 	struct reader_info info;
 	uint8_t normalized_code[15];
+	size_t evex_normalization_limit = 0;
+	size_t evex_normalization_offset = 0;
+	unsigned int evex_segment_count = 0;
+	unsigned int evex_address_size_count = 0;
+	bool evex_invalid_prefix = false;
+	bool has_evex_normalization_prefix = false;
 	size_t apx_evex_offset = 0;
 	uint8_t apx_evex_p0 = 0, apx_evex_p1 = 0;
 	bool apx_evex_normalized = false;
@@ -1640,27 +1654,50 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 	if (extension_result == X86_FEATURE_INVALID)
 		return false;
 
+	evex_normalization_limit = code_len < sizeof(normalized_code) ?
+					   code_len :
+					   sizeof(normalized_code);
+	has_evex_normalization_prefix = scan_x86_evex_prefix(
+		code, evex_normalization_limit,
+		(handle->mode & CS_MODE_64) != 0, &evex_normalization_offset,
+		&evex_segment_count, &evex_address_size_count,
+		&evex_invalid_prefix);
+
 	/* AVX512ER uses EVEX.L'L as LLIG for scalar register/memory forms
 	 * without EVEX.b.  The generated decoder only has the LL=0 spelling,
 	 * so canonicalize the other legal spellings after rejecting reserved
 	 * combinations.  Packed forms remain fixed at 512 bits; EVEX.b means
 	 * SAE for a register source and broadcast for a memory source. */
-	if (code_len >= 6 && code_len <= sizeof(normalized_code) &&
-	    code[0] == 0x62 && (code[1] & 7) == 2 &&
-	    (code[2] & 3) == 1 &&
-	    (code[4] == 0xc8 || (code[4] >= 0xca && code[4] <= 0xcd))) {
-		const uint8_t ll = (code[3] >> 5) & 3;
-		const bool b = (code[3] & 0x10) != 0;
-		const bool memory = (code[5] & 0xc0) != 0xc0;
-		const bool scalar = code[4] == 0xcb || code[4] == 0xcd;
+	if (has_evex_normalization_prefix &&
+	    evex_normalization_limit - evex_normalization_offset >= 6 &&
+	    (code[evex_normalization_offset + 1] & 7) == 2 &&
+	    (code[evex_normalization_offset + 2] & 3) == 1 &&
+	    (code[evex_normalization_offset + 4] == 0xc8 ||
+	     (code[evex_normalization_offset + 4] >= 0xca &&
+	      code[evex_normalization_offset + 4] <= 0xcd))) {
+		const uint8_t ll =
+			(code[evex_normalization_offset + 3] >> 5) & 3;
+		const bool b =
+			(code[evex_normalization_offset + 3] & 0x10) != 0;
+		const bool memory =
+			(code[evex_normalization_offset + 5] & 0xc0) != 0xc0;
+		const bool scalar = code[evex_normalization_offset + 4] == 0xcb ||
+				    code[evex_normalization_offset + 4] == 0xcd;
+
+		if (evex_invalid_prefix || evex_segment_count > 1 ||
+		    evex_address_size_count > 1)
+			return false;
 
 		if (scalar) {
 			if ((memory && b) || (!b && ll == 3))
 				return false;
 			if (!b && ll != 0) {
-				memcpy(normalized_code, code, code_len);
-				normalized_code[3] &= ~0x60;
+				memcpy(normalized_code, info.code,
+				       evex_normalization_limit);
+				normalized_code[evex_normalization_offset + 3] &=
+					~0x60;
 				info.code = normalized_code;
+				info.size = evex_normalization_limit;
 			}
 		} else if (!(b && !memory) && ll != 2) {
 			return false;
@@ -1670,36 +1707,59 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 	 * packed forms use LL as their actual vector length.  EVEX.b is only
 	 * defined for packed memory broadcast and is reserved for registers and
 	 * all scalar forms. */
-	if (code_len >= 6 && code_len <= sizeof(normalized_code) &&
-	    code[0] == 0x62 && (code[1] & 7) == 2 &&
-	    (code[2] & 3) == 1 && code[4] >= 0x4c && code[4] <= 0x4f) {
-		const uint8_t ll = (code[3] >> 5) & 3;
-		const bool b = (code[3] & 0x10) != 0;
-		const bool memory = (code[5] & 0xc0) != 0xc0;
-		const bool scalar = (code[4] & 1) != 0;
+	if (has_evex_normalization_prefix &&
+	    evex_normalization_limit - evex_normalization_offset >= 6 &&
+	    (code[evex_normalization_offset + 1] & 7) == 2 &&
+	    (code[evex_normalization_offset + 2] & 3) == 1 &&
+	    code[evex_normalization_offset + 4] >= 0x4c &&
+	    code[evex_normalization_offset + 4] <= 0x4f) {
+		const uint8_t ll =
+			(code[evex_normalization_offset + 3] >> 5) & 3;
+		const bool b =
+			(code[evex_normalization_offset + 3] & 0x10) != 0;
+		const bool memory =
+			(code[evex_normalization_offset + 5] & 0xc0) != 0xc0;
+		const bool scalar =
+			(code[evex_normalization_offset + 4] & 1) != 0;
+
+		if (evex_invalid_prefix || evex_segment_count > 1 ||
+		    evex_address_size_count > 1)
+			return false;
 
 		if (ll == 3 || (b && (!memory || scalar)))
 			return false;
 		if (scalar && ll != 0) {
-			memcpy(normalized_code, code, code_len);
-			normalized_code[3] &= ~0x60;
+			memcpy(normalized_code, info.code,
+			       evex_normalization_limit);
+			normalized_code[evex_normalization_offset + 3] &= ~0x60;
 			info.code = normalized_code;
+			info.size = evex_normalization_limit;
 		}
 	}
 	/* Scalar VFPCLASSSS/SD treats EVEX.L'L as LLIG for its register and
 	 * m32/m64 source forms.  The generated tables only contain LL=0. */
-	if (code_len >= 7 && code_len <= sizeof(normalized_code) &&
-	    code[0] == 0x62 && (code[1] & 7) == 3 &&
-	    (code[2] & 3) == 1 && code[4] == 0x67) {
-		const uint8_t ll = (code[3] >> 5) & 3;
-		const bool b = (code[3] & 0x10) != 0;
+	if (has_evex_normalization_prefix &&
+	    evex_normalization_limit - evex_normalization_offset >= 7 &&
+	    (code[evex_normalization_offset + 1] & 7) == 3 &&
+	    (code[evex_normalization_offset + 2] & 3) == 1 &&
+	    code[evex_normalization_offset + 4] == 0x67) {
+		const uint8_t ll =
+			(code[evex_normalization_offset + 3] >> 5) & 3;
+		const bool b =
+			(code[evex_normalization_offset + 3] & 0x10) != 0;
+
+		if (evex_invalid_prefix || evex_segment_count > 1 ||
+		    evex_address_size_count > 1)
+			return false;
 
 		if (ll == 3 || b)
 			return false;
 		if (ll != 0) {
-			memcpy(normalized_code, code, code_len);
-			normalized_code[3] &= ~0x60;
+			memcpy(normalized_code, info.code,
+			       evex_normalization_limit);
+			normalized_code[evex_normalization_offset + 3] &= ~0x60;
 			info.code = normalized_code;
+			info.size = evex_normalization_limit;
 		}
 	}
 	/* Scalar AVX512_4FMAPS encodings are EVEX.LLIG.  LLVM's generated
@@ -1707,35 +1767,30 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 	 * changing EVEX.b, z, aaa, or any operand bits.  Packed PS opcodes are
 	 * deliberately excluded because their vector length remains fixed. */
 	{
-		size_t evex_offset = 0;
-		unsigned int segment_count = 0, address_size_count = 0;
-		bool invalid_prefix = false;
-		const bool has_evex = scan_x86_evex_prefix(
-			code, code_len, (handle->mode & CS_MODE_64) != 0,
-			&evex_offset, &segment_count, &address_size_count,
-			&invalid_prefix);
-
-		if (has_evex && code_len - evex_offset >= 6 &&
-		    code_len <= sizeof(normalized_code) &&
-		    code[evex_offset] == 0x62 &&
-		    (code[evex_offset + 1] & 7) == 2 &&
-		    (code[evex_offset + 2] & 3) == 3 &&
-		    (code[evex_offset + 4] == 0x9b ||
-		     code[evex_offset + 4] == 0xab)) {
-			const uint8_t p2 = code[evex_offset + 3];
+		if (has_evex_normalization_prefix &&
+		    evex_normalization_limit - evex_normalization_offset >= 6 &&
+		    (code[evex_normalization_offset + 1] & 7) == 2 &&
+		    (code[evex_normalization_offset + 2] & 3) == 3 &&
+		    (code[evex_normalization_offset + 4] == 0x9b ||
+		     code[evex_normalization_offset + 4] == 0xab)) {
+			const uint8_t p2 =
+				code[evex_normalization_offset + 3];
 			const uint8_t ll = (p2 >> 5) & 3;
 			const uint8_t mask = p2 & 7;
 			const bool broadcast = (p2 & 0x10) != 0;
 			const bool zeroing = (p2 & 0x80) != 0;
 
-			if (invalid_prefix || segment_count > 1 ||
-			    address_size_count > 1 || broadcast ||
+			if (evex_invalid_prefix || evex_segment_count > 1 ||
+			    evex_address_size_count > 1 || broadcast ||
 			    (zeroing && mask == 0))
 				return false;
 			if (ll != 0) {
-				memcpy(normalized_code, code, code_len);
-				normalized_code[evex_offset + 3] &= ~0x60;
+				memcpy(normalized_code, info.code,
+				       evex_normalization_limit);
+				normalized_code[evex_normalization_offset + 3] &=
+					~0x60;
 				info.code = normalized_code;
+				info.size = evex_normalization_limit;
 			}
 		}
 	}

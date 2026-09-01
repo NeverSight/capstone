@@ -58,6 +58,43 @@ done:
 	return success;
 }
 
+static bool check_unused_address_extensions(csh handle)
+{
+	/* vpdpbusd zmm0 {k1}{z}, zmm2, zmm3.  EVEX.B4 and X4 are set,
+	 * but neither bit extends an operand in a register-only form. */
+	static const uint8_t code[] = {
+		0x62, 0xfa, 0x69, 0xc9, 0x50, 0xc3,
+	};
+	cs_insn *insn = NULL;
+	const cs_x86 *x86;
+	bool success;
+	size_t count = cs_disasm(handle, code, sizeof(code), 0x1000, 1, &insn);
+
+	if (count != 1 || insn == NULL || insn[0].id != X86_INS_VPDPBUSD ||
+	    insn[0].detail == NULL) {
+		fprintf(stderr,
+			"vpdpbusd with unused address extensions did not decode\n");
+		cs_free(insn, count);
+		return false;
+	}
+
+	x86 = &insn[0].detail->x86;
+	success = x86->op_count == 4 &&
+		  x86->operands[0].type == X86_OP_REG &&
+		  x86->operands[0].reg == X86_REG_ZMM0 &&
+		  x86->operands[1].type == X86_OP_REG &&
+		  x86->operands[1].reg == X86_REG_K1 &&
+		  x86->operands[2].type == X86_OP_REG &&
+		  x86->operands[2].reg == X86_REG_ZMM2 &&
+		  x86->operands[3].type == X86_OP_REG &&
+		  x86->operands[3].reg == X86_REG_ZMM3;
+	if (!success)
+		fprintf(stderr,
+			"unused address extensions changed vpdpbusd operands\n");
+	cs_free(insn, count);
+	return success;
+}
+
 int main(void)
 {
 	static const dot_product_family families[] = {
@@ -88,6 +125,7 @@ int main(void)
 						   vector_sizes[size_index]);
 		}
 	}
+	success &= check_unused_address_extensions(handle);
 
 	cs_close(&handle);
 	return success ? 0 : 1;
