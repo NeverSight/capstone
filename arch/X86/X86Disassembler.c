@@ -127,6 +127,46 @@ enum {
 	X86_sib64 = 505
 };
 
+#ifndef CAPSTONE_X86_REDUCE
+static bool gfniAffineBroadcastNeedsDisp8Scale(
+	const InternalInstruction *insn)
+{
+	unsigned int i;
+
+	switch (insn->instructionID) {
+	default:
+		return false;
+	case X86_VGF2P8AFFINEINVQBZ128rmbi:
+	case X86_VGF2P8AFFINEINVQBZ128rmbik:
+	case X86_VGF2P8AFFINEINVQBZ128rmbikz:
+	case X86_VGF2P8AFFINEINVQBZ256rmbi:
+	case X86_VGF2P8AFFINEINVQBZ256rmbik:
+	case X86_VGF2P8AFFINEINVQBZ256rmbikz:
+	case X86_VGF2P8AFFINEINVQBZrmbi:
+	case X86_VGF2P8AFFINEINVQBZrmbik:
+	case X86_VGF2P8AFFINEINVQBZrmbikz:
+	case X86_VGF2P8AFFINEQBZ128rmbi:
+	case X86_VGF2P8AFFINEQBZ128rmbik:
+	case X86_VGF2P8AFFINEQBZ128rmbikz:
+	case X86_VGF2P8AFFINEQBZ256rmbi:
+	case X86_VGF2P8AFFINEQBZ256rmbik:
+	case X86_VGF2P8AFFINEQBZ256rmbikz:
+	case X86_VGF2P8AFFINEQBZrmbi:
+	case X86_VGF2P8AFFINEQBZrmbik:
+	case X86_VGF2P8AFFINEQBZrmbikz:
+		break;
+	}
+
+	for (i = 0; i < X86_MAX_OPERANDS; ++i) {
+		const OperandSpecifier *operand = &insn->operands[i];
+
+		if (operand->type == TYPE_M)
+			return operand->encoding == ENCODING_RM;
+	}
+	return false;
+}
+#endif
+
 //
 // Private code that translates from struct InternalInstructions to MCInsts.
 //
@@ -1910,6 +1950,12 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 			insn.vectorExtensionPrefix[1] = apx_evex_p0;
 			insn.vectorExtensionPrefix[2] = apx_evex_p1;
 		}
+
+#ifndef CAPSTONE_X86_REDUCE
+		if (insn.displacementSize == 1 &&
+		    gfniAffineBroadcastNeedsDisp8Scale(&insn))
+			insn.displacement *= 8;
+#endif
 
 		result = (!translateInstruction(instr, &insn)) ? true : false;
 		if (result) {

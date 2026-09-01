@@ -134,7 +134,11 @@ static void printopaquemem(MCInst *MI, unsigned OpNo, SStream *O)
 
 static void printi8mem(MCInst *MI, unsigned OpNo, SStream *O)
 {
-	MI->x86opsize = 1;
+	if (MI->flat_insn->id == X86_INS_VGF2P8AFFINEQB ||
+	    MI->flat_insn->id == X86_INS_VGF2P8AFFINEINVQB)
+		MI->x86opsize = 8;
+	else
+		MI->x86opsize = 1;
 	printMemReference(MI, OpNo, O);
 }
 
