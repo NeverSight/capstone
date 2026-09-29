@@ -67,6 +67,23 @@ static bool check_valid(csh handle, const uint8_t *code, size_t code_size,
 	return success;
 }
 
+/* The code starts with an instruction other than JMPABS. */
+static bool decodes_other(csh handle, const uint8_t *code, size_t code_size,
+			  x86_insn id, uint16_t size, const char *mnemonic,
+			  const char *operands, const char *message)
+{
+	cs_insn *insn = NULL;
+	size_t count = cs_disasm(handle, code, code_size, 0x1000, 1, &insn);
+	bool success =
+		check(count == 1 && insn[0].id == id && insn[0].size == size &&
+			      strcmp(insn[0].mnemonic, mnemonic) == 0 &&
+			      strcmp(insn[0].op_str, operands) == 0,
+		      message);
+
+	cs_free(insn, count);
+	return success;
+}
+
 static bool rejects(csh handle, const uint8_t *code, size_t code_size,
 		    const char *message)
 {
@@ -90,8 +107,9 @@ int main(void)
 					     0x55, 0x66, 0x77, 0x88 };
 	const uint8_t invalid_w[] = { 0xd5, 0x08, 0xa1, 0x11, 0x22, 0x33,
 				      0x44, 0x55, 0x66, 0x77, 0x88 };
-	const uint8_t invalid_map[] = { 0xd5, 0x80, 0xa1, 0x11, 0x22, 0x33,
-					0x44, 0x55, 0x66, 0x77, 0x88 };
+	/* REX2.M0=1 selects map 1, where A1 is POP FS. */
+	const uint8_t map1[] = { 0xd5, 0x80, 0xa1, 0x11, 0x22, 0x33,
+				 0x44, 0x55, 0x66, 0x77, 0x88 };
 	const uint8_t invalid_prefix[] = { 0x66, 0xd5, 0x00, 0xa1,
 					   0x11, 0x22, 0x33, 0x44,
 					   0x55, 0x66, 0x77, 0x88 };
@@ -120,8 +138,8 @@ int main(void)
 			       "0x8877665544332211");
 	success &= rejects(intel, invalid_w, sizeof(invalid_w),
 			   "REX2.W=1 is rejected");
-	success &= rejects(intel, invalid_map, sizeof(invalid_map),
-			   "REX2.M0=1 is rejected");
+	success &= decodes_other(intel, map1, sizeof(map1), X86_INS_POP, 3,
+				 "pop", "fs", "REX2.M0=1 decodes as POP FS");
 	success &= rejects(intel, invalid_prefix, sizeof(invalid_prefix),
 			   "forbidden legacy prefix is rejected");
 	success &= rejects(intel, canonical, sizeof(canonical) - 1,

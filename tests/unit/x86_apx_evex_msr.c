@@ -73,8 +73,21 @@ static bool check_case(csh handle, const msr_case *test, bool att)
 static bool rejects(csh handle, const uint8_t *bytes, size_t size)
 {
 	cs_insn *instruction = NULL;
-	bool ok = cs_disasm(handle, bytes, size, 0, 1, &instruction) == 0;
-	cs_free(instruction, 1);
+	size_t count = cs_disasm(handle, bytes, size, 0, 1, &instruction);
+
+	cs_free(instruction, count);
+	return count == 0;
+}
+
+static bool decodes_as(csh handle, const uint8_t *bytes, size_t size,
+		       unsigned int id, uint16_t length)
+{
+	cs_insn *instruction = NULL;
+	size_t count = cs_disasm(handle, bytes, size, 0, 1, &instruction);
+	bool ok = count == 1 && instruction->id == id &&
+		  instruction->size == length;
+
+	cs_free(instruction, count);
 	return ok;
 }
 
@@ -224,8 +237,17 @@ int main(void)
 
 	if (cs_open(CS_ARCH_X86, CS_MODE_32, &handle) != CS_ERR_OK)
 		return 1;
-	for (i = 0; i < sizeof(tests) / sizeof(tests[0]); ++i)
-		ok &= rejects(handle, tests[i].bytes, tests[i].size);
+	/* Outside 64-bit mode the EVEX forms are invalid, while 0x45 is INC EBP
+	 * and C4 before a memory ModR/M is LES. */
+	for (i = 0; i < sizeof(tests) / sizeof(tests[0]); ++i) {
+		if (tests[i].bytes[0] == 0x62)
+			ok &= rejects(handle, tests[i].bytes, tests[i].size);
+		else
+			ok &= decodes_as(handle, tests[i].bytes, tests[i].size,
+					 tests[i].bytes[0] == 0xc4 ? X86_INS_LES :
+								     X86_INS_INC,
+					 2);
+	}
 	cs_close(&handle);
 	return ok ? 0 : 1;
 }

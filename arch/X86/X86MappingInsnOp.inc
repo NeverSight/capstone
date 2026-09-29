@@ -17730,92 +17730,92 @@
 
 {	/* X86_VCVTPD2PSZ128rm, X86_INS_VCVTPD2PS: vcvtpd2ps */
 	0,
-	{ 0 }
+	{ CS_AC_WRITE, CS_AC_READ, 0 }
 },
 
 {	/* X86_VCVTPD2PSZ128rmb, X86_INS_VCVTPD2PS: vcvtpd2ps */
 	0,
-	{ 0 }
+	{ CS_AC_WRITE, CS_AC_READ, 0 }
 },
 
 {	/* X86_VCVTPD2PSZ128rmbk, X86_INS_VCVTPD2PS: vcvtpd2ps */
 	0,
-	{ 0 }
+	{ CS_AC_READ | CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
 },
 
 {	/* X86_VCVTPD2PSZ128rmbkz, X86_INS_VCVTPD2PS: vcvtpd2ps */
 	0,
-	{ 0 }
+	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
 },
 
 {	/* X86_VCVTPD2PSZ128rmk, X86_INS_VCVTPD2PS: vcvtpd2ps */
 	0,
-	{ 0 }
+	{ CS_AC_READ | CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
 },
 
 {	/* X86_VCVTPD2PSZ128rmkz, X86_INS_VCVTPD2PS: vcvtpd2ps */
 	0,
-	{ 0 }
+	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
 },
 
 {	/* X86_VCVTPD2PSZ128rr, X86_INS_VCVTPD2PS: vcvtpd2ps */
 	0,
-	{ 0 }
+	{ CS_AC_WRITE, CS_AC_READ, 0 }
 },
 
 {	/* X86_VCVTPD2PSZ128rrk, X86_INS_VCVTPD2PS: vcvtpd2ps */
 	0,
-	{ 0 }
+	{ CS_AC_READ | CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
 },
 
 {	/* X86_VCVTPD2PSZ128rrkz, X86_INS_VCVTPD2PS: vcvtpd2ps */
 	0,
-	{ 0 }
+	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
 },
 
 {	/* X86_VCVTPD2PSZ256rm, X86_INS_VCVTPD2PS: vcvtpd2ps */
 	0,
-	{ 0 }
+	{ CS_AC_WRITE, CS_AC_READ, 0 }
 },
 
 {	/* X86_VCVTPD2PSZ256rmb, X86_INS_VCVTPD2PS: vcvtpd2ps */
 	0,
-	{ 0 }
+	{ CS_AC_WRITE, CS_AC_READ, 0 }
 },
 
 {	/* X86_VCVTPD2PSZ256rmbk, X86_INS_VCVTPD2PS: vcvtpd2ps */
 	0,
-	{ 0 }
+	{ CS_AC_READ | CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
 },
 
 {	/* X86_VCVTPD2PSZ256rmbkz, X86_INS_VCVTPD2PS: vcvtpd2ps */
 	0,
-	{ 0 }
+	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
 },
 
 {	/* X86_VCVTPD2PSZ256rmk, X86_INS_VCVTPD2PS: vcvtpd2ps */
 	0,
-	{ 0 }
+	{ CS_AC_READ | CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
 },
 
 {	/* X86_VCVTPD2PSZ256rmkz, X86_INS_VCVTPD2PS: vcvtpd2ps */
 	0,
-	{ 0 }
+	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
 },
 
 {	/* X86_VCVTPD2PSZ256rr, X86_INS_VCVTPD2PS: vcvtpd2ps */
 	0,
-	{ 0 }
+	{ CS_AC_WRITE, CS_AC_READ, 0 }
 },
 
 {	/* X86_VCVTPD2PSZ256rrk, X86_INS_VCVTPD2PS: vcvtpd2ps */
 	0,
-	{ 0 }
+	{ CS_AC_READ | CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
 },
 
 {	/* X86_VCVTPD2PSZ256rrkz, X86_INS_VCVTPD2PS: vcvtpd2ps */
 	0,
-	{ 0 }
+	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
 },
 
 {	/* X86_VCVTPD2PSZrm, X86_INS_VCVTPD2PS: vcvtpd2ps */
@@ -17825,27 +17825,27 @@
 
 {	/* X86_VCVTPD2PSZrmb, X86_INS_VCVTPD2PS: vcvtpd2ps */
 	0,
-	{ 0 }
+	{ CS_AC_WRITE, CS_AC_READ, 0 }
 },
 
 {	/* X86_VCVTPD2PSZrmbk, X86_INS_VCVTPD2PS: vcvtpd2ps */
 	0,
-	{ 0 }
+	{ CS_AC_READ | CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
 },
 
 {	/* X86_VCVTPD2PSZrmbkz, X86_INS_VCVTPD2PS: vcvtpd2ps */
 	0,
-	{ 0 }
+	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
 },
 
 {	/* X86_VCVTPD2PSZrmk, X86_INS_VCVTPD2PS: vcvtpd2ps */
 	0,
-	{ 0 }
+	{ CS_AC_READ | CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
 },
 
 {	/* X86_VCVTPD2PSZrmkz, X86_INS_VCVTPD2PS: vcvtpd2ps */
 	0,
-	{ 0 }
+	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
 },
 
 {	/* X86_VCVTPD2PSZrr, X86_INS_VCVTPD2PS: vcvtpd2ps */
@@ -17860,27 +17860,27 @@
 
 {	/* X86_VCVTPD2PSZrrbk, X86_INS_VCVTPD2PS: vcvtpd2ps */
 	0,
-	{ 0 }
+	{ CS_AC_READ | CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
 },
 
 {	/* X86_VCVTPD2PSZrrbkz, X86_INS_VCVTPD2PS: vcvtpd2ps */
 	0,
-	{ 0 }
+	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
 },
 
 {	/* X86_VCVTPD2PSZrrk, X86_INS_VCVTPD2PS: vcvtpd2ps */
 	0,
-	{ 0 }
+	{ CS_AC_READ | CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
 },
 
 {	/* X86_VCVTPD2PSZrrkz, X86_INS_VCVTPD2PS: vcvtpd2ps */
 	0,
-	{ 0 }
+	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
 },
 
 {	/* X86_VCVTPD2PSrm, X86_INS_VCVTPD2PS: vcvtpd2ps */
 	0,
-	{ 0 }
+	{ CS_AC_WRITE, CS_AC_READ, 0 }
 },
 
 {	/* X86_VCVTPD2PSrr, X86_INS_VCVTPD2PS: vcvtpd2ps */
@@ -18645,92 +18645,92 @@
 
 {	/* X86_VCVTPS2PDZ128rm, X86_INS_VCVTPS2PD: vcvtps2pd */
 	0,
-	{ 0 }
+	{ CS_AC_WRITE, CS_AC_READ, 0 }
 },
 
 {	/* X86_VCVTPS2PDZ128rmb, X86_INS_VCVTPS2PD: vcvtps2pd */
 	0,
-	{ 0 }
+	{ CS_AC_WRITE, CS_AC_READ, 0 }
 },
 
 {	/* X86_VCVTPS2PDZ128rmbk, X86_INS_VCVTPS2PD: vcvtps2pd */
 	0,
-	{ 0 }
+	{ CS_AC_READ | CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
 },
 
 {	/* X86_VCVTPS2PDZ128rmbkz, X86_INS_VCVTPS2PD: vcvtps2pd */
 	0,
-	{ 0 }
+	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
 },
 
 {	/* X86_VCVTPS2PDZ128rmk, X86_INS_VCVTPS2PD: vcvtps2pd */
 	0,
-	{ 0 }
+	{ CS_AC_READ | CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
 },
 
 {	/* X86_VCVTPS2PDZ128rmkz, X86_INS_VCVTPS2PD: vcvtps2pd */
 	0,
-	{ 0 }
+	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
 },
 
 {	/* X86_VCVTPS2PDZ128rr, X86_INS_VCVTPS2PD: vcvtps2pd */
 	0,
-	{ 0 }
+	{ CS_AC_WRITE, CS_AC_READ, 0 }
 },
 
 {	/* X86_VCVTPS2PDZ128rrk, X86_INS_VCVTPS2PD: vcvtps2pd */
 	0,
-	{ 0 }
+	{ CS_AC_READ | CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
 },
 
 {	/* X86_VCVTPS2PDZ128rrkz, X86_INS_VCVTPS2PD: vcvtps2pd */
 	0,
-	{ 0 }
+	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
 },
 
 {	/* X86_VCVTPS2PDZ256rm, X86_INS_VCVTPS2PD: vcvtps2pd */
 	0,
-	{ 0 }
+	{ CS_AC_WRITE, CS_AC_READ, 0 }
 },
 
 {	/* X86_VCVTPS2PDZ256rmb, X86_INS_VCVTPS2PD: vcvtps2pd */
 	0,
-	{ 0 }
+	{ CS_AC_WRITE, CS_AC_READ, 0 }
 },
 
 {	/* X86_VCVTPS2PDZ256rmbk, X86_INS_VCVTPS2PD: vcvtps2pd */
 	0,
-	{ 0 }
+	{ CS_AC_READ | CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
 },
 
 {	/* X86_VCVTPS2PDZ256rmbkz, X86_INS_VCVTPS2PD: vcvtps2pd */
 	0,
-	{ 0 }
+	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
 },
 
 {	/* X86_VCVTPS2PDZ256rmk, X86_INS_VCVTPS2PD: vcvtps2pd */
 	0,
-	{ 0 }
+	{ CS_AC_READ | CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
 },
 
 {	/* X86_VCVTPS2PDZ256rmkz, X86_INS_VCVTPS2PD: vcvtps2pd */
 	0,
-	{ 0 }
+	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
 },
 
 {	/* X86_VCVTPS2PDZ256rr, X86_INS_VCVTPS2PD: vcvtps2pd */
 	0,
-	{ 0 }
+	{ CS_AC_WRITE, CS_AC_READ, 0 }
 },
 
 {	/* X86_VCVTPS2PDZ256rrk, X86_INS_VCVTPS2PD: vcvtps2pd */
 	0,
-	{ 0 }
+	{ CS_AC_READ | CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
 },
 
 {	/* X86_VCVTPS2PDZ256rrkz, X86_INS_VCVTPS2PD: vcvtps2pd */
 	0,
-	{ 0 }
+	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
 },
 
 {	/* X86_VCVTPS2PDZrm, X86_INS_VCVTPS2PD: vcvtps2pd */
@@ -18740,27 +18740,27 @@
 
 {	/* X86_VCVTPS2PDZrmb, X86_INS_VCVTPS2PD: vcvtps2pd */
 	0,
-	{ 0 }
+	{ CS_AC_WRITE, CS_AC_READ, 0 }
 },
 
 {	/* X86_VCVTPS2PDZrmbk, X86_INS_VCVTPS2PD: vcvtps2pd */
 	0,
-	{ 0 }
+	{ CS_AC_READ | CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
 },
 
 {	/* X86_VCVTPS2PDZrmbkz, X86_INS_VCVTPS2PD: vcvtps2pd */
 	0,
-	{ 0 }
+	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
 },
 
 {	/* X86_VCVTPS2PDZrmk, X86_INS_VCVTPS2PD: vcvtps2pd */
 	0,
-	{ 0 }
+	{ CS_AC_READ | CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
 },
 
 {	/* X86_VCVTPS2PDZrmkz, X86_INS_VCVTPS2PD: vcvtps2pd */
 	0,
-	{ 0 }
+	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
 },
 
 {	/* X86_VCVTPS2PDZrr, X86_INS_VCVTPS2PD: vcvtps2pd */
@@ -18770,27 +18770,27 @@
 
 {	/* X86_VCVTPS2PDZrrb, X86_INS_VCVTPS2PD: vcvtps2pd */
 	0,
-	{ 0 }
+	{ CS_AC_WRITE, CS_AC_READ, 0 }
 },
 
 {	/* X86_VCVTPS2PDZrrbk, X86_INS_VCVTPS2PD: vcvtps2pd */
 	0,
-	{ 0 }
+	{ CS_AC_READ | CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
 },
 
 {	/* X86_VCVTPS2PDZrrbkz, X86_INS_VCVTPS2PD: vcvtps2pd */
 	0,
-	{ 0 }
+	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
 },
 
 {	/* X86_VCVTPS2PDZrrk, X86_INS_VCVTPS2PD: vcvtps2pd */
 	0,
-	{ 0 }
+	{ CS_AC_READ | CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
 },
 
 {	/* X86_VCVTPS2PDZrrkz, X86_INS_VCVTPS2PD: vcvtps2pd */
 	0,
-	{ 0 }
+	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
 },
 
 {	/* X86_VCVTPS2PDrm, X86_INS_VCVTPS2PD: vcvtps2pd */
