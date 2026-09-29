@@ -337,6 +337,11 @@ typedef enum cs_opt_type {
 	CS_OPT_UNSIGNED, ///< print immediate operands in unsigned form
 	CS_OPT_ONLY_OFFSET_BRANCH, ///< ARM, PPC, AArch64: Don't add the branch immediate value to the PC.
 	CS_OPT_LITBASE, ///< Xtensa, set the LITBASE value. LITBASE is set to 0 by default.
+	CS_OPT_TEXT, ///< Print instructions into mnemonic and op_str (default on).
+	///< With CS_OPT_OFF the printer does not run: mnemonic and op_str are
+	///< empty, operand detail is not filled, and an ID the printer adjusts
+	///< (an x86 compare with a predicate, say) is left unadjusted.  For a
+	///< caller that reads only an instruction's size, bytes and ID.
 } cs_opt_type;
 
 /// Runtime option value (associated with option type above)

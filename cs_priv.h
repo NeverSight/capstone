@@ -113,6 +113,7 @@ struct cs_struct {
 	const insn_map *insn_map;
 	// The number of elements in the array pointed to by .insn_map
 	unsigned short insn_map_size;
+	bool no_text; // CS_OPT_TEXT is off: instructions are not printed
 	bool skipdata; // set this to True if we skip data when disassembling
 	uint8_t skipdata_size; // how many bytes to skip
 	cs_opt_skipdata skipdata_setup; // user-defined skipdata setup
