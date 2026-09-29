@@ -424,6 +424,7 @@ static void setSegmentOverride(struct InternalInstruction *insn,
 static int readPrefixes(struct InternalInstruction *insn)
 {
 	bool isPrefix = true;
+	bool vexForbiddenPrefix;
 	unsigned int segmentPrefixCount = 0;
 	unsigned int addressSizePrefixCount = 0;
 	uint8_t byte = 0;
@@ -523,6 +524,11 @@ static int readPrefixes(struct InternalInstruction *insn)
 	}
 
 	insn->vectorExtensionType = TYPE_NO_VEX_XOP;
+	/* A 66, F2, F3 or LOCK prefix anywhere before a VEX, EVEX or XOP prefix,
+	 * or a REX prefix right before it, makes the instruction #UD, as in
+	 * XED.  Record them before the prefixes below rewrite these fields. */
+	vexForbiddenPrefix = insn->hasOpSize || insn->prefix0 != 0 ||
+			     insn->rexPrefix != 0;
 
 	if (byte == 0xd5 && insn->mode == MODE_64BIT) {
 		uint8_t payload;
@@ -725,6 +731,9 @@ static int readPrefixes(struct InternalInstruction *insn)
 		}
 	} else
 		unconsumeByte(insn);
+
+	if (insn->vectorExtensionType != TYPE_NO_VEX_XOP && vexForbiddenPrefix)
+		return -1;
 
 	if (insn->repeatPrefix != 0) {
 		if (lookAtByte(insn, &nextByte))
