@@ -255,6 +255,50 @@ static bool test_att_detail_order(csh handle)
 	return success;
 }
 
+/* mov dword ptr [r16], eax: REX2.B4 extends the ModR/M base. */
+static bool test_memory_destination(csh handle)
+{
+	static const uint8_t movd_memory[] = { 0xd5, 0x10, 0x89, 0x00 };
+	cs_insn *insn = NULL;
+	bool success = true;
+	size_t count = cs_disasm(handle, movd_memory, sizeof(movd_memory),
+				 0x1000, 1, &insn);
+
+	if (!check(count == 1, "REX2 memory destination decodes"))
+		return false;
+	success &= check(insn[0].size == sizeof(movd_memory) &&
+				 insn[0].id == X86_INS_MOV,
+			 "REX2 memory destination size and ID are exact");
+	success &= check(strcmp(insn[0].mnemonic, "mov") == 0 &&
+				 strcmp(insn[0].op_str,
+					"dword ptr [r16], eax") == 0,
+			 "REX2 memory destination text is exact");
+	if (check(insn[0].detail != NULL, "memory detail is available")) {
+		const cs_x86 *x86 = &insn[0].detail->x86;
+
+		success &= check(x86->opcode[0] == 0x89 && x86->modrm == 0x00 &&
+					 x86->encoding.modrm_offset == 3,
+				 "REX2 memory encoding detail is exact");
+		success &= check(
+			x86->op_count == 2 &&
+				x86->operands[0].type == X86_OP_MEM &&
+				x86->operands[0].mem.base == X86_REG_R16 &&
+				x86->operands[0].mem.index == X86_REG_INVALID &&
+				x86->operands[0].mem.disp == 0 &&
+				x86->operands[0].size == 4 &&
+				x86->operands[0].access == CS_AC_WRITE &&
+				x86->operands[1].type == X86_OP_REG &&
+				x86->operands[1].reg == X86_REG_EAX &&
+				x86->operands[1].size == 4 &&
+				x86->operands[1].access == CS_AC_READ,
+			"REX2 memory operand detail is exact");
+	} else {
+		success = false;
+	}
+	cs_free(insn, count);
+	return success;
+}
+
 static bool test_invalid_rex2(csh handle, const uint8_t *code,
 			      size_t code_size, const char *description)
 {
@@ -319,6 +363,7 @@ int main(void)
 	static const uint8_t addw[] = { 0x66, 0xd5, 0x55, 0x01, 0xc7 };
 	static const uint8_t addd[] = { 0xd5, 0x55, 0x01, 0xc7 };
 	static const uint8_t addq[] = { 0xd5, 0x5d, 0x01, 0xc7 };
+	static const uint8_t subd[] = { 0xd5, 0x55, 0x29, 0xc7 };
 	static const rex2_case test_cases[] = {
 		{ movb, sizeof(movb), X86_INS_MOV, "mov", "r26b, r25b",
 		  X86_REG_R26B, X86_REG_R25B, "r26b", "r25b", 1,
@@ -351,6 +396,10 @@ int main(void)
 		  X86_REG_R31, X86_REG_R24, "r31", "r24", 8,
 		  CS_AC_READ | CS_AC_WRITE, 0x01, 0xc7, 3, false,
 		  add_eflags },
+		{ subd, sizeof(subd), X86_INS_SUB, "sub", "r31d, r24d",
+		  X86_REG_R31D, X86_REG_R24D, "r31d", "r24d", 4,
+		  CS_AC_READ | CS_AC_WRITE, 0x29, 0xc7, 3, false,
+		  add_eflags },
 	};
 	static const uint8_t rex_before_rex2[] = { 0x48, 0xd5, 0x5d, 0x89,
 						   0xca };
@@ -360,8 +409,6 @@ int main(void)
 	static const uint8_t reserved_map1_row[] = { 0xd5, 0x80, 0x30, 0xc0 };
 	static const uint8_t prefix_after_rex2[] = { 0xd5, 0x55, 0x66, 0x89,
 						    0xca };
-	static const uint8_t unsupported_sub[] = { 0xd5, 0x55, 0x29, 0xc7 };
-	static const uint8_t unsupported_memory[] = { 0xd5, 0x10, 0x89, 0x00 };
 	static const uint8_t truncated_rex2[] = { 0xd5, 0x55 };
 	static const uint8_t legacy_aad_in_64[] = { 0xd5, 0x0a };
 	csh handle = 0;
@@ -397,12 +444,7 @@ int main(void)
 	success &= test_invalid_rex2(handle, prefix_after_rex2,
 				     sizeof(prefix_after_rex2),
 				     "legacy prefix after REX2 must fail closed");
-	success &= test_invalid_rex2(handle, unsupported_sub,
-				     sizeof(unsupported_sub),
-				     "unimplemented REX2 opcode must fail closed");
-	success &= test_invalid_rex2(handle, unsupported_memory,
-				     sizeof(unsupported_memory),
-				     "unimplemented REX2 memory form must fail closed");
+	success &= test_memory_destination(handle);
 	success &= test_invalid_rex2(handle, truncated_rex2,
 				     sizeof(truncated_rex2),
 				     "truncated REX2 must fail closed");

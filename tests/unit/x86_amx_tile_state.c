@@ -287,13 +287,10 @@ static bool test_invalid_encodings(csh handle)
 						    0xc0 };
 	static const uint8_t invalid_release_vvvv[] = { 0xc4, 0xe2, 0x70, 0x49,
 						       0xc0 };
-	static const uint8_t invalid_release_extension[] = { 0xc4, 0xc2, 0x78,
-							    0x49, 0xc0 };
 	static const uint8_t invalid_cfg_reg[] = { 0xc4, 0xe2, 0x78, 0x49, 0x08 };
 	static const uint8_t invalid_cfg_register_form[] = { 0xc4, 0xe2, 0x79,
 							    0x49, 0xc0 };
 	static const uint8_t invalid_cfg_pp[] = { 0xc4, 0xe2, 0x7a, 0x49, 0x00 };
-	static const uint8_t invalid_cfg_r[] = { 0xc4, 0x62, 0x78, 0x49, 0x00 };
 	static const uint8_t truncated_cfg_disp[] = { 0xc4, 0xe2, 0x78, 0x49,
 						     0x05, 0x01, 0x02 };
 	static const uint8_t invalid_load_without_sib[] = { 0xc4, 0xe2, 0x7b,
@@ -306,10 +303,6 @@ static bool test_invalid_encodings(csh handle)
 						     0x04 };
 	static const uint8_t invalid_tilezero_rm[] = { 0xc4, 0xe2, 0x7b, 0x49,
 						      0xf1 };
-	static const uint8_t unsupported_tdpbssd[] = { 0xc4, 0xe2, 0x63, 0x5e,
-						      0xca };
-	static const uint8_t unsupported_tileloaddrs[] = { 0xc4, 0xe2, 0x7b,
-							  0x4a, 0x0c, 0x18 };
 	bool success = true;
 
 	success &= expect_invalid(handle, invalid_release_modrm,
@@ -324,9 +317,6 @@ static bool test_invalid_encodings(csh handle)
 	success &= expect_invalid(handle, invalid_release_vvvv,
 				  sizeof(invalid_release_vvvv),
 				  "reserved TILERELEASE VEX.vvvv");
-	success &= expect_invalid(handle, invalid_release_extension,
-				  sizeof(invalid_release_extension),
-				  "reserved TILERELEASE VEX.X/B");
 	success &= expect_invalid(handle, invalid_cfg_reg, sizeof(invalid_cfg_reg),
 				  "reserved tilecfg ModR/M.reg");
 	success &= expect_invalid(handle, invalid_cfg_register_form,
@@ -334,8 +324,6 @@ static bool test_invalid_encodings(csh handle)
 				  "reserved tilecfg register form");
 	success &= expect_invalid(handle, invalid_cfg_pp, sizeof(invalid_cfg_pp),
 				  "reserved tilecfg mandatory prefix");
-	success &= expect_invalid(handle, invalid_cfg_r, sizeof(invalid_cfg_r),
-				  "reserved tilecfg VEX.R");
 	success &= expect_invalid(handle, truncated_cfg_disp,
 				  sizeof(truncated_cfg_disp),
 				  "truncated tilecfg displacement");
@@ -354,12 +342,6 @@ static bool test_invalid_encodings(csh handle)
 	success &= expect_invalid(handle, invalid_tilezero_rm,
 				  sizeof(invalid_tilezero_rm),
 				  "reserved TILEZERO r/m field");
-	success &= expect_invalid(handle, unsupported_tdpbssd,
-				  sizeof(unsupported_tdpbssd),
-				  "unimplemented AMX opcode");
-	success &= expect_invalid(handle, unsupported_tileloaddrs,
-				  sizeof(unsupported_tileloaddrs),
-				  "unimplemented AMX tile-load opcode");
 	return success;
 }
 
@@ -397,6 +379,11 @@ int main(void)
 	static const uint8_t negative_cfg[] = { 0xc4, 0xc2, 0x78, 0x49, 0x45,
 						0xf8 };
 	static const uint8_t zero[] = { 0xc4, 0xe2, 0x7b, 0x49, 0xf0 };
+	/* VEX.R, X and B extend no register of these forms; XED ignores them. */
+	static const uint8_t release_ignored_xb[] = { 0xc4, 0xc2, 0x78, 0x49,
+						      0xc0 };
+	static const uint8_t loadcfg_ignored_r[] = { 0xc4, 0x62, 0x78, 0x49,
+						     0x00 };
 	static const amx_case cases[] = {
 		{ release, sizeof(release), X86_INS_TILERELEASE, "tilerelease", "",
 		  0, -1, -1, X86_REG_INVALID, X86_REG_INVALID, 1, 0, 0, 0,
@@ -440,6 +427,14 @@ int main(void)
 		{ zero, sizeof(zero), X86_INS_TILEZERO, "tilezero", "tmm6", 1,
 		  -1, 0, X86_REG_INVALID, X86_REG_INVALID, 1, 0, 0, 0,
 		  X86_REG_TMM6, CS_AC_WRITE, 4, 0xf0, 0, 0, 0 },
+		{ release_ignored_xb, sizeof(release_ignored_xb),
+		  X86_INS_TILERELEASE, "tilerelease", "", 0, -1, -1,
+		  X86_REG_INVALID, X86_REG_INVALID, 1, 0, 0, 0,
+		  X86_REG_INVALID, 0, 4, 0xc0, 0, 0, 0 },
+		{ loadcfg_ignored_r, sizeof(loadcfg_ignored_r),
+		  X86_INS_LDTILECFG, "ldtilecfg", "[rax]", 1, 0, -1,
+		  X86_REG_RAX, X86_REG_INVALID, 1, 0, 64, CS_AC_READ,
+		  X86_REG_INVALID, 0, 4, 0x00, 0, 0, 0 },
 	};
 	csh handle = 0;
 	bool success = true;

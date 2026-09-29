@@ -519,8 +519,8 @@ static bool test_invalid_encodings(csh handle)
 	static const uint8_t reserved_p2_bits[] = {
 		0x80, 0x40, 0x20, 0x02, 0x01,
 	};
+	/* 0x80 lacks its immediate; 0xfc is unassigned in map 4. */
 	static const uint8_t unsupported_opcodes[] = {
-		0x38,
 		0x80,
 		0xfc,
 	};

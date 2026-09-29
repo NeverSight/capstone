@@ -433,14 +433,7 @@ static bool test_fail_closed(csh handle)
 	static const uint8_t unsupported_map1[] = {
 		0xd5, 0xd5, 0x01, 0xc7
 	};
-	static const uint8_t memory_form[] = { 0xd5, 0x55, 0x29, 0x07 };
 	static const uint8_t truncated[] = { 0xd5, 0x55, 0x2b };
-	static const uint8_t evex_ndd[] = {
-		0x62, 0xf4, 0x2c, 0x18, 0x31, 0xca
-	};
-	static const uint8_t evex_nf[] = {
-		0x62, 0xf4, 0x7c, 0x0c, 0x30, 0xd9
-	};
 	bool success = true;
 
 	success &= test_invalid(handle, rex_before_rex2,
@@ -458,14 +451,69 @@ static bool test_fail_closed(csh handle)
 	success &= test_invalid(handle, unsupported_map1,
 				sizeof(unsupported_map1),
 				"an unimplemented map-1 opcode must fail closed");
-	success &= test_invalid(handle, memory_form, sizeof(memory_form),
-				"an unimplemented memory form must fail closed");
 	success &= test_invalid(handle, truncated, sizeof(truncated),
 				"a truncated REX2 instruction must fail closed");
-	success &= test_invalid(handle, evex_ndd, sizeof(evex_ndd),
-				"EVEX NDD remains outside this decoder slice");
-	success &= test_invalid(handle, evex_nf, sizeof(evex_nf),
-				"EVEX NF remains outside this decoder slice");
+	return success;
+}
+
+static bool test_decoded_as(csh handle, const uint8_t *code, size_t code_size,
+			    x86_insn instruction, const char *op_str,
+			    const char *description)
+{
+	cs_insn *insn = NULL;
+	size_t count = cs_disasm(handle, code, code_size, 0x1000, 1, &insn);
+	bool success = check(count == 1 && insn[0].size == code_size &&
+				     insn[0].id == instruction &&
+				     strcmp(insn[0].op_str, op_str) == 0,
+			     description);
+
+	if (!success && count == 1)
+		fprintf(stderr, "decoded as %s %s\n", insn[0].mnemonic,
+			insn[0].op_str);
+	cs_free(insn, count);
+	return success;
+}
+
+/* Forms next to the REX2 register ALU: a REX2 memory destination and the
+ * EVEX NDD and NF forms, which decode as XED decodes them. */
+static bool test_neighbouring_forms(csh handle, uint64_t add_eflags)
+{
+	static const uint8_t memory_form[] = { 0xd5, 0x55, 0x29, 0x07 };
+	static const uint8_t evex_ndd[] = { 0x62, 0xf4, 0x2c, 0x18, 0x31, 0xca };
+	static const uint8_t evex_nf[] = { 0x62, 0xf4, 0x7c, 0x0c, 0x30, 0xd9 };
+	cs_insn *insn = NULL;
+	bool success = true;
+	size_t count;
+
+	success &= test_decoded_as(handle, memory_form, sizeof(memory_form),
+				   X86_INS_SUB, "dword ptr [r31], r24d",
+				   "a REX2 memory destination decodes");
+	count = cs_disasm(handle, memory_form, sizeof(memory_form), 0x1000, 1,
+			  &insn);
+	if (count == 1 && insn[0].detail != NULL) {
+		const cs_x86 *x86 = &insn[0].detail->x86;
+
+		success &= check(
+			x86->op_count == 2 &&
+				x86->operands[0].type == X86_OP_MEM &&
+				x86->operands[0].mem.base == X86_REG_R31 &&
+				x86->operands[0].mem.index == X86_REG_INVALID &&
+				x86->operands[0].size == 4 &&
+				x86->operands[0].access ==
+					(CS_AC_READ | CS_AC_WRITE) &&
+				x86->operands[1].type == X86_OP_REG &&
+				x86->operands[1].reg == X86_REG_R24D &&
+				x86->operands[1].access == CS_AC_READ &&
+				x86->eflags == add_eflags,
+			"REX2 memory destination detail is exact");
+	}
+	cs_free(insn, count);
+	success &= test_decoded_as(handle, evex_ndd, sizeof(evex_ndd),
+				   X86_INS_XOR, "r10d, edx, ecx",
+				   "EVEX NDD decodes as a three-operand XOR");
+	success &= test_decoded_as(handle, evex_nf, sizeof(evex_nf),
+				   X86_INS_XOR, "cl, bl",
+				   "EVEX NF decodes as a flag-free XOR");
 	return success;
 }
 
@@ -542,6 +590,7 @@ int main(void)
 	success &= test_fixed_forms(handle, arithmetic_eflags);
 	success &= test_att_syntax(handle);
 	success &= test_fail_closed(handle);
+	success &= test_neighbouring_forms(handle, arithmetic_eflags);
 	cs_close(&handle);
 	success &= test_non64_aad();
 	return success ? 0 : 1;

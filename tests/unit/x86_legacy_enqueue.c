@@ -223,10 +223,23 @@ static bool rejects(csh handle, const uint8_t *bytes, size_t length)
 	return ok;
 }
 
+/* F2 0F 38 F8 with a register ModR/M is URDMSR, not ENQCMD. */
+static bool check_register_form_is_urdmsr(csh handle)
+{
+	static const uint8_t bytes[] = { 0xf2, 0x0f, 0x38, 0xf8, 0xc0 };
+	cs_insn *insn = NULL;
+	size_t count = cs_disasm(handle, bytes, sizeof(bytes), 0, 1, &insn);
+	bool ok = count == 1 && insn->id == X86_INS_URDMSR &&
+		  insn->size == sizeof(bytes) &&
+		  strcmp(insn->mnemonic, "urdmsr") == 0 &&
+		  strcmp(insn->op_str, "rax, rax") == 0;
+
+	cs_free(insn, count);
+	return ok;
+}
+
 static bool check_invalid_encodings(csh handle)
 {
-	static const uint8_t register_source[] = { 0xf2, 0x0f, 0x38, 0xf8,
-						   0xc0 };
 	static const uint8_t lock[] = { 0xf0, 0xf2, 0x0f, 0x38, 0xf8, 0x00 };
 	static const uint8_t repeated_mandatory[] = { 0xf2, 0xf2, 0x0f,
 						      0x38, 0xf8, 0x00 };
@@ -239,8 +252,7 @@ static bool check_invalid_encodings(csh handle)
 	static const uint8_t truncated_disp32[] = { 0xf2, 0x0f, 0x38, 0xf8,
 						    0x80, 0x01, 0x02 };
 
-	return rejects(handle, register_source, sizeof(register_source)) &&
-	       rejects(handle, lock, sizeof(lock)) &&
+	return rejects(handle, lock, sizeof(lock)) &&
 	       rejects(handle, repeated_mandatory,
 		       sizeof(repeated_mandatory)) &&
 	       rejects(handle, conflicting_mandatory,
@@ -470,6 +482,10 @@ int main(void)
 	}
 	if (!check_att(handle)) {
 		fprintf(stderr, "legacy enqueue AT&T contract failure\n");
+		ok = false;
+	}
+	if (!check_register_form_is_urdmsr(handle)) {
+		fprintf(stderr, "legacy enqueue register-form routing failure\n");
 		ok = false;
 	}
 	if (!check_invalid_encodings(handle)) {
