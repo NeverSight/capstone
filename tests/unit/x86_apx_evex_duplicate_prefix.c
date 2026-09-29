@@ -60,7 +60,8 @@ int main(void)
 
 	/* Legacy instructions keep the generated decoder's reading of repeated
 	 * prefixes, also when the byte after their opcode has the value of an
-	 * EVEX or REX2 escape. */
+	 * EVEX or REX2 escape, and the last FS or GS override takes effect, as
+	 * in XED. */
 	{
 		static const uint8_t mov_cs_cs[] = { 0x2e, 0x2e, 0x8b, 0xd5 };
 		static const uint8_t mov_addr32_addr32[] = { 0x67, 0x67, 0x8b,
@@ -68,6 +69,10 @@ int main(void)
 		static const uint8_t add_es_es[] = { 0x26, 0x26, 0x00, 0x62,
 						     0xf4, 0x7c, 0x08, 0x80,
 						     0xd1, 0x05 };
+		static const uint8_t add_fs_gs[] = { 0x64, 0x65, 0x00, 0x62,
+						     0xf4 };
+		static const uint8_t mov_gs_fs[] = { 0x65, 0x64, 0x8b, 0x00 };
+		static const uint8_t mov_gs_cs[] = { 0x65, 0x2e, 0x8b, 0x00 };
 
 		ok &= decodes(handle, mov_cs_cs, sizeof(mov_cs_cs), 4,
 			      "mov edx, ebp");
@@ -75,6 +80,12 @@ int main(void)
 			      sizeof(mov_addr32_addr32), 4, "mov edx, ebp");
 		ok &= decodes(handle, add_es_es, sizeof(add_es_es), 5,
 			      "add byte ptr [rdx - 0xc], ah");
+		ok &= decodes(handle, add_fs_gs, sizeof(add_fs_gs), 5,
+			      "add byte ptr gs:[rdx - 0xc], ah");
+		ok &= decodes(handle, mov_gs_fs, sizeof(mov_gs_fs), 4,
+			      "mov eax, dword ptr fs:[rax]");
+		ok &= decodes(handle, mov_gs_cs, sizeof(mov_gs_cs), 4,
+			      "mov eax, dword ptr gs:[rax]");
 	}
 	cs_close(&handle);
 	if (!ok)
