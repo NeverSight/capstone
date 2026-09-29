@@ -2366,12 +2366,15 @@ decode_sha512_vex(csh handle, const uint8_t *code, size_t code_len,
 		source2_number = source1_number;
 		source1_number = (~(p1 >> 3)) & 0xf;
 	}
-	/* VEX.X is unused in 64-bit register forms; 32-bit mode has no
-	 * corresponding extended register bank. */
-	if (!(arch->mode & CS_MODE_64) &&
-	    ((p0 & 0x40) == 0 || destination_number >= 8 ||
-	     source1_number >= 8 || source2_number >= 8))
-		return X86_FEATURE_INVALID;
+	/* VEX.X is unused in these register forms.  Outside 64-bit mode only
+	 * eight vector registers exist: VEX.B and the top bit of VEX.vvvv are
+	 * ignored there, and VEX.R and VEX.X are one, as the byte would
+	 * otherwise be the ModR/M of LES. */
+	if (!(arch->mode & CS_MODE_64)) {
+		destination_number &= 7;
+		source1_number &= 7;
+		source2_number &= 7;
+	}
 	destination = (x86_reg)(X86_REG_YMM0 + destination_number);
 	if (opcode == 0xcb) {
 		source1 = (x86_reg)(X86_REG_YMM0 + source1_number);
@@ -3150,6 +3153,35 @@ static bool starts_with_legacy_inc_dec(csh handle, const uint8_t *code,
 	return false;
 }
 
+/* Outside 64-bit mode C4, C5 and 62 escape to VEX or EVEX only when the next
+ * byte would be a register ModR/M; otherwise they are LES, LDS and BOUND,
+ * which the generated tables decode. */
+static bool starts_with_legacy_pointer_load(csh handle, const uint8_t *code,
+					    size_t code_len)
+{
+	const cs_struct *arch = (const cs_struct *)(uintptr_t)handle;
+	size_t offset = 0;
+
+	if (arch->mode & CS_MODE_64)
+		return false;
+	while (offset < code_len &&
+	       (is_apx_evex_segment_prefix(code[offset]) ||
+		code[offset] == 0x66 || code[offset] == 0x67 ||
+		code[offset] == 0xf0 || code[offset] == 0xf2 ||
+		code[offset] == 0xf3))
+		++offset;
+	if (offset + 1 >= code_len)
+		return false;
+	switch (code[offset]) {
+	default:
+		return false;
+	case 0x62:
+	case 0xc4:
+	case 0xc5:
+		return (code[offset + 1] & 0xc0) != 0xc0;
+	}
+}
+
 static x86_reg rex2_register(unsigned int number, uint8_t width)
 {
 	static const x86_reg registers_8[] = {
@@ -3314,7 +3346,8 @@ X86_decodeFeatureExtension(csh handle, const uint8_t *code, size_t code_len,
 	/* In 16/32-bit modes 0x40..0x4f are INC/DEC opcodes, not REX
 	 * prefixes.  Do not let a later EVEX-looking byte sequence make a
 	 * feature decoder reinterpret the current legacy instruction. */
-	if (starts_with_legacy_inc_dec(handle, code, code_len))
+	if (starts_with_legacy_inc_dec(handle, code, code_len) ||
+	    starts_with_legacy_pointer_load(handle, code, code_len))
 		return X86_FEATURE_NOT_HANDLED;
 	if (has_duplicate_feature_evex_prefixes(code, code_len))
 		return X86_FEATURE_INVALID;

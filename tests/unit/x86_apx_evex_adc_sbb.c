@@ -1135,7 +1135,22 @@ static bool test_invalid_encodings(csh handle)
 	return success;
 }
 
-static bool test_wrong_mode(const uint8_t *code, size_t code_size)
+static bool decodes_bound(csh handle, const uint8_t *code, size_t code_size,
+			  const char *message)
+{
+	cs_insn *insn = NULL;
+	size_t count = cs_disasm(handle, code, code_size, 0x1000, 1, &insn);
+	bool success =
+		check(count == 1 && insn[0].id == X86_INS_BOUND, message);
+
+	cs_free(insn, count);
+	return success;
+}
+
+/* Outside 64-bit mode APX does not exist: its EVEX encodings are invalid,
+ * and those whose P0 extends a register are BOUND, as XED decodes them. */
+static bool test_wrong_mode(const uint8_t *code, size_t code_size,
+			    const uint8_t *extended, size_t extended_size)
 {
 	static const cs_mode modes[] = { CS_MODE_16, CS_MODE_32 };
 	bool success = true;
@@ -1149,6 +1164,8 @@ static bool test_wrong_mode(const uint8_t *code, size_t code_size)
 			return false;
 		success &= rejects(handle, code, code_size,
 				   "APX promoted ADC/SBB requires 64-bit mode");
+		success &= decodes_bound(handle, extended, extended_size,
+					 "extended registers make 62 BOUND");
 		cs_close(&handle);
 	}
 	return success;
@@ -1157,7 +1174,7 @@ static bool test_wrong_mode(const uint8_t *code, size_t code_size)
 int main(void)
 {
 	csh handle;
-	uint8_t wrong_mode_code[6];
+	uint8_t wrong_mode_code[6], wrong_mode_extended[6];
 	bool success = true;
 
 	if (!check(cs_open(CS_ARCH_X86, CS_MODE_64, &handle) == CS_ERR_OK,
@@ -1172,9 +1189,13 @@ int main(void)
 	success &= run_matrix(handle, true);
 	success &= test_encoding_anchors(handle);
 	success &= test_invalid_encodings(handle);
-	encode_binary_register(wrong_mode_code, &operations[0], 8, false, true,
-			       31, 29, 30);
-	success &= test_wrong_mode(wrong_mode_code, sizeof(wrong_mode_code));
+	encode_binary_register(wrong_mode_code, &operations[0], 4, false, false,
+			       1, 1, 0);
+	encode_binary_register(wrong_mode_extended, &operations[0], 8, false,
+			       true, 31, 29, 30);
+	success &= test_wrong_mode(wrong_mode_code, sizeof(wrong_mode_code),
+				   wrong_mode_extended,
+				   sizeof(wrong_mode_extended));
 	cs_close(&handle);
 	return success ? 0 : 1;
 }

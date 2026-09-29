@@ -225,6 +225,19 @@ static bool rejects(csh handle, const uint8_t *code, size_t code_size,
 	return success;
 }
 
+static bool check_les(csh handle, const uint8_t *code, size_t code_size)
+{
+	cs_insn *insn = NULL;
+	size_t count = cs_disasm(handle, code, code_size, 0x1000, 1, &insn);
+	bool success = check(
+		count == 1 && insn[0].id == X86_INS_LES && insn[0].size == 3 &&
+			strcmp(insn[0].op_str, "esp, ptr [edx + 0x7f]") == 0,
+		"32-bit C4 before a memory ModR/M is LES");
+
+	cs_free(insn, count);
+	return success;
+}
+
 static bool test_64bit_variants(csh handle)
 {
 	static const uint8_t msg1_high[] = { 0xc4, 0x42, 0x7f, 0xcc, 0xe4 };
@@ -317,12 +330,13 @@ static bool test_32bit_and_16bit_modes(void)
 	static const uint8_t msg1[] = { 0xc4, 0xe2, 0x7f, 0xcc, 0xd3 };
 	static const uint8_t msg2[] = { 0xc4, 0xe2, 0x7f, 0xcd, 0xd3 };
 	static const uint8_t rnds2[] = { 0xc4, 0xe2, 0x67, 0xcb, 0xd4 };
-	static const uint8_t high_destination[] = { 0xc4, 0x62, 0x7f, 0xcc,
-						    0xe3 };
-	static const uint8_t high_source[] = { 0xc4, 0xc2, 0x7f, 0xcc, 0xd3 };
-	static const uint8_t unused_x_extension[] = { 0xc4, 0xa2, 0x7f, 0xcc,
-						      0xd3 };
-	static const uint8_t high_vvvv[] = { 0xc4, 0xe2, 0x27, 0xcb, 0xd4 };
+	/* Outside 64-bit mode a clear VEX.R or VEX.X makes C4 the LES opcode,
+	 * while VEX.B and the top bit of VEX.vvvv are ignored, as in XED. */
+	static const uint8_t les[] = { 0xc4, 0x62, 0x7f, 0xcc, 0xe3 };
+	static const uint8_t les_truncated_disp32[] = { 0xc4, 0xa2, 0x7f, 0xcc,
+							0xd3 };
+	static const uint8_t ignored_b[] = { 0xc4, 0xc2, 0x7f, 0xcc, 0xd3 };
+	static const uint8_t ignored_vvvv3[] = { 0xc4, 0xe2, 0x27, 0xcb, 0xd4 };
 	static const x86_reg msg1_regs[] = { X86_REG_YMM2, X86_REG_XMM3 };
 	static const x86_reg msg2_regs[] = { X86_REG_YMM2, X86_REG_YMM3 };
 	static const x86_reg rnds2_regs[] = { X86_REG_YMM2, X86_REG_YMM3,
@@ -343,12 +357,14 @@ static bool test_32bit_and_16bit_modes(void)
 	success &= check_render(handle, rnds2, X86_INS_VSHA512RNDS2,
 				"vsha512rnds2", "ymm2, ymm3, xmm4", 4, 3,
 				rnds2_regs);
-	success &= rejects(handle, high_destination, 5,
-			   "32-bit extended destination");
-	success &= rejects(handle, high_source, 5, "32-bit extended source");
-	success &= rejects(handle, unused_x_extension, 5,
-			   "32-bit VEX.X extension");
-	success &= rejects(handle, high_vvvv, 5, "32-bit extended VEX.vvvv");
+	success &= check_render(handle, ignored_b, X86_INS_VSHA512MSG1,
+				"vsha512msg1", "ymm2, xmm3", 4, 2, msg1_regs);
+	success &= check_render(handle, ignored_vvvv3, X86_INS_VSHA512RNDS2,
+				"vsha512rnds2", "ymm2, ymm3, xmm4", 4, 3,
+				rnds2_regs);
+	success &= check_les(handle, les, sizeof(les));
+	success &= rejects(handle, les_truncated_disp32, 5,
+			   "32-bit LES with a truncated displacement");
 	cs_close(&handle);
 
 	if (!check(cs_open(CS_ARCH_X86, CS_MODE_16, &handle) == CS_ERR_OK,

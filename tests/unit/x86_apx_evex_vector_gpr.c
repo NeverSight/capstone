@@ -145,6 +145,24 @@ static bool rejects(csh handle, const uint8_t code[6], cs_mode mode,
 	return check(count == 0, name, "reserved encoding is rejected");
 }
 
+/* Outside 64-bit mode an EVEX P0 that extends a register makes 62 BOUND, as
+ * XED decodes it. */
+static bool decodes_bound_in_32bit(const uint8_t code[6], const char *name)
+{
+	cs_insn *insn = NULL;
+	csh handle;
+	size_t count;
+	bool bound;
+
+	if (cs_open(CS_ARCH_X86, CS_MODE_32, &handle) != CS_ERR_OK)
+		return false;
+	count = cs_disasm(handle, code, 6, 0x1000, 1, &insn);
+	bound = count == 1 && insn[0].id == X86_INS_BOUND;
+	cs_free(insn, count);
+	cs_close(&handle);
+	return check(bound, name, "extended registers make 62 BOUND");
+}
+
 int main(void)
 {
 	static const vector_gpr_case cases[] = {
@@ -208,8 +226,8 @@ int main(void)
 			   "reserved-broadcast-bit");
 	success &= rejects(handle, missing_fixed_bit, CS_MODE_64,
 			   "missing-fixed-bit");
-	success &= rejects(handle, cases[2].code, CS_MODE_32,
-			   "extended-gpr-outside-64-bit");
+	success &= decodes_bound_in_32bit(cases[2].code,
+					  "extended-gpr-outside-64-bit");
 
 	cs_close(&handle);
 	return success ? 0 : 1;

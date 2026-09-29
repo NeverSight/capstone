@@ -869,18 +869,27 @@ static bool test_invalid_encodings(csh handle)
 	return success;
 }
 
+/* Outside 64-bit mode APX does not exist: its EVEX encodings are invalid,
+ * and those whose P0 extends a register are BOUND, as XED decodes them. */
 static bool test_wrong_mode(void)
 {
-	uint8_t code[6];
+	uint8_t code[6], extended[6];
+	cs_insn *insn = NULL;
 	csh handle = 0;
+	size_t count;
 	bool success;
 
-	encode_register_case(code, 4, true, true, 31, 30, 29);
+	encode_register_case(code, 4, false, false, 0, 0, 1);
+	encode_register_case(extended, 4, true, true, 31, 30, 29);
 	if (!check(cs_open(CS_ARCH_X86, CS_MODE_32, &handle) == CS_ERR_OK,
 		   "open 32-bit mode"))
 		return false;
 	success = rejects(handle, code, sizeof(code),
 			  "APX EVEX IMUL is rejected outside 64-bit mode");
+	count = cs_disasm(handle, extended, sizeof(extended), 0x1000, 1, &insn);
+	success &= check(count == 1 && insn[0].id == X86_INS_BOUND,
+			 "extended registers make 62 BOUND");
+	cs_free(insn, count);
 	cs_close(&handle);
 	return success;
 }
