@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
 static bool rejects(csh handle, const uint8_t *code, size_t size)
 {
@@ -11,6 +12,26 @@ static bool rejects(csh handle, const uint8_t *code, size_t size)
 	if (instruction)
 		cs_free(instruction, 1);
 	return rejected;
+}
+
+static bool decodes(csh handle, const uint8_t *code, size_t size,
+		    uint16_t length, const char *text)
+{
+	cs_insn *instruction = NULL;
+	size_t count = cs_disasm(handle, code, size, 0, 1, &instruction);
+	char actual[160] = "";
+	bool ok;
+
+	if (count == 1)
+		snprintf(actual, sizeof(actual), "%s %s", instruction->mnemonic,
+			 instruction->op_str);
+	ok = count == 1 && instruction->size == length &&
+	     strcmp(actual, text) == 0;
+	if (!ok)
+		fprintf(stderr, "decoded as \"%s\", expected \"%s\"\n", actual,
+			text);
+	cs_free(instruction, count);
+	return ok;
 }
 
 int main(void)
@@ -36,6 +57,36 @@ int main(void)
 		return 1;
 	for (unsigned int i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i)
 		ok &= rejects(handle, cases[i], sizes[i]);
+
+	/* Legacy instructions keep the generated decoder's reading of repeated
+	 * prefixes, also when the byte after their opcode has the value of an
+	 * EVEX or REX2 escape, and the last FS or GS override takes effect, as
+	 * in XED. */
+	{
+		static const uint8_t mov_cs_cs[] = { 0x2e, 0x2e, 0x8b, 0xd5 };
+		static const uint8_t mov_addr32_addr32[] = { 0x67, 0x67, 0x8b,
+							     0xd5 };
+		static const uint8_t add_es_es[] = { 0x26, 0x26, 0x00, 0x62,
+						     0xf4, 0x7c, 0x08, 0x80,
+						     0xd1, 0x05 };
+		static const uint8_t add_fs_gs[] = { 0x64, 0x65, 0x00, 0x62,
+						     0xf4 };
+		static const uint8_t mov_gs_fs[] = { 0x65, 0x64, 0x8b, 0x00 };
+		static const uint8_t mov_gs_cs[] = { 0x65, 0x2e, 0x8b, 0x00 };
+
+		ok &= decodes(handle, mov_cs_cs, sizeof(mov_cs_cs), 4,
+			      "mov edx, ebp");
+		ok &= decodes(handle, mov_addr32_addr32,
+			      sizeof(mov_addr32_addr32), 4, "mov edx, ebp");
+		ok &= decodes(handle, add_es_es, sizeof(add_es_es), 5,
+			      "add byte ptr [rdx - 0xc], ah");
+		ok &= decodes(handle, add_fs_gs, sizeof(add_fs_gs), 5,
+			      "add byte ptr gs:[rdx - 0xc], ah");
+		ok &= decodes(handle, mov_gs_fs, sizeof(mov_gs_fs), 4,
+			      "mov eax, dword ptr fs:[rax]");
+		ok &= decodes(handle, mov_gs_cs, sizeof(mov_gs_cs), 4,
+			      "mov eax, dword ptr gs:[rax]");
+	}
 	cs_close(&handle);
 	if (!ok)
 		fprintf(stderr, "APX duplicate-prefix rejection failure\n");
