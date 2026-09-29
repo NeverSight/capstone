@@ -1546,23 +1546,12 @@ cs_insn *CAPSTONE_API cs_malloc(csh ud)
 	return insn;
 }
 
-// iterator for instruction "single-stepping"
-CAPSTONE_EXPORT
-bool CAPSTONE_API cs_disasm_iter(csh ud, const uint8_t **code, size_t *size,
-				 uint64_t *address, cs_insn *insn)
+static bool disasm_iter(struct cs_struct *handle, csh ud, const uint8_t **code,
+			size_t *size, uint64_t *address, cs_insn *insn)
 {
-	if (*size == 0)
-		return false;
-
-	struct cs_struct *handle;
 	uint16_t insn_size;
 	MCInst mci;
 	bool r;
-
-	handle = (struct cs_struct *)(uintptr_t)ud;
-	if (!handle) {
-		return false;
-	}
 
 	handle->errnum = CS_ERR_OK;
 
@@ -1650,6 +1639,30 @@ bool CAPSTONE_API cs_disasm_iter(csh ud, const uint8_t **code, size_t *size,
 	}
 
 	return true;
+}
+
+// iterator for instruction "single-stepping"
+CAPSTONE_EXPORT
+bool CAPSTONE_API cs_disasm_iter(csh ud, const uint8_t **code, size_t *size,
+				 uint64_t *address, cs_insn *insn)
+{
+	struct cs_struct *handle = (struct cs_struct *)(uintptr_t)ud;
+	cs_detail *detail;
+	bool r;
+
+	if (*size == 0 || !handle)
+		return false;
+
+	// An instruction cs_malloc() allocated while detail was on keeps its
+	// detail after detail is turned off.  Much of the decoder tests only
+	// whether that pointer is set, so a decode without detail hides it, as
+	// cs_disasm() never allocates it then; the detail is left as it was.
+	detail = insn->detail;
+	if (!handle->detail_opt)
+		insn->detail = NULL;
+	r = disasm_iter(handle, ud, code, size, address, insn);
+	insn->detail = detail;
+	return r;
 }
 
 // return friendly name of register in a string

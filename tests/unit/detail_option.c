@@ -5,6 +5,7 @@
 
 #include <stdbool.h>
 #include <stdio.h>
+#include <string.h>
 
 static bool check(bool condition, const char *message)
 {
@@ -28,8 +29,59 @@ static bool decodes_with_detail(csh handle, bool *detail)
 	return true;
 }
 
+/// Decoding with cs_disasm_iter() into an instruction cs_malloc() allocated
+/// while detail was on, after detail is turned off, leaves its detail as the
+/// last decode with detail filled it.
+static bool test_iter(cs_arch arch, cs_mode mode, const uint8_t *insn_code,
+		      size_t insn_size)
+{
+	csh handle = 0;
+	cs_insn *insn;
+	cs_detail *detail, before;
+	const uint8_t *cursor;
+	size_t left;
+	uint64_t address;
+	bool success = true;
+	int i;
+
+	if (!cs_support(arch))
+		return true;
+	if (!check(cs_open(arch, mode, &handle) == CS_ERR_OK, "open"))
+		return false;
+	cs_option(handle, CS_OPT_DETAIL, CS_OPT_ON);
+	insn = cs_malloc(handle);
+	detail = insn->detail;
+	cursor = insn_code;
+	left = insn_size;
+	address = 0x1000;
+	success &=
+		check(cs_disasm_iter(handle, &cursor, &left, &address, insn) &&
+			      insn->detail == detail,
+		      "decode with detail");
+	before = *detail;
+
+	cs_option(handle, CS_OPT_DETAIL, CS_OPT_OFF);
+	for (i = 0; success && i < 64; i++) {
+		cursor = insn_code;
+		left = insn_size;
+		address = 0x1000;
+		success &= check(cs_disasm_iter(handle, &cursor, &left,
+						&address, insn),
+				 "decode without detail");
+	}
+	success &= check(insn->detail == detail, "the detail is kept");
+	success &= check(memcmp(&before, detail, sizeof(before)) == 0,
+			 "decodes without detail leave it as it was");
+
+	cs_free(insn, 1);
+	cs_close(&handle);
+	return success;
+}
+
 int main(void)
 {
+	// bl 0x1000
+	static const uint8_t aarch64_code[] = { 0x00, 0x00, 0x00, 0x94 };
 	csh handle = 0;
 	bool detail = false;
 	bool success = true;
@@ -59,5 +111,9 @@ int main(void)
 			 "CS_OPT_OFF clears CS_OPT_DETAIL_REAL too");
 
 	cs_close(&handle);
+
+	success &= test_iter(CS_ARCH_X86, CS_MODE_64, code, sizeof(code));
+	success &= test_iter(CS_ARCH_AARCH64, CS_MODE_ARM, aarch64_code,
+			     sizeof(aarch64_code));
 	return success ? 0 : 1;
 }
