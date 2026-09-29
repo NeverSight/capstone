@@ -3131,6 +3131,30 @@ static bool is_rex2_leading_prefix(uint8_t byte)
 	}
 }
 
+/* Every feature decoder starts at the first byte after the legacy and REX
+ * prefixes, which is an EVEX, VEX or REX2 escape or the 0F 38 of a legacy
+ * map-2 opcode.  Most instructions start with none of them and need not run
+ * the decoders at all. */
+static bool may_be_feature_extension(const uint8_t *code, size_t code_len)
+{
+	size_t offset = 0;
+
+	while (offset < code_len && is_rex2_leading_prefix(code[offset]))
+		++offset;
+	if (offset == code_len)
+		return false;
+	switch (code[offset]) {
+	default:
+		return false;
+	case 0x0f:
+		return code_len - offset >= 2 && code[offset + 1] == 0x38;
+	case 0x62:
+	case 0xc4:
+	case 0xd5:
+		return true;
+	}
+}
+
 static bool starts_with_legacy_inc_dec(csh handle, const uint8_t *code,
 				       size_t code_len)
 {
@@ -3342,6 +3366,8 @@ x86_feature_decode_result
 X86_decodeFeatureExtension(csh handle, const uint8_t *code, size_t code_len,
 			   MCInst *instr, uint16_t *size)
 {
+	if (!may_be_feature_extension(code, code_len))
+		return X86_FEATURE_NOT_HANDLED;
 	/* In 16/32-bit modes 0x40..0x4f are INC/DEC opcodes, not REX
 	 * prefixes.  Do not let a later EVEX-looking byte sequence make a
 	 * feature decoder reinterpret the current legacy instruction. */
