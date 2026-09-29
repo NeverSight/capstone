@@ -919,6 +919,23 @@ static int str_replace(char *result, char *target, const char *str1, char *str2)
 #endif
 
 // fill insn with mnemonic & operands info
+// fill the parts of insn that do not come from printing it, for a handle
+// with CS_OPT_TEXT off
+static void fill_insn_without_text(cs_insn *insn, MCInst *mci,
+				   const uint8_t *code)
+{
+	uint16_t copy_size = MIN(sizeof(insn->bytes), insn->size);
+
+	memcpy(insn->bytes, code + insn->size - copy_size, copy_size);
+	insn->size = copy_size;
+	insn->mnemonic[0] = '\0';
+	insn->op_str[0] = '\0';
+
+	// alias instruction might have ID saved in OpcodePub
+	if (MCInst_getOpcodePub(mci))
+		insn->id = MCInst_getOpcodePub(mci);
+}
+
 static void fill_insn(struct cs_struct *handle, cs_insn *insn, SStream *OS,
 		      MCInst *mci, PostPrinter_t postprinter,
 		      const uint8_t *code)
@@ -1090,6 +1107,10 @@ cs_err CAPSTONE_API cs_option(csh ud, cs_opt_type type, uintptr_t value)
 
 	case CS_OPT_UNSIGNED:
 		handle->imm_unsigned = (cs_opt_value)value;
+		return CS_ERR_OK;
+
+	case CS_OPT_TEXT:
+		handle->no_text = value == CS_OPT_OFF;
 		return CS_ERR_OK;
 
 	case CS_OPT_DETAIL:
@@ -1330,19 +1351,24 @@ size_t CAPSTONE_API cs_disasm(csh ud, const uint8_t *buffer, size_t size,
 		r = handle->disasm(ud, buffer, size, &mci, &insn_size, offset,
 				   handle->getinsn_info);
 		if (r) {
-			SStream ss;
-			SStream_Init(&ss);
-
 			mci.flat_insn->size = insn_size;
 
 			// map internal instruction opcode to public insn ID
 
 			handle->insn_id(handle, insn_cache, mci.Opcode);
 
-			SStream_opt_unum(&ss, handle->imm_unsigned);
-			handle->printer(&mci, &ss, handle->printer_info);
-			fill_insn(handle, insn_cache, &ss, &mci,
-				  handle->post_printer, buffer);
+			if (handle->no_text) {
+				fill_insn_without_text(insn_cache, &mci,
+						       buffer);
+			} else {
+				SStream ss;
+				SStream_Init(&ss);
+				SStream_opt_unum(&ss, handle->imm_unsigned);
+				handle->printer(&mci, &ss,
+						handle->printer_info);
+				fill_insn(handle, insn_cache, &ss, &mci,
+					  handle->post_printer, buffer);
+			}
 
 			// adjust for pseudo opcode (X86)
 			if (handle->arch == CS_ARCH_X86 &&
@@ -1553,18 +1579,21 @@ bool CAPSTONE_API cs_disasm_iter(csh ud, const uint8_t **code, size_t *size,
 	r = handle->disasm(ud, *code, *size, &mci, &insn_size, *address,
 			   handle->getinsn_info);
 	if (r) {
-		SStream ss;
-		SStream_Init(&ss);
-
 		mci.flat_insn->size = insn_size;
 
 		// map internal instruction opcode to public insn ID
 		handle->insn_id(handle, insn, mci.Opcode);
 
-		SStream_opt_unum(&ss, handle->imm_unsigned);
-		handle->printer(&mci, &ss, handle->printer_info);
-
-		fill_insn(handle, insn, &ss, &mci, handle->post_printer, *code);
+		if (handle->no_text) {
+			fill_insn_without_text(insn, &mci, *code);
+		} else {
+			SStream ss;
+			SStream_Init(&ss);
+			SStream_opt_unum(&ss, handle->imm_unsigned);
+			handle->printer(&mci, &ss, handle->printer_info);
+			fill_insn(handle, insn, &ss, &mci, handle->post_printer,
+				  *code);
+		}
 
 		// adjust for pseudo opcode (X86)
 		if (handle->arch == CS_ARCH_X86)
