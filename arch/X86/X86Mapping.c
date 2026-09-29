@@ -3319,15 +3319,14 @@ static bool has_duplicate_feature_evex_prefixes(const uint8_t *code,
 	unsigned int segment_count = 0, address_size_count = 0;
 	while (prefix_offset < code_len && code[prefix_offset] != 0x62 &&
 	       code[prefix_offset] != 0xd5) {
-		uint8_t prefix = code[prefix_offset++];
+		uint8_t prefix = code[prefix_offset];
 		if (is_apx_evex_segment_prefix(prefix))
 			++segment_count;
 		else if (prefix == 0x67)
 			++address_size_count;
-		else if (is_rex2_leading_prefix(prefix))
-			continue;
-		else
+		else if (!is_rex2_leading_prefix(prefix))
 			break;
+		++prefix_offset;
 	}
 	if ((segment_count <= 1 && address_size_count <= 1) ||
 	    prefix_offset >= code_len)
