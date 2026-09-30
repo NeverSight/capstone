@@ -2372,6 +2372,76 @@ static int checkEVEX(const struct InternalInstruction *insn)
 	return 0;
 }
 
+/* The architectural number of a vector register, whatever its width. */
+static int vectorRegisterNumber(Reg reg)
+{
+	if (reg >= MODRM_REG_XMM0 && reg <= MODRM_REG_XMM31)
+		return reg - MODRM_REG_XMM0;
+	if (reg >= MODRM_REG_YMM0 && reg <= MODRM_REG_YMM31)
+		return reg - MODRM_REG_YMM0;
+	if (reg >= MODRM_REG_ZMM0 && reg <= MODRM_REG_ZMM31)
+		return reg - MODRM_REG_ZMM0;
+	return -1;
+}
+
+static int vectorIndexNumber(SIBIndex index)
+{
+	if (index >= SIB_INDEX_XMM0 && index <= SIB_INDEX_XMM31)
+		return index - SIB_INDEX_XMM0;
+	if (index >= SIB_INDEX_YMM0 && index <= SIB_INDEX_YMM31)
+		return index - SIB_INDEX_YMM0;
+	if (index >= SIB_INDEX_ZMM0 && index <= SIB_INDEX_ZMM31)
+		return index - SIB_INDEX_ZMM0;
+	return -1;
+}
+
+/*
+ * checkGatherRegisters - Rejects a gather whose destination shares a register
+ *   with its vector index or, in the VEX form, whose mask shares one with
+ *   either; the SDM makes both #UD, and XED rejects them.
+ *
+ * @param insn  - The instruction whose operands have been read.
+ * @return      - 0 if the registers are distinct; nonzero otherwise.
+ */
+static int checkGatherRegisters(const struct InternalInstruction *insn)
+{
+	const OperandSpecifier *operands =
+		&x86OperandSets[insn->spec->operands][0];
+	int destination, index, mask = -1;
+	bool reg = false, vsib = false;
+	int i;
+
+	/* A gather lists its ModRM.reg destination before its VSIB source; a
+	 * scatter lists its VSIB destination first. */
+	for (i = 0; i < X86_MAX_OPERANDS; ++i) {
+		switch (operands[i].encoding) {
+		default:
+			break;
+		case ENCODING_REG:
+			reg = true;
+			break;
+CASE_ENCODING_VSIB:
+			if (!reg)
+				return 0;
+			vsib = true;
+			break;
+		case ENCODING_VVVV:
+			mask = vectorRegisterNumber(insn->vvvv);
+			break;
+		}
+	}
+	if (!vsib)
+		return 0;
+	destination = vectorRegisterNumber(insn->reg);
+	index = vectorIndexNumber(insn->sibIndex);
+	if (destination < 0 || index < 0)
+		return 0;
+	if (destination == index ||
+	    (mask >= 0 && (mask == destination || mask == index)))
+		return -1;
+	return 0;
+}
+
 static bool isRex2ForbiddenExtendedStateInstruction(uint16_t instructionID)
 {
 	switch (instructionID) {
@@ -2649,7 +2719,8 @@ int decodeInstruction(struct InternalInstruction *insn, byteReader_t reader,
 
 	if (readPrefixes(insn) || readOpcode(insn) || getID(insn) ||
 	    insn->instructionID == 0 || checkPrefix(insn) ||
-	    readOperands(insn) || checkEVEX(insn))
+	    readOperands(insn) || checkEVEX(insn) ||
+	    checkGatherRegisters(insn))
 		return -1;
 
 	insn->length = (size_t)(insn->readerCursor - insn->startLocation);
