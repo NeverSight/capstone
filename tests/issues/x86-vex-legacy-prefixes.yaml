@@ -1,0 +1,89 @@
+test_cases:
+  -
+    input:
+      name: "x86-64: a 66 prefix before VEX makes the instruction invalid"
+      bytes: [ 0x66, 0xc5, 0xf8, 0x77 ]
+      arch: "CS_ARCH_X86"
+      options: [ CS_MODE_64 ]
+    expected:
+      insns: []
+  -
+    input:
+      name: "x86-64: an F3 prefix before VEX makes the instruction invalid"
+      bytes: [ 0xf3, 0xc5, 0xf8, 0x77 ]
+      arch: "CS_ARCH_X86"
+      options: [ CS_MODE_64 ]
+    expected:
+      insns: []
+  -
+    input:
+      name: "x86-64: an F2 prefix before a segment override and VEX makes the instruction invalid"
+      bytes: [ 0xf2, 0x2e, 0xc5, 0xf8, 0x77 ]
+      arch: "CS_ARCH_X86"
+      options: [ CS_MODE_64 ]
+    expected:
+      insns: []
+  -
+    input:
+      name: "x86-64: a REX prefix before EVEX makes the instruction invalid"
+      bytes: [ 0x48, 0x62, 0xf1, 0x7c, 0x08, 0x58, 0xc2 ]
+      arch: "CS_ARCH_X86"
+      options: [ CS_MODE_64 ]
+    expected:
+      insns: []
+  -
+    input:
+      name: "x86-64: a 66 prefix before XOP makes the instruction invalid"
+      bytes: [ 0x66, 0x8f, 0xe9, 0x78, 0xe2, 0xc8 ]
+      arch: "CS_ARCH_X86"
+      options: [ CS_MODE_64 ]
+    expected:
+      insns: []
+  -
+    input:
+      name: "x86-32: a 66 prefix before VEX makes the instruction invalid"
+      bytes: [ 0x66, 0xc5, 0xf8, 0x77 ]
+      arch: "CS_ARCH_X86"
+      options: [ CS_MODE_32 ]
+    expected:
+      insns: []
+  -
+    input:
+      name: "x86-64: a segment override before VEX is accepted"
+      bytes: [ 0x2e, 0xc5, 0xf8, 0x77 ]
+      arch: "CS_ARCH_X86"
+      options: [ CS_MODE_64 ]
+    expected:
+      insns:
+      -
+        asm_text: "vzeroupper"
+  -
+    input:
+      name: "x86-64: an address-size prefix before VEX is accepted"
+      bytes: [ 0x67, 0xc5, 0xf8, 0x77 ]
+      arch: "CS_ARCH_X86"
+      options: [ CS_MODE_64 ]
+    expected:
+      insns:
+      -
+        asm_text: "vzeroupper"
+  -
+    input:
+      name: "x86-64: a REX prefix followed by a segment override before VEX is accepted"
+      bytes: [ 0x48, 0x2e, 0xc5, 0xf8, 0x77 ]
+      arch: "CS_ARCH_X86"
+      options: [ CS_MODE_64 ]
+    expected:
+      insns:
+      -
+        asm_text: "vzeroupper"
+  -
+    input:
+      name: "x86-64: EVEX without a legacy prefix still decodes"
+      bytes: [ 0x62, 0xf1, 0x7c, 0x08, 0x58, 0xc2 ]
+      arch: "CS_ARCH_X86"
+      options: [ CS_MODE_64 ]
+    expected:
+      insns:
+      -
+        asm_text: "vaddps xmm0, xmm0, xmm2"
