@@ -2640,7 +2640,8 @@ static x86_feature_decode_result decode_apx_convert(csh handle,const uint8_t *co
 	while(off<len&&code[off]!=0x62){uint8_t p=code[off];if(is_apx_evex_segment_prefix(p))segp=p;else if(p==0x67)a32=true;else if(p==0x66||p==0xf0||p==0xf2||p==0xf3||is_effective_rex(code,len,off))bad=true;else if(p<0x40||p>0x4f)return X86_FEATURE_NOT_HANDLED;++off;}
 	if(off==len||len-off<2||(code[off+1]&7)!=4)return X86_FEATURE_NOT_HANDLED;if(len-off<5)return X86_FEATURE_INVALID;e=&code[off];op=e[4];if(op!=0x60&&op!=0x61&&op!=0xf0&&op!=0xf1)return X86_FEATURE_NOT_HANDLED;if(!(arch->mode&CS_MODE_64)||bad||len-off<6||off+6>15)return X86_FEATURE_INVALID;
 	p0=e[1];p1=e[2];p2=e[3];m=e[5];pp=p1&3;mem=(m&0xc0)!=0xc0;crc=op>=0xf0;store=op==0x61;if(pp>1||(p1&0x78)!=0x78||p2!=8||(!mem&&!(p1&4)))return X86_FEATURE_INVALID;
-	if(crc){if(op==0xf0&&pp)return X86_FEATURE_INVALID;dw=(p1&0x80)?8:4;sw=op==0xf0?1:(pp?2:dw);store=false;}else{dw=sw=pp?2:((p1&0x80)?8:4);}
+	/* As in the other promoted forms, W selects 64-bit operands over 66. */
+	if(crc){if(op==0xf0&&pp)return X86_FEATURE_INVALID;dw=(p1&0x80)?8:4;sw=op==0xf0?1:(p1&0x80)?8:(pp?2:4);store=false;}else{dw=sw=(p1&0x80)?8:(pp?2:4);}
 	dn=((~p0&0x80)>>4)|(~p0&0x10)|((m>>3)&7);d=rex2_register(dn,store?sw:dw);if(d==X86_REG_INVALID)return X86_FEATURE_INVALID;
 	MCInst_clear(instr);MCInst_setOpcode(instr,crc?X86_FEATURE_APX_CRC32:X86_FEATURE_APX_MOVBE);MCOperand_CreateImm0(instr,d);MCOperand_CreateImm0(instr,mem);MCOperand_CreateImm0(instr,store);
 	if(!mem){rn=((~p0&0x20)>>2)|((p0&8)<<1)|(m&7);s=rex2_register(rn,store?dw:sw);if(s==X86_REG_INVALID)return X86_FEATURE_INVALID;MCOperand_CreateImm0(instr,s);MCOperand_CreateImm0(instr,dw);MCOperand_CreateImm0(instr,sw);*size=(uint16_t)(off+6);set_apx_evex_encoding_detail(instr,e,off,segp,a32,NULL);return X86_FEATURE_DECODED;}
