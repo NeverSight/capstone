@@ -3323,10 +3323,13 @@ decode_apx_jmpabs(csh handle, const uint8_t *code, size_t code_len,
 static bool has_duplicate_feature_evex_prefixes(const uint8_t *code,
 						 size_t code_len)
 {
-	// Repeated legacy segment/address-size prefixes are architecturally
-	// undefined.  Keep this fork's canonical fail-closed policy stateless and
-	// ahead of every feature-extension decoder so a newly added APX topology
-	// cannot accidentally reintroduce last-prefix-wins normalization.
+	// The SDM counts at most one prefix from each group as useful (Vol. 2A,
+	// 2.1.1), so a repeated segment or address-size prefix is not a
+	// canonical encoding.  XED and GNU objdump let the last one win, as the
+	// generated decoder does for legacy and VEX forms.  For EVEX and REX2
+	// forms this fork deliberately fails closed instead: the check runs
+	// ahead of every feature-extension decoder, so a newly added APX or AMX
+	// decoder cannot silently adopt either reading.
 	size_t prefix_offset = 0;
 	unsigned int segment_count = 0, address_size_count = 0;
 	while (prefix_offset < code_len && code[prefix_offset] != 0x62 &&
