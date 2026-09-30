@@ -2375,21 +2375,47 @@ decode_sha512_vex(csh handle, const uint8_t *code, size_t code_len,
 		  MCInst *instr, uint16_t *size)
 {
 	const cs_struct *arch = (const cs_struct *)(uintptr_t)handle;
+	const bool mode64 = (arch->mode & CS_MODE_64) != 0;
+	const uint8_t *vex;
+	size_t vex_offset = 0;
+	uint8_t segment_prefix = 0;
+	bool address_size_prefix = false, invalid_prefix = false;
 	uint8_t p0, p1, opcode, modrm;
 	unsigned int destination_number, source1_number, source2_number = 0;
 	x86_reg destination, source1, source2 = X86_REG_INVALID;
 
-	if (code_len < 4 || code[0] != 0xc4 || (code[1] & 0x1f) != 2 ||
-	    (code[3] != 0xcb && code[3] != 0xcc && code[3] != 0xcd))
+	/* Segment and address-size prefixes do not affect these register
+	 * forms.  66, F2, F3, LOCK and an effective REX make VEX #UD. */
+	while (vex_offset < code_len && code[vex_offset] != 0xc4) {
+		uint8_t prefix = code[vex_offset];
+
+		if (is_apx_evex_segment_prefix(prefix)) {
+			segment_prefix = prefix;
+		} else if (prefix == 0x67) {
+			address_size_prefix = true;
+		} else if (prefix == 0x66 || prefix == 0xf0 || prefix == 0xf2 ||
+			   prefix == 0xf3 ||
+			   (mode64 &&
+			    is_effective_rex(code, code_len, vex_offset))) {
+			invalid_prefix = true;
+		} else if (!mode64 || prefix < 0x40 || prefix > 0x4f) {
+			return X86_FEATURE_NOT_HANDLED;
+		}
+		++vex_offset;
+	}
+	if (code_len - vex_offset < 4 || (code[vex_offset + 1] & 0x1f) != 2 ||
+	    (code[vex_offset + 3] != 0xcb && code[vex_offset + 3] != 0xcc &&
+	     code[vex_offset + 3] != 0xcd))
 		return X86_FEATURE_NOT_HANDLED;
-	if (code_len < 5)
+	if (code_len - vex_offset < 5 || vex_offset + 5 > 15)
 		return X86_FEATURE_INVALID;
-	p0 = code[1];
-	p1 = code[2];
-	opcode = code[3];
-	modrm = code[4];
+	vex = &code[vex_offset];
+	p0 = vex[1];
+	p1 = vex[2];
+	opcode = vex[3];
+	modrm = vex[4];
 	/* The SDM 11:rrr:bbb opcode forms are register-only. */
-	if (!(arch->mode & (CS_MODE_32 | CS_MODE_64)) ||
+	if (!(arch->mode & (CS_MODE_32 | CS_MODE_64)) || invalid_prefix ||
 	    (opcode == 0xcb ? (p1 & 0x87) != 0x07 : p1 != 0x7f) ||
 	    (modrm & 0xc0) != 0xc0)
 		return X86_FEATURE_INVALID;
@@ -2427,12 +2453,14 @@ decode_sha512_vex(csh handle, const uint8_t *code, size_t code_len,
 	MCOperand_CreateImm0(instr, source1);
 	if (source2 != X86_REG_INVALID)
 		MCOperand_CreateImm0(instr, source2);
-	*size = 5;
-	set_amx_tile_encoding_detail(instr, code, 0, 3, 0, false, 4, NULL);
+	*size = (uint16_t)(vex_offset + 5);
+	set_amx_tile_encoding_detail(instr, code, vex_offset, 3, segment_prefix,
+				     address_size_prefix, vex_offset + 4, NULL);
 	if (instr->flat_insn->detail) {
 		cs_x86 *x86 = &instr->flat_insn->detail->x86;
 
-		x86->addr_size = (arch->mode & CS_MODE_64) ? 8 : 4;
+		x86->addr_size = mode64 ? (address_size_prefix ? 4 : 8) :
+					  (address_size_prefix ? 2 : 4);
 		x86->rex = (uint8_t)((arch->mode & CS_MODE_64) ?
 					     0x40 | ((~p0 & 0xe0) >> 5) :
 					     0);
