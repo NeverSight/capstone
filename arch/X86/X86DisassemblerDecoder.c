@@ -389,22 +389,21 @@ static void setSegmentOverride(struct InternalInstruction *insn,
 		return;
 	}
 
-	// In 64-bit mode, the ES/CS/SS/DS segment overrides should be ignored.
-	// In the case there are multiple segment overrides, do not override
-	// an existing FS or GS segment prefix.
-	switch (insn->prefix1) {
-	case 0x64: // FS
-	case 0x65: // GS
-		return;
-	}
-
-	// If the proposed override is for FS or GS, mark it overridden.
-	// All other segment prefixes are ignored.
+	// In 64-bit mode, the last FS or GS override takes effect, as in XED.
 	switch (byte) {
 	case 0x64: // FS
 	case 0x65: // GS
 		insn->segmentOverride = prefix;
-		break;
+		insn->prefix1 = byte;
+		return;
+	}
+
+	// The ES/CS/SS/DS segment overrides are ignored, and do not cancel an
+	// earlier FS or GS override either.
+	switch (insn->prefix1) {
+	case 0x64: // FS
+	case 0x65: // GS
+		return;
 	}
 
 	// `prefix1` may later be used to decode the `notrack` prefix.
