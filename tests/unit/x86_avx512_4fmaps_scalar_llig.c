@@ -96,7 +96,9 @@ int main(void)
 	if (cs_open(CS_ARCH_X86, CS_MODE_64, &handle) != CS_ERR_OK)
 		return 1;
 	cs_option(handle, CS_OPT_DETAIL, CS_OPT_ON);
-	for (unsigned int ll = 0; ll != 4; ++ll) {
+	/* The scalar forms ignore EVEX.L'L, except that the reserved
+	 * L'L = 11 is #UD, as XED decodes them. */
+	for (unsigned int ll = 0; ll != 3; ++ll) {
 		ok &= valid(handle, 0x9b, (uint8_t)(0x08 | (ll << 5)),
 			    X86_INS_V4FMADDSS, "v4fmaddss");
 		ok &= valid(handle, 0xab, (uint8_t)(0x08 | (ll << 5)),
@@ -107,25 +109,36 @@ int main(void)
 			    X86_INS_V4FNMADDSS, "v4fnmaddss");
 	}
 	{
+		const uint8_t reserved_ll[][6] = {
+			{ 0x62, 0xf2, 0x5f, 0x68, 0x9b, 0x08 },
+			{ 0x62, 0xf2, 0x5f, 0x68, 0xab, 0x08 },
+			{ 0x62, 0xf2, 0x5f, 0x6b, 0x9b, 0x08 },
+			{ 0x62, 0xf2, 0x5f, 0xeb, 0xab, 0x08 },
+		};
+		for (size_t i = 0;
+		     i != sizeof(reserved_ll) / sizeof(reserved_ll[0]); ++i)
+			ok &= invalid(handle, reserved_ll[i]);
+	}
+	{
 		const uint8_t fs[] = { 0x64 };
 		const uint8_t address32[] = { 0x67 };
 		const uint8_t fs_address32[] = { 0x64, 0x67 };
-		ok &= valid_prefixed(handle, fs, sizeof(fs), 0x9b, 0x68,
+		ok &= valid_prefixed(handle, fs, sizeof(fs), 0x9b, 0x48,
 				     X86_INS_V4FMADDSS, X86_REG_FS, 8);
 		ok &= valid_prefixed(handle, address32, sizeof(address32), 0xab,
 				     0x48, X86_INS_V4FNMADDSS,
 				     X86_REG_INVALID, 4);
 		ok &= valid_prefixed(handle, fs_address32, sizeof(fs_address32),
-				     0x9b, 0x68, X86_INS_V4FMADDSS,
-				     X86_REG_FS, 4);
+				     0x9b, 0x48, X86_INS_V4FMADDSS, X86_REG_FS,
+				     4);
 	}
 	{
-		const uint8_t duplicate_segment[] =
-			{ 0x64, 0x65, 0x62, 0xf2, 0x5f, 0x68, 0x9b, 0x08 };
-		const uint8_t duplicate_address[] =
-			{ 0x67, 0x67, 0x62, 0xf2, 0x5f, 0x68, 0xab, 0x08 };
-		const uint8_t illegal_prefix[] =
-			{ 0x66, 0x62, 0xf2, 0x5f, 0x68, 0x9b, 0x08 };
+		const uint8_t duplicate_segment[] = { 0x64, 0x65, 0x62, 0xf2,
+						      0x5f, 0x48, 0x9b, 0x08 };
+		const uint8_t duplicate_address[] = { 0x67, 0x67, 0x62, 0xf2,
+						      0x5f, 0x48, 0xab, 0x08 };
+		const uint8_t illegal_prefix[] = { 0x66, 0x62, 0xf2, 0x5f,
+						   0x48, 0x9b, 0x08 };
 		cs_insn *instruction = NULL;
 		ok &= cs_disasm(handle, duplicate_segment,
 				sizeof(duplicate_segment), 0, 1, &instruction) == 0;

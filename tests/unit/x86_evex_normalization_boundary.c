@@ -135,6 +135,8 @@ static bool check_packed_compare_length(csh handle, const char *name,
 	return ok;
 }
 
+/* Scalar VCMPSS/SD ignore EVEX.L'L, except that the reserved L'L = 11 is #UD
+ * unless EVEX.b selects SAE for a register source, as XED decodes them. */
 static bool check_scalar_compare_llig(csh handle)
 {
 	static const struct {
@@ -178,8 +180,11 @@ static bool check_scalar_compare_llig(csh handle)
 			code[3] = (uint8_t)(0x08 | lengths[length]);
 			snprintf(name, sizeof(name), "%s-reg-ll%zu",
 				 families[family].name, length);
-			ok &= check_evex_p2(handle, name, code, sizeof(code),
-					    families[family].id);
+			ok &= length == 3 ? check_rejected(handle, name, code,
+							   sizeof(code)) :
+					    check_evex_p2(handle, name, code,
+							  sizeof(code),
+							  families[family].id);
 			code[3] = (uint8_t)(0x18 | lengths[length]);
 			snprintf(name, sizeof(name), "%s-sae-ll%zu",
 				 families[family].name, length);
@@ -189,20 +194,29 @@ static bool check_scalar_compare_llig(csh handle)
 			code[5] = 0x0b;
 			snprintf(name, sizeof(name), "%s-mem-ll%zu",
 				 families[family].name, length);
-			ok &= check_evex_p2(handle, name, code, sizeof(code),
-					    families[family].id);
+			ok &= length == 3 ? check_rejected(handle, name, code,
+							   sizeof(code)) :
+					    check_evex_p2(handle, name, code,
+							  sizeof(code),
+							  families[family].id);
 			code[3] = (uint8_t)(0x0a | lengths[length]);
 			code[5] = 0xcb;
 			snprintf(name, sizeof(name), "%s-masked-reg-ll%zu",
 				 families[family].name, length);
-			ok &= check_evex_p2(handle, name, code, sizeof(code),
-					    families[family].id);
+			ok &= length == 3 ? check_rejected(handle, name, code,
+							   sizeof(code)) :
+					    check_evex_p2(handle, name, code,
+							  sizeof(code),
+							  families[family].id);
 			code[3] = (uint8_t)(0x0a | lengths[length]);
 			code[5] = 0x0b;
 			snprintf(name, sizeof(name), "%s-masked-mem-ll%zu",
 				 families[family].name, length);
-			ok &= check_evex_p2(handle, name, code, sizeof(code),
-					    families[family].id);
+			ok &= length == 3 ? check_rejected(handle, name, code,
+							   sizeof(code)) :
+					    check_evex_p2(handle, name, code,
+							  sizeof(code),
+							  families[family].id);
 			code[3] = (uint8_t)(0x1a | lengths[length]);
 			code[5] = 0xcb;
 			snprintf(name, sizeof(name), "%s-masked-sae-ll%zu",
@@ -314,20 +328,27 @@ int main(void)
 		{ "avx512er-llig", { 0x62, 0xf2, 0x4d, 0x28, 0xcb, 0xef }, 6 },
 		{ "rcp14-llig", { 0x62, 0xf2, 0x7d, 0x28, 0x4d, 0xca }, 6 },
 		{ "vfpclass-llig",
-		  { 0x62, 0xf3, 0x7d, 0x29, 0x67, 0xda, 0xff }, 7 },
+		  { 0x62, 0xf3, 0x7d, 0x29, 0x67, 0xda, 0xff },
+		  7 },
 		{ "4fmaps-llig", { 0x62, 0xf2, 0x5f, 0x28, 0x9b, 0x08 }, 6 },
 		{ "vcmpss-llig",
-		  { 0x62, 0xf1, 0x6e, 0x28, 0xc2, 0xcb, 0x00 }, 7 },
+		  { 0x62, 0xf1, 0x6e, 0x28, 0xc2, 0xcb, 0x00 },
+		  7 },
 		{ "vcmpsd-llig",
-		  { 0x62, 0xf1, 0xef, 0x68, 0xc2, 0xcb, 0x00 }, 7 },
+		  { 0x62, 0xf1, 0xef, 0x48, 0xc2, 0xcb, 0x00 },
+		  7 },
 		{ "fs-avx512er-llig",
-		  { 0x64, 0x62, 0xf2, 0x4d, 0x28, 0xcb, 0x28 }, 7 },
+		  { 0x64, 0x62, 0xf2, 0x4d, 0x28, 0xcb, 0x28 },
+		  7 },
 		{ "fs-rcp14-llig",
-		  { 0x64, 0x62, 0xf2, 0x7d, 0x28, 0x4d, 0x08 }, 7 },
+		  { 0x64, 0x62, 0xf2, 0x7d, 0x28, 0x4d, 0x08 },
+		  7 },
 		{ "fs-vfpclass-llig",
-		  { 0x64, 0x62, 0xf3, 0x7d, 0x29, 0x67, 0x1a, 0xff }, 8 },
+		  { 0x64, 0x62, 0xf3, 0x7d, 0x29, 0x67, 0x1a, 0xff },
+		  8 },
 		{ "fs-4fmaps-llig",
-		  { 0x64, 0x62, 0xf2, 0x5f, 0x28, 0x9b, 0x08 }, 7 },
+		  { 0x64, 0x62, 0xf2, 0x5f, 0x28, 0x9b, 0x08 },
+		  7 },
 	};
 	csh handle = 0;
 	bool ok;

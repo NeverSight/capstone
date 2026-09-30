@@ -102,20 +102,30 @@ done:
 
 static bool check_unused_address_extensions(csh handle)
 {
-	/* vpdpbusd zmm0 {k1}{z}, zmm2, zmm3.  EVEX.B4 and X4 are set,
-	 * but neither bit extends an operand in a register-only form. */
+	/* vpdpbusd zmm0 {k1}{z}, zmm2, zmm3.  EVEX.B4 is set but extends
+	 * nothing in a register-only form.  EVEX.U must stay set there: a clear
+	 * U (X4) is #UD without a memory index, as XED decodes it. */
 	static const uint8_t code[] = {
+		0x62, 0xfa, 0x6d, 0xc9, 0x50, 0xc3,
+	};
+	static const uint8_t clear_u[] = {
 		0x62, 0xfa, 0x69, 0xc9, 0x50, 0xc3,
 	};
 	cs_insn *insn = NULL;
 	const cs_x86 *x86;
 	bool success;
-	size_t count = cs_disasm(handle, code, sizeof(code), 0x1000, 1, &insn);
+	size_t count =
+		cs_disasm(handle, clear_u, sizeof(clear_u), 0x1000, 1, &insn);
 
+	if (count != 0) {
+		fprintf(stderr, "vpdpbusd with a clear EVEX.U decoded\n");
+		cs_free(insn, count);
+		return false;
+	}
+	count = cs_disasm(handle, code, sizeof(code), 0x1000, 1, &insn);
 	if (count != 1 || insn == NULL || insn[0].id != X86_INS_VPDPBUSD ||
 	    insn[0].detail == NULL) {
-		fprintf(stderr,
-			"vpdpbusd with unused address extensions did not decode\n");
+		fprintf(stderr, "vpdpbusd with an unused B4 did not decode\n");
 		cs_free(insn, count);
 		return false;
 	}

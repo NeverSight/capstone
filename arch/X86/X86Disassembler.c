@@ -1743,7 +1743,8 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 			(code[evex_normalization_offset + 5] & 0xc0) != 0xc0;
 
 		if (evex_invalid_prefix || evex_segment_count > 1 ||
-		    evex_address_size_count > 1 || (memory && b))
+		    evex_address_size_count > 1 || (memory && b) ||
+		    (!b && ll == 3))
 			return false;
 		if (!b && ll != 0) {
 			memcpy(normalized_code, info.code,
@@ -1854,10 +1855,11 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 			info.size = evex_normalization_limit;
 		}
 	}
-	/* Scalar AVX512_4FMAPS encodings are EVEX.LLIG.  LLVM's generated
-	 * decoder contains only the LL=0 spelling, so canonicalize LL without
-	 * changing EVEX.b, z, aaa, or any operand bits.  Packed PS opcodes are
-	 * deliberately excluded because their vector length remains fixed. */
+	/* Scalar AVX512_4FMAPS encodings are EVEX.LLIG, except that the
+	 * reserved L'L = 11 is #UD.  LLVM's generated decoder contains only the
+	 * LL=0 spelling, so canonicalize LL without changing EVEX.b, z, aaa, or
+	 * any operand bits.  Packed PS opcodes are deliberately excluded because
+	 * their vector length remains fixed. */
 	{
 		if (has_evex_normalization_prefix &&
 		    evex_normalization_limit - evex_normalization_offset >= 6 &&
@@ -1874,7 +1876,7 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 
 			if (evex_invalid_prefix || evex_segment_count > 1 ||
 			    evex_address_size_count > 1 || broadcast ||
-			    (zeroing && mask == 0))
+			    (zeroing && mask == 0) || ll == 3)
 				return false;
 			if (ll != 0) {
 				memcpy(normalized_code, info.code,
@@ -1892,7 +1894,8 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 	 * decoder predates APX and treats B4=1 or U=0 (X4=1) as a malformed EVEX
 	 * prefix.  Normalize only those two bits for table lookup, then retain the
 	 * architectural values for operand translation and public raw detail.
-	 * VSIB continues to use V4 for its vector index; X4 is ignored there. */
+	 * VSIB continues to use V4 for its vector index; X4 is ignored there.
+	 * A register r/m has no index, so U=0 remains #UD there, as in XED. */
 	{
 		const size_t limit = code_len < sizeof(normalized_code) ?
 					     code_len : sizeof(normalized_code);
@@ -1912,7 +1915,9 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 			const uint8_t modrm = code[apx_evex_offset + 5];
 
 			if (!(handle->mode & CS_MODE_64) || invalid_prefix ||
-			    segment_count > 1 || address_size_count > 1)
+			    segment_count > 1 || address_size_count > 1 ||
+			    ((modrm & 0xc0) == 0xc0 &&
+			     (code[apx_evex_offset + 2] & 0x04) == 0))
 				return false;
 			apx_evex_p0 = code[apx_evex_offset + 1];
 			apx_evex_p1 = code[apx_evex_offset + 2];

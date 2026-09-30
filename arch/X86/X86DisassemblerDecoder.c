@@ -1832,7 +1832,7 @@ static int readModRM(struct InternalInstruction *insn)
 	return 0;
 }
 
-#define GENERIC_FIXUP_FUNC(name, base, prefix, mask) \
+#define GENERIC_FIXUP_FUNC(name, base, prefix, mask, rm_field) \
 	static uint16_t name(struct InternalInstruction *insn, \
 			     OperandType type, uint8_t index, uint8_t *valid) \
 	{ \
@@ -1874,10 +1874,11 @@ static int readModRM(struct InternalInstruction *insn)
 		case TYPE_XMM: \
 			return prefix##_XMM0 + index; \
 		case TYPE_VK: \
-			index &= 0xf; \
-			if (index > 7) \
+			/* An opmask register in ModRM.reg or VVVV has no \
+			 * extension bits; in ModRM.r/m, B and X are ignored. */ \
+			if (index > 7 && !(rm_field)) \
 				*valid = 0; \
-			return prefix##_K0 + index; \
+			return prefix##_K0 + (index & 7); \
 		case TYPE_MM64: \
 			return prefix##_MM0 + (index & 0x7); \
 		case TYPE_SEGMENTREG: \
@@ -1914,8 +1915,8 @@ static int readModRM(struct InternalInstruction *insn)
  *                field is valid for the register class; 0 if not.
  * @return      - The proper value.
  */
-GENERIC_FIXUP_FUNC(fixupRegValue, insn->regBase, MODRM_REG, 0x1f)
-GENERIC_FIXUP_FUNC(fixupRMValue, insn->eaRegBase, EA_REG, 0xf)
+GENERIC_FIXUP_FUNC(fixupRegValue, insn->regBase, MODRM_REG, 0x1f, false)
+GENERIC_FIXUP_FUNC(fixupRMValue, insn->eaRegBase, EA_REG, 0xf, true)
 
 /*
  * fixupReg - Consults an operand specifier to determine which of the
@@ -2343,6 +2344,34 @@ CASE_ENCODING_RM:
 	return 0;
 }
 
+/*
+ * checkEVEX - Rejects the EVEX encodings that the decode tables accept but
+ *   that are #UD, as XED rejects them: zeroing without an opmask, the reserved
+ *   vector length L'L = 11 outside a register-form rounding control, and
+ *   EVEX.V' outside 64-bit mode.
+ *
+ * @param insn  - The instruction whose operands have been read.
+ * @return      - 0 if the EVEX prefix is legal; nonzero otherwise.
+ */
+static int checkEVEX(const struct InternalInstruction *insn)
+{
+	uint8_t p2;
+	bool registerForm;
+
+	if (insn->vectorExtensionType != TYPE_EVEX)
+		return 0;
+	p2 = insn->vectorExtensionPrefix[3];
+	registerForm = insn->consumedModRM && modFromModRM(insn->modRM) == 3;
+	if (zFromEVEX4of4(p2) && !aaaFromEVEX4of4(p2))
+		return -1;
+	if (l2FromEVEX4of4(p2) && lFromEVEX4of4(p2) &&
+	    !(bFromEVEX4of4(p2) && registerForm))
+		return -1;
+	if (insn->mode != MODE_64BIT && v2FromEVEX4of4(p2))
+		return -1;
+	return 0;
+}
+
 static bool isRex2ForbiddenExtendedStateInstruction(uint16_t instructionID)
 {
 	switch (instructionID) {
@@ -2619,7 +2648,8 @@ int decodeInstruction(struct InternalInstruction *insn, byteReader_t reader,
 	insn->numImmediatesConsumed = 0;
 
 	if (readPrefixes(insn) || readOpcode(insn) || getID(insn) ||
-	    insn->instructionID == 0 || checkPrefix(insn) || readOperands(insn))
+	    insn->instructionID == 0 || checkPrefix(insn) ||
+	    readOperands(insn) || checkEVEX(insn))
 		return -1;
 
 	insn->length = (size_t)(insn->readerCursor - insn->startLocation);
