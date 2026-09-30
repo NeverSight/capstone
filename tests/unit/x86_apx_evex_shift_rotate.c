@@ -62,6 +62,14 @@ static bool check(bool condition, const char *message)
 	return condition;
 }
 
+/* Counts print like every other x86 immediate: decimal up to 9, else hex. */
+static void format_count(char *buffer, size_t buffer_size, unsigned int count,
+			 bool att_syntax)
+{
+	snprintf(buffer, buffer_size, count > 9 ? "%s0x%x" : "%s%u",
+		 att_syntax ? "$" : "", count);
+}
+
 static x86_reg register_for(uint8_t width, unsigned int number)
 {
 	static const x86_reg registers_8[] = {
@@ -300,8 +308,8 @@ static bool check_register_case(csh handle, const shift_operation *operation,
 		snprintf(count_text, sizeof(count_text), "%s",
 			 att_syntax ? "%cl" : "cl");
 	else
-		snprintf(count_text, sizeof(count_text),
-			 att_syntax ? "$%u" : "%u", count_value);
+		format_count(count_text, sizeof(count_text), count_value,
+			     att_syntax);
 	if (att_syntax) {
 		snprintf(expected_mnemonic, sizeof(expected_mnemonic), "%s%s%c",
 			 nf ? "{nf} " : "", operation->mnemonic,
@@ -465,8 +473,8 @@ static bool check_memory_case(csh handle, const shift_operation *operation,
 		snprintf(count_text, sizeof(count_text), "%s",
 			 att_syntax ? "%cl" : "cl");
 	else
-		snprintf(count_text, sizeof(count_text),
-			 att_syntax ? "$%u" : "%u", count_value);
+		format_count(count_text, sizeof(count_text), count_value,
+			     att_syntax);
 	if (att_syntax) {
 		snprintf(expected_mnemonic, sizeof(expected_mnemonic), "%s%s%c",
 			 nf ? "{nf} " : "", operation->mnemonic,
@@ -733,8 +741,8 @@ static bool test_encoding_anchors(csh handle)
 		  "rcl", "r31w, word ptr gs:[r29 + r30*4 + 0x20], 1", "rclw",
 		  "$1, %gs:0x20(%r29,%r30,4), %r31w" },
 		{ sar_nd_nf_memory, sizeof(sar_nd_nf_memory), X86_INS_SAR,
-		  "{nf} sar", "r31w, word ptr [r29 + r30*4 + 0x20], 37",
-		  "{nf} sarw", "$37, 0x20(%r29,%r30,4), %r31w" },
+		  "{nf} sar", "r31w, word ptr [r29 + r30*4 + 0x20], 0x25",
+		  "{nf} sarw", "$0x25, 0x20(%r29,%r30,4), %r31w" },
 	};
 	uint8_t code[10];
 	size_t code_size;

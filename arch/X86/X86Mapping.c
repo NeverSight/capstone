@@ -4770,7 +4770,8 @@ static bool print_apx_shift_rotate(MCInst *instr, SStream *stream,
 		if (count_kind == X86_FEATURE_SHIFT_CL)
 			SStream_concat0(stream, "%cl");
 		else
-			SStream_concat(stream, "$%u", count_value);
+			print_apx_scalar_immediate(instr, stream, count_value,
+						   1, true);
 		++output_index;
 	}
 	for (i = 0; i < data_count; ++i) {
@@ -4816,7 +4817,8 @@ static bool print_apx_shift_rotate(MCInst *instr, SStream *stream,
 		if (count_kind == X86_FEATURE_SHIFT_CL)
 			SStream_concat0(stream, "cl");
 		else
-			SStream_concat(stream, "%u", count_value);
+			print_apx_scalar_immediate(instr, stream, count_value,
+						   1, false);
 	}
 	if (!instr->flat_insn->detail)
 		return true;
@@ -4883,7 +4885,7 @@ static bool print_apx_convert(MCInst*in,SStream*out,bool att){unsigned opc=MCIns
 
 static bool print_apx_double_shift(MCInst*in,SStream*s,bool att)
 {
-	unsigned op=MCInst_getOpcode(in),n,i;bool right=op==X86_FEATURE_APX_SHRD,mem,nd,nf,cl;x86_reg dst,src,rm=X86_REG_INVALID,seg=X86_REG_INVALID;uint8_t w,imm;x86_feature_memory m;cs_detail*d;cs_x86*x;if(!right&&op!=X86_FEATURE_APX_SHLD)return false;dst=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,0));src=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,1));mem=MCOperand_getImm(MCInst_getOperand(in,2))!=0;nd=MCOperand_getImm(MCInst_getOperand(in,3))!=0;nf=MCOperand_getImm(MCInst_getOperand(in,4))!=0;memset(&m,0,sizeof(m));if(mem){if(MCInst_getNumOperands(in)!=14||!get_feature_memory(in,5,&m))return false;seg=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,9));w=(uint8_t)MCOperand_getImm(MCInst_getOperand(in,11));cl=MCOperand_getImm(MCInst_getOperand(in,12))!=0;imm=(uint8_t)MCOperand_getImm(MCInst_getOperand(in,13));}else{if(MCInst_getNumOperands(in)!=9)return false;rm=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,5));w=(uint8_t)MCOperand_getImm(MCInst_getOperand(in,6));cl=MCOperand_getImm(MCInst_getOperand(in,7))!=0;imm=(uint8_t)MCOperand_getImm(MCInst_getOperand(in,8));}if(nf)SStream_concat0(s,"{nf}|");SStream_concat(s,att?"%s%c\t":"%s\t",right?"shrd":"shld",w==2?'w':w==4?'l':'q');n=nd?4:3;for(i=0;i<n;i++){unsigned k=att?n-1-i:i;if(i)SStream_concat0(s,", ");if(k==n-1){if(cl)SStream_concat0(s,att?"%cl":"cl");else SStream_concat(s,att?"$%u":"%u",imm);}else if(nd&&k==0)SStream_concat(s,att?"%%%s":"%s",X86_reg_name((csh)in->csh,dst));else if((nd&&k==1)||(!nd&&k==0)){if(mem){if(!att)SStream_concat0(s,w==2?"word ptr ":w==4?"dword ptr ":"qword ptr ");if(seg!=X86_REG_INVALID)SStream_concat(s,att?"%%%s:":"%s:",feature_register_name(seg));if(!print_feature_memory(s,&m,att))return false;}else SStream_concat(s,att?"%%%s":"%s",X86_reg_name((csh)in->csh,rm));}else SStream_concat(s,att?"%%%s":"%s",X86_reg_name((csh)in->csh,src));}if(!in->flat_insn->detail)return true;d=in->flat_insn->detail;x=&d->x86;for(i=0;i<n;i++){unsigned k=att?n-1-i:i;cs_x86_op*o=&x->operands[i];if(k==n-1){o->type=cl?X86_OP_REG:X86_OP_IMM;if(cl)o->reg=X86_REG_CL;else o->imm=imm;o->size=1;o->access=CS_AC_READ;}else if(nd&&k==0){o->type=X86_OP_REG;o->reg=dst;o->size=w;o->access=CS_AC_WRITE;}else if((nd&&k==1)||(!nd&&k==0)){uint8_t ac=nd?CS_AC_READ:CS_AC_READ_WRITE;if(mem){set_feature_memory_operand(o,&m,w,ac);o->mem.segment=seg;}else{o->type=X86_OP_REG;o->reg=rm;o->size=w;o->access=ac;}}else{o->type=X86_OP_REG;o->reg=src;o->size=w;o->access=CS_AC_READ;}}x->op_count=n;if(cl)d->regs_read[d->regs_read_count++]=X86_REG_CL;if(!nf){d->regs_write[d->regs_write_count++]=X86_REG_EFLAGS;x->eflags=X86_EFLAGS_MODIFY_OF|X86_EFLAGS_MODIFY_SF|X86_EFLAGS_MODIFY_ZF|X86_EFLAGS_UNDEFINED_AF|X86_EFLAGS_MODIFY_PF|X86_EFLAGS_MODIFY_CF;}return true;
+	unsigned op=MCInst_getOpcode(in),n,i;bool right=op==X86_FEATURE_APX_SHRD,mem,nd,nf,cl;x86_reg dst,src,rm=X86_REG_INVALID,seg=X86_REG_INVALID;uint8_t w,imm;x86_feature_memory m;cs_detail*d;cs_x86*x;if(!right&&op!=X86_FEATURE_APX_SHLD)return false;dst=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,0));src=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,1));mem=MCOperand_getImm(MCInst_getOperand(in,2))!=0;nd=MCOperand_getImm(MCInst_getOperand(in,3))!=0;nf=MCOperand_getImm(MCInst_getOperand(in,4))!=0;memset(&m,0,sizeof(m));if(mem){if(MCInst_getNumOperands(in)!=14||!get_feature_memory(in,5,&m))return false;seg=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,9));w=(uint8_t)MCOperand_getImm(MCInst_getOperand(in,11));cl=MCOperand_getImm(MCInst_getOperand(in,12))!=0;imm=(uint8_t)MCOperand_getImm(MCInst_getOperand(in,13));}else{if(MCInst_getNumOperands(in)!=9)return false;rm=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,5));w=(uint8_t)MCOperand_getImm(MCInst_getOperand(in,6));cl=MCOperand_getImm(MCInst_getOperand(in,7))!=0;imm=(uint8_t)MCOperand_getImm(MCInst_getOperand(in,8));}if(nf)SStream_concat0(s,"{nf}|");SStream_concat(s,att?"%s%c\t":"%s\t",right?"shrd":"shld",w==2?'w':w==4?'l':'q');n=nd?4:3;for(i=0;i<n;i++){unsigned k=att?n-1-i:i;if(i)SStream_concat0(s,", ");if(k==n-1){if(cl)SStream_concat0(s,att?"%cl":"cl");else print_apx_scalar_immediate(in,s,imm,1,att);}else if(nd&&k==0)SStream_concat(s,att?"%%%s":"%s",X86_reg_name((csh)in->csh,dst));else if((nd&&k==1)||(!nd&&k==0)){if(mem){if(!att)SStream_concat0(s,w==2?"word ptr ":w==4?"dword ptr ":"qword ptr ");if(seg!=X86_REG_INVALID)SStream_concat(s,att?"%%%s:":"%s:",feature_register_name(seg));if(!print_feature_memory(s,&m,att))return false;}else SStream_concat(s,att?"%%%s":"%s",X86_reg_name((csh)in->csh,rm));}else SStream_concat(s,att?"%%%s":"%s",X86_reg_name((csh)in->csh,src));}if(!in->flat_insn->detail)return true;d=in->flat_insn->detail;x=&d->x86;for(i=0;i<n;i++){unsigned k=att?n-1-i:i;cs_x86_op*o=&x->operands[i];if(k==n-1){o->type=cl?X86_OP_REG:X86_OP_IMM;if(cl)o->reg=X86_REG_CL;else o->imm=imm;o->size=1;o->access=CS_AC_READ;}else if(nd&&k==0){o->type=X86_OP_REG;o->reg=dst;o->size=w;o->access=CS_AC_WRITE;}else if((nd&&k==1)||(!nd&&k==0)){uint8_t ac=nd?CS_AC_READ:CS_AC_READ_WRITE;if(mem){set_feature_memory_operand(o,&m,w,ac);o->mem.segment=seg;}else{o->type=X86_OP_REG;o->reg=rm;o->size=w;o->access=ac;}}else{o->type=X86_OP_REG;o->reg=src;o->size=w;o->access=CS_AC_READ;}}x->op_count=n;if(cl)d->regs_read[d->regs_read_count++]=X86_REG_CL;if(!nf){d->regs_write[d->regs_write_count++]=X86_REG_EFLAGS;x->eflags=X86_EFLAGS_MODIFY_OF|X86_EFLAGS_MODIFY_SF|X86_EFLAGS_MODIFY_ZF|X86_EFLAGS_UNDEFINED_AF|X86_EFLAGS_MODIFY_PF|X86_EFLAGS_MODIFY_CF;}return true;
 }
 
 static bool print_apx_cmpccxadd(MCInst*in,SStream*s,bool att)
@@ -5042,7 +5044,7 @@ static bool print_apx_rorx(MCInst *in, SStream *s, bool att)
 			SStream_concat(s, att ? "%%%s" : "%s",
 				       X86_reg_name((csh)in->csh, dr));
 		else if (k == 2)
-			SStream_concat(s, att ? "$%u" : "%u", imm);
+			print_apx_scalar_immediate(in, s, imm, 1, att);
 		else if (mem) {
 			if (!att)
 				SStream_concat0(s, w == 4 ? "dword ptr " :
