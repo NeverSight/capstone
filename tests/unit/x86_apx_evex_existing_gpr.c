@@ -185,9 +185,12 @@ int main(void)
 	static const uint8_t vsib_memory[] = {
 		0x62, 0x9a, 0x79, 0x42, 0x90, 0x4c, 0xb5, 0x00
 	};
-	static const uint8_t ignored_bits[] = {
-		0x62, 0xf9, 0x60, 0x4d, 0x58, 0xd4
-	};
+	/* B4 extends nothing in a register-only form and is ignored, but a
+	 * clear EVEX.U (X4) there is #UD, as XED decodes it. */
+	static const uint8_t ignored_bits[] = { 0x62, 0xf9, 0x64,
+						0x4d, 0x58, 0xd4 };
+	static const uint8_t register_x4[] = { 0x62, 0xf9, 0x60,
+					       0x4d, 0x58, 0xd4 };
 	static const uint8_t gpr_source[] = {
 		0x62, 0xd9, 0x6e, 0x08, 0x2a, 0xcd
 	};
@@ -227,11 +230,17 @@ int main(void)
 			  &insn);
 	success &= check(count == 1 && insn[0].id == X86_INS_VADDPS,
 			 "ignored-register-bits",
-			 "unused B4 and U do not alter vector operands");
+			 "an unused B4 does not alter vector operands");
 	if (count == 1)
 		success &= check(strcmp(insn[0].op_str,
 					"zmm2 {k5}, zmm3, zmm4") == 0,
 				 "ignored-register-bits", "vector text is exact");
+	cs_free(insn, count);
+	insn = NULL;
+	count = cs_disasm(handle, register_x4, sizeof(register_x4), 0x1000, 1,
+			  &insn);
+	success &= check(count == 0, "register-x4",
+			 "a clear EVEX.U is rejected in a register form");
 	cs_free(insn, count);
 
 	success &= check_memory(

@@ -565,7 +565,7 @@ static bool rejects(csh handle, const uint8_t *code, size_t code_size,
 }
 
 static bool decodes_as(csh handle, const uint8_t *code, size_t code_size,
-		       const char *mnemonic, const char *operands,
+		       x86_insn id, const char *mnemonic, const char *operands,
 		       const char *message)
 {
 	cs_insn *insn = NULL;
@@ -574,7 +574,7 @@ static bool decodes_as(csh handle, const uint8_t *code, size_t code_size,
 
 	if (count == 1) {
 		success &=
-			check(insn[0].id == X86_INS_IMUL &&
+			check(insn[0].id == id &&
 				      strcmp(insn[0].mnemonic, mnemonic) == 0 &&
 				      strcmp(insn[0].op_str, operands) == 0,
 			      "legal IMUL variant semantics are exact");
@@ -597,10 +597,12 @@ static bool test_legal_variants(csh handle)
 			 "select Intel syntax for legal variants");
 	encode_register_case(base, 8, true, true, 31, 30, 29);
 	base[2] |= 1;
-	success &= decodes_as(handle, base, 6, "{nf} imul", "r31, r30, r29",
+	success &= decodes_as(handle, base, 6, X86_INS_IMUL, "{nf} imul",
+			      "r31, r30, r29",
 			      "W=1 takes precedence over pp=66");
 	base[1] ^= 0x40;
-	success &= decodes_as(handle, base, 6, "{nf} imul", "r31, r30, r29",
+	success &= decodes_as(handle, base, 6, X86_INS_IMUL, "{nf} imul",
+			      "r31, r30, r29",
 			      "unused register-form X extension is ignored");
 
 	encode_register_case(base, 4, false, true, 23, 23, 12);
@@ -637,13 +639,13 @@ static bool test_legal_variants(csh handle)
 
 	encode_memory_case(base, 4, true, true, 31, 30);
 	base[2] |= 0x04;
-	success &= decodes_as(handle, base, 8, "{nf} imul",
+	success &= decodes_as(handle, base, 8, X86_INS_IMUL, "{nf} imul",
 			      "r31d, r30d, dword ptr [r29 + r14*4 + 0x20]",
 			      "memory EVEX.U is the X4 address extension");
 	code[0] = 0x67;
 	encode_memory_case(code + 1, 2, true, false, 31, 30);
 	success &=
-		decodes_as(handle, code, 9, "imul",
+		decodes_as(handle, code, 9, X86_INS_IMUL, "imul",
 			   "r31w, r30w, word ptr [r29d + r30d*4 + 0x20]",
 			   "address-size override uses 32-bit EGPR addressing");
 	return success;
@@ -652,7 +654,7 @@ static bool test_legal_variants(csh handle)
 static bool rejects(csh handle, const uint8_t *code, size_t code_size,
 		    const char *message);
 static bool decodes_as(csh handle, const uint8_t *code, size_t code_size,
-		       const char *mnemonic, const char *operands,
+		       x86_insn id, const char *mnemonic, const char *operands,
 		       const char *message);
 
 static bool test_immediate_and_one_operand_forms(csh handle)
@@ -684,8 +686,10 @@ static bool test_immediate_and_one_operand_forms(csh handle)
 		const cs_x86 *x86 = &insn[0].detail->x86;
 
 		success &= check(
-			insn[0].id == X86_INS_IMUL &&
-				strcmp(insn[0].mnemonic, "{nf} imul") == 0 &&
+			insn[0].id == X86_INS_IMULZU &&
+				strcmp(cs_insn_name(handle, insn[0].id),
+				       "imulzu") == 0 &&
+				strcmp(insn[0].mnemonic, "{nf} imulzu") == 0 &&
 				strcmp(insn[0].op_str, "r17w, r19w, -3") == 0,
 			"IMUL 6B public identity and operands are exact");
 		success &=
@@ -787,10 +791,11 @@ static bool test_immediate_and_one_operand_forms(csh handle)
 				 CS_ERR_OK,
 			 "select AT&T syntax for extended IMUL forms");
 	success &= decodes_as(handle, imul6b_zu_nf, sizeof(imul6b_zu_nf),
-			      "{nf} imulw", "$-3, %r19w, %r17w",
+			      X86_INS_IMULZU, "{nf} imulzuw",
+			      "$-3, %r19w, %r17w",
 			      "IMUL 6B AT&T order is exact");
 	success &= decodes_as(handle, imul_f7_nf, sizeof(imul_f7_nf),
-			      "{nf} imulq", "%r19",
+			      X86_INS_IMUL, "{nf} imulq", "%r19",
 			      "IMUL F7 AT&T form is exact");
 	memcpy(invalid, imul6b_zu_nf, sizeof(imul6b_zu_nf));
 	invalid[2] ^= 0x08;

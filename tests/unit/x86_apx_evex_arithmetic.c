@@ -14,6 +14,8 @@ typedef struct arithmetic_operation {
 	uint8_t binary_base;
 	uint8_t immediate_group;
 	uint64_t eflags;
+	/* ADC and SBB read CF, which also makes EVEX.NF reserved for them. */
+	bool reads_carry;
 } arithmetic_operation;
 
 typedef struct decode_anchor {
@@ -27,20 +29,51 @@ typedef struct decode_anchor {
 } decode_anchor;
 
 static const arithmetic_operation operations[] = {
+	{ X86_INS_ADD, "add", 0x00, 0,
+	  X86_EFLAGS_MODIFY_AF | X86_EFLAGS_MODIFY_CF | X86_EFLAGS_MODIFY_OF |
+		  X86_EFLAGS_MODIFY_PF | X86_EFLAGS_MODIFY_SF |
+		  X86_EFLAGS_MODIFY_ZF,
+	  false },
+	{ X86_INS_OR, "or", 0x08, 1,
+	  X86_EFLAGS_UNDEFINED_AF | X86_EFLAGS_RESET_CF | X86_EFLAGS_RESET_OF |
+		  X86_EFLAGS_MODIFY_PF | X86_EFLAGS_MODIFY_SF |
+		  X86_EFLAGS_MODIFY_ZF,
+	  false },
 	{ X86_INS_ADC, "adc", 0x10, 2,
 	  X86_EFLAGS_MODIFY_OF | X86_EFLAGS_MODIFY_SF | X86_EFLAGS_MODIFY_ZF |
 		  X86_EFLAGS_MODIFY_AF | X86_EFLAGS_MODIFY_PF |
-		  X86_EFLAGS_MODIFY_CF | X86_EFLAGS_TEST_CF },
+		  X86_EFLAGS_MODIFY_CF | X86_EFLAGS_TEST_CF,
+	  true },
 	{ X86_INS_SBB, "sbb", 0x18, 3,
 	  X86_EFLAGS_MODIFY_OF | X86_EFLAGS_MODIFY_SF | X86_EFLAGS_MODIFY_ZF |
 		  X86_EFLAGS_UNDEFINED_AF | X86_EFLAGS_MODIFY_PF |
-		  X86_EFLAGS_MODIFY_CF | X86_EFLAGS_TEST_CF },
+		  X86_EFLAGS_MODIFY_CF | X86_EFLAGS_TEST_CF,
+	  true },
+	{ X86_INS_AND, "and", 0x20, 4,
+	  X86_EFLAGS_UNDEFINED_AF | X86_EFLAGS_RESET_CF | X86_EFLAGS_RESET_OF |
+		  X86_EFLAGS_MODIFY_PF | X86_EFLAGS_MODIFY_SF |
+		  X86_EFLAGS_MODIFY_ZF,
+	  false },
+	{ X86_INS_SUB, "sub", 0x28, 5,
+	  X86_EFLAGS_MODIFY_AF | X86_EFLAGS_MODIFY_CF | X86_EFLAGS_MODIFY_OF |
+		  X86_EFLAGS_MODIFY_PF | X86_EFLAGS_MODIFY_SF |
+		  X86_EFLAGS_MODIFY_ZF,
+	  false },
+	{ X86_INS_XOR, "xor", 0x30, 6,
+	  X86_EFLAGS_UNDEFINED_AF | X86_EFLAGS_RESET_CF | X86_EFLAGS_RESET_OF |
+		  X86_EFLAGS_MODIFY_PF | X86_EFLAGS_MODIFY_SF |
+		  X86_EFLAGS_MODIFY_ZF,
+	  false },
 };
+
+#define ADC_OPERATION (&operations[2])
+#define SBB_OPERATION (&operations[3])
 
 static bool check(bool condition, const char *message)
 {
 	if (!condition)
-		fprintf(stderr, "APX EVEX ADC/SBB check failed: %s\n", message);
+		fprintf(stderr, "APX EVEX arithmetic check failed: %s\n",
+			message);
 	return condition;
 }
 
@@ -129,7 +162,7 @@ static const char *memory_size_name(uint8_t width)
 static void encode_binary_register(uint8_t code[6],
 				   const arithmetic_operation *operation,
 				   uint8_t width, bool reverse, bool nd,
-				   unsigned int destination_number,
+				   bool nf, unsigned int destination_number,
 				   unsigned int source1_number,
 				   unsigned int source2_number)
 {
@@ -145,7 +178,8 @@ static void encode_binary_register(uint8_t code[6],
 		  ((reg_number & 16) ? 0 : 0x10) |
 		  ((rm_number & 16) ? 0x08 : 0);
 	code[2] = w | (((~ndd_number) & 0xf) << 3) | 0x04 | pp;
-	code[3] = (nd ? 0x10 : 0) | ((ndd_number & 16) ? 0 : 0x08);
+	code[3] = (nd ? 0x10 : 0) | (nf ? 0x04 : 0) |
+		  ((ndd_number & 16) ? 0 : 0x08);
 	code[4] = operation->binary_base + (reverse ? 2 : 0) +
 		  (width == 1 ? 0 : 1);
 	code[5] = 0xc0 | ((reg_number & 7) << 3) | (rm_number & 7);
@@ -153,7 +187,7 @@ static void encode_binary_register(uint8_t code[6],
 
 static void encode_binary_memory(uint8_t code[8],
 				 const arithmetic_operation *operation,
-				 uint8_t width, bool reverse, bool nd,
+				 uint8_t width, bool reverse, bool nd, bool nf,
 				 unsigned int destination_number,
 				 unsigned int register_number)
 {
@@ -166,7 +200,8 @@ static void encode_binary_memory(uint8_t code[8],
 	code[1] = 0x0c | ((register_number & 8) ? 0 : 0x80) |
 		  ((register_number & 16) ? 0 : 0x10);
 	code[2] = w | (((~ndd_number) & 0xf) << 3) | pp;
-	code[3] = (nd ? 0x10 : 0) | ((ndd_number & 16) ? 0 : 0x08);
+	code[3] = (nd ? 0x10 : 0) | (nf ? 0x04 : 0) |
+		  ((ndd_number & 16) ? 0 : 0x08);
 	code[4] = operation->binary_base + (reverse ? 2 : 0) +
 		  (width == 1 ? 0 : 1);
 	code[5] = 0x44 | ((register_number & 7) << 3);
@@ -175,21 +210,40 @@ static void encode_binary_memory(uint8_t code[8],
 }
 
 static bool check_flag_detail(const cs_insn *insn,
-			      const arithmetic_operation *operation)
+			      const arithmetic_operation *operation, bool nf)
 {
 	const cs_detail *detail = insn->detail;
+	bool carry_read = operation->reads_carry ?
+				  detail->regs_read_count == 1 &&
+					  detail->regs_read[0] ==
+						  X86_REG_EFLAGS :
+				  detail->regs_read_count == 0;
 
-	return check(detail->x86.eflags == operation->eflags &&
-			     detail->regs_read_count == 1 &&
-			     detail->regs_read[0] == X86_REG_EFLAGS &&
+	if (nf)
+		return check(carry_read && detail->x86.eflags == 0 &&
+				     detail->regs_write_count == 0,
+			     "NF suppresses every EFLAGS effect");
+	return check(carry_read && detail->x86.eflags == operation->eflags &&
 			     detail->regs_write_count == 1 &&
 			     detail->regs_write[0] == X86_REG_EFLAGS,
 		     "carry input and arithmetic EFLAGS effects are exact");
 }
 
+static void format_mnemonic(char *buffer, size_t buffer_size,
+			    const arithmetic_operation *operation,
+			    uint8_t width, bool nf, bool att_syntax)
+{
+	if (att_syntax)
+		snprintf(buffer, buffer_size, "%s%s%c", nf ? "{nf} " : "",
+			 operation->mnemonic, att_suffix(width));
+	else
+		snprintf(buffer, buffer_size, "%s%s", nf ? "{nf} " : "",
+			 operation->mnemonic);
+}
+
 static bool check_binary_register(csh handle,
 				  const arithmetic_operation *operation,
-				  uint8_t width, bool reverse, bool nd,
+				  uint8_t width, bool reverse, bool nd, bool nf,
 				  unsigned int seed, bool att_syntax)
 {
 	unsigned int destination_number = seed;
@@ -202,7 +256,7 @@ static bool check_binary_register(csh handle,
 	const char *source1_name = cs_reg_name(handle, source1);
 	const char *source2_name = cs_reg_name(handle, source2);
 	uint8_t code[6];
-	char expected_mnemonic[16];
+	char expected_mnemonic[24];
 	char expected_operands[128];
 	cs_insn *insn = NULL;
 	cs_regs regs_read = { 0 }, regs_write = { 0 };
@@ -210,12 +264,12 @@ static bool check_binary_register(csh handle,
 	bool success = true;
 	size_t count;
 
-	encode_binary_register(code, operation, width, reverse, nd,
+	encode_binary_register(code, operation, width, reverse, nd, nf,
 			       destination_number, source1_number,
 			       source2_number);
+	format_mnemonic(expected_mnemonic, sizeof(expected_mnemonic), operation,
+			width, nf, att_syntax);
 	if (att_syntax) {
-		snprintf(expected_mnemonic, sizeof(expected_mnemonic), "%s%c",
-			 operation->mnemonic, att_suffix(width));
 		if (nd) {
 			snprintf(expected_operands, sizeof(expected_operands),
 				 "%%%s, %%%s, %%%s", source2_name, source1_name,
@@ -225,8 +279,6 @@ static bool check_binary_register(csh handle,
 				 "%%%s, %%%s", source2_name, source1_name);
 		}
 	} else {
-		snprintf(expected_mnemonic, sizeof(expected_mnemonic), "%s",
-			 operation->mnemonic);
 		if (nd) {
 			snprintf(expected_operands, sizeof(expected_operands),
 				 "%s, %s, %s", destination_name, source1_name,
@@ -282,26 +334,28 @@ static bool check_binary_register(csh handle,
 						access[logical_index],
 				"binary register operand detail is exact");
 		}
-		success &= check_flag_detail(&insn[0], operation);
+		success &= check_flag_detail(&insn[0], operation, nf);
 		success &= check(cs_regs_access(handle, &insn[0], regs_read,
 						&regs_read_count, regs_write,
 						&regs_write_count) == CS_ERR_OK,
 				 "binary register cs_regs_access succeeds");
-		success &=
-			check(regs_read_count == 3 &&
-				      has_register(regs_read, regs_read_count,
-						   source1) &&
-				      has_register(regs_read, regs_read_count,
-						   source2) &&
-				      has_register(regs_read, regs_read_count,
-						   X86_REG_EFLAGS),
-			      "binary data registers and carry input are read");
 		success &= check(
-			regs_write_count == 2 &&
+			regs_read_count == (operation->reads_carry ? 3 : 2) &&
+				has_register(regs_read, regs_read_count,
+					     source1) &&
+				has_register(regs_read, regs_read_count,
+					     source2) &&
+				(!operation->reads_carry ||
+				 has_register(regs_read, regs_read_count,
+					      X86_REG_EFLAGS)),
+			"binary data registers and carry input are read");
+		success &= check(
+			regs_write_count == (nf ? 1 : 2) &&
 				has_register(regs_write, regs_write_count,
 					     nd ? destination : source1) &&
-				has_register(regs_write, regs_write_count,
-					     X86_REG_EFLAGS),
+				(nf ||
+				 has_register(regs_write, regs_write_count,
+					      X86_REG_EFLAGS)),
 			"binary destination and EFLAGS writes are exact");
 	}
 
@@ -310,8 +364,8 @@ static bool check_binary_register(csh handle,
 		return true;
 failed:
 	fprintf(stderr,
-		"binary register: op=%s width=%u reverse=%u nd=%u seed=%u syntax=%s\n",
-		operation->mnemonic, width, reverse, nd, seed,
+		"binary register: op=%s width=%u reverse=%u nd=%u nf=%u seed=%u syntax=%s\n",
+		operation->mnemonic, width, reverse, nd, nf, seed,
 		att_syntax ? "att" : "intel");
 	if (count != 0)
 		cs_free(insn, count);
@@ -320,7 +374,7 @@ failed:
 
 static bool check_binary_memory(csh handle,
 				const arithmetic_operation *operation,
-				uint8_t width, bool reverse, bool nd,
+				uint8_t width, bool reverse, bool nd, bool nf,
 				bool att_syntax)
 {
 	const unsigned int destination_number = 31;
@@ -331,18 +385,18 @@ static bool check_binary_memory(csh handle,
 	const char *register_name = cs_reg_name(handle, source_register);
 	const char *size_name = memory_size_name(width);
 	uint8_t code[8];
-	char expected_mnemonic[16], expected_operands[192];
+	char expected_mnemonic[24], expected_operands[192];
 	cs_insn *insn = NULL;
 	cs_regs regs_read = { 0 }, regs_write = { 0 };
 	uint8_t regs_read_count = 0, regs_write_count = 0;
 	bool success = true;
 	size_t count;
 
-	encode_binary_memory(code, operation, width, reverse, nd,
+	encode_binary_memory(code, operation, width, reverse, nd, nf,
 			     destination_number, register_number);
+	format_mnemonic(expected_mnemonic, sizeof(expected_mnemonic), operation,
+			width, nf, att_syntax);
 	if (att_syntax) {
-		snprintf(expected_mnemonic, sizeof(expected_mnemonic), "%s%c",
-			 operation->mnemonic, att_suffix(width));
 		if (nd && reverse) {
 			snprintf(expected_operands, sizeof(expected_operands),
 				 "0x20(%%r29,%%r30,4), %%%s, %%%s",
@@ -359,8 +413,6 @@ static bool check_binary_memory(csh handle,
 				 "%%%s, 0x20(%%r29,%%r30,4)", register_name);
 		}
 	} else {
-		snprintf(expected_mnemonic, sizeof(expected_mnemonic), "%s",
-			 operation->mnemonic);
 		if (nd && reverse) {
 			snprintf(expected_operands, sizeof(expected_operands),
 				 "%s, %s, %s ptr [r29 + r30*4 + 0x20]",
@@ -465,26 +517,29 @@ static bool check_binary_memory(csh handle,
 					"unexpected binary logical operand");
 			}
 		}
-		success &= check_flag_detail(&insn[0], operation);
+		success &= check_flag_detail(&insn[0], operation, nf);
 		success &= check(cs_regs_access(handle, &insn[0], regs_read,
 						&regs_read_count, regs_write,
 						&regs_write_count) == CS_ERR_OK,
 				 "binary memory cs_regs_access succeeds");
 		success &= check(
-			regs_read_count == 4 &&
+			regs_read_count == (operation->reads_carry ? 4 : 3) &&
 				has_register(regs_read, regs_read_count,
 					     source_register) &&
 				has_register(regs_read, regs_read_count,
 					     X86_REG_R29) &&
 				has_register(regs_read, regs_read_count,
 					     X86_REG_R30) &&
-				has_register(regs_read, regs_read_count,
-					     X86_REG_EFLAGS),
+				(!operation->reads_carry ||
+				 has_register(regs_read, regs_read_count,
+					      X86_REG_EFLAGS)),
 			"binary memory data, address, and carry reads are exact");
 		success &= check(
-			regs_write_count == (nd || reverse ? 2 : 1) &&
-				has_register(regs_write, regs_write_count,
-					     X86_REG_EFLAGS) &&
+			regs_write_count == (nd || reverse ? 1 : 0) +
+						    (nf ? 0 : 1) &&
+				(nf ||
+				 has_register(regs_write, regs_write_count,
+					      X86_REG_EFLAGS)) &&
 				(!nd ||
 				 has_register(regs_write, regs_write_count,
 					      destination)) &&
@@ -499,8 +554,8 @@ static bool check_binary_memory(csh handle,
 		return true;
 failed:
 	fprintf(stderr,
-		"binary memory: op=%s width=%u reverse=%u nd=%u syntax=%s\n",
-		operation->mnemonic, width, reverse, nd,
+		"binary memory: op=%s width=%u reverse=%u nd=%u nf=%u syntax=%s\n",
+		operation->mnemonic, width, reverse, nd, nf,
 		att_syntax ? "att" : "intel");
 	if (count != 0)
 		cs_free(insn, count);
@@ -510,7 +565,8 @@ failed:
 static void encode_immediate(uint8_t code[13], size_t *code_size,
 			     const arithmetic_operation *operation,
 			     uint8_t width, bool sign_extended_byte, bool nd,
-			     bool memory, unsigned int destination_number,
+			     bool nf, bool memory,
+			     unsigned int destination_number,
 			     unsigned int source_number, uint32_t raw_immediate)
 {
 	unsigned int ndd_number = nd ? destination_number : 0;
@@ -531,7 +587,8 @@ static void encode_immediate(uint8_t code[13], size_t *code_size,
 			  ((source_number & 16) ? 0x08 : 0);
 		code[2] = w | (((~ndd_number) & 0xf) << 3) | 0x04 | pp;
 	}
-	code[3] = (nd ? 0x10 : 0) | ((ndd_number & 16) ? 0 : 0x08);
+	code[3] = (nd ? 0x10 : 0) | (nf ? 0x04 : 0) |
+		  ((ndd_number & 16) ? 0 : 0x08);
 	code[4] = opcode;
 	code[5] = (memory ? 0x44 : 0xc0) | (operation->immediate_group << 3) |
 		  (memory ? 0 : source_number & 7);
@@ -583,8 +640,8 @@ static void format_immediate(char *buffer, size_t buffer_size, int64_t value,
 static bool check_immediate_case(csh handle,
 				 const arithmetic_operation *operation,
 				 uint8_t width, bool sign_extended_byte,
-				 bool nd, bool memory, unsigned int seed,
-				 bool att_syntax)
+				 bool nd, bool nf, bool memory,
+				 unsigned int seed, bool att_syntax)
 {
 	unsigned int destination_number = seed;
 	unsigned int source_number = nd ? (seed + 13) & 31 : seed;
@@ -604,7 +661,7 @@ static bool check_immediate_case(csh handle,
 								    4;
 	uint8_t code[13];
 	size_t code_size;
-	char expected_mnemonic[16], expected_operands[224];
+	char expected_mnemonic[24], expected_operands[224];
 	char immediate_text[48];
 	cs_insn *insn = NULL;
 	cs_regs regs_read = { 0 }, regs_write = { 0 };
@@ -613,13 +670,13 @@ static bool check_immediate_case(csh handle,
 	size_t count;
 
 	encode_immediate(code, &code_size, operation, width, sign_extended_byte,
-			 nd, memory, destination_number, source_number,
+			 nd, nf, memory, destination_number, source_number,
 			 raw_immediate);
 	format_immediate(immediate_text, sizeof(immediate_text), value,
 			 att_syntax);
+	format_mnemonic(expected_mnemonic, sizeof(expected_mnemonic), operation,
+			width, nf, att_syntax);
 	if (att_syntax) {
-		snprintf(expected_mnemonic, sizeof(expected_mnemonic), "%s%c",
-			 operation->mnemonic, att_suffix(width));
 		if (memory && nd) {
 			snprintf(expected_operands, sizeof(expected_operands),
 				 "%s, 0x20(%%r29,%%r30,4), %%%s",
@@ -636,8 +693,6 @@ static bool check_immediate_case(csh handle,
 				 "%s, %%%s", immediate_text, source_name);
 		}
 	} else {
-		snprintf(expected_mnemonic, sizeof(expected_mnemonic), "%s",
-			 operation->mnemonic);
 		if (memory && nd) {
 			snprintf(expected_operands, sizeof(expected_operands),
 				 "%s, %s ptr [r29 + r30*4 + 0x20], %s",
@@ -746,34 +801,44 @@ static bool check_immediate_case(csh handle,
 					"unexpected immediate logical operand");
 			}
 		}
-		success &= check_flag_detail(&insn[0], operation);
+		success &= check_flag_detail(&insn[0], operation, nf);
 		success &= check(cs_regs_access(handle, &insn[0], regs_read,
 						&regs_read_count, regs_write,
 						&regs_write_count) == CS_ERR_OK,
 				 "immediate cs_regs_access succeeds");
 		if (memory) {
 			success &= check(
-				regs_read_count == 3 &&
+				regs_read_count == (operation->reads_carry ?
+							    3 :
+							    2) &&
 					has_register(regs_read, regs_read_count,
 						     X86_REG_R29) &&
 					has_register(regs_read, regs_read_count,
 						     X86_REG_R30) &&
-					has_register(regs_read, regs_read_count,
-						     X86_REG_EFLAGS),
+					(!operation->reads_carry ||
+					 has_register(regs_read,
+						      regs_read_count,
+						      X86_REG_EFLAGS)),
 				"immediate memory address and carry reads are exact");
 		} else {
 			success &= check(
-				regs_read_count == 2 &&
+				regs_read_count == (operation->reads_carry ?
+							    2 :
+							    1) &&
 					has_register(regs_read, regs_read_count,
 						     source) &&
-					has_register(regs_read, regs_read_count,
-						     X86_REG_EFLAGS),
+					(!operation->reads_carry ||
+					 has_register(regs_read,
+						      regs_read_count,
+						      X86_REG_EFLAGS)),
 				"immediate register and carry reads are exact");
 		}
 		success &= check(
-			regs_write_count == (nd || !memory ? 2 : 1) &&
-				has_register(regs_write, regs_write_count,
-					     X86_REG_EFLAGS) &&
+			regs_write_count == (nd || !memory ? 1 : 0) +
+						    (nf ? 0 : 1) &&
+				(nf ||
+				 has_register(regs_write, regs_write_count,
+					      X86_REG_EFLAGS)) &&
 				(!nd ||
 				 has_register(regs_write, regs_write_count,
 					      destination)) &&
@@ -788,19 +853,58 @@ static bool check_immediate_case(csh handle,
 		return true;
 failed:
 	fprintf(stderr,
-		"immediate: op=%s width=%u sign8=%u nd=%u memory=%u seed=%u syntax=%s\n",
-		operation->mnemonic, width, sign_extended_byte, nd, memory,
+		"immediate: op=%s width=%u sign8=%u nd=%u nf=%u memory=%u seed=%u syntax=%s\n",
+		operation->mnemonic, width, sign_extended_byte, nd, nf, memory,
 		seed, att_syntax ? "att" : "intel");
 	if (count != 0)
 		cs_free(insn, count);
 	return false;
 }
 
+static bool run_width_matrix(csh handle, const arithmetic_operation *operation,
+			     uint8_t width, bool nf, bool att_syntax)
+{
+	unsigned int sign8_forms = width == 1 ? 1 : 2;
+	unsigned int reverse, nd, sign8, seed;
+
+	for (reverse = 0; reverse < 2; ++reverse) {
+		for (nd = 0; nd < 2; ++nd) {
+			for (seed = 0; seed < 32; ++seed) {
+				if (!check_binary_register(
+					    handle, operation, width, reverse,
+					    nd, nf, seed, att_syntax))
+					return false;
+			}
+			if (!check_binary_memory(handle, operation, width,
+						 reverse, nd, nf, att_syntax))
+				return false;
+		}
+	}
+	for (nd = 0; nd < 2; ++nd) {
+		for (sign8 = 0; sign8 < sign8_forms; ++sign8) {
+			bool sign_extended_byte = sign8 != 0;
+
+			for (seed = 0; seed < 32; ++seed) {
+				if (!check_immediate_case(
+					    handle, operation, width,
+					    sign_extended_byte, nd, nf, false,
+					    seed, att_syntax))
+					return false;
+			}
+			if (!check_immediate_case(handle, operation, width,
+						  sign_extended_byte, nd, nf,
+						  true, 31, att_syntax))
+				return false;
+		}
+	}
+	return true;
+}
+
 static bool run_matrix(csh handle, bool att_syntax)
 {
 	static const uint8_t widths[] = { 1, 2, 4, 8 };
 	size_t operation_index, width_index;
-	unsigned int reverse, nd, seed;
+	unsigned int nf;
 
 	if (!check(cs_option(handle, CS_OPT_SYNTAX,
 			     att_syntax ? CS_OPT_SYNTAX_ATT :
@@ -812,49 +916,16 @@ static bool run_matrix(csh handle, bool att_syntax)
 	     ++operation_index) {
 		const arithmetic_operation *operation =
 			&operations[operation_index];
+		unsigned int nf_forms = operation->reads_carry ? 1 : 2;
 
-		for (width_index = 0;
-		     width_index < sizeof(widths) / sizeof(widths[0]);
-		     ++width_index) {
-			uint8_t width = widths[width_index];
-
-			for (reverse = 0; reverse < 2; ++reverse) {
-				for (nd = 0; nd < 2; ++nd) {
-					for (seed = 0; seed < 32; ++seed) {
-						if (!check_binary_register(
-							    handle, operation,
-							    width, reverse, nd,
-							    seed, att_syntax))
-							return false;
-					}
-					if (!check_binary_memory(
-						    handle, operation, width,
-						    reverse, nd, att_syntax))
-						return false;
-				}
-			}
-			for (nd = 0; nd < 2; ++nd) {
-				unsigned int sign8_forms = width == 1 ? 1 : 2;
-				unsigned int sign8;
-
-				for (sign8 = 0; sign8 < sign8_forms; ++sign8) {
-					bool sign_extended_byte = sign8 != 0;
-
-					for (seed = 0; seed < 32; ++seed) {
-						if (!check_immediate_case(
-							    handle, operation,
-							    width,
-							    sign_extended_byte,
-							    nd, false, seed,
-							    att_syntax))
-							return false;
-					}
-					if (!check_immediate_case(
-						    handle, operation, width,
-						    sign_extended_byte, nd,
-						    true, 31, att_syntax))
-						return false;
-				}
+		for (nf = 0; nf < nf_forms; ++nf) {
+			for (width_index = 0;
+			     width_index < sizeof(widths) / sizeof(widths[0]);
+			     ++width_index) {
+				if (!run_width_matrix(handle, operation,
+						      widths[width_index],
+						      nf != 0, att_syntax))
+					return false;
 			}
 		}
 	}
@@ -994,12 +1065,12 @@ static bool test_encoding_anchors(csh handle)
 	bool success = true;
 	size_t i;
 
-	encode_binary_register(encoded, &operations[0], 8, false, true, 31, 29,
-			       30);
+	encode_binary_register(encoded, ADC_OPERATION, 8, false, true, false,
+			       31, 29, 30);
 	success &= check(memcmp(encoded, adc64_nd, sizeof(adc64_nd)) == 0,
 			 "binary encoding matches current XED");
-	encode_immediate(encoded, &encoded_size, &operations[0], 8, false, true,
-			 false, 31, 29, 0xfffffffeU);
+	encode_immediate(encoded, &encoded_size, ADC_OPERATION, 8, false, true,
+			 false, false, 31, 29, 0xfffffffeU);
 	success &= check(encoded_size == sizeof(adc64_nd_immediate) &&
 				 memcmp(encoded, adc64_nd_immediate,
 					sizeof(adc64_nd_immediate)) == 0,
@@ -1037,29 +1108,25 @@ static bool test_invalid_encodings(csh handle)
 		   "select invalid-test syntax"))
 		return false;
 	for (i = 0; i < sizeof(operations) / sizeof(operations[0]); ++i) {
+		if (!operations[i].reads_carry)
+			continue;
 		encode_binary_register(binary, &operations[i], 8, false, true,
-				       31, 29, 30);
-		memcpy(mutated, binary, 6);
-		mutated[3] |= 0x04;
+				       true, 31, 29, 30);
 		success &= rejects(
-			handle, mutated, 6,
+			handle, binary, 6,
 			"NF is reserved for carry-consuming binary forms");
-		encode_binary_memory(binary, &operations[i], 4, false, false, 0,
-				     28);
-		memcpy(mutated, binary, 8);
-		mutated[3] |= 0x04;
-		success &= rejects(handle, mutated, 8,
+		encode_binary_memory(binary, &operations[i], 4, false, false,
+				     true, 0, 28);
+		success &= rejects(handle, binary, 8,
 				   "NF is reserved for memory binary forms");
 		encode_immediate(immediate, &immediate_size, &operations[i], 8,
-				 false, true, false, 31, 29, 0x12345678);
-		memcpy(mutated, immediate, immediate_size);
-		mutated[3] |= 0x04;
-		success &= rejects(handle, mutated, immediate_size,
+				 false, true, true, false, 31, 29, 0x12345678);
+		success &= rejects(handle, immediate, immediate_size,
 				   "NF is reserved for immediate forms");
 	}
 
-	encode_binary_register(binary, &operations[0], 4, false, false, 0, 0,
-			       1);
+	encode_binary_register(binary, ADC_OPERATION, 4, false, false, false, 0,
+			       0, 1);
 	memcpy(mutated, binary, 6);
 	mutated[2] ^= 0x08;
 	success &= rejects(handle, mutated, 6,
@@ -1091,26 +1158,27 @@ static bool test_invalid_encodings(csh handle)
 	success &= rejects(handle, mutated, 6,
 			   "F2 is not a legal scalable prefix");
 
-	encode_binary_register(binary, &operations[0], 1, false, false, 0, 0,
-			       1);
+	encode_binary_register(binary, ADC_OPERATION, 1, false, false, false, 0,
+			       0, 1);
 	memcpy(mutated, binary, 6);
 	mutated[2] |= 0x01;
 	success &= rejects(handle, mutated, 6,
 			   "byte binary form requires the NP prefix");
 
-	encode_immediate(immediate, &immediate_size, &operations[0], 8, false,
-			 false, false, 0, 0, 0x12345678);
+	encode_immediate(immediate, &immediate_size, ADC_OPERATION, 8, false,
+			 false, false, false, 0, 0, 0x12345678);
 	memcpy(mutated, immediate, immediate_size);
-	mutated[5] = (mutated[5] & (uint8_t)~0x38) | 0x08;
-	success &= rejects(
-		handle, mutated, immediate_size,
-		"a different group extension is not decoded as ADC/SBB");
+	mutated[3] |= 0x10;
+	mutated[5] |= 0x38;
+	success &= rejects(handle, mutated, immediate_size,
+			   "group extension 7 is CCMP, which has no ND form");
 	for (i = 0; i < immediate_size; ++i) {
 		success &= rejects(handle, immediate, i,
 				   "truncated immediate encoding is rejected");
 	}
 
-	encode_binary_memory(binary, &operations[1], 8, true, true, 31, 28);
+	encode_binary_memory(binary, SBB_OPERATION, 8, true, true, false, 31,
+			     28);
 	for (i = 0; i < sizeof(binary); ++i) {
 		success &= rejects(handle, binary, i,
 				   "truncated memory encoding is rejected");
@@ -1162,8 +1230,9 @@ static bool test_wrong_mode(const uint8_t *code, size_t code_size,
 		if (!check(cs_open(CS_ARCH_X86, modes[i], &handle) == CS_ERR_OK,
 			   "open non-64-bit handle"))
 			return false;
-		success &= rejects(handle, code, code_size,
-				   "APX promoted ADC/SBB requires 64-bit mode");
+		success &=
+			rejects(handle, code, code_size,
+				"APX promoted arithmetic requires 64-bit mode");
 		success &= decodes_bound(handle, extended, extended_size,
 					 "extended registers make 62 BOUND");
 		cs_close(&handle);
@@ -1189,10 +1258,10 @@ int main(void)
 	success &= run_matrix(handle, true);
 	success &= test_encoding_anchors(handle);
 	success &= test_invalid_encodings(handle);
-	encode_binary_register(wrong_mode_code, &operations[0], 4, false, false,
-			       1, 1, 0);
-	encode_binary_register(wrong_mode_extended, &operations[0], 8, false,
-			       true, 31, 29, 30);
+	encode_binary_register(wrong_mode_code, ADC_OPERATION, 4, false, false,
+			       false, 1, 1, 0);
+	encode_binary_register(wrong_mode_extended, ADC_OPERATION, 8, false,
+			       true, false, 31, 29, 30);
 	success &= test_wrong_mode(wrong_mode_code, sizeof(wrong_mode_code),
 				   wrong_mode_extended,
 				   sizeof(wrong_mode_extended));

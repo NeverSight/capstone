@@ -325,6 +325,104 @@ static bool test_invalid_64bit(csh handle)
 	return success;
 }
 
+/* Segment and address-size prefixes do not change these register forms, as
+ * in XED; 66, F2, F3, LOCK and a REX right before VEX make them #UD. */
+static bool test_prefixes(void)
+{
+	static const struct {
+		cs_mode mode;
+		uint8_t code[8];
+		size_t size;
+		uint8_t segment, address_size;
+	} accepted[] = {
+		{ CS_MODE_64,
+		  { 0x2e, 0xc4, 0xe2, 0x7f, 0xcc, 0xd3 },
+		  6,
+		  0x2e,
+		  8 },
+		{ CS_MODE_64, { 0x67, 0xc4, 0xe2, 0x7f, 0xcc, 0xd3 }, 6, 0, 4 },
+		{ CS_MODE_64,
+		  { 0x65, 0x67, 0xc4, 0xe2, 0x7f, 0xcc, 0xd3 },
+		  7,
+		  0x65,
+		  4 },
+		{ CS_MODE_64,
+		  { 0x2e, 0x2e, 0xc4, 0xe2, 0x7f, 0xcc, 0xd3 },
+		  7,
+		  0x2e,
+		  8 },
+		{ CS_MODE_64,
+		  { 0x40, 0x64, 0xc4, 0xe2, 0x7f, 0xcc, 0xd3 },
+		  7,
+		  0x64,
+		  8 },
+		{ CS_MODE_32,
+		  { 0x36, 0xc4, 0xe2, 0x7f, 0xcc, 0xd3 },
+		  6,
+		  0x36,
+		  4 },
+		{ CS_MODE_32, { 0x67, 0xc4, 0xe2, 0x7f, 0xcc, 0xd3 }, 6, 0, 2 },
+	};
+	static const struct {
+		uint8_t code[6];
+		const char *message;
+	} rejected[] = {
+		{ { 0x66, 0xc4, 0xe2, 0x7f, 0xcc, 0xd3 }, "66 before VEX" },
+		{ { 0xf2, 0xc4, 0xe2, 0x7f, 0xcc, 0xd3 }, "F2 before VEX" },
+		{ { 0xf3, 0xc4, 0xe2, 0x7f, 0xcc, 0xd3 }, "F3 before VEX" },
+		{ { 0xf0, 0xc4, 0xe2, 0x7f, 0xcc, 0xd3 }, "LOCK before VEX" },
+		{ { 0x40, 0xc4, 0xe2, 0x7f, 0xcc, 0xd3 }, "REX before VEX" },
+	};
+	bool success = true;
+	size_t i;
+
+	for (i = 0; i < sizeof(accepted) / sizeof(accepted[0]); ++i) {
+		cs_insn *insn = NULL;
+		csh handle = 0;
+		size_t count;
+
+		if (!check(cs_open(CS_ARCH_X86, accepted[i].mode, &handle) ==
+				   CS_ERR_OK,
+			   "open prefix-test mode"))
+			return false;
+		cs_option(handle, CS_OPT_DETAIL, CS_OPT_ON);
+		count = cs_disasm(handle, accepted[i].code, accepted[i].size,
+				  0x1000, 1, &insn);
+		success &= check(count == 1, "prefixed SHA512 decodes");
+		if (count == 1) {
+			const cs_x86 *x86 = &insn[0].detail->x86;
+
+			success &= check(
+				insn[0].id == X86_INS_VSHA512MSG1 &&
+					insn[0].size == accepted[i].size &&
+					strcmp(insn[0].op_str, "ymm2, xmm3") ==
+						0 &&
+					x86->prefix[1] == accepted[i].segment &&
+					x86->addr_size ==
+						accepted[i].address_size &&
+					x86->encoding.modrm_offset ==
+						accepted[i].size - 1,
+				"prefixed SHA512 detail is exact");
+			cs_free(insn, count);
+		}
+		cs_close(&handle);
+	}
+	{
+		csh handle = 0;
+
+		if (!check(cs_open(CS_ARCH_X86, CS_MODE_64, &handle) ==
+				   CS_ERR_OK,
+			   "open 64-bit mode"))
+			return false;
+		for (i = 0; i < sizeof(rejected) / sizeof(rejected[0]); ++i)
+			success &= rejects(handle, rejected[i].code,
+					   sizeof(rejected[i].code),
+					   rejected[i].message);
+		cs_close(&handle);
+	}
+	return success;
+}
+
 static bool test_32bit_and_16bit_modes(void)
 {
 	static const uint8_t msg1[] = { 0xc4, 0xe2, 0x7f, 0xcc, 0xd3 };
@@ -397,6 +495,7 @@ int main(void)
 	success &= test_64bit_variants(handle);
 	success &= test_invalid_64bit(handle);
 	cs_close(&handle);
+	success &= test_prefixes();
 	success &= test_32bit_and_16bit_modes();
 	return success ? 0 : 1;
 }

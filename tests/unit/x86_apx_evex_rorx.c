@@ -1,6 +1,7 @@
 #include <capstone/capstone.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <string.h>
 int main(void)
 {
 	uint8_t c[] = { 0x62, 0xeb, 0xff, 8, 0xf0, 0xd3, 7 };
@@ -22,6 +23,20 @@ int main(void)
 		      i->detail->x86.eflags == 0;
 		cs_free(i, 1);
 		i = NULL;
+	}
+	{
+		/* A rotate count above 9 prints in hex, as in the VEX form. */
+		const uint8_t hex[] = {
+			0x62, 0xbb, 0x7f, 0x08, 0xf0, 0xd6, 0xe6
+		};
+		if (cs_disasm(h, hex, sizeof(hex), 0, 1, &i) != 1)
+			ok = false;
+		else {
+			ok &= !strcmp(i->op_str, "edx, r22d, 0xe6") &&
+			      i->detail->x86.operands[2].imm == 0xe6;
+			cs_free(i, 1);
+			i = NULL;
+		}
 	}
 	c[3] = 12;
 	if (cs_disasm(h, c, 7, 0, 1, &i)) {

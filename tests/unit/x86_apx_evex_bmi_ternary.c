@@ -1,12 +1,16 @@
 #include <capstone/capstone.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <string.h>
 int main(void)
 {
+	/* ANDN reads VVVVV first; BZHI masks ModRM.r/m with the VVVVV index,
+	 * so its r/m operand comes first, as in the VEX form. */
 	static const struct {
 		x86_insn id;
 		uint8_t op;
-	} v[] = { { X86_INS_ANDN, 0xf2 }, { X86_INS_BZHI, 0xf5 } };
+		uint8_t vvvvv_index, rm_index;
+	} v[] = { { X86_INS_ANDN, 0xf2, 1, 2 }, { X86_INS_BZHI, 0xf5, 2, 1 } };
 	csh h;
 	cs_insn *i = NULL;
 	bool ok = true;
@@ -28,8 +32,10 @@ int main(void)
 			      i->detail->x86.operands[0].reg == X86_REG_R18 &&
 			      i->detail->x86.operands[0].access ==
 				      CS_AC_WRITE &&
-			      i->detail->x86.operands[1].reg == X86_REG_R17 &&
-			      i->detail->x86.operands[2].reg == X86_REG_R19;
+			      i->detail->x86.operands[v[k].vvvvv_index].reg ==
+				      X86_REG_R17 &&
+			      i->detail->x86.operands[v[k].rm_index].reg ==
+				      X86_REG_R19;
 			cs_free(i, 1);
 			i = NULL;
 			c[3] |= 0x10;
@@ -46,16 +52,29 @@ int main(void)
 			ok = false;
 		else {
 			const cs_x86 *x86 = &i->detail->x86;
-			const cs_x86_op *mem = &x86->operands[2];
+			const cs_x86_op *mem = &x86->operands[v[k].rm_index];
 			ok &= i->id == v[k].id && x86->op_count == 3 &&
 			      x86->operands[0].reg == X86_REG_R18 &&
-			      x86->operands[1].reg == X86_REG_R17 &&
+			      x86->operands[v[k].vvvvv_index].reg ==
+				      X86_REG_R17 &&
 			      mem->type == X86_OP_MEM && mem->size == 8 &&
 			      mem->access == CS_AC_READ &&
 			      mem->mem.segment == X86_REG_FS &&
 			      mem->mem.base == X86_REG_R29 &&
 			      mem->mem.index == X86_REG_R28 &&
 			      mem->mem.scale == 4 && mem->mem.disp == 0x20;
+			cs_free(i, 1);
+			i = NULL;
+		}
+	}
+	{
+		/* The BZHI text order matches XED and GNU objdump. */
+		const uint8_t c[] = { 0x62, 0xf2, 0x7c, 0x08, 0xf5, 0xc1 };
+		if (cs_disasm(h, c, 6, 0, 1, &i) != 1)
+			ok = false;
+		else {
+			ok &= !strcmp(i->mnemonic, "bzhi") &&
+			      !strcmp(i->op_str, "eax, ecx, eax");
 			cs_free(i, 1);
 			i = NULL;
 		}

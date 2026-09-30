@@ -10,7 +10,7 @@
 typedef struct prefix_case {
 	cs_mode mode;
 	const char *name;
-	uint8_t code[8];
+	uint8_t code[16];
 	size_t size;
 	/* The decoded text, or NULL when the encoding is #UD. */
 	const char *text;
@@ -46,7 +46,7 @@ int main(void)
 	/* A 66, F2, F3 or LOCK prefix anywhere before a VEX or EVEX prefix, or
 	 * a REX prefix right before it, makes the instruction #UD, as in XED.
 	 * A segment or address-size prefix does not, and neither does a REX
-	 * prefix that a later legacy prefix makes ineffective. */
+	 * prefix that a later prefix makes ineffective. */
 	static const prefix_case cases[] = {
 		{ CS_MODE_64, "vex2", { 0xc5, 0xf8, 0x77 }, 3, "vzeroupper " },
 		{ CS_MODE_64, "66 vex2", { 0x66, 0xc5, 0xf8, 0x77 }, 4, NULL },
@@ -93,6 +93,52 @@ int main(void)
 		  { 0x66, 0xc5, 0xf8, 0x77 },
 		  4,
 		  NULL },
+		/* The source-owned APX, USER_MSR and CET decoders follow the
+		 * same REX rule. */
+		{ CS_MODE_64,
+		  "rex apx evex",
+		  { 0x40, 0x62, 0xf4, 0x7c, 0x08, 0x01, 0xc1 },
+		  7,
+		  NULL },
+		{ CS_MODE_64,
+		  "rex fs apx evex",
+		  { 0x40, 0x64, 0x62, 0xf4, 0x7c, 0x08, 0x01, 0xc1 },
+		  8,
+		  "add ecx, eax" },
+		{ CS_MODE_64,
+		  "rex rex fs apx evex",
+		  { 0x41, 0x48, 0x64, 0x62, 0xf4, 0x7c, 0x08, 0x01, 0xc1 },
+		  9,
+		  "add ecx, eax" },
+		{ CS_MODE_64,
+		  "rex vex urdmsr",
+		  { 0x40, 0xc4, 0xe7, 0x7b, 0xf8, 0xc0, 0x78, 0x56, 0x34,
+		    0x12 },
+		  10,
+		  NULL },
+		{ CS_MODE_64,
+		  "rex addr32 vex urdmsr",
+		  { 0x40, 0x67, 0xc4, 0xe7, 0x7b, 0xf8, 0xc0, 0x78, 0x56,
+		    0x34, 0x12 },
+		  11,
+		  "urdmsr rax, 0x12345678" },
+		/* In a legacy encoding only the last REX before the opcode
+		 * counts. */
+		{ CS_MODE_64,
+		  "rex.w fs wrss",
+		  { 0x48, 0x64, 0x0f, 0x38, 0xf6, 0x00 },
+		  6,
+		  "wrssd dword ptr fs:[rax], eax" },
+		{ CS_MODE_64,
+		  "rex rex.w wrss",
+		  { 0x40, 0x48, 0x0f, 0x38, 0xf6, 0x00 },
+		  6,
+		  "wrssq qword ptr [rax], rax" },
+		{ CS_MODE_64,
+		  "rex.w rex wrss",
+		  { 0x48, 0x40, 0x0f, 0x38, 0xf6, 0x00 },
+		  6,
+		  "wrssd dword ptr [rax], eax" },
 		/* Before a memory ModR/M, C5 is LDS, which 66 may prefix. */
 		{ CS_MODE_32,
 		  "32-bit 66 lds",

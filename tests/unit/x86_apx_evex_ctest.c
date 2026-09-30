@@ -51,7 +51,15 @@ int main(void)
     cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_ATT);
     ok&=check(h,b,6,X86_INS_CTESTB,"ctestbq","{dfv=sf,cf} %r26, %r17");
     cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_INTEL);
+    /* W overrides 66, byte forms ignore W, and byte immediates are
+     * zero-extended as for TEST. */
+    b[2]=0xad;ok&=check(h,b,6,X86_INS_CTESTB,"ctestb","{dfv=sf,cf} r17, r26");
+    b[2]=0xac;b[4]=0x84;ok&=check(h,b,6,X86_INS_CTESTB,"ctestb",
+      "{dfv=sf,cf} r17b, r26b");b[4]=0x85;
+    {const uint8_t q[]={0x62,0x6c,0x04,0x02,0xf6,0xc1,0xa5};
+      ok&=check(h,q,7,X86_INS_CTESTB,"ctestb","{dfv=} r17b, 0xa5");}
     b[3]=0x12;if(cs_disasm(h,b,6,0,1,&i)){ok=false;cs_free(i,1);}
     b[3]=2;b[2]=0xa8;if(cs_disasm(h,b,6,0,1,&i)){ok=false;cs_free(i,1);}
+    b[2]=0xae;if(cs_disasm(h,b,6,0,1,&i)){ok=false;cs_free(i,1);}
     cs_close(&h);return ok?0:1;
 }

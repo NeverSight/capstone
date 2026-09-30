@@ -42,6 +42,11 @@ int main(void)
     cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_ATT);
     ok&=ck(h,b64,sizeof(b64),"movrsq","%fs:(%r17d), %r18",X86_REG_R18,8);
     cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_INTEL);
+    /* W selects 64-bit operands over 66, as in XED; the byte form is W0. */
+    {const uint8_t w66[]={0x62,0xec,0xfd,8,0x8b,0x11};
+      ok&=ck(h,w66,sizeof(w66),"movrs","r18, qword ptr [r17]",X86_REG_R18,8);
+      const uint8_t w8[]={0x62,0xec,0xfc,8,0x8a,0x11};
+      if(cs_disasm(h,w8,sizeof(w8),0,1,&i)){ok=false;cs_free(i,1);}}
     {uint8_t x[]={0x62,0xec,0x7c,8,0x8b,0xd1};if(cs_disasm(h,x,6,0,1,&i)){ok=false;cs_free(i,1);}x[2]=0x78;if(cs_disasm(h,x,6,0,1,&i)){ok=false;cs_free(i,1);}x[5]=0x11;x[3]=9;if(cs_disasm(h,x,6,0,1,&i)){ok=false;cs_free(i,1);}x[3]=8;x[2]=0x7e;if(cs_disasm(h,x,6,0,1,&i)){ok=false;cs_free(i,1);}}
     cs_close(&h);return ok?0:1;
 }

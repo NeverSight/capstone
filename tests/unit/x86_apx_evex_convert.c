@@ -28,6 +28,10 @@ int main(void)
 	ok&=one(h,cw,sizeof(cw),X86_INS_CRC32,"crc32","r18d, r19w");
 	ok&=one(h,cq,sizeof(cq),X86_INS_CRC32,"crc32","r26, qword ptr fs:[r29 + r14*4 + 0x20]");
 	if(cs_disasm(h,cq,sizeof(cq),0,1,&i)!=1)ok=false;else{const cs_x86*x=&i->detail->x86;ok&=x->op_count==2&&x->operands[0].reg==X86_REG_R26&&x->operands[0].access==CS_AC_READ_WRITE&&x->operands[1].type==X86_OP_MEM&&x->operands[1].access==CS_AC_READ&&x->operands[1].mem.segment==X86_REG_FS&&x->operands[1].mem.base==X86_REG_R29&&x->operands[1].mem.index==X86_REG_R14;cs_free(i,1);i=NULL;}
+	/* W selects 64-bit operands over 66, as XED decodes them. */
+	{const uint8_t mw[]={0x62,0xec,0xfd,0x08,0x60,0xd3};const uint8_t cw66[]={0x62,0xec,0xfd,0x08,0xf1,0xd3};
+	ok&=one(h,mw,sizeof(mw),X86_INS_MOVBE,"movbe","r18, r19");
+	ok&=one(h,cw66,sizeof(cw66),X86_INS_CRC32,"crc32","r18, r19");}
 	cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_ATT);
 	ok&=one(h,cq,sizeof(cq),X86_INS_CRC32,"crc32q","%fs:0x20(%r29,%r14,4), %r26");
 	cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_INTEL);

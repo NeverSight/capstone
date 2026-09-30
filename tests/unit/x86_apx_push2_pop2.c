@@ -214,6 +214,39 @@ int main(void)
 	encode(invalid, false, false, 4, 20);
 	success &= rejects(intel, invalid, "POP2 with RSP is rejected");
 
+	/* Segment and address-size prefixes do not affect the stack
+	 * operation, as in XED; 66 and a REX right before EVEX are #UD. */
+	{
+		static const uint8_t prefixes[] = { 0x2e, 0x3e, 0x64, 0x67 };
+		uint8_t prefixed[8];
+		cs_insn *insn = NULL;
+		size_t i, count;
+
+		encode(prefixed + 1, false, true, 17, 8);
+		for (i = 0; i < sizeof(prefixes); ++i) {
+			prefixed[0] = prefixes[i];
+			count = cs_disasm(intel, prefixed, 7, 0x1000, 1, &insn);
+			success &= check(
+				count == 1 && insn[0].size == 7 &&
+					insn[0].id == X86_INS_POP2P &&
+					!strcmp(insn[0].op_str, "r17, r8") &&
+					insn[0].detail->x86.encoding
+							.modrm_offset == 6,
+				"a segment or address-size prefix is accepted");
+			cs_free(insn, count);
+		}
+		prefixed[0] = 0x66;
+		count = cs_disasm(intel, prefixed, 7, 0x1000, 1, &insn);
+		success &=
+			check(count == 0, "66 before PUSH2/POP2 is rejected");
+		cs_free(insn, count);
+		prefixed[0] = 0x40;
+		count = cs_disasm(intel, prefixed, 7, 0x1000, 1, &insn);
+		success &= check(count == 0,
+				 "a REX right before PUSH2/POP2 is rejected");
+		cs_free(insn, count);
+	}
+
 	cs_close(&att);
 	cs_close(&intel);
 	return success ? 0 : 1;

@@ -2309,6 +2309,7 @@ typedef enum x86_insn {
 	X86_INS_VSHA512MSG1,
 	X86_INS_VSHA512MSG2,
 	X86_INS_VSHA512RNDS2,
+	X86_INS_IMULZU,
 	X86_INS_ENDING, // mark the end of the list of insn
 } x86_insn;
 
