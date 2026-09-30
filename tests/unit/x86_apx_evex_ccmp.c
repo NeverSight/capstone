@@ -47,8 +47,38 @@ int main(void)
     { const uint8_t q[]={0x62,0x6c,0x2c,0x02,0x83,0xf9,0x07};
       ok &= check(h,q,sizeof(q),X86_INS_CCMPB,"ccmpb",
                   "{dfv=sf,cf} r17d, 7"); }
-    b[3]=0x12; if (cs_disasm(h,b,sizeof(b),0,1,&i)) { ok=false; cs_free(i,1); }
+    /* As in the promoted ALU forms, W overrides 66 and byte forms ignore it. */
+    b[3]=2; b[2]=0xad;
+    ok &= check(h,b,sizeof(b),X86_INS_CCMPB,"ccmpb","{dfv=sf,cf} r17, r26");
+    { const uint8_t w8[]={0x62,0x6c,0xac,0x02,0x38,0xd1};
+      ok &= check(h,w8,sizeof(w8),X86_INS_CCMPB,"ccmpb",
+                  "{dfv=sf,cf} r17b, r26b"); }
+    /* Immediates follow CMP: byte and word values are zero-extended, and
+     * the operand has the width of the comparison. */
+    { const uint8_t q[]={0x62,0x6c,0x04,0x02,0x80,0xf9,0xa5};
+      ok &= check(h,q,sizeof(q),X86_INS_CCMPB,"ccmpb","{dfv=} r17b, 0xa5");
+      if (cs_disasm(h,q,sizeof(q),0,1,&i) == 1) {
+        ok &= i->detail->x86.operands[1].type == X86_OP_IMM &&
+              i->detail->x86.operands[1].imm == 0xa5 &&
+              i->detail->x86.operands[1].size == 1;
+        cs_free(i,1);
+      } else ok = false; }
+    { const uint8_t q[]={0x62,0x6c,0xac,0x02,0x83,0xf9,0x80};
+      ok &= check(h,q,sizeof(q),X86_INS_CCMPB,"ccmpb",
+                  "{dfv=sf,cf} r17, -0x80");
+      if (cs_disasm(h,q,sizeof(q),0,1,&i) == 1) {
+        ok &= i->detail->x86.operands[1].imm == -0x80 &&
+              i->detail->x86.operands[1].size == 8;
+        cs_free(i,1);
+      } else ok = false; }
+    { const uint8_t q[]={0x62,0x6c,0x2d,0x02,0x81,0xf9,0x00,0x80};
+      ok &= check(h,q,sizeof(q),X86_INS_CCMPB,"ccmpb",
+                  "{dfv=sf,cf} r17w, 0x8000"); }
+    { const uint8_t q[]={0x62,0x6c,0x2c,0x02,0x81,0xf9,0x00,0x00,0x00,0x80};
+      ok &= check(h,q,sizeof(q),X86_INS_CCMPB,"ccmpb",
+                  "{dfv=sf,cf} r17d, 0x80000000"); }
+    b[2]=0xac; b[3]=0x12; if (cs_disasm(h,b,sizeof(b),0,1,&i)) { ok=false; cs_free(i,1); }
     b[3]=2; b[2]=0xa8; if (cs_disasm(h,b,sizeof(b),0,1,&i)) { ok=false; cs_free(i,1); }
-    b[2]=0xad; if (cs_disasm(h,b,sizeof(b),0,1,&i)) { ok=false; cs_free(i,1); }
+    b[2]=0xae; if (cs_disasm(h,b,sizeof(b),0,1,&i)) { ok=false; cs_free(i,1); }
     cs_close(&h); return ok ? 0 : 1;
 }
