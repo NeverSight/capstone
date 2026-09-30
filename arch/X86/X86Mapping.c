@@ -933,24 +933,6 @@ decode_apx_push2_pop2(csh handle, const uint8_t *code, size_t code_len,
 	return X86_FEATURE_DECODED;
 }
 
-static unsigned int apx_evex_alu_feature_opcode(uint8_t opcode)
-{
-	switch (opcode & 0xfc) {
-	default:
-		return 0;
-	case 0x00:
-		return X86_FEATURE_REX2_ADD;
-	case 0x08:
-		return X86_FEATURE_REX2_OR;
-	case 0x20:
-		return X86_FEATURE_REX2_AND;
-	case 0x28:
-		return X86_FEATURE_REX2_SUB;
-	case 0x30:
-		return X86_FEATURE_REX2_XOR;
-	}
-}
-
 static bool is_apx_evex_segment_prefix(uint8_t byte)
 {
 	switch (byte) {
@@ -1626,10 +1608,41 @@ decode_apx_imul_immediate(csh handle, const uint8_t *code, size_t code_len,
 	return X86_FEATURE_DECODED;
 }
 
-static bool is_apx_adc_sbb_binary_opcode(uint8_t opcode)
+/* ADD, OR, ADC, SBB, AND, SUB and XOR keep their legacy opcode rows in map 4:
+ * the rm,reg and reg,rm forms at row * 8 + 0..3, and the 80, 81 and 83
+ * immediate group whose ModRM.reg selects the row.  Row 7, CMP, is CCMP. */
+static bool is_apx_arithmetic_binary_opcode(uint8_t opcode)
 {
-	return (opcode >= 0x10 && opcode <= 0x13) ||
-	       (opcode >= 0x18 && opcode <= 0x1b);
+	return opcode < 0x38 && (opcode & 0x04) == 0;
+}
+
+static unsigned int apx_arithmetic_feature_opcode(unsigned int row)
+{
+	switch (row) {
+	default:
+		return 0;
+	case 0:
+		return X86_FEATURE_APX_ADD;
+	case 1:
+		return X86_FEATURE_APX_OR;
+	case 2:
+		return X86_FEATURE_APX_ADC;
+	case 3:
+		return X86_FEATURE_APX_SBB;
+	case 4:
+		return X86_FEATURE_APX_AND;
+	case 5:
+		return X86_FEATURE_APX_SUB;
+	case 6:
+		return X86_FEATURE_APX_XOR;
+	}
+}
+
+/* ADC and SBB consume CF, so EVEX.NF is reserved for them. */
+static bool apx_arithmetic_reads_carry(unsigned int feature_opcode)
+{
+	return feature_opcode == X86_FEATURE_APX_ADC ||
+	       feature_opcode == X86_FEATURE_APX_SBB;
 }
 
 static x86_feature_decode_result decode_apx_adx(csh handle,
@@ -2586,15 +2599,15 @@ static x86_feature_decode_result decode_apx_convert(csh handle,const uint8_t *co
 }
 
 static x86_feature_decode_result
-decode_apx_adc_sbb(csh handle, const uint8_t *code, size_t code_len,
-		   MCInst *instr, uint16_t *size)
+decode_apx_arithmetic(csh handle, const uint8_t *code, size_t code_len,
+		      MCInst *instr, uint16_t *size)
 {
 	const cs_struct *arch = (const cs_struct *)(uintptr_t)handle;
 	const uint8_t *evex;
 	size_t evex_offset = 0, instruction_size, immediate_offset = 0;
 	uint8_t segment_prefix = 0;
 	bool address32 = false, invalid_prefix = false, memory_form;
-	bool binary_form, immediate_form, nd;
+	bool binary_form, immediate_form, nd, nf;
 	uint8_t p0, p1, p2, opcode, modrm, pp, width, memory_position = 0;
 	uint8_t immediate_size = 0;
 	unsigned int feature_opcode, reg_number, rm_number, ndd_number;
@@ -2629,7 +2642,7 @@ decode_apx_adc_sbb(csh handle, const uint8_t *code, size_t code_len,
 		return X86_FEATURE_INVALID;
 	evex = &code[evex_offset];
 	opcode = evex[4];
-	binary_form = is_apx_adc_sbb_binary_opcode(opcode);
+	binary_form = is_apx_arithmetic_binary_opcode(opcode);
 	immediate_form = opcode == 0x80 || opcode == 0x81 || opcode == 0x83;
 	if (!binary_form && !immediate_form)
 		return X86_FEATURE_NOT_HANDLED;
@@ -2644,18 +2657,13 @@ decode_apx_adc_sbb(csh handle, const uint8_t *code, size_t code_len,
 	modrm = evex[5];
 	pp = p1 & 3;
 	memory_form = (modrm & 0xc0) != 0xc0;
-	if (binary_form) {
-		feature_opcode = opcode < 0x18 ? X86_FEATURE_APX_ADC :
-						 X86_FEATURE_APX_SBB;
-	} else {
-		uint8_t group = (modrm >> 3) & 7;
-
-		if (group != 2 && group != 3)
-			return X86_FEATURE_NOT_HANDLED;
-		feature_opcode = group == 2 ? X86_FEATURE_APX_ADC :
-					      X86_FEATURE_APX_SBB;
-	}
-	if ((p2 & 0xe7) != 0 || (!memory_form && !(p1 & 0x04)))
+	feature_opcode = apx_arithmetic_feature_opcode(
+		binary_form ? opcode >> 3 : (modrm >> 3) & 7);
+	if (feature_opcode == 0)
+		return X86_FEATURE_NOT_HANDLED;
+	if ((p2 & (apx_arithmetic_reads_carry(feature_opcode) ? 0xe7 : 0xe3)) !=
+		    0 ||
+	    (!memory_form && !(p1 & 0x04)))
 		return X86_FEATURE_INVALID;
 	if ((binary_form && (opcode & 1) == 0) || opcode == 0x80) {
 		if (pp != 0)
@@ -2674,6 +2682,7 @@ decode_apx_adc_sbb(csh handle, const uint8_t *code, size_t code_len,
 	}
 
 	nd = (p2 & 0x10) != 0;
+	nf = (p2 & 0x04) != 0;
 	ndd_number = ((~p2 & 0x08) << 1) | ((~p1 & 0x78) >> 3);
 	if (!nd && ndd_number != 0)
 		return X86_FEATURE_INVALID;
@@ -2764,6 +2773,7 @@ decode_apx_adc_sbb(csh handle, const uint8_t *code, size_t code_len,
 	MCOperand_CreateImm0(instr, immediate);
 	MCOperand_CreateImm0(instr, width);
 	MCOperand_CreateImm0(instr, nd);
+	MCOperand_CreateImm0(instr, nf);
 	*size = (uint16_t)instruction_size;
 	set_apx_evex_encoding_detail(instr, evex, evex_offset, segment_prefix,
 				     address32, memory_form ? &memory : NULL);
@@ -2997,118 +3007,27 @@ static x86_feature_decode_result decode_apx_cmov(csh handle,
 	return X86_FEATURE_DECODED;
 }
 
-static x86_feature_decode_result
-decode_apx_evex_alu(csh handle, const uint8_t *code, size_t code_len,
-		    MCInst *instr, uint16_t *size)
+/* Map 4 holds only the promoted legacy instructions the decoders above
+ * recognize.  Every other map-4 encoding is reserved, and must not fall
+ * through to the generated tables. */
+static x86_feature_decode_result decode_apx_map4_reserved(const uint8_t *code,
+							  size_t code_len)
 {
-	const cs_struct *arch = (const cs_struct *)(uintptr_t)handle;
-	const uint8_t *evex;
 	size_t evex_offset = 0;
-	uint8_t p0, p1, p2, opcode, modrm;
-	uint8_t segment_prefix = 0;
-	unsigned int reg_number, rm_number, ndd_number;
-	unsigned int feature_opcode;
-	x86_reg destination, source1, source2;
-	uint8_t width;
-	bool nd, nf, address_size_prefix = false, invalid_prefix = false;
-	cs_x86 *x86;
 
 	while (evex_offset < code_len && code[evex_offset] != 0x62) {
 		uint8_t prefix = code[evex_offset];
 
-		if (is_apx_evex_segment_prefix(prefix)) {
-			segment_prefix = prefix;
-		} else if (prefix == 0x67) {
-			address_size_prefix = true;
-		} else if (prefix == 0x66 || prefix == 0xf0 || prefix == 0xf2 ||
-			   prefix == 0xf3 ||
-			   (prefix >= 0x40 && prefix <= 0x4f)) {
-			invalid_prefix = true;
-		} else {
+		if (!is_apx_evex_segment_prefix(prefix) && prefix != 0x67 &&
+		    prefix != 0x66 && prefix != 0xf0 && prefix != 0xf2 &&
+		    prefix != 0xf3 && (prefix < 0x40 || prefix > 0x4f)) {
 			return X86_FEATURE_NOT_HANDLED;
 		}
 		++evex_offset;
 	}
-	if (code_len - evex_offset < 2 || (code[evex_offset + 1] & 7) != 4) {
+	if (code_len - evex_offset < 2 || (code[evex_offset + 1] & 7) != 4)
 		return X86_FEATURE_NOT_HANDLED;
-	}
-	if (!(arch->mode & CS_MODE_64) || invalid_prefix ||
-	    code_len - evex_offset < 6 || evex_offset + 6 > 15) {
-		return X86_FEATURE_INVALID;
-	}
-
-	evex = &code[evex_offset];
-	p0 = evex[1];
-	p1 = evex[2];
-	p2 = evex[3];
-	opcode = evex[4];
-	modrm = evex[5];
-	feature_opcode = apx_evex_alu_feature_opcode(opcode);
-	if (feature_opcode == 0 || (modrm & 0xc0) != 0xc0 || !(p1 & 0x04) ||
-	    (p2 & 0xe3) != 0) {
-		return X86_FEATURE_INVALID;
-	}
-	if ((opcode & 1) == 0) {
-		if ((p1 & 3) != 0)
-			return X86_FEATURE_INVALID;
-		width = 1;
-	} else if (p1 & 0x80) {
-		if ((p1 & 3) > 1)
-			return X86_FEATURE_INVALID;
-		width = 8;
-	} else if ((p1 & 3) == 1) {
-		width = 2;
-	} else if ((p1 & 3) == 0) {
-		width = 4;
-	} else {
-		return X86_FEATURE_INVALID;
-	}
-	nd = (p2 & 0x10) != 0;
-	nf = (p2 & 0x04) != 0;
-	ndd_number = ((~p2 & 0x08) << 1) | ((~p1 & 0x78) >> 3);
-	if (!nd && ndd_number != 0)
-		return X86_FEATURE_INVALID;
-
-	reg_number = ((~p0 & 0x80) >> 4) | (~p0 & 0x10) | ((modrm >> 3) & 7);
-	rm_number = ((~p0 & 0x20) >> 2) | ((p0 & 0x08) << 1) | (modrm & 7);
-	if (opcode & 2) {
-		source1 = rex2_register(reg_number, width);
-		source2 = rex2_register(rm_number, width);
-	} else {
-		source1 = rex2_register(rm_number, width);
-		source2 = rex2_register(reg_number, width);
-	}
-	destination = nd ? rex2_register(ndd_number, width) : source1;
-	if (destination == X86_REG_INVALID || source1 == X86_REG_INVALID ||
-	    source2 == X86_REG_INVALID) {
-		return X86_FEATURE_INVALID;
-	}
-
-	MCInst_clear(instr);
-	MCInst_setOpcode(instr, feature_opcode);
-	MCOperand_CreateImm0(instr, destination);
-	MCOperand_CreateImm0(instr, source1);
-	MCOperand_CreateImm0(instr, source2);
-	MCOperand_CreateImm0(instr, width);
-	MCOperand_CreateImm0(instr, nd);
-	MCOperand_CreateImm0(instr, nf);
-	*size = (uint16_t)(evex_offset + 6);
-
-	if (!instr->flat_insn->detail)
-		return X86_FEATURE_DECODED;
-	x86 = &instr->flat_insn->detail->x86;
-	x86->opcode[0] = evex[0];
-	x86->opcode[1] = p0;
-	x86->opcode[2] = p1;
-	x86->opcode[3] = p2;
-	x86->prefix[1] = segment_prefix;
-	x86->prefix[3] = address_size_prefix ? 0x67 : 0;
-	instr->x86_prefix[1] = segment_prefix;
-	instr->x86_prefix[3] = address_size_prefix ? 0x67 : 0;
-	x86->addr_size = address_size_prefix ? 4 : 8;
-	x86->modrm = modrm;
-	x86->encoding.modrm_offset = (uint8_t)(evex_offset + 5);
-	return X86_FEATURE_DECODED;
+	return X86_FEATURE_INVALID;
 }
 
 static bool is_rex2_leading_prefix(uint8_t byte)
@@ -3481,10 +3400,10 @@ X86_decodeFeatureExtension(csh handle, const uint8_t *code, size_t code_len,
 	result = decode_apx_convert(handle, code, code_len, instr, size);
 	if (result != X86_FEATURE_NOT_HANDLED)
 		return result;
-	result = decode_apx_adc_sbb(handle, code, code_len, instr, size);
+	result = decode_apx_arithmetic(handle, code, code_len, instr, size);
 	if (result != X86_FEATURE_NOT_HANDLED)
 		return result;
-	result = decode_apx_evex_alu(handle, code, code_len, instr, size);
+	result = decode_apx_map4_reserved(code, code_len);
 	if (result != X86_FEATURE_NOT_HANDLED)
 		return result;
 	result = decode_apx_jmpabs(handle, code, code_len, instr, size);
@@ -4142,166 +4061,6 @@ static bool print_tile_compute(MCInst *instr, SStream *stream, bool att_syntax)
 			X86_REG_TMM0 + printed_tiles[i], access[i]);
 	}
 	instr->flat_insn->detail->x86.op_count = 3;
-	return true;
-}
-
-static bool print_apx_evex_alu(MCInst *instr, SStream *stream, bool att_syntax)
-{
-	const MCOperand *destination_operand, *source1_operand,
-		*source2_operand;
-	const MCOperand *width_operand, *nd_operand, *nf_operand;
-	x86_reg destination, source1, source2;
-	const char *destination_name, *source1_name, *source2_name;
-	cs_detail *detail;
-	cs_x86 *x86;
-	uint8_t width;
-	x86_reg printed_registers[3];
-	uint8_t printed_count;
-	uint8_t destination_index;
-	uint8_t i;
-	bool nd, nf;
-	char suffix;
-	const char *mnemonic;
-	uint64_t eflags;
-
-	if (MCInst_getNumOperands(instr) != 6)
-		return false;
-	switch (MCInst_getOpcode(instr)) {
-	default:
-		return false;
-	case X86_FEATURE_REX2_ADD:
-		mnemonic = "add";
-		eflags = X86_EFLAGS_MODIFY_AF | X86_EFLAGS_MODIFY_CF |
-			 X86_EFLAGS_MODIFY_OF | X86_EFLAGS_MODIFY_PF |
-			 X86_EFLAGS_MODIFY_SF | X86_EFLAGS_MODIFY_ZF;
-		break;
-	case X86_FEATURE_REX2_OR:
-		mnemonic = "or";
-		eflags = X86_EFLAGS_UNDEFINED_AF | X86_EFLAGS_RESET_CF |
-			 X86_EFLAGS_RESET_OF | X86_EFLAGS_MODIFY_PF |
-			 X86_EFLAGS_MODIFY_SF | X86_EFLAGS_MODIFY_ZF;
-		break;
-	case X86_FEATURE_REX2_AND:
-		mnemonic = "and";
-		eflags = X86_EFLAGS_UNDEFINED_AF | X86_EFLAGS_RESET_CF |
-			 X86_EFLAGS_RESET_OF | X86_EFLAGS_MODIFY_PF |
-			 X86_EFLAGS_MODIFY_SF | X86_EFLAGS_MODIFY_ZF;
-		break;
-	case X86_FEATURE_REX2_SUB:
-		mnemonic = "sub";
-		eflags = X86_EFLAGS_MODIFY_AF | X86_EFLAGS_MODIFY_CF |
-			 X86_EFLAGS_MODIFY_OF | X86_EFLAGS_MODIFY_PF |
-			 X86_EFLAGS_MODIFY_SF | X86_EFLAGS_MODIFY_ZF;
-		break;
-	case X86_FEATURE_REX2_XOR:
-		mnemonic = "xor";
-		eflags = X86_EFLAGS_UNDEFINED_AF | X86_EFLAGS_RESET_CF |
-			 X86_EFLAGS_RESET_OF | X86_EFLAGS_MODIFY_PF |
-			 X86_EFLAGS_MODIFY_SF | X86_EFLAGS_MODIFY_ZF;
-		break;
-	}
-	destination_operand = MCInst_getOperand(instr, 0);
-	source1_operand = MCInst_getOperand(instr, 1);
-	source2_operand = MCInst_getOperand(instr, 2);
-	width_operand = MCInst_getOperand(instr, 3);
-	nd_operand = MCInst_getOperand(instr, 4);
-	nf_operand = MCInst_getOperand(instr, 5);
-	if (!MCOperand_isImm(destination_operand) ||
-	    !MCOperand_isImm(source1_operand) ||
-	    !MCOperand_isImm(source2_operand) ||
-	    !MCOperand_isImm(width_operand) || !MCOperand_isImm(nd_operand) ||
-	    !MCOperand_isImm(nf_operand)) {
-		return false;
-	}
-
-	destination = (x86_reg)MCOperand_getImm(destination_operand);
-	source1 = (x86_reg)MCOperand_getImm(source1_operand);
-	source2 = (x86_reg)MCOperand_getImm(source2_operand);
-	width = (uint8_t)MCOperand_getImm(width_operand);
-	nd = MCOperand_getImm(nd_operand) != 0;
-	nf = MCOperand_getImm(nf_operand) != 0;
-	if ((!nd && source1 != destination) ||
-	    (width != 1 && width != 2 && width != 4 && width != 8)) {
-		return false;
-	}
-	destination_name = X86_reg_name((csh)instr->csh, destination);
-	source1_name = X86_reg_name((csh)instr->csh, source1);
-	source2_name = X86_reg_name((csh)instr->csh, source2);
-	if (!destination_name || !source1_name || !source2_name)
-		return false;
-
-	if (nf)
-		SStream_concat0(stream, "{nf}|");
-	if (att_syntax) {
-		switch (width) {
-		default:
-			return false;
-		case 1:
-			suffix = 'b';
-			break;
-		case 2:
-			suffix = 'w';
-			break;
-		case 4:
-			suffix = 'l';
-			break;
-		case 8:
-			suffix = 'q';
-			break;
-		}
-		if (nd) {
-			SStream_concat(stream, "%s%c\t%%%s, %%%s, %%%s",
-				       mnemonic, suffix, source2_name,
-				       source1_name, destination_name);
-			printed_registers[0] = source2;
-			printed_registers[1] = source1;
-			printed_registers[2] = destination;
-			destination_index = 2;
-			printed_count = 3;
-		} else {
-			SStream_concat(stream, "%s%c\t%%%s, %%%s", mnemonic,
-				       suffix, source2_name, destination_name);
-			printed_registers[0] = source2;
-			printed_registers[1] = destination;
-			destination_index = 1;
-			printed_count = 2;
-		}
-	} else if (nd) {
-		SStream_concat(stream, "%s\t%s, %s, %s", mnemonic,
-			       destination_name, source1_name, source2_name);
-		printed_registers[0] = destination;
-		printed_registers[1] = source1;
-		printed_registers[2] = source2;
-		destination_index = 0;
-		printed_count = 3;
-	} else {
-		SStream_concat(stream, "%s\t%s, %s", mnemonic, destination_name,
-			       source2_name);
-		printed_registers[0] = destination;
-		printed_registers[1] = source2;
-		destination_index = 0;
-		printed_count = 2;
-	}
-	if (!instr->flat_insn->detail)
-		return true;
-
-	detail = instr->flat_insn->detail;
-	x86 = &detail->x86;
-	for (i = 0; i < printed_count; ++i) {
-		x86->operands[i].type = X86_OP_REG;
-		x86->operands[i].reg = printed_registers[i];
-		x86->operands[i].size = width;
-		x86->operands[i].access =
-			i == destination_index ?
-				(nd ? CS_AC_WRITE : CS_AC_READ | CS_AC_WRITE) :
-				CS_AC_READ;
-	}
-	x86->op_count = printed_count;
-	if (!nf) {
-		detail->regs_write[0] = X86_REG_EFLAGS;
-		detail->regs_write_count = 1;
-		x86->eflags = eflags;
-	}
 	return true;
 }
 
@@ -5922,7 +5681,8 @@ static bool print_apx_imul_immediate(MCInst *instr, SStream *stream,
 	return true;
 }
 
-static bool print_apx_adc_sbb(MCInst *instr, SStream *stream, bool att_syntax)
+static bool print_apx_arithmetic(MCInst *instr, SStream *stream,
+				 bool att_syntax)
 {
 	enum {
 		APX_ARITHMETIC_REGISTER,
@@ -5933,10 +5693,11 @@ static bool print_apx_adc_sbb(MCInst *instr, SStream *stream, bool att_syntax)
 		*source2_operand;
 	const MCOperand *memory_position_operand, *immediate_form_operand;
 	const MCOperand *immediate_operand, *width_operand, *nd_operand;
+	const MCOperand *nf_operand;
 	x86_reg destination, source1, source2;
 	x86_reg segment = X86_REG_INVALID;
 	uint8_t memory_position, width, address_size = 8;
-	bool immediate_form, nd;
+	bool immediate_form, nd, nf, reads_carry;
 	int64_t immediate;
 	x86_feature_memory memory;
 	uint8_t kind[3], logical_count, i;
@@ -5951,6 +5712,18 @@ static bool print_apx_adc_sbb(MCInst *instr, SStream *stream, bool att_syntax)
 	switch (MCInst_getOpcode(instr)) {
 	default:
 		return false;
+	case X86_FEATURE_APX_ADD:
+		mnemonic = "add";
+		eflags = X86_EFLAGS_MODIFY_AF | X86_EFLAGS_MODIFY_CF |
+			 X86_EFLAGS_MODIFY_OF | X86_EFLAGS_MODIFY_PF |
+			 X86_EFLAGS_MODIFY_SF | X86_EFLAGS_MODIFY_ZF;
+		break;
+	case X86_FEATURE_APX_OR:
+		mnemonic = "or";
+		eflags = X86_EFLAGS_UNDEFINED_AF | X86_EFLAGS_RESET_CF |
+			 X86_EFLAGS_RESET_OF | X86_EFLAGS_MODIFY_PF |
+			 X86_EFLAGS_MODIFY_SF | X86_EFLAGS_MODIFY_ZF;
+		break;
 	case X86_FEATURE_APX_ADC:
 		mnemonic = "adc";
 		eflags = X86_EFLAGS_MODIFY_OF | X86_EFLAGS_MODIFY_SF |
@@ -5965,8 +5738,27 @@ static bool print_apx_adc_sbb(MCInst *instr, SStream *stream, bool att_syntax)
 			 X86_EFLAGS_MODIFY_PF | X86_EFLAGS_MODIFY_CF |
 			 X86_EFLAGS_TEST_CF;
 		break;
+	case X86_FEATURE_APX_AND:
+		mnemonic = "and";
+		eflags = X86_EFLAGS_UNDEFINED_AF | X86_EFLAGS_RESET_CF |
+			 X86_EFLAGS_RESET_OF | X86_EFLAGS_MODIFY_PF |
+			 X86_EFLAGS_MODIFY_SF | X86_EFLAGS_MODIFY_ZF;
+		break;
+	case X86_FEATURE_APX_SUB:
+		mnemonic = "sub";
+		eflags = X86_EFLAGS_MODIFY_AF | X86_EFLAGS_MODIFY_CF |
+			 X86_EFLAGS_MODIFY_OF | X86_EFLAGS_MODIFY_PF |
+			 X86_EFLAGS_MODIFY_SF | X86_EFLAGS_MODIFY_ZF;
+		break;
+	case X86_FEATURE_APX_XOR:
+		mnemonic = "xor";
+		eflags = X86_EFLAGS_UNDEFINED_AF | X86_EFLAGS_RESET_CF |
+			 X86_EFLAGS_RESET_OF | X86_EFLAGS_MODIFY_PF |
+			 X86_EFLAGS_MODIFY_SF | X86_EFLAGS_MODIFY_ZF;
+		break;
 	}
-	if (MCInst_getNumOperands(instr) < 8)
+	reads_carry = apx_arithmetic_reads_carry(MCInst_getOpcode(instr));
+	if (MCInst_getNumOperands(instr) < 9)
 		return false;
 	destination_operand = MCInst_getOperand(instr, 0);
 	source1_operand = MCInst_getOperand(instr, 1);
@@ -5987,7 +5779,7 @@ static bool print_apx_adc_sbb(MCInst *instr, SStream *stream, bool att_syntax)
 		const MCOperand *segment_operand, *address_size_operand;
 
 		if ((memory_position != 1 && memory_position != 2) ||
-		    MCInst_getNumOperands(instr) != 14 ||
+		    MCInst_getNumOperands(instr) != 15 ||
 		    !get_feature_memory(instr, 4, &memory)) {
 			return false;
 		}
@@ -5997,6 +5789,7 @@ static bool print_apx_adc_sbb(MCInst *instr, SStream *stream, bool att_syntax)
 		immediate_operand = MCInst_getOperand(instr, 11);
 		width_operand = MCInst_getOperand(instr, 12);
 		nd_operand = MCInst_getOperand(instr, 13);
+		nf_operand = MCInst_getOperand(instr, 14);
 		if (!MCOperand_isImm(segment_operand) ||
 		    !MCOperand_isImm(address_size_operand)) {
 			return false;
@@ -6009,23 +5802,27 @@ static bool print_apx_adc_sbb(MCInst *instr, SStream *stream, bool att_syntax)
 			return false;
 		}
 	} else {
-		if (MCInst_getNumOperands(instr) != 8)
+		if (MCInst_getNumOperands(instr) != 9)
 			return false;
 		immediate_form_operand = MCInst_getOperand(instr, 4);
 		immediate_operand = MCInst_getOperand(instr, 5);
 		width_operand = MCInst_getOperand(instr, 6);
 		nd_operand = MCInst_getOperand(instr, 7);
+		nf_operand = MCInst_getOperand(instr, 8);
 	}
 	if (!MCOperand_isImm(immediate_form_operand) ||
 	    !MCOperand_isImm(immediate_operand) ||
-	    !MCOperand_isImm(width_operand) || !MCOperand_isImm(nd_operand)) {
+	    !MCOperand_isImm(width_operand) || !MCOperand_isImm(nd_operand) ||
+	    !MCOperand_isImm(nf_operand)) {
 		return false;
 	}
 	immediate_form = MCOperand_getImm(immediate_form_operand) != 0;
 	immediate = MCOperand_getImm(immediate_operand);
 	width = (uint8_t)MCOperand_getImm(width_operand);
 	nd = MCOperand_getImm(nd_operand) != 0;
+	nf = MCOperand_getImm(nf_operand) != 0;
 	if ((width != 1 && width != 2 && width != 4 && width != 8) ||
+	    (nf && reads_carry) ||
 	    (memory_position == 1 ? source1 != X86_REG_INVALID :
 				    !X86_reg_name((csh)instr->csh, source1)) ||
 	    (!immediate_form &&
@@ -6067,6 +5864,8 @@ static bool print_apx_adc_sbb(MCInst *instr, SStream *stream, bool att_syntax)
 		access[logical_count - 1] = CS_AC_READ;
 	}
 
+	if (nf)
+		SStream_concat0(stream, "{nf}|");
 	if (att_syntax)
 		SStream_concat(stream, "%s%c\t", mnemonic,
 			       width == 1 ? 'b' :
@@ -6140,9 +5939,12 @@ static bool print_apx_adc_sbb(MCInst *instr, SStream *stream, bool att_syntax)
 		}
 	}
 	x86->op_count = logical_count;
-	detail->regs_read[detail->regs_read_count++] = X86_REG_EFLAGS;
-	detail->regs_write[detail->regs_write_count++] = X86_REG_EFLAGS;
-	x86->eflags = eflags;
+	if (reads_carry)
+		detail->regs_read[detail->regs_read_count++] = X86_REG_EFLAGS;
+	if (!nf) {
+		detail->regs_write[detail->regs_write_count++] = X86_REG_EFLAGS;
+		x86->eflags = eflags;
+	}
 	return true;
 }
 
@@ -6605,8 +6407,7 @@ bool X86_printFeatureExtension(MCInst *instr, SStream *stream, bool att_syntax)
 	       print_apx_unary(instr, stream, att_syntax) ||
 	       print_apx_imul_immediate(instr, stream, att_syntax) ||
 	       print_apx_imul(instr, stream, att_syntax) ||
-	       print_apx_adc_sbb(instr, stream, att_syntax) ||
-	       print_apx_evex_alu(instr, stream, att_syntax) ||
+	       print_apx_arithmetic(instr, stream, att_syntax) ||
 	       print_apx_jmpabs(instr, stream) ||
 	       print_apx_push2_pop2(instr, stream, att_syntax) ||
 	       print_rex2_push_pop(instr, stream, att_syntax) ||
@@ -6851,11 +6652,26 @@ bool X86_mapFeatureExtension(cs_insn *insn, unsigned int opcode)
 	case X86_FEATURE_APX_IMUL_ONE:
 		insn->id = X86_INS_IMUL;
 		return true;
+	case X86_FEATURE_APX_ADD:
+		insn->id = X86_INS_ADD;
+		return true;
+	case X86_FEATURE_APX_OR:
+		insn->id = X86_INS_OR;
+		return true;
 	case X86_FEATURE_APX_ADC:
 		insn->id = X86_INS_ADC;
 		return true;
 	case X86_FEATURE_APX_SBB:
 		insn->id = X86_INS_SBB;
+		return true;
+	case X86_FEATURE_APX_AND:
+		insn->id = X86_INS_AND;
+		return true;
+	case X86_FEATURE_APX_SUB:
+		insn->id = X86_INS_SUB;
+		return true;
+	case X86_FEATURE_APX_XOR:
+		insn->id = X86_INS_XOR;
 		return true;
 	case X86_FEATURE_APX_ADCX:
 		insn->id = X86_INS_ADCX;

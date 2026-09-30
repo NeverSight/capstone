@@ -571,10 +571,6 @@ static bool test_invalid_encodings(csh handle)
 		code[2] = (code[2] & (uint8_t)~3) | 3;
 		success &= rejects(handle, code, sizeof(code),
 				   "scalable form with F2 pp is rejected");
-		memcpy(code, base, sizeof(base));
-		code[5] &= 0x3f;
-		success &= rejects(handle, code, sizeof(code),
-				   "memory form remains fail-closed");
 	}
 	for (i = 0; i < sizeof(unsupported_opcodes); ++i) {
 		uint8_t code[sizeof(base)];

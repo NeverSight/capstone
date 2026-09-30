@@ -127,6 +127,11 @@
 #define X86_FEATURE_VSHA512MSG1 0x100e2U
 #define X86_FEATURE_VSHA512MSG2 0x100e3U
 #define X86_FEATURE_VSHA512RNDS2 0x100e4U
+#define X86_FEATURE_APX_ADD 0x100e5U
+#define X86_FEATURE_APX_OR 0x100e6U
+#define X86_FEATURE_APX_AND 0x100e7U
+#define X86_FEATURE_APX_SUB 0x100e8U
+#define X86_FEATURE_APX_XOR 0x100e9U
 
 // Generated x86 register identifiers stop at R15.  These private MC register
 // identifiers let the generated EVEX printer carry APX R16-R31 operands while
