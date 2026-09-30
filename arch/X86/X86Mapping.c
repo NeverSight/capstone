@@ -5420,6 +5420,14 @@ static bool print_apx_imul(MCInst *instr, SStream *stream, bool att_syntax)
 							  CS_AC_READ };
 		logical_count = 2;
 	}
+	/* ANDN takes its first source from VVVVV, but BZHI masks ModRM.r/m
+	 * with the index in VVVVV, as in its VEX form. */
+	if (feature_opcode == X86_FEATURE_APX_BZHI && nd) {
+		x86_feature_print_operand index = logical[1];
+
+		logical[1] = logical[2];
+		logical[2] = index;
+	}
 
 	if (nf)
 		SStream_concat0(stream, "{nf}|");
