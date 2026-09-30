@@ -49,6 +49,10 @@ static bool is_apx_evex_segment_prefix(uint8_t byte);
 static x86_reg apx_segment_register(uint8_t prefix);
 static bool is_effective_rex(const uint8_t *code, size_t code_len,
 			     size_t offset);
+static void set_apx_evex_encoding_detail(MCInst *instr, const uint8_t *evex,
+					 size_t evex_offset,
+					 uint8_t segment_prefix, bool address32,
+					 const x86_feature_memory *memory);
 static void print_apx_scalar_immediate(MCInst *instr, SStream *stream,
 				       int64_t immediate, uint8_t width,
 				       bool att_syntax);
@@ -869,27 +873,51 @@ decode_apx_push2_pop2(csh handle, const uint8_t *code, size_t code_len,
 		      MCInst *instr, uint16_t *size)
 {
 	const cs_struct *arch = (const cs_struct *)(uintptr_t)handle;
+	const uint8_t *evex;
+	size_t evex_offset = 0;
+	uint8_t segment_prefix = 0;
+	bool address32 = false, invalid_prefix = false;
 	uint8_t p0, p1, p2, opcode, modrm;
 	unsigned int v_number, b_number, feature_opcode;
 	x86_reg v_register, b_register;
-	cs_x86 *x86;
 
-	if (code_len < 2 || code[0] != 0x62 || (code[1] & 7) != 4)
+	/* Segment and address-size prefixes do not affect these stack
+	 * operations; 66, F2, F3, LOCK and an effective REX make EVEX #UD. */
+	while (evex_offset < code_len && code[evex_offset] != 0x62) {
+		uint8_t prefix = code[evex_offset];
+
+		if (is_apx_evex_segment_prefix(prefix)) {
+			segment_prefix = prefix;
+		} else if (prefix == 0x67) {
+			address32 = true;
+		} else if (prefix == 0x66 || prefix == 0xf0 || prefix == 0xf2 ||
+			   prefix == 0xf3 ||
+			   is_effective_rex(code, code_len, evex_offset)) {
+			invalid_prefix = true;
+		} else if (prefix < 0x40 || prefix > 0x4f) {
+			return X86_FEATURE_NOT_HANDLED;
+		}
+		++evex_offset;
+	}
+	if (code_len - evex_offset < 2 || (code[evex_offset + 1] & 7) != 4)
 		return X86_FEATURE_NOT_HANDLED;
-	if (code_len < 5)
+	if (code_len - evex_offset < 5)
 		return X86_FEATURE_INVALID;
-	opcode = code[4];
+	evex = &code[evex_offset];
+	opcode = evex[4];
 	if (opcode != 0xff && opcode != 0x8f)
 		return X86_FEATURE_NOT_HANDLED;
-	if (opcode == 0xff && (code_len < 6 || (code[5] & 0x38) != 0x30))
+	if (opcode == 0xff &&
+	    (code_len - evex_offset < 6 || (evex[5] & 0x38) != 0x30))
 		return X86_FEATURE_NOT_HANDLED;
-	if (!(arch->mode & CS_MODE_64) || code_len < 6)
+	if (!(arch->mode & CS_MODE_64) || invalid_prefix ||
+	    code_len - evex_offset < 6 || evex_offset + 6 > 15)
 		return X86_FEATURE_INVALID;
 
-	p0 = code[1];
-	p1 = code[2];
-	p2 = code[3];
-	modrm = code[5];
+	p0 = evex[1];
+	p1 = evex[2];
+	p2 = evex[3];
+	modrm = evex[5];
 	// MAP4, the mandatory EVEX fixed bit, pp=0, LLZ=0, ND=1, NF=0,
 	// and ModRM.Mod=3 are architectural requirements.  R/R' address an
 	// unused field and are architecturally ignored for PUSH2/POP2.
@@ -923,18 +951,9 @@ decode_apx_push2_pop2(csh handle, const uint8_t *code, size_t code_len,
 	MCInst_setOpcode(instr, feature_opcode);
 	MCOperand_CreateImm0(instr, v_register);
 	MCOperand_CreateImm0(instr, b_register);
-	*size = 6;
-
-	if (!instr->flat_insn->detail)
-		return X86_FEATURE_DECODED;
-	x86 = &instr->flat_insn->detail->x86;
-	x86->opcode[0] = 0x62;
-	x86->opcode[1] = p0;
-	x86->opcode[2] = p1;
-	x86->opcode[3] = p2;
-	x86->addr_size = 8;
-	x86->modrm = modrm;
-	x86->encoding.modrm_offset = 5;
+	*size = (uint16_t)(evex_offset + 6);
+	set_apx_evex_encoding_detail(instr, evex, evex_offset, segment_prefix,
+				     address32, NULL);
 	return X86_FEATURE_DECODED;
 }
 
