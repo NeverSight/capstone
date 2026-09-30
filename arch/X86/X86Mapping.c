@@ -1596,7 +1596,10 @@ decode_apx_imul_immediate(csh handle, const uint8_t *code, size_t code_len,
 	instruction_size += immediate_size;
 
 	MCInst_clear(instr);
-	MCInst_setOpcode(instr, X86_FEATURE_APX_IMUL_IMMEDIATE);
+	/* EVEX.ND selects IMULZU, which zero-extends the product into the
+	 * whole destination register. */
+	MCInst_setOpcode(instr, (p2 & 0x10) ? X86_FEATURE_APX_IMULZU_IMMEDIATE :
+					      X86_FEATURE_APX_IMUL_IMMEDIATE);
 	MCOperand_CreateImm0(instr, destination);
 	MCOperand_CreateImm0(instr, memory_form);
 	if (memory_form) {
@@ -5549,16 +5552,18 @@ static bool print_apx_imul_immediate(MCInst *instr, SStream *stream,
 	x86_reg destination, source = X86_REG_INVALID;
 	x86_reg segment = X86_REG_INVALID;
 	uint8_t width, address_size = 8, i;
-	bool memory_form, nf;
+	bool memory_form, nf, zu;
 	int64_t immediate;
 	x86_feature_memory memory;
 	cs_detail *detail;
 	cs_x86 *x86;
 
-	if (MCInst_getOpcode(instr) != X86_FEATURE_APX_IMUL_IMMEDIATE ||
+	if ((MCInst_getOpcode(instr) != X86_FEATURE_APX_IMUL_IMMEDIATE &&
+	     MCInst_getOpcode(instr) != X86_FEATURE_APX_IMULZU_IMMEDIATE) ||
 	    MCInst_getNumOperands(instr) < 7) {
 		return false;
 	}
+	zu = MCInst_getOpcode(instr) == X86_FEATURE_APX_IMULZU_IMMEDIATE;
 	destination_operand = MCInst_getOperand(instr, 0);
 	memory_form_operand = MCInst_getOperand(instr, 1);
 	if (!MCOperand_isImm(destination_operand) ||
@@ -5611,7 +5616,7 @@ static bool print_apx_imul_immediate(MCInst *instr, SStream *stream,
 	}
 	width = (uint8_t)MCOperand_getImm(width_operand);
 	immediate = MCOperand_getImm(immediate_operand);
-	if (MCOperand_getImm(zu_operand) > 1 ||
+	if (MCOperand_getImm(zu_operand) != zu ||
 	    MCOperand_getImm(nf_operand) > 1 ||
 	    (width != 2 && width != 4 && width != 8) ||
 	    (instr->imm_size != 1 &&
@@ -5626,10 +5631,10 @@ static bool print_apx_imul_immediate(MCInst *instr, SStream *stream,
 	if (nf)
 		SStream_concat0(stream, "{nf}|");
 	if (att_syntax)
-		SStream_concat(stream, "imul%c\t",
+		SStream_concat(stream, "%s%c\t", zu ? "imulzu" : "imul",
 			       width == 2 ? 'w' : width == 4 ? 'l' : 'q');
 	else
-		SStream_concat0(stream, "imul\t");
+		SStream_concat(stream, "%s\t", zu ? "imulzu" : "imul");
 	for (i = 0; i < 3; ++i) {
 		uint8_t logical = att_syntax ? 2 - i : i;
 
@@ -6670,6 +6675,9 @@ bool X86_mapFeatureExtension(cs_insn *insn, unsigned int opcode)
 	case X86_FEATURE_APX_IMUL_ONE:
 		insn->id = X86_INS_IMUL;
 		return true;
+	case X86_FEATURE_APX_IMULZU_IMMEDIATE:
+		insn->id = X86_INS_IMULZU;
+		return true;
 	case X86_FEATURE_APX_ADD:
 		insn->id = X86_INS_ADD;
 		return true;
@@ -7057,6 +7065,8 @@ const char *X86_featureExtensionInstructionName(unsigned int id)
 		return "vsha512msg2";
 	case X86_INS_VSHA512RNDS2:
 		return "vsha512rnds2";
+	case X86_INS_IMULZU:
+		return "imulzu";
 	case X86_INS_LDTILECFG:
 		return "ldtilecfg";
 	case X86_INS_STTILECFG:
