@@ -120,6 +120,9 @@ Nonetheless, we hope this additional information is useful to you.
 - Adding new instructions of SME, SVE2 extensions. With it the new `sme` and `pred` operands are added.
 - System operands are provided with way more detail in separated operand.
 	- The `EXACTFPIMM` operand also sets the `fp` field.
+- Added `CS_OPT_SYNTAX_AARCH64_EXPLICIT_WIDE_IMM` to print shifted `MOVN` and `MOVZ` instructions in their explicit form, including the `lsl` shift, instead of the equivalent `MOV` alias.
+  - The default output remains unchanged and matches LLVM's default disassembly output.
+  - The corresponding `cstool` option is `+explicitwideimm`.
 
 **PPC**
 
@@ -234,25 +237,37 @@ Nonetheless, we hope this additional information is useful to you.
 	* `CS_MODE_RISCV_ZBKX = 1 << 19`
 	* `CS_MODE_RISCV_ZBS = 1 << 20`
 	* `CS_MODE_RISCV_VENTANA = 1 << 21`
-- Added two syntax options for alias control:
-  * `CS_OPT_SYNTAX_NO_ALIAS_TEXT`: RISC-V assigns readable aliases to special cases of more flexible instructions, for example: `ret` is a `jalr`, a more general instruction that takes an arbitrary register as jump destination and a link register. `ret` is the special case where those 2 arguments are restricted to `ra` and `x0` respectively.
+- Added RISC-V syntax/detail options for selecting real, uncompressed-real, or alias-preferred printing/details:
+  * `CS_OPT_SYNTAX_REAL` / `CS_OPT_DETAIL_REAL`
+  * `CS_OPT_SYNTAX_UNCOMPRESSED_REAL` / `CS_OPT_DETAIL_UNCOMPRESSED_REAL`
+  * `CS_OPT_SYNTAX_ALIAS` / `CS_OPT_DETAIL_ALIAS`
 
-    The default behaviour of Capstone is to print those aliases whenever applicable, but this default can be suppressed by opening capstone with `CS_OPT_SYNTAX_NO_ALIAS_TEXT`. When using `cstool`, the corresponding cmdline option is `+noalias`
-  * `CS_OPT_SYNTAX_NO_ALIAS_TEXT_COMPRESSED`: some find it useful to only suppress aliases for compressed instructions, but leave other instruction printed as usual. This flag implements this restricted non-aliasing. For example the special compressed addition will normally be printed as its equivalent normal addition, but with this flag enabled it will be printed as `c.addi`, and non-compressed aliases won't be suppressed. When using `cstool`, the corresponding cmdline option is `+noaliascompressed`
-  * Interaction:
-    | Case | `+noalias` | `+noaliascompressed` | Options Set                                                                   | Behavior                                                                                                       |
-    | ---- | ---------- | -------------------- | ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-    | 1    | `false`    | `false`              | *(neither)*                                                                   | All instruction aliases will be printed (default behavior)                                                     |
-    | 2    | `true`     | `false`              | `CS_OPT_SYNTAX_NO_ALIAS_TEXT` only                                            | All instruction aliases will NOT be printed; exact text only                                                   |
-    | 3    | `false`    | `true`               | `CS_OPT_SYNTAX_NO_ALIAS_TEXT_COMPRESSED` only                                 | Non-compressed instructions show aliases normally; compressed instructions are printed exactly with no aliases |
-    | 4    | `true`     | `true`               | Both `CS_OPT_SYNTAX_NO_ALIAS_TEXT` & `CS_OPT_SYNTAX_NO_ALIAS_TEXT_COMPRESSED` | All instruction aliases will NOT be printed *(redundant/equivalent to case 2)*                                 |
-  
-  Note that `+noalias` "overpowers" `noaliascompressed` in the second case: despite `+noaliascompressed` being false, meaning aliases are wanted for compressed instructions, `+noalias` being true means ALL aliases are supressed, and this takes precedence. Other than that, case 1 and case 3 work as intuitively expected, and case 4 is redundant. 
-  
-  So a single-sentence description of this table is: if `+noalias` is given then no aliases will be printed for any instruction, but if not given then aliases will be printed for non-compressed instruction and alias printing for compressed instruction futher checks `+noaliascompressed` before proceeding.
+  * When configuring how the instruction text should appear, use [Syntax flags table (HTML)](html/syntax_flags_table.html)
+
+    [![Syntax flags table](images/syntax_flags.png)](html/syntax_flags_table.html)
+
+  * When configuring how the instruction details and operands array should be filled, use [Details flags table (HTML)](html/details_flags_table.html)
+
+    [![Details flags table](images/details_flags.png)](html/details_flags_table.html)
+
+  * Notice that despite the apparent complexity of the rules above, there are really only 4 distinct outcomes: 
+      - An instruction is treated exactly as decoded (No uncompression and no aliasing happens)
+      - An instruction is treated as if it's the uncompressed form (if it's compressed)
+      - An instruction is treated as if it's the alias form (whether compressed or not)
+      - Assuming an instruction is compressed: it is uncompressed, then the alias of the uncompressed instruction is printed.
+  * and then every flag is encoding a different bias or preference over those outcomes:
+      - Real: has no bias, every instruction is always treated exactly as decoded
+      - Uncompressed Real: has a bias for the uncompressed but non-alias forms
+      - Alias: has a bias for alias forms, and considers the uncompressed form as a last-resort alias form preferable to the original
+
+- `CS_OPT_SYNTAX_*` and `CS_OPT_DETAIL_*` flag sets are independent and can be chosen separately, in that case their combined effect will take effect. For example `CS_OPT_SYNTAX_REAL` and `CS_OPT_DETAIL_UNCOMPRESSED_REAL` will always preserve the text of compressed instructions but their details will be of the uncompressed equivalents.
+
+- **The default case** is: `CS_OPT_SYNTAX_ALIAS` and `CS_OPT_DETAIL_ALIAS`
+
 - Added `reg_access` capstone callback to return all read and written registers for the instructions, including registers used as part of memory operands.
   * Note that `reg_access` does NOT treat CSRs as registers, detailed reasons for why can be found in [the PR implementing the feature](https://github.com/capstone-engine/capstone/pull/2895) 
   * Note that `reg_access` does NOT treat reading the PC's value as reading a register, detailed reasons for why can be found in [the PR implementing the feature](https://github.com/capstone-engine/capstone/pull/2895) 
+- Added `rounding_mode` field to `cs_riscv` struct inside details struct (`insn->detail->riscv->rounding_mode`) for float and double instructions.
 
 > [!NOTE] 
 > All `CS_MODE_RISCV_*` extensions above are disabled by default unless enabled by their option name or the corresponding command line flag in cstool. Any other extension is always enabled and can't be disabled.
@@ -270,6 +285,10 @@ Nonetheless, we hope this additional information is useful to you.
 - Decoding of conflicting segment overrides was changed to match CPU behavior:
   For instructions with both an FS/GS and a ES/CS/SS/DS overrides the FS/GS override now takes priority, regardless of prefix ordering.
 - Decoding of instructions with multiple mandatory prefixes was fixed. (e.g., `shld` with a data size override and a redundant `F3` prefix, or `addss` with an additional `66` prefix)
+- Added `CS_MODE_X86_INTEL` and `CS_MODE_X86_AMD` to select ISA specific quirks.
+  Currently this is only:
+  - How `66`-prefixed near conditional jumps are decoded in 64-bit mode (see flag documentation).
+    Without either flag, the previous LLVM behavior is preserved.
 
 **BPF**
 
@@ -281,8 +300,10 @@ Nonetheless, we hope this additional information is useful to you.
 
 **M68K**
 
-- Architecture support added for `cpu32`, `M68060`.
-- Enhanced bitfield instructions, PC-relative addressing, and immediate value type handling.
+- Architecture support added for `cpu32`, `M68060`, and ColdFire variants (`CFV1`, `CFV2`, `CFV3`, `CFV4`, `CFV4E`, `CFV5`), including feature flags for USP, DIV, MAC/EMAC, and FPU instructions.
+- Expanded operand details for bitfield instructions, PC-relative addressing, immediate value types, and memory addressing metadata.
+- Added lossless detail operands for immediate 96-bit extended (`.x`) and packed-decimal (`.p`) values. Extended operands use `M68K_OP_FP_EXTENDED` with `sign_exp`, `reserved`, and `significand` in `fp_extended`; packed operands use `M68K_OP_FP_PACKED` with `header` and `fraction` in `fp_packed`.
+- Added `M68K_FPU_SIZE_PACKED` for `.p` operands. Packed register-to-memory moves expose their static immediate or dynamic data-register k-factor as a third detail operand.
 - Expanded integration tests and refactored invalid assembly edge cases.
 
 **UX**
@@ -439,6 +460,7 @@ Such an instruction is ill-defined in LLVM and should be fixed upstream.
 | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | ARM64 -> AArch64 | ARM64 was everywhere renamed to AArch64 to match the LLVM naming.                                                                                                                                                                                                                                                       | See below.                                                                                                                                                                                       |
 | Post-index       | Post-index memory access has the disponent now set int the `MEMORY` operand! No longer as separated `reg`/`imm` operand.                                                                                                                                                                                                | See post-index explanation for ARM.                                                                                                                                                              |
+| `mem.disp`       | `cs_aarch64_op.mem.disp` changed from `int32_t` to `int64_t`.                                                                                                                                                                                                                                                           | Prevent truncation of large AArch64 memory displacements.                                                                                                                                        |
 | `SME` operands   | `SME` operands contain more detail now and member names are closer to the ISA terminology.                                                                                                                                                                                                                              | New SVE2, SME extensions required more detail.                                                                                                                                                   |
 | System operands  | System Operands are separated into different types now.                                                                                                                                                                                                                                                                 | System operands follow a special encoding. Some byte sequences match two different operands. Hence, a more detailed concept was necessary.                                                       |
 | `writeback`      | `writeback` member was moved to detail.                                                                                                                                                                                                                                                                                 | See ARM explanation.                                                                                                                                                                             |
@@ -482,9 +504,14 @@ Such an instruction is ill-defined in LLVM and should be fixed upstream.
 | m68k_op_mem.in_disp, m68k_op_mem.out_disp           | These fields are now signed instead of unsigned.                                                        | The M68K architecture uses sign extended displacements for effective address calculation. |
 | m68k_op_mem.disp_size                               | Defines if the .disp field was encoded as a byte (false) or word (true)                                 | Necessary for accurate printing.                                                          |
 | m68k_op_mem.in_disp_size, m68k_op_mem.out_disp_size | Defines if the .in_disp and .out_disp fields respectively were encoded as words (false) or longs (true) | Necessary for accurate printing.                                                          |
+| `M68K_OP_MEM` storage                               | Memory operands now store base registers in `m68k_op_mem.base_reg` and absolute addresses in `m68k_op_mem.address`; `op->reg` and `op->imm` are only used for register and immediate operands. | Keeps memory-addressing details in `m68k_op_mem` consistently. |
+| `M68K_OP_FP_EXTENDED`, `cs_m68k_op.fp_extended`     | Immediate `.x` operands use a dedicated type with `sign_exp`, `reserved`, and `significand` fields. | Avoids losing precision or reserved bits by converting detail data to binary64. |
+| `M68K_OP_FP_PACKED`, `cs_m68k_op.fp_packed`         | Immediate `.p` operands use a dedicated type with `header` and `fraction` fields. | Preserves every packed-decimal digit, sign, exponent, and special-value encoding. |
+| `M68K_FPU_SIZE_PACKED`                              | Identifies `.p` operands separately from `M68K_FPU_SIZE_EXTENDED`; both external formats occupy 12 bytes. | Allows consumers and printers to distinguish packed decimal from extended precision. |
+| Packed register-to-memory `FMOVE` operands          | A static immediate or dynamic data-register k-factor is exposed as the third detail operand. | Preserves the formatting operand encoded for packed-decimal output. |
 
 
-### Notes about AArch64, SystemZ and ARM renaming
+### Notes about AArch64, SystemZ, ARM and RISC-V renaming
 
 `ARM64` was everywhere renamed to `AArch64`. And `SYSZ` to `SYSTEMZ`. This is a necessity to ensure that the update scripts stay reasonably simple.
 Capstone was very inconsistent with the naming before (sometimes `AArch64` sometimes `ARM64`. Sometimes `SYSZ` sometimes `SYSTEMZ`).
@@ -494,19 +521,21 @@ Because this would completely break maintaining Capstone `v6` and `pre-v6` in a 
 
 1. `arm64.h` is a compatibility header now, which merely maps every member to the one in the `aarch64.h` header. Defining `CAPSTONE_AARCH64_COMPAT_HEADER` before including `capstone.h` will include the headers in the right order.
 2. The `systemz.h` header includes the `systemz_compatibility.h` header if `CAPSTONE_SYSTEMZ_COMPAT_HEADER` is defined.
+3. Defining `CAPSTONE_RISCV_COMPAT_HEADER` before including `capstone.h` exposes the legacy RISC-V compressed-mode constant `CS_MODE_RISCVC` as an alias of `CS_MODE_RISCV_C`.
 
-We will continue to maintain both headers.
+We will continue to maintain both compatibility headers, `arm64.h` and `systemz_compatibility.h`.
 
 _Compatibility header_
 
-If you want to use the compatibility header and stick with the `ARM64`/`SYSZ` naming, you can define `CAPSTONE_AARCH64_COMPAT_HEADER` and `CAPSTONE_SYSTEMZ_COMPAT_HEADER` before including `capstone.h`.
+If you want to use the compatibility header and stick with the `ARM64`/`SYSZ` naming, you can define `CAPSTONE_AARCH64_COMPAT_HEADER` and `CAPSTONE_SYSTEMZ_COMPAT_HEADER` before including `capstone.h`. For the legacy RISC-V compressed-mode spelling (`CS_MODE_RISCVC`), define `CAPSTONE_RISCV_COMPAT_HEADER` before including `capstone.h`.
 
-**Note**: The `CAPSTONE_ARM_COMPAT_HEADER` will only define macros for the `ARM_CC -> ARMCC` and `arm_cc -> ARMCC_CondCodes` renaming.
+**Note**: The `CAPSTONE_ARM_COMPAT_HEADER` will only define macros for the `ARM_CC -> ARMCC` and `arm_cc -> ARMCC_CondCodes` renaming. The `CAPSTONE_RISCV_COMPAT_HEADER` only defines `CS_MODE_RISCVC` for the `CS_MODE_RISCVC -> CS_MODE_RISCV_C` renaming.
 
 ```c
 #define CAPSTONE_SYSTEMZ_COMPAT_HEADER
 #define CAPSTONE_AARCH64_COMPAT_HEADER
 #define CAPSTONE_ARM_COMPAT_HEADER
+#define CAPSTONE_RISCV_COMPAT_HEADER
 #include <capstone/capstone.h>
 
 // Your code...

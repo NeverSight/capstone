@@ -44,31 +44,28 @@
 #define BIT_1E(A) ((A) & 0x40000000)
 #define BIT_1F(A) ((A) & 0x80000000)
 
-/* These are the CPU types understood by this disassembler */
-#define TYPE_68000 1
-#define TYPE_68010 2
-#define TYPE_68020 4
-#define TYPE_68030 8
-#define TYPE_68040 16
-#define TYPE_68060 32
-#define TYPE_CPU32 64
+/* These are the M68K feature masks understood by this disassembler. */
+#define M68000_ONLY CS_MODE_M68K_000
 
-#define M68000_ONLY TYPE_68000
-
-#define M68010_ONLY TYPE_68010
-#define M68010_LESS (TYPE_68000 | TYPE_68010)
+#define M68010_ONLY CS_MODE_M68K_010
+#define M68010_LESS (CS_MODE_M68K_000 | CS_MODE_M68K_010)
 #define M68010_PLUS \
-	(TYPE_68010 | TYPE_68020 | TYPE_68030 | TYPE_68040 | TYPE_68060)
+	(CS_MODE_M68K_010 | CS_MODE_M68K_020 | CS_MODE_M68K_030 | \
+	 CS_MODE_M68K_040 | CS_MODE_M68K_060)
 
-#define M68020_ONLY TYPE_68020
-#define M68020_LESS (TYPE_68010 | TYPE_68020)
-#define M68020_PLUS (TYPE_68020 | TYPE_68030 | TYPE_68040 | TYPE_68060)
+#define M68020_ONLY CS_MODE_M68K_020
+#define M68020_LESS (CS_MODE_M68K_010 | CS_MODE_M68K_020)
+#define M68020_PLUS \
+	(CS_MODE_M68K_020 | CS_MODE_M68K_030 | CS_MODE_M68K_040 | \
+	 CS_MODE_M68K_060)
 
-#define M68030_ONLY TYPE_68030
-#define M68030_LESS (TYPE_68010 | TYPE_68020 | TYPE_68030)
-#define M68030_PLUS (TYPE_68030 | TYPE_68040 | TYPE_68060)
+#define M68030_ONLY CS_MODE_M68K_030
+#define M68030_LESS (CS_MODE_M68K_010 | CS_MODE_M68K_020 | CS_MODE_M68K_030)
+#define M68030_PLUS (CS_MODE_M68K_030 | CS_MODE_M68K_040 | CS_MODE_M68K_060)
 
-#define M68040_PLUS (TYPE_68040 | TYPE_68060)
+#define M68040_PLUS (CS_MODE_M68K_040 | CS_MODE_M68K_060)
+
+typedef uint32_t m68k_feature_mask;
 
 /* Extension word formats */
 #define EXT_8BIT_DISPLACEMENT(A) ((A) & 0xff)
@@ -120,8 +117,23 @@
 /* ── IR bit-field helpers ────────────────────────────────────────────
  * Extract commonly-used fields from the first instruction word.      */
 
-/* 6-bit coprocessor condition (bits 5:0 of IR). */
-#define M68K_IR_CONDITION(info) ((info)->ir & 0x3f)
+/* Coprocessor conditional predicate field (bits 5:0).
+ *
+ * Reference: Motorola MC68881/MC68882 Floating-Point Coprocessor User's
+ * Manual, first edition (1987), sections 4.7.2-4.7.3, Tables 4-20 and
+ * 4-22, pages 4-129 through 4-134. A reference copy is available at:
+ * https://www.bitsavers.org/components/motorola/68000/68020/MC68881_MC68882_Floating-Point_Coprocessor_Users_Manual_1ed_1987.pdf
+ */
+#define M68K_COPROCESSOR_CONDITION_MASK 0x3f
+
+static inline uint32_t m68k_coprocessor_condition(uint32_t word)
+{
+	return word & M68K_COPROCESSOR_CONDITION_MASK;
+}
+
+/* 4-bit condition selector used by Bcc/DBcc/Scc/TRAPcc. */
+#define M68K_IR_CONDITION_NIBBLE(info) (((info)->ir >> 8) & 0xf)
+#define M68K_CONDITION_FALSE 1
 
 /* cinv/cpush: select cpush(1) vs cinv(0) -- bit 5 of IR. */
 #define M68K_IR_IS_CPUSH(info) (((info)->ir >> 5) & 1)
@@ -135,13 +147,19 @@
 /* ── FPU extension-word bit-field helpers ────────────────────────────
  * The FPU command word is the 16-bit extension following the F-line. */
 
-/* R/M bit (bit 14): 1 = source from EA, 0 = source from FP register. */
+/* R/M bit (bit 14): 1 = effective-address operand, 0 = FP-register operand. */
 #define M68K_FEXT_RM(ext) (((ext) >> 14) & 1)
 
 /* Type / command class (bits 15:13). */
 #define M68K_FEXT_TYPE(ext) (((ext) >> 13) & 7)
+#define M68K_FEXT_TYPE_GENERAL_MAX 0x1
+#define M68K_FEXT_TYPE_FMOVE_TO_EA 0x3
+#define M68K_FEXT_TYPE_FPCR_FROM_EA 0x4
+#define M68K_FEXT_TYPE_FPCR_TO_EA 0x5
+#define M68K_FEXT_TYPE_FMOVEM_FROM_EA 0x6
+#define M68K_FEXT_TYPE_FMOVEM_TO_EA 0x7
 
-/* Source specifier (bits 12:10) -- data format when R/M=1. */
+/* Source/format specifier (bits 12:10). */
 #define M68K_FEXT_SRC(ext) (((ext) >> 10) & 7)
 
 /* Destination FP register (bits 9:7). */
@@ -162,15 +180,59 @@
 /* Direction bit for FMOVE FPCR (bit 13): 0 = ea->fpcr, 1 = fpcr->ea. */
 #define M68K_FEXT_DIR(ext) (((ext) >> 13) & 1)
 
+/* FMOVEM register-list encoding.
+ *
+ * Bits 12:11 select static/dynamic and predecrement versus
+ * postincrement-or-control forms. A static list occupies bits 7:0; a dynamic
+ * list has the reserved-bit format 0rrr0000, with Dn in bits 6:4.
+ *
+ * Reference: Motorola MC68881/MC68882 Floating-Point Coprocessor User's
+ * Manual, first edition (1987), section 4.7.1.6, Table 4-18, pages 4-126
+ * through 4-128:
+ * https://www.bitsavers.org/components/motorola/68000/68020/MC68881_MC68882_Floating-Point_Coprocessor_Users_Manual_1ed_1987.pdf
+ */
+typedef enum {
+	M68K_FMOVEM_MODE_STATIC_PREDECREMENT = 0,
+	M68K_FMOVEM_MODE_DYNAMIC_PREDECREMENT = 1,
+	M68K_FMOVEM_MODE_STATIC_POSTINCREMENT_OR_CONTROL = 2,
+	M68K_FMOVEM_MODE_DYNAMIC_POSTINCREMENT_OR_CONTROL = 3,
+} m68k_fmovem_mode;
+
+static inline m68k_fmovem_mode m68k_fmovem_get_mode(uint32_t extension)
+{
+	return (m68k_fmovem_mode)BITFIELD(extension, 12, 11);
+}
+
+static inline uint32_t m68k_fmovem_register_list(uint32_t extension)
+{
+	return BITFIELD(extension, 7, 0);
+}
+
+static inline bool
+m68k_fmovem_dynamic_reserved_bits_are_zero(uint32_t extension)
+{
+	return BITFIELD(extension, 7, 7) == 0 && BITFIELD(extension, 3, 0) == 0;
+}
+
+static inline uint32_t m68k_fmovem_dynamic_register(uint32_t extension)
+{
+	return BITFIELD(extension, 6, 4);
+}
+
 /* ── FPU condition-code mask ─────────────────────────────────────────
- * FBcc/FDBcc/FScc/FTRAPcc encode the FP condition in bits 5,3:0
- * of the extension word (or IR for FBcc).  Bit 4 is always 0,
- * yielding the 0x2f mask.                                            */
-#define M68K_FP_COND(x) ((x) & 0x2f)
+ * The FPU defines predicates 0xxxxx; 1xxxxx encodings are reserved
+ * aliases that evaluate identically. Use the low five bits to index the
+ * contiguous FBcc/FDBcc/FScc/FTRAPcc opcode ranges. See the manual
+ * reference above.                                                   */
+#define M68K_FPU_CONDITION_INDEX_MASK 0x1f
+
+static inline uint32_t m68k_fpu_condition_index(uint32_t word)
+{
+	return word & M68K_FPU_CONDITION_INDEX_MASK;
+}
 
 /* Maximum valid condition codes per coprocessor. */
 #define M68K_PMMU_MAX_COND 16
-#define M68K_FPU_MAX_COND 32
 
 /* ── FPU source-format constants (bits 12:10 of ext word) ───────────*/
 #define M68K_FPSRC_LONG 0x00 /* .l  -- 32-bit integer            */
@@ -181,42 +243,46 @@
 #define M68K_FPSRC_DOUBLE 0x05 /* .d  -- 64-bit IEEE double        */
 #define M68K_FPSRC_BYTE 0x06 /* .b  -- 8-bit integer             */
 
+/* FMOVE register-to-memory packed-decimal destination encodings. */
+#define M68K_FPDST_PACKED_STATIC 0x03
+#define M68K_FPDST_PACKED_DYNAMIC 0x07
+
 /* ── FPU special raw opmodes (before SD-flag masking) ───────────────
  * FSSQRT/FDSQRT have raw 7-bit opmodes 0x41/0x45.  After the 6-bit
  * truncation (& 0x3f) they become 0x01/0x05 with the SD flag set.   */
 #define M68K_FPOP_FSSQRT_RAW 0x01 /* 0x41 & 0x3f */
 #define M68K_FPOP_FDSQRT_RAW 0x05 /* 0x45 & 0x3f */
 
-/* ── CPU-type guard macros ───────────────────────────────────────────
+/* ── Feature guard macros ────────────────────────────────────────────
  * These reference the `info` parameter available at each call site.
- * They early-return from the calling function on type mismatch.      */
+ * They early-return from the calling function on guard mismatch.     */
 
-#define LIMIT_CPU_TYPES(info, ALLOWED_CPU_TYPES) \
+#define LIMIT_FEATURE(info, FEATURES) \
 	do { \
-		if (!(info->type & ALLOWED_CPU_TYPES)) { \
+		if (!m68k_has_feature(info, FEATURES)) { \
 			d68000_invalid(info); \
 			return; \
 		} \
 	} while (0)
 
-/* Like LIMIT_CPU_TYPES but also reverses the instruction word consumption,
+/* Like LIMIT_FEATURE but also reverses the instruction word consumption,
  * so the invalid instruction produces size=0 (not decoded) instead of size=2.
  * Use for handlers that replace d68000_invalid in the dispatch table. */
-#define LIMIT_CPU_TYPES_UNDECODED(info, ALLOWED_CPU_TYPES) \
+#define LIMIT_FEATURE_UNDECODED(info, FEATURES) \
 	do { \
-		if (!(info->type & ALLOWED_CPU_TYPES)) { \
+		if (!m68k_has_feature(info, FEATURES)) { \
 			info->pc -= 2; \
 			d68000_invalid(info); \
 			return; \
 		} \
 	} while (0)
 
-/* Like LIMIT_CPU_TYPES but also rejects CPU32.  CPU32 shares TYPE_68020 but
- * lacks some 68020 instructions (CAS, CAS2, CHK.L, PACK, UNPK). */
-#define LIMIT_CPU_TYPES_NOT_CPU32(info, ALLOWED_CPU_TYPES) \
+/* Like LIMIT_FEATURE but also rejects a feature subset.  CPU32 implies 68020
+ * but lacks some 68020 instructions (CAS, CAS2, CHK.L, PACK, UNPK). */
+#define LIMIT_FEATURE_EXCLUDING(info, FEATURES, EXCLUDED_FEATURES) \
 	do { \
-		if (!(info->type & (ALLOWED_CPU_TYPES)) || \
-		    (info->type & TYPE_CPU32)) { \
+		if (!m68k_has_feature(info, FEATURES) || \
+		    m68k_has_feature(info, EXCLUDED_FEATURES)) { \
 			d68000_invalid(info); \
 			return; \
 		} \
@@ -227,21 +293,6 @@
 #define REQUIRE_CPID_FPU(info) \
 	do { \
 		if (M68K_CPID(info) != M68K_CPID_FPU) { \
-			d68000_invalid(info); \
-			return; \
-		} \
-	} while (0)
-
-/* Require CpID == MMU or CpID == FPU.
- * CpID MMU is rejected on CPU32 (no PMMU).  Used by cpSAVE/cpRESTORE. */
-#define REQUIRE_CPID_FPU_OR_PMMU(info) \
-	do { \
-		int _cpid = M68K_CPID(info); \
-		if (_cpid == M68K_CPID_MMU && ((info)->type & TYPE_CPU32)) { \
-			d68000_invalid(info); \
-			return; \
-		} \
-		if (_cpid != M68K_CPID_MMU && _cpid != M68K_CPID_FPU) { \
 			d68000_invalid(info); \
 			return; \
 		} \
@@ -279,10 +330,10 @@ typedef struct m68k_info {
 	size_t code_len;
 	uint64_t baseAddress;
 	MCInst *inst;
-	unsigned int pc; /* program counter */
-	unsigned int ir; /* instruction register */
-	unsigned int type;
-	unsigned int address_mask; /* Address mask to simulate address lines */
+	uint32_t pc; /* program counter */
+	uint32_t ir; /* instruction register */
+	m68k_feature_mask features;
+	uint32_t address_mask; /* Address mask to simulate address lines */
 	cs_m68k extension;
 	uint16_t regs_read
 		[MAX_IMPL_R_REGS]; // list of implicit registers read by this insn
@@ -293,6 +344,27 @@ typedef struct m68k_info {
 	uint8_t groups[MAX_NUM_GROUPS];
 	uint8_t groups_count;
 } m68k_info;
+
+static inline bool m68k_has_feature(const m68k_info *info,
+				    m68k_feature_mask features)
+{
+	m68k_feature_mask available = info->features;
+
+	if (available & CS_MODE_M68K_CPU32)
+		available |= CS_MODE_M68K_020;
+	if (available & CS_MODE_M68K_CF_ISA_A_PLUS)
+		available |= CS_MODE_M68K_CF_ISA_A;
+	if (available & CS_MODE_M68K_CF_ISA_B)
+		available |= CS_MODE_M68K_CF_ISA_A | CS_MODE_M68K_CF_ISA_A_PLUS;
+	if (available & CS_MODE_M68K_CF_ISA_C)
+		available |= CS_MODE_M68K_CF_ISA_A;
+	if (available & CS_MODE_M68K_CF_EMAC)
+		available |= CS_MODE_M68K_CF_MAC;
+	if (available & CS_MODE_M68K_CF_EMAC_B)
+		available |= CS_MODE_M68K_CF_EMAC | CS_MODE_M68K_CF_MAC;
+
+	return (available & features) != 0;
+}
 
 bool M68K_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 			 MCInst *instr, uint16_t *size, uint64_t address,

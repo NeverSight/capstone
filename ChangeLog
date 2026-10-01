@@ -1,6 +1,211 @@
 This file details the changelog of Capstone.
 
 -----------------------------
+Version 6.0.0-Alpha11: September 21th, 2026
+
+## What's Changed
+* Xtensa: gate ESP32-S3 and HIFI3 ops behind CS_MODE_XTENSA_ESP32S3 by @germiBest in https://github.com/capstone-engine/capstone/pull/2979
+* AArch64: report NZCV access for MRS/MSR of NZCV by @gaul in https://github.com/capstone-engine/capstone/pull/3002
+* xtensa: sign-extend scaled offsets in decodeOffset_* helpers by @Samin061 in https://github.com/capstone-engine/capstone/pull/2997
+* Fix Xtensa test with wrong mode selection. by @Rot127 in https://github.com/capstone-engine/capstone/pull/3004
+* Xtensa: Fix Stack overflow by @Rot127 in https://github.com/capstone-engine/capstone/pull/3012
+* AArch64: Fix diet-mode NULL deref in printMatrixTileVector by @amit-sides in https://github.com/capstone-engine/capstone/pull/3017
+* HHPA: Correct name of r0 register - flags -> r0 by @Rot127 in https://github.com/capstone-engine/capstone/pull/3024
+* Fix read from uninitialized memory by @Rot127 in https://github.com/capstone-engine/capstone/pull/3011
+* Add MSAN build option to CMakeLists.txt by @Rot127 in https://github.com/capstone-engine/capstone/pull/3029
+* x86: use effective address size for the loop counter register by @phverg in https://github.com/capstone-engine/capstone/pull/3025
+* systemz: bounds-check register index in decodeRegisterClass by @jmestwa-coder in https://github.com/capstone-engine/capstone/pull/3044
+* x86: fix VMOVUPS memory operand access by @raaller in https://github.com/capstone-engine/capstone/pull/3035
+* PowerPC: Keep BI out of the CTR-only branch predicate by @phix33 in https://github.com/capstone-engine/capstone/pull/3043
+* Alpha: Fix implicit read/write details for some memory instructions by @atirna in https://github.com/capstone-engine/capstone/pull/3034
+* X86: Fix four AT&T operand-detail defects by @phix33 in https://github.com/capstone-engine/capstone/pull/3042
+* RISCV: Revamp flags to allow fine grained control over aliasing by @moste00 in https://github.com/capstone-engine/capstone/pull/3008
+* M68K: Fix fmove.x 96-bit extended immediate decode length and printing by @b1llow in https://github.com/capstone-engine/capstone/pull/3016
+* AArch64: fix Rt operand of the integer STLUR forms by @gaul in https://github.com/capstone-engine/capstone/pull/3046
+* AArch64: SYSL writes its Rt operand, it does not read it by @gaul in https://github.com/capstone-engine/capstone/pull/3045
+* x86: fix near RET decoding with 0x66 and REX.W by @raaller in https://github.com/capstone-engine/capstone/pull/3049
+* ARM/AArch64: Improve runtime of ARM/AArch64 register name patching. by @Rot127 in https://github.com/capstone-engine/capstone/pull/3048
+* Handle case of vsprintf returning oob pointer offset. by @Rot127 in https://github.com/capstone-engine/capstone/pull/3060
+* PowerPC: add mcrxr instruction support by @StilesCrisis in https://github.com/capstone-engine/capstone/pull/3065
+* X86: Zero the operand slot before filling it in the Intel implicit insert by @phix33 in https://github.com/capstone-engine/capstone/pull/3057
+* cstest: Compare the PPC branch details once and without requiring operands by @phix33 in https://github.com/capstone-engine/capstone/pull/3058
+* Add AI guidelines and requirements. by @Rot127 in https://github.com/capstone-engine/capstone/pull/3064
+* x86: Add missing access info for operand[3] of vmulps. by @raaller in https://github.com/capstone-engine/capstone/pull/3059
+* x86: fix EVEX writemask access in AT&T syntax by @raaller in https://github.com/capstone-engine/capstone/pull/3072
+* Replace all system allocations with cs_mem_ allocations. by @Rot127 in https://github.com/capstone-engine/capstone/pull/3074
+* x86: fix JO/JNO operand size in 64-bit mode by @raaller in https://github.com/capstone-engine/capstone/pull/3067
+* riscv: propagate register-class decode failure in custom decoders by @jmestwa-coder in https://github.com/capstone-engine/capstone/pull/3071
+* x86: Fix access of X86_CMPSL memory operands by @raaller in https://github.com/capstone-engine/capstone/pull/3080
+* Add AI guidance by @raaller in https://github.com/capstone-engine/capstone/pull/3081
+
+## New Contributors
+* @germiBest made their first contribution in https://github.com/capstone-engine/capstone/pull/2979
+* @gaul made their first contribution in https://github.com/capstone-engine/capstone/pull/3002
+* @amit-sides made their first contribution in https://github.com/capstone-engine/capstone/pull/3017
+* @phverg made their first contribution in https://github.com/capstone-engine/capstone/pull/3025
+* @raaller made their first contribution in https://github.com/capstone-engine/capstone/pull/3035
+* @atirna made their first contribution in https://github.com/capstone-engine/capstone/pull/3034
+* @StilesCrisis made their first contribution in https://github.com/capstone-engine/capstone/pull/3065
+
+**Full Changelog**: https://github.com/capstone-engine/capstone/compare/6.0.0-Alpha10...6.0.0-Alpha11
+
+-----------------------------
+Version 6.0.0-Alpha10: July 21th, 2026
+
+## API changes and additions
+
+- Enum names of the Alpha architecture are now correctly all upper case.
+  Because of an old Auto-Sync bug all the enum names were prefixed with `Alpha` instead of `ALPHA`
+  and some contained lower case letters.
+  Sadly, I just recently recognized that Alpha was effected by that bug.
+
+  While this change is very annoying for everybody using the Alpha module,
+  it must be done before the Beta release.
+  Please excuse the inconvenience!
+
+  A simple command to replace almost all of these occurrences in your code base is:
+  ```
+  find . -type f -regex ".*\.\(c\|h\)$" -exec sed -i -E "s|Alpha_([A-Z0-9_]+)|ALPHA_\1|g" {} +
+  ```
+  Author: @Rot127
+
+- RISC-V got a v5 compatibility macro for its header.
+  With its recent module update `CS_MODE_RISCVC` was renamed to `CS_MODE_RISCV_C` to be
+  more consistent with the other `CS_MODE_` enums.
+  This could break builds against a `v5` code base which only has `CS_MODE_RISCVC`.
+
+  Now you can simply define `CAPSTONE_RISCV_COMPAT_HEADER` before including `capstone.h`
+  and `CS_MODE_RISCVC` will be defined as alias for `CS_MODE_RISCV_C`
+
+  ```
+  #define CAPSTONE_RISCV_COMPAT_HEADER
+  #include <capstone/capstone.h>
+  ```
+  Author: @moste00
+
+- Prevent literal displacement truncation for AArch64 memory operands.
+  There are AArch64 displacements which are 64bit in size. But `aarch64_op_mem.disp` was an `int32_t`.
+  It was promoted to an `int64_t`.
+  Author: @amaanmujawar
+
+- Fixed several decoding bugs in the Alpha module.
+  See https://github.com/capstone-engine/capstone/pull/2967 for details.
+  Author: @mattst88
+
+- The RISC-V details now also include the FP rounding mode `cs_riscv.rounding_mode`.
+  Author: @moste00
+
+- AArch64: Add `CS_OPT_SYNTAX_AARCH64_EXPLICIT_WIDE_IMM` flag to print shifted `MOVN` and
+  `MOVZ` instructions in their explicit forms instead of using the equivalent `MOV` aliases.
+
+  Example output from `cstool`:
+  ```
+  > cstool aarch64 0xe402a012
+  mov w4, #-0x170001
+
+  > cstool aarch64+explicitwideimm 0xe402a012
+  movn w4, #0x17, lsl #16
+
+  > cstool aarch64+explicitwideimm 0xe402a052
+  movz w4, #0x17, lsl #16
+  ```
+  Author: @amaanmujawar
+
+- M68K: Fixed EA decoding error and added ColdFire EMAC_B dual-acc MAC.
+  Author: @b1llow
+
+## What's Changed
+* Add CI job for building and testing on 32bit big endian by @trufae in https://github.com/capstone-engine/capstone/pull/2941
+* Fixed CONTRIBUTING.md not listing all Architectures by @rectrap in https://github.com/capstone-engine/capstone/pull/2952
+* Find writeback registers by @slate5 in https://github.com/capstone-engine/capstone/pull/2960
+* m68k: fix off-by-one bounds check in M68K_insn_name by @jmestwa-coder in https://github.com/capstone-engine/capstone/pull/2964
+* Fix OOB reads/writes - CVE-2026-55893 & CVE-2026-55894 by @Rot127 in https://github.com/capstone-engine/capstone/pull/2968
+* Alpha: fix decoder bugs and add test coverage by @mattst88 in https://github.com/capstone-engine/capstone/pull/2967
+* Fix crash due to invalid register by @moste00 in https://github.com/capstone-engine/capstone/pull/2966
+* Fix naming convention for Alpha enums by @Rot127 in https://github.com/capstone-engine/capstone/pull/2971
+* Add frm operands to float/double instructions by @moste00 in https://github.com/capstone-engine/capstone/pull/2972
+* Apply clang-format by @Rot127 in https://github.com/capstone-engine/capstone/pull/2975
+* Fix AArch64 predicate-as-counter register printed in hex by @yufengzjj in https://github.com/capstone-engine/capstone/pull/2976
+* SH: fix signed shift overflow in sh_disassemble dsp decode by @jmestwa-coder in https://github.com/capstone-engine/capstone/pull/2983
+* Guard operand append past MAX_MC_OPS in MCInst.c by @Samin061 in https://github.com/capstone-engine/capstone/pull/2985
+* M68K: Handle EA decoding error case and add ColdFire EMAC_B dual-acc MAC  by @b1llow in https://github.com/capstone-engine/capstone/pull/2987
+* Xtensa: fix swapped isIntN arguments in decodeOffset_16_16Operand by @jmestwa-coder in https://github.com/capstone-engine/capstone/pull/2986
+* Don't build cstool arch specific details printing, if not requested. by @Rot127 in https://github.com/capstone-engine/capstone/pull/2888
+* Add overflow check to cs_kern_os_calloc by @Rot127 in https://github.com/capstone-engine/capstone/pull/2980
+* M68K: Fix FPU condition and FMOVEM decoding by @b1llow in https://github.com/capstone-engine/capstone/pull/2993
+* AArch64: enh Add option for explicit shifted wide immediates by @amaanmujawar in https://github.com/capstone-engine/capstone/pull/2995
+* Add compat behaviour for RISCV for RISCVC/RISCV_C constant by @moste00 in https://github.com/capstone-engine/capstone/pull/2996
+* AArch64: fix LDR literal detail operand truncation by @amaanmujawar in https://github.com/capstone-engine/capstone/pull/2984
+
+## New Contributors
+* @rectrap made their first contribution in https://github.com/capstone-engine/capstone/pull/2952
+* @jmestwa-coder made their first contribution in https://github.com/capstone-engine/capstone/pull/2964
+* @mattst88 made their first contribution in https://github.com/capstone-engine/capstone/pull/2967
+* @yufengzjj made their first contribution in https://github.com/capstone-engine/capstone/pull/2976
+* @Samin061 made their first contribution in https://github.com/capstone-engine/capstone/pull/2985
+* @amaanmujawar made their first contribution in https://github.com/capstone-engine/capstone/pull/2995
+
+**Full Changelog**: https://github.com/capstone-engine/capstone/compare/6.0.0-Alpha9...6.0.0-Alpha10
+
+-----------------------------
+Version 6.0.0-Alpha9: May 28th, 2026
+
+## What's Changed
+* Add post fix version by @Rot127 in https://github.com/capstone-engine/capstone/pull/2935
+* Fix reachable OOB read in M68KInstPrinter.c and RISCVMapping.c (GHSA-jrw4-wj52-2vw8).
+* Fix invalid decoding for malformed br_table instruction in WASM (GHSA-5m9f-vqcm-g5pr).
+
+**Full Changelog**: https://github.com/capstone-engine/capstone/compare/6.0.0-Alpha8...6.0.0-Alpha9
+
+-----------------------------
+Version 6.0.0-Alpha8: May 23th, 2026
+
+## What's Changed
+* wasm: add missing error check in read_memoryimmediate() by @Oblivionsage in https://github.com/capstone-engine/capstone/pull/2866
+* Extend M680X support to RS08 by @historicattle in https://github.com/capstone-engine/capstone/pull/2872
+* Python binding: Removing xprint utility used in the tests in v6 branch by @Antelox in https://github.com/capstone-engine/capstone/pull/2874
+* Introduce a +noaliascompressed option to selectively enable none-aliasing for compressed instrcution only but leave aliasing for the rest of instructions by @moste00 in https://github.com/capstone-engine/capstone/pull/2869
+* riscv: remove extra RISCV_INS_INVALID by @12101111 in https://github.com/capstone-engine/capstone/pull/2876
+* update clang-format to 20 by @b1llow in https://github.com/capstone-engine/capstone/pull/2883
+* cs_disasm_iter: return early on zero-size input by @slate5 in https://github.com/capstone-engine/capstone/pull/2886
+* Fix stale values in the detail struct by @slate5 in https://github.com/capstone-engine/capstone/pull/2881
+* Add dependabot.yml by @Rot127 in https://github.com/capstone-engine/capstone/pull/2884
+* x86: correctly handle XACQUIRE/XRELEASE by @jxors in https://github.com/capstone-engine/capstone/pull/2882
+* fix: avoid strnlen() in cs_strndup for Mac OS X 10.5 portability by @Scottcjn in https://github.com/capstone-engine/capstone/pull/2889
+* Fix RISCV aliases by @slate5 in https://github.com/capstone-engine/capstone/pull/2891
+* Document the test boolean values. by @Rot127 in https://github.com/capstone-engine/capstone/pull/2892
+* x86: simplify REX prefix parsing by @jxors in https://github.com/capstone-engine/capstone/pull/2885
+* Fix sysreg registers in RISC-V and modify the header patcher to not crash if a header doesn't include all tags of a generated .inc file by @moste00 in https://github.com/capstone-engine/capstone/pull/2894
+* RISC-V: add reg_access and test its usages in C and Python by @moste00 in https://github.com/capstone-engine/capstone/pull/2895
+* RISCV: Fix operand detection (REAL/ALIAS) by @slate5 in https://github.com/capstone-engine/capstone/pull/2897
+* Coverity fixes by @Rot127 in https://github.com/capstone-engine/capstone/pull/2901
+* Update m68k by @b1llow in https://github.com/capstone-engine/capstone/pull/2880
+* Fix position of comments to not break const_generator.py by @historicattle in https://github.com/capstone-engine/capstone/pull/2906
+* Extend M680X support to HCS12X by @historicattle in https://github.com/capstone-engine/capstone/pull/2898
+* next: Speedup x86 decoding with the help of LUT tables by @trufae in https://github.com/capstone-engine/capstone/pull/2908
+* Implements load libcapstone.so with RTLD_DEEPBIND #2912 by @AGhebrea in https://github.com/capstone-engine/capstone/pull/2913
+* Replace cmake setup with manual steps to reduce dependencies. by @Rot127 in https://github.com/capstone-engine/capstone/pull/2916
+* Python: use setattr to rewire Cs.disasm to avoid type checking errors by @mrexodia in https://github.com/capstone-engine/capstone/pull/2915
+* Handle SStream overflow by truncating appends by @Rot127 in https://github.com/capstone-engine/capstone/pull/2921
+* RISCV: the Ventana vendor is missing in the API by @slate5 in https://github.com/capstone-engine/capstone/pull/2917
+* Fix UB of shift >63. by @Rot127 in https://github.com/capstone-engine/capstone/pull/2922
+* Add M68K ColdFire ISA support by @b1llow in https://github.com/capstone-engine/capstone/pull/2927
+* Fix AArch64 register-offset load/store memory operand access (#2802) by @DanielBotnik in https://github.com/capstone-engine/capstone/pull/2929
+* x86: Decode MOVSXD r32, r/m32 and MOVSXD r16, r/m16 by @0xradulf in https://github.com/capstone-engine/capstone/pull/2930
+
+## New Contributors
+* @Oblivionsage made their first contribution in https://github.com/capstone-engine/capstone/pull/2866
+* @historicattle made their first contribution in https://github.com/capstone-engine/capstone/pull/2872
+* @12101111 made their first contribution in https://github.com/capstone-engine/capstone/pull/2876
+* @slate5 made their first contribution in https://github.com/capstone-engine/capstone/pull/2886
+* @Scottcjn made their first contribution in https://github.com/capstone-engine/capstone/pull/2889
+* @AGhebrea made their first contribution in https://github.com/capstone-engine/capstone/pull/2913
+* @DanielBotnik made their first contribution in https://github.com/capstone-engine/capstone/pull/2929
+* @0xradulf made their first contribution in https://github.com/capstone-engine/capstone/pull/2930
+
+**Full Changelog**: https://github.com/capstone-engine/capstone/compare/6.0.0-Alpha7...6.0.0-Alpha8
+
+-----------------------------
 Version 6.0.0-Alpha7: February 15th, 2026
 
 ## What's Changed
