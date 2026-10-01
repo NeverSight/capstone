@@ -123,7 +123,7 @@ typedef struct cs_arch_config {
 		X86_global_init, \
 		X86_option, \
 		~(CS_MODE_LITTLE_ENDIAN | CS_MODE_32 | CS_MODE_64 | \
-		  CS_MODE_16), \
+		  CS_MODE_16 | CS_MODE_X86_INTEL | CS_MODE_X86_AMD), \
 	}
 #define CS_ARCH_CONFIG_PPC \
 	{ \
@@ -166,9 +166,7 @@ typedef struct cs_arch_config {
 	{ \
 		M68K_global_init, \
 		M68K_option, \
-		~(CS_MODE_BIG_ENDIAN | CS_MODE_M68K_000 | CS_MODE_M68K_010 | \
-		  CS_MODE_M68K_020 | CS_MODE_M68K_030 | CS_MODE_M68K_040 | \
-		  CS_MODE_M68K_060 | CS_MODE_M68K_CPU32), \
+		~(CS_MODE_BIG_ENDIAN | CS_MODE_M68K_FEATURE_MASK), \
 	}
 #define CS_ARCH_CONFIG_TMS320C64X \
 	{ \
@@ -264,7 +262,7 @@ typedef struct cs_arch_config {
 		Xtensa_global_init, \
 		Xtensa_option, \
 		~(CS_MODE_XTENSA_ESP32 | CS_MODE_XTENSA_ESP32S2 | \
-		  CS_MODE_XTENSA_ESP8266), \
+		  CS_MODE_XTENSA_ESP8266 | CS_MODE_XTENSA_ESP32S3), \
 	}
 
 #define CS_ARCH_CONFIG_ARC \
@@ -503,7 +501,11 @@ extern void *kern_os_realloc(void *addr, size_t nsize);
 
 static void *cs_kern_os_calloc(size_t num, size_t size)
 {
-	return kern_os_malloc(num * size); // malloc bzeroes the buffer
+	size_t alloc = num * size;
+	if (num && size != alloc / num) {
+		return NULL; // overflow check
+	}
+	return kern_os_malloc(alloc); // malloc bzeroes the buffer
 }
 
 cs_malloc_t cs_mem_malloc = kern_os_malloc;
@@ -804,8 +806,7 @@ cs_err CAPSTONE_API cs_open(cs_arch arch, cs_mode mode, csh *handle)
 	cs_err err = CS_ERR_ARCH;
 	struct cs_struct *ud = NULL;
 
-	if (!cs_mem_malloc || !cs_mem_calloc || !cs_mem_realloc ||
-	    !cs_mem_free || !cs_vsnprintf) {
+	if (!cs_mem_is_setup()) {
 		// Error: before cs_open(), dynamic memory management must be initialized
 		// with cs_option(CS_OPT_MEM)
 		err = CS_ERR_MEMSETUP;
@@ -1094,7 +1095,7 @@ cs_err CAPSTONE_API cs_option(csh ud, cs_opt_type type, uintptr_t value)
 		cs_mem_free = mem->free;
 		cs_vsnprintf = mem->vsnprintf;
 
-		return CS_ERR_OK;
+		return cs_mem_is_setup() ? CS_ERR_OK : CS_ERR_MEMSETUP;
 	}
 
 	handle = (struct cs_struct *)(uintptr_t)ud;
@@ -1248,6 +1249,10 @@ static void skipdata_opstr(char *opstr, const uint8_t *buffer, size_t size)
 	}
 
 	len = cs_snprintf(p, available, "0x%02x", buffer[0]);
+	if (len < 0 || (size_t)len > available - 1) {
+		opstr[0] = '\0';
+		return;
+	}
 	p += len;
 	available -= len;
 
@@ -1444,6 +1449,7 @@ size_t CAPSTONE_API cs_disasm(csh ud, const uint8_t *buffer, size_t size,
 		if (f == cache_size) {
 			// full cache, so expand the cache to contain incoming insns
 			cache_size = cache_size * 8 / 5; // * 1.6 ~ golden ratio
+			size_t old_total_size = total_size;
 			total_size += (sizeof(cs_insn) * cache_size);
 			tmp = cs_mem_realloc(total, total_size);
 			if (tmp == NULL) { // insufficient memory
@@ -1458,6 +1464,10 @@ size_t CAPSTONE_API cs_disasm(csh ud, const uint8_t *buffer, size_t size,
 				handle->errnum = CS_ERR_MEM;
 				return 0;
 			}
+			// Zero reallocated memory to prevent
+			// access to uninitialized memory down the line.
+			memset(((uint8_t *)tmp) + old_total_size, 0,
+			       total_size - old_total_size);
 
 			total = tmp;
 			// continue to fill in the cache after the last instruction

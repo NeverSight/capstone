@@ -45,6 +45,8 @@ __all__ = [
     "CS_MODE_16",
     "CS_MODE_32",
     "CS_MODE_64",
+    "CS_MODE_X86_INTEL",
+    "CS_MODE_X86_AMD",
     "CS_MODE_ARM",
     "CS_MODE_THUMB",
     "CS_MODE_MCLASS",
@@ -88,6 +90,24 @@ __all__ = [
     "CS_MODE_M68K_040",
     "CS_MODE_M68K_060",
     "CS_MODE_M68K_CPU32",
+    "CS_MODE_M68K_CF_ISA_A",
+    "CS_MODE_M68K_CF_ISA_A_PLUS",
+    "CS_MODE_M68K_CF_ISA_B",
+    "CS_MODE_M68K_CF_ISA_C",
+    "CS_MODE_M68K_CF_USP",
+    "CS_MODE_M68K_CF_DIV",
+    "CS_MODE_M68K_CF_MAC",
+    "CS_MODE_M68K_CF_EMAC",
+    "CS_MODE_M68K_CF_EMAC_B",
+    "CS_MODE_M68K_CF_FPU",
+    "CS_MODE_M68K_COLDFIRE",
+    "CS_MODE_M68K_CFV1",
+    "CS_MODE_M68K_CFV2",
+    "CS_MODE_M68K_CFV3",
+    "CS_MODE_M68K_CFV4",
+    "CS_MODE_M68K_CFV4E",
+    "CS_MODE_M68K_CFV5",
+    "CS_MODE_M68K_FEATURE_MASK",
     "CS_MODE_M680X_6301",
     "CS_MODE_M680X_6309",
     "CS_MODE_M680X_6800",
@@ -105,6 +125,7 @@ __all__ = [
     "CS_MODE_RISCV32",
     "CS_MODE_RISCV64",
     "CS_MODE_RISCV_C",
+    "CS_MODE_RISCVC",
     "CS_MODE_RISCV_FD",
     "CS_MODE_RISCV_F",
     "CS_MODE_RISCV_D",
@@ -198,6 +219,10 @@ __all__ = [
     "CS_MODE_SYSTEMZ_Z15",
     "CS_MODE_SYSTEMZ_Z16",
     "CS_MODE_SYSTEMZ_GENERIC",
+    "CS_MODE_XTENSA_ESP32",
+    "CS_MODE_XTENSA_ESP32S2",
+    "CS_MODE_XTENSA_ESP8266",
+    "CS_MODE_XTENSA_ESP32S3",
     "CS_OPT_SYNTAX",
     "CS_OPT_SYNTAX_DEFAULT",
     "CS_OPT_SYNTAX_INTEL",
@@ -207,10 +232,14 @@ __all__ = [
     "CS_OPT_SYNTAX_MOTOROLA",
     "CS_OPT_SYNTAX_CS_REG_ALIAS",
     "CS_OPT_SYNTAX_NO_DOLLAR",
-    "CS_OPT_SYNTAX_NO_ALIAS_TEXT",
-    "CS_OPT_SYNTAX_NO_ALIAS_TEXT_COMPRESSED",
+    "CS_OPT_SYNTAX_REAL",
+    "CS_OPT_SYNTAX_UNCOMPRESSED_REAL",
+    "CS_OPT_SYNTAX_AARCH64_EXPLICIT_WIDE_IMM",
+    "CS_OPT_SYNTAX_ALIAS",
     "CS_OPT_DETAIL",
     "CS_OPT_DETAIL_REAL",
+    "CS_OPT_DETAIL_UNCOMPRESSED_REAL",
+    "CS_OPT_DETAIL_ALIAS",
     "CS_OPT_MODE",
     "CS_OPT_ON",
     "CS_OPT_OFF",
@@ -326,6 +355,8 @@ CS_MODE_ARM = 0  # ARM mode
 CS_MODE_16 = 1 << 1  # 16-bit mode (for X86)
 CS_MODE_32 = 1 << 2  # 32-bit mode (for X86)
 CS_MODE_64 = 1 << 3  # 64-bit mode (for X86, PPC)
+CS_MODE_X86_INTEL = 1 << 4
+CS_MODE_X86_AMD = 1 << 5
 CS_MODE_THUMB = 1 << 4  # ARM's Thumb mode, including Thumb-2
 CS_MODE_MCLASS = 1 << 5  # ARM's Cortex-M series
 CS_MODE_V8 = 1 << 6  # ARMv8 A32 encodings for ARM
@@ -358,6 +389,56 @@ CS_MODE_M68K_030 = 1 << 4  # M68K 68030 mode
 CS_MODE_M68K_040 = 1 << 5  # M68K 68040 mode
 CS_MODE_M68K_060 = 1 << 6  # M68K 68060 mode
 CS_MODE_M68K_CPU32 = 1 << 7
+CS_MODE_M68K_CF_ISA_A = 1 << 8
+CS_MODE_M68K_CF_ISA_A_PLUS = 1 << 9
+CS_MODE_M68K_CF_ISA_B = 1 << 10
+CS_MODE_M68K_CF_ISA_C = 1 << 11
+CS_MODE_M68K_CF_USP = 1 << 12
+CS_MODE_M68K_CF_DIV = 1 << 13
+CS_MODE_M68K_CF_MAC = 1 << 14
+CS_MODE_M68K_CF_EMAC = 1 << 15
+CS_MODE_M68K_CF_EMAC_B = 1 << 16
+CS_MODE_M68K_CF_FPU = 1 << 17
+CS_MODE_M68K_COLDFIRE = (
+    CS_MODE_M68K_CF_ISA_A
+    | CS_MODE_M68K_CF_ISA_A_PLUS
+    | CS_MODE_M68K_CF_ISA_B
+    | CS_MODE_M68K_CF_ISA_C
+    | CS_MODE_M68K_CF_USP
+    | CS_MODE_M68K_CF_DIV
+    | CS_MODE_M68K_CF_MAC
+    | CS_MODE_M68K_CF_EMAC
+    | CS_MODE_M68K_CF_EMAC_B
+    | CS_MODE_M68K_CF_FPU
+)
+CS_MODE_M68K_CFV1 = CS_MODE_M68K_CF_ISA_C | CS_MODE_M68K_CF_USP
+CS_MODE_M68K_CFV2 = CS_MODE_M68K_CF_ISA_A | CS_MODE_M68K_CF_DIV
+CS_MODE_M68K_CFV3 = CS_MODE_M68K_CF_ISA_A | CS_MODE_M68K_CF_DIV
+CS_MODE_M68K_CFV4 = CS_MODE_M68K_CF_ISA_B | CS_MODE_M68K_CF_DIV
+CS_MODE_M68K_CFV4E = (
+    CS_MODE_M68K_CF_ISA_B
+    | CS_MODE_M68K_CF_DIV
+    | CS_MODE_M68K_CF_USP
+    | CS_MODE_M68K_CF_EMAC
+    | CS_MODE_M68K_CF_FPU
+)
+CS_MODE_M68K_CFV5 = (
+    CS_MODE_M68K_CF_ISA_C
+    | CS_MODE_M68K_CF_USP
+    | CS_MODE_M68K_CF_DIV
+    | CS_MODE_M68K_CF_EMAC
+    | CS_MODE_M68K_CF_EMAC_B
+)
+CS_MODE_M68K_FEATURE_MASK = (
+    CS_MODE_M68K_000
+    | CS_MODE_M68K_010
+    | CS_MODE_M68K_020
+    | CS_MODE_M68K_030
+    | CS_MODE_M68K_040
+    | CS_MODE_M68K_060
+    | CS_MODE_M68K_CPU32
+    | CS_MODE_M68K_COLDFIRE
+)
 CS_MODE_BIG_ENDIAN = 1 << 31  # big-endian mode
 CS_MODE_MIPS16 = CS_MODE_16  # Generic mips16
 CS_MODE_MIPS32 = CS_MODE_32  # Generic mips32
@@ -402,6 +483,7 @@ CS_MODE_BPF_EXTENDED = 1 << 0  # Extended BPF mode
 CS_MODE_RISCV32 = 1 << 0  # RISCV32 mode
 CS_MODE_RISCV64 = 1 << 1  # RISCV64 mode
 CS_MODE_RISCV_C = 1 << 2  # RISCV compressed instructure mode
+CS_MODE_RISCVC = CS_MODE_RISCV_C
 CS_MODE_RISCV_FD = 1 << 3
 CS_MODE_RISCV_F = CS_MODE_RISCV_FD
 CS_MODE_RISCV_D = CS_MODE_RISCV_FD
@@ -497,6 +579,10 @@ CS_MODE_SYSTEMZ_Z14 = 1 << 12
 CS_MODE_SYSTEMZ_Z15 = 1 << 13
 CS_MODE_SYSTEMZ_Z16 = 1 << 14
 CS_MODE_SYSTEMZ_GENERIC = 1 << 15
+CS_MODE_XTENSA_ESP32 = 1 << 1  # Xtensa ESP32
+CS_MODE_XTENSA_ESP32S2 = 1 << 2  # Xtensa ESP32S2
+CS_MODE_XTENSA_ESP8266 = 1 << 3  # Xtensa ESP8266
+CS_MODE_XTENSA_ESP32S3 = 1 << 4  # Xtensa ESP32-S3 (SIMD/AI "ee.*" ops)
 
 # Capstone option type
 CS_OPT_INVALID = 0  # No option specified
@@ -572,15 +658,27 @@ CS_OPT_SYNTAX_PERCENT = 1 << 8  # Prints the % in front of PPC registers.
 CS_OPT_SYNTAX_NO_DOLLAR = (
     1 << 9
 )  # Does not print the $ in front of Mips, LoongArch registers.
-CS_OPT_SYNTAX_NO_ALIAS_TEXT = (
+CS_OPT_SYNTAX_REAL = (
     1 << 10
-)  # Does not print an instruction's alias test if the instruction is an alias
-CS_OPT_SYNTAX_NO_ALIAS_TEXT_COMPRESSED = (
+)  # Prints the original decoded instruction without aliases or uncompression.
+CS_OPT_SYNTAX_UNCOMPRESSED_REAL = (
     1 << 11
-)  # Like the one above it, but only supresses compressed instruction aliases
+)  # Prints the uncompressed real instruction when possible, without aliases.
+CS_OPT_SYNTAX_AARCH64_EXPLICIT_WIDE_IMM = (
+    1 << 12
+)  # Prints shifted AArch64 MOVN and MOVZ instructions without MOV aliases
+CS_OPT_SYNTAX_ALIAS = (
+    1 << 13
+)  # Prints aliases when available.
 CS_OPT_DETAIL_REAL = (
     1 << 1
-)  # If enabled, always sets the real instruction detail.Even if the instruction is an alias.
+)  # If enabled, always sets the real instruction detail. Even if the instruction is an alias.
+CS_OPT_DETAIL_UNCOMPRESSED_REAL = (
+    1 << 2
+)  # If enabled, sets uncompressed real instruction detail when possible.
+CS_OPT_DETAIL_ALIAS = (
+    1 << 3
+)  # If enabled, sets alias instruction detail when possible.
 
 # Capstone error type
 CS_ERR_OK = 0  # No error: everything was fine
@@ -634,7 +732,7 @@ elif sys.platform in ("win32", "cygwin"):
     _lib = "capstone.dll"
 else:
     _lib = "libcapstone.so"
-    mode = getattr(os, 'RTLD_DEEPBIND', 0)
+    mode = getattr(os, "RTLD_DEEPBIND", 0)
 
 _found = False
 
@@ -647,10 +745,7 @@ def _load_lib(path):
         # if we're on linux, try again with .so.5 extension
         if lib_file.endswith(".so"):
             if os.path.exists(lib_file + ".{}".format(CS_VERSION_MAJOR)):
-                return ctypes.CDLL(
-                    lib_file + ".{}".format(CS_VERSION_MAJOR),
-                    mode=mode
-                )
+                return ctypes.CDLL(lib_file + ".{}".format(CS_VERSION_MAJOR), mode=mode)
     return None
 
 
@@ -1260,9 +1355,11 @@ class CsInsn(object):
         elif arch == CS_ARCH_BPF:
             (self.operands) = bpf.get_arch_info(self._raw.detail.contents.arch.bpf)
         elif arch == CS_ARCH_RISCV:
-            (self.need_effective_addr, self.operands) = riscv.get_arch_info(
-                self._raw.detail.contents.arch.riscv
-            )
+            (
+                self.need_effective_addr,
+                self.operands,
+                self.rounding_mode,
+            ) = riscv.get_arch_info(self._raw.detail.contents.arch.riscv)
         elif arch == CS_ARCH_SH:
             (self.sh_insn, self.sh_size, self.operands) = sh.get_arch_info(
                 self._raw.detail.contents.arch.sh

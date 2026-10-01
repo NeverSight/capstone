@@ -16,88 +16,108 @@
 #include "../../MCInst.h"
 #include "../../MCInstrDesc.h"
 #include "../../MCRegisterInfo.h"
+#include "../../MathExtras.h"
 
 #ifndef CAPSTONE_DIET
 static const char s_spacing[] = " ";
 
 static const char *const s_reg_names[] = {
-	"invalid", "d0",    "d1",    "d2",  "d3",  "d4",   "d5",   "d6",
-	"d7",	   "a0",    "a1",    "a2",  "a3",  "a4",   "a5",   "a6",
-	"a7",	   "fp0",   "fp1",   "fp2", "fp3", "fp4",  "fp5",  "fp6",
-	"fp7",	   "pc",    "sr",    "ccr", "sfc", "dfc",  "usp",  "vbr",
-	"cacr",	   "caar",  "msp",   "isp", "tc",  "itt0", "itt1", "dtt0",
-	"dtt1",	   "mmusr", "urp",   "srp",
+	"invalid",  "d0",	"d1",	 "d2",	 "d3",	 "d4",	 "d5",	 "d6",
+	"d7",	    "a0",	"a1",	 "a2",	 "a3",	 "a4",	 "a5",	 "a6",
+	"a7",	    "fp0",	"fp1",	 "fp2",	 "fp3",	 "fp4",	 "fp5",	 "fp6",
+	"fp7",	    "pc",	"sr",	 "ccr",	 "sfc",	 "dfc",	 "usp",	 "vbr",
+	"cacr",	    "caar",	"msp",	 "isp",	 "tc",	 "itt0", "itt1", "dtt0",
+	"dtt1",	    "mmusr",	"urp",	 "srp",
 
-	"fpcr",	   "fpsr",  "fpiar",
+	"fpcr",	    "fpsr",	"fpiar",
 
-	"tt0",	   "tt1",   "crp",
+	"tt0",	    "tt1",	"crp",	 "acc",	 "acc0", "acc1", "acc2", "acc3",
+	"accext01", "accext23", "macsr", "mask",
 };
 
 static const char *const s_instruction_names[] = {
-	"invalid",  "abcd",	"add",	    "adda",	"addi",	     "addq",
-	"addx",	    "and",	"andi",	    "asl",	"asr",	     "bhs",
-	"blo",	    "bhi",	"bls",	    "bcc",	"bcs",	     "bne",
-	"beq",	    "bvc",	"bvs",	    "bpl",	"bmi",	     "bge",
-	"blt",	    "bgt",	"ble",	    "bra",	"bsr",	     "bchg",
-	"bclr",	    "bset",	"btst",	    "bfchg",	"bfclr",     "bfexts",
-	"bfextu",   "bfffo",	"bfins",    "bfset",	"bftst",     "bkpt",
-	"callm",    "cas",	"cas2",	    "chk",	"chk2",	     "clr",
-	"cmp",	    "cmpa",	"cmpi",	    "cmpm",	"cmp2",	     "cinvl",
-	"cinvp",    "cinva",	"cpushl",   "cpushp",	"cpusha",    "dbt",
-	"dbf",	    "dbhi",	"dbls",	    "dbcc",	"dbcs",	     "dbne",
-	"dbeq",	    "dbvc",	"dbvs",	    "dbpl",	"dbmi",	     "dbge",
-	"dblt",	    "dbgt",	"dble",	    "dbra",	"divs",	     "divsl",
-	"divu",	    "divul",	"eor",	    "eori",	"exg",	     "ext",
-	"extb",	    "fabs",	"fsabs",    "fdabs",	"facos",     "fadd",
-	"fsadd",    "fdadd",	"fasin",    "fatan",	"fatanh",    "fbf",
-	"fbeq",	    "fbogt",	"fboge",    "fbolt",	"fbole",     "fbogl",
-	"fbor",	    "fbun",	"fbueq",    "fbugt",	"fbuge",     "fbult",
-	"fbule",    "fbne",	"fbt",	    "fbsf",	"fbseq",     "fbgt",
-	"fbge",	    "fblt",	"fble",	    "fbgl",	"fbgle",     "fbngle",
-	"fbngl",    "fbnle",	"fbnlt",    "fbnge",	"fbngt",     "fbsne",
-	"fbst",	    "fcmp",	"fcos",	    "fcosh",	"fdbf",	     "fdbeq",
-	"fdbogt",   "fdboge",	"fdbolt",   "fdbole",	"fdbogl",    "fdbor",
-	"fdbun",    "fdbueq",	"fdbugt",   "fdbuge",	"fdbult",    "fdbule",
-	"fdbne",    "fdbt",	"fdbsf",    "fdbseq",	"fdbgt",     "fdbge",
-	"fdblt",    "fdble",	"fdbgl",    "fdbgle",	"fdbngle",   "fdbngl",
-	"fdbnle",   "fdbnlt",	"fdbnge",   "fdbngt",	"fdbsne",    "fdbst",
-	"fdiv",	    "fsdiv",	"fddiv",    "fetox",	"fetoxm1",   "fgetexp",
-	"fgetman",  "fint",	"fintrz",   "flog10",	"flog2",     "flogn",
-	"flognp1",  "fmod",	"fmove",    "fsmove",	"fdmove",    "fmovecr",
-	"fmovem",   "fmul",	"fsmul",    "fdmul",	"fneg",	     "fsneg",
-	"fdneg",    "fnop",	"frem",	    "frestore", "fsave",     "fscale",
-	"fsgldiv",  "fsglmul",	"fsin",	    "fsincos",	"fsinh",     "fsqrt",
-	"fssqrt",   "fdsqrt",	"fsf",	    "fseq",	"fsogt",     "fsoge",
-	"fsolt",    "fsole",	"fsogl",    "fsor",	"fsun",	     "fsueq",
-	"fsugt",    "fsuge",	"fsult",    "fsule",	"fsne",	     "fst",
-	"fssf",	    "fsseq",	"fsgt",	    "fsge",	"fslt",	     "fsle",
-	"fsgl",	    "fsgle",	"fsngle",   "fsngl",	"fsnle",     "fsnlt",
-	"fsnge",    "fsngt",	"fssne",    "fsst",	"fsub",	     "fssub",
-	"fdsub",    "ftan",	"ftanh",    "ftentox",	"ftrapf",    "ftrapeq",
-	"ftrapogt", "ftrapoge", "ftrapolt", "ftrapole", "ftrapogl",  "ftrapor",
-	"ftrapun",  "ftrapueq", "ftrapugt", "ftrapuge", "ftrapult",  "ftrapule",
-	"ftrapne",  "ftrapt",	"ftrapsf",  "ftrapseq", "ftrapgt",   "ftrapge",
-	"ftraplt",  "ftraple",	"ftrapgl",  "ftrapgle", "ftrapngle", "ftrapngl",
-	"ftrapnle", "ftrapnlt", "ftrapnge", "ftrapngt", "ftrapsne",  "ftrapst",
-	"ftst",	    "ftwotox",	"halt",	    "illegal",	"jmp",	     "jsr",
-	"lea",	    "link",	"lpstop",   "lsl",	"lsr",	     "move",
-	"movea",    "movec",	"movem",    "movep",	"moveq",     "moves",
-	"move16",   "muls",	"mulu",	    "nbcd",	"neg",	     "negx",
-	"nop",	    "not",	"or",	    "ori",	"pack",	     "pea",
-	"pflush",   "pflusha",	"pflushan", "pflushn",	"ploadr",    "ploadw",
-	"plpar",    "plpaw",	"pmove",    "pmovefd",	"ptestr",    "ptestw",
-	"pulse",    "rems",	"remu",	    "reset",	"rol",	     "ror",
-	"roxl",	    "roxr",	"rtd",	    "rte",	"rtm",	     "rtr",
-	"rts",	    "sbcd",	"st",	    "sf",	"shi",	     "sls",
-	"scc",	    "shs",	"scs",	    "slo",	"sne",	     "seq",
-	"svc",	    "svs",	"spl",	    "smi",	"sge",	     "slt",
-	"sgt",	    "sle",	"stop",	    "sub",	"suba",	     "subi",
-	"subq",	    "subx",	"swap",	    "tas",	"trap",	     "trapv",
-	"trapt",    "trapf",	"traphi",   "trapls",	"trapcc",    "traphs",
-	"trapcs",   "traplo",	"trapne",   "trapeq",	"trapvc",    "trapvs",
-	"trappl",   "trapmi",	"trapge",   "traplt",	"trapgt",    "traple",
-	"tst",	    "unlk",	"unpk",	    "bgnd",	"tbls",	     "tblu",
-	"tblsn",    "tblun",
+	"invalid",   "abcd",	 "add",	     "adda",	  "addi",
+	"addq",	     "addx",	 "and",	     "andi",	  "asl",
+	"asr",	     "bhs",	 "blo",	     "bhi",	  "bls",
+	"bcc",	     "bcs",	 "bne",	     "beq",	  "bvc",
+	"bvs",	     "bpl",	 "bmi",	     "bge",	  "blt",
+	"bgt",	     "ble",	 "bra",	     "bsr",	  "bchg",
+	"bclr",	     "bset",	 "btst",     "bitrev",	  "byterev",
+	"bfchg",     "bfclr",	 "bfexts",   "bfextu",	  "bfffo",
+	"bfins",     "bfset",	 "bftst",    "bkpt",	  "callm",
+	"cas",	     "cas2",	 "chk",	     "chk2",	  "clr",
+	"cmp",	     "cmpa",	 "cmpi",     "cmpm",	  "cmp2",
+	"cinvl",     "cinvp",	 "cinva",    "cpushl",	  "cpushp",
+	"cpusha",    "dbt",	 "dbf",	     "dbhi",	  "dbls",
+	"dbcc",	     "dbcs",	 "dbne",     "dbeq",	  "dbvc",
+	"dbvs",	     "dbpl",	 "dbmi",     "dbge",	  "dblt",
+	"dbgt",	     "dble",	 "dbra",     "divs",	  "divsl",
+	"divu",	     "divul",	 "eor",	     "eori",	  "exg",
+	"ext",	     "extb",	 "ff1",	     "fabs",	  "fsabs",
+	"fdabs",     "facos",	 "fadd",     "fsadd",	  "fdadd",
+	"fasin",     "fatan",	 "fatanh",   "fbf",	  "fbeq",
+	"fbogt",     "fboge",	 "fbolt",    "fbole",	  "fbogl",
+	"fbor",	     "fbun",	 "fbueq",    "fbugt",	  "fbuge",
+	"fbult",     "fbule",	 "fbne",     "fbt",	  "fbsf",
+	"fbseq",     "fbgt",	 "fbge",     "fblt",	  "fble",
+	"fbgl",	     "fbgle",	 "fbngle",   "fbngl",	  "fbnle",
+	"fbnlt",     "fbnge",	 "fbngt",    "fbsne",	  "fbst",
+	"fcmp",	     "fcos",	 "fcosh",    "fdbf",	  "fdbeq",
+	"fdbogt",    "fdboge",	 "fdbolt",   "fdbole",	  "fdbogl",
+	"fdbor",     "fdbun",	 "fdbueq",   "fdbugt",	  "fdbuge",
+	"fdbult",    "fdbule",	 "fdbne",    "fdbt",	  "fdbsf",
+	"fdbseq",    "fdbgt",	 "fdbge",    "fdblt",	  "fdble",
+	"fdbgl",     "fdbgle",	 "fdbngle",  "fdbngl",	  "fdbnle",
+	"fdbnlt",    "fdbnge",	 "fdbngt",   "fdbsne",	  "fdbst",
+	"fdiv",	     "fsdiv",	 "fddiv",    "fetox",	  "fetoxm1",
+	"fgetexp",   "fgetman",	 "fint",     "fintrz",	  "flog10",
+	"flog2",     "flogn",	 "flognp1",  "fmod",	  "fmove",
+	"fsmove",    "fdmove",	 "fmovecr",  "fmovem",	  "fmul",
+	"fsmul",     "fdmul",	 "fneg",     "fsneg",	  "fdneg",
+	"fnop",	     "frem",	 "frestore", "fsave",	  "fscale",
+	"fsgldiv",   "fsglmul",	 "fsin",     "fsincos",	  "fsinh",
+	"fsqrt",     "fssqrt",	 "fdsqrt",   "fsf",	  "fseq",
+	"fsogt",     "fsoge",	 "fsolt",    "fsole",	  "fsogl",
+	"fsor",	     "fsun",	 "fsueq",    "fsugt",	  "fsuge",
+	"fsult",     "fsule",	 "fsne",     "fst",	  "fssf",
+	"fsseq",     "fsgt",	 "fsge",     "fslt",	  "fsle",
+	"fsgl",	     "fsgle",	 "fsngle",   "fsngl",	  "fsnle",
+	"fsnlt",     "fsnge",	 "fsngt",    "fssne",	  "fsst",
+	"fsub",	     "fssub",	 "fdsub",    "ftan",	  "ftanh",
+	"ftentox",   "ftrapf",	 "ftrapeq",  "ftrapogt",  "ftrapoge",
+	"ftrapolt",  "ftrapole", "ftrapogl", "ftrapor",	  "ftrapun",
+	"ftrapueq",  "ftrapugt", "ftrapuge", "ftrapult",  "ftrapule",
+	"ftrapne",   "ftrapt",	 "ftrapsf",  "ftrapseq",  "ftrapgt",
+	"ftrapge",   "ftraplt",	 "ftraple",  "ftrapgl",	  "ftrapgle",
+	"ftrapngle", "ftrapngl", "ftrapnle", "ftrapnlt",  "ftrapnge",
+	"ftrapngt",  "ftrapsne", "ftrapst",  "ftst",	  "ftwotox",
+	"halt",	     "illegal",	 "intouch",  "jmp",	  "jsr",
+	"lea",	     "link",	 "lpstop",   "lsl",	  "lsr",
+	"mac",	     "move",	 "movea",    "movec",	  "movem",
+	"movep",     "moveq",	 "moves",    "move16",	  "mov3q",
+	"movclr",    "msac",	 "muls",     "mulu",	  "mvs",
+	"mvz",	     "nbcd",	 "neg",	     "negx",	  "nop",
+	"not",	     "or",	 "ori",	     "pack",	  "pea",
+	"pflush",    "pflusha",	 "pflushan", "pflushn",	  "ploadr",
+	"ploadw",    "plpar",	 "plpaw",    "pmove",	  "pmovefd",
+	"ptestr",    "ptestw",	 "pulse",    "rems",	  "remu",
+	"reset",     "rol",	 "ror",	     "roxl",	  "roxr",
+	"rtd",	     "rte",	 "rtm",	     "rtr",	  "rts",
+	"sats",	     "sbcd",	 "st",	     "sf",	  "shi",
+	"sls",	     "scc",	 "shs",	     "scs",	  "slo",
+	"sne",	     "seq",	 "svc",	     "svs",	  "spl",
+	"smi",	     "sge",	 "slt",	     "sgt",	  "sle",
+	"stop",	     "strldsr",	 "sub",	     "suba",	  "subi",
+	"subq",	     "subx",	 "swap",     "tas",	  "trap",
+	"trapv",     "trapt",	 "trapf",    "traphi",	  "trapls",
+	"trapcc",    "traphs",	 "trapcs",   "traplo",	  "trapne",
+	"trapeq",    "trapvc",	 "trapvs",   "trappl",	  "trapmi",
+	"trapge",    "traplt",	 "trapgt",   "traple",	  "tst",
+	"unlk",	     "unpk",	 "wddata",   "wdebug",	  "bgnd",
+	"tbls",	     "tblu",	 "tblsn",    "tblun",	  "cp0bcbusy",
+	"cp0ld",     "cp0nop",	 "cp0st",    "cp1bcbusy", "cp1ld",
+	"cp1nop",    "cp1st",	 "tpf",	     "maaac",	  "masac",
+	"msaac",     "mssac",
 };
 #endif
 
@@ -154,6 +174,15 @@ static void registerPair(SStream *O, const cs_m68k_op *op)
 		       s_reg_names[op->reg_pair.reg_1]);
 }
 
+static void printRegisterName(SStream *O, const cs_m68k_op *op)
+{
+	SStream_concat(O, "%s", getRegName(op->reg));
+	if (op->flags & M68K_OP_FLAG_REG_LOWER)
+		SStream_concat0(O, "l");
+	else if (op->flags & M68K_OP_FLAG_REG_UPPER)
+		SStream_concat0(O, "u");
+}
+
 static void printScaleFactor(SStream *O, uint8_t scale, int threshold)
 {
 	if (scale > threshold)
@@ -183,18 +212,166 @@ static void printBitfield(SStream *O, const cs_m68k_op *op)
 	SStream_concat0(O, "}");
 }
 
+static bool packed_bcd_to_string(uint64_t packed, char digits[17])
+{
+	unsigned int i;
+
+	for (i = 0; i < 16; ++i) {
+		unsigned int digit =
+			(unsigned int)((packed >> ((15 - i) * 4)) & 0xf);
+		if (digit > 9)
+			return false;
+		digits[i] = (char)('0' + digit);
+	}
+	digits[16] = '\0';
+	return true;
+}
+
+static bool packed_exponent_to_string(uint16_t packed, char digits[4])
+{
+	unsigned int i;
+
+	for (i = 0; i < 3; ++i) {
+		unsigned int digit =
+			(unsigned int)((packed >> ((2 - i) * 4)) & 0xf);
+		if (digit > 9)
+			return false;
+		digits[i] = (char)('0' + digit);
+	}
+	digits[3] = '\0';
+	return true;
+}
+
+static void printPackedImmediate(SStream *O, const m68k_op_fp_packed *value)
+{
+	const uint32_t header = value->header;
+	const bool negative = (header & 0x80000000U) != 0;
+	const bool negative_exponent = (header & 0x40000000U) != 0;
+	const uint16_t exponent = (uint16_t)((header >> 16) & 0x0fff);
+	const unsigned int integer_digit = header & 0xf;
+	char exponent_digits[4];
+	char fraction_digits[17];
+
+	/* SE=1, y=3, and exponent=FFF encode infinity or NaN. */
+	if (((header >> 16) & 0x7fff) == 0x7fff) {
+		SStream_concat(O, "#0e%s%s", negative ? "-" : "",
+			       value->fraction == 0 ? "inf" : "nan");
+		return;
+	}
+
+	if (integer_digit == 0 && value->fraction == 0) {
+		SStream_concat(O, "#0e%s0", negative ? "-" : "");
+		return;
+	}
+
+	if (integer_digit > 9 ||
+	    !packed_exponent_to_string(exponent, exponent_digits) ||
+	    !packed_bcd_to_string(value->fraction, fraction_digits)) {
+		SStream_concat0(O, "#<invalid-packed>");
+		return;
+	}
+
+	SStream_concat(O, "#0e%s%u.%se%c%s", negative ? "-" : "", integer_digit,
+		       fraction_digits, negative_exponent ? '-' : '+',
+		       exponent_digits);
+}
+
+/* Issue #681: Windows kernel printf-style functions do not support
+ * floating-point format specifiers, so the text conversion is unused there. */
+#if !defined(_KERNEL_MODE)
+/* Round `value >> shift` to nearest, ties to even.  Requires 1 <= shift <= 64. */
+static uint64_t round_right_to_even(uint64_t value, unsigned int shift)
+{
+	if (shift < 64) {
+		uint64_t quotient = value >> shift;
+		uint64_t remainder = value & ((1ULL << shift) - 1);
+		uint64_t halfway = 1ULL << (shift - 1);
+		if (remainder > halfway ||
+		    (remainder == halfway && (quotient & 1)))
+			return quotient + 1;
+		return quotient;
+	}
+	if (value > 0x8000000000000000ULL)
+		return 1;
+	return 0;
+}
+
+/* Convert only for assembly-text rendering.  The detail operand retains the
+ * complete external representation in fp_extended. */
+static double extended_to_double(const m68k_op_fp_extended *value)
+{
+	const uint16_t sign_exp = value->sign_exp;
+	const uint64_t significand = value->significand;
+	const uint64_t sign = ((uint64_t)(sign_exp & 0x8000)) << 48;
+	const unsigned int E = sign_exp & 0x7fff;
+
+	if (E == 0x7fff) {
+		uint64_t fraction = significand & 0x7fffffffffffffffULL;
+		if (fraction == 0)
+			return BitsToDouble(sign | 0x7ff0000000000000ULL);
+		return BitsToDouble(sign | 0x7ff0000000000000ULL |
+				    ((fraction >> 11) | 0x0008000000000000ULL));
+	}
+
+	if (E == 0 || significand == 0)
+		return BitsToDouble(sign);
+
+	{
+		unsigned int leading = CountLeadingZeros_64(significand);
+		uint64_t normalized = significand << leading;
+		int64_t e = (int64_t)E - 16383 - (int64_t)leading;
+
+		if (e > 1023)
+			return BitsToDouble(sign | 0x7ff0000000000000ULL);
+
+		if (e >= -1022) {
+			uint64_t rounded = round_right_to_even(normalized, 11);
+			if (rounded == (1ULL << 53)) {
+				rounded >>= 1;
+				++e;
+				if (e > 1023)
+					return BitsToDouble(
+						sign | 0x7ff0000000000000ULL);
+			}
+			return BitsToDouble(sign |
+					    ((uint64_t)(e + 1023) << 52) |
+					    (rounded & 0x000fffffffffffffULL));
+		}
+
+		{
+			uint64_t shift = (uint64_t)(-e - 1011);
+			uint64_t fraction =
+				shift > 64 ? 0 :
+					     round_right_to_even(
+						     normalized,
+						     (unsigned int)shift);
+			return BitsToDouble(sign | fraction);
+		}
+	}
+}
+#endif
+
 static void printImmediate(SStream *O, const cs_m68k *inst,
 			   const cs_m68k_op *op)
 {
 	if (inst->op_size.type == M68K_SIZE_TYPE_FPU) {
+		if (op->type == M68K_OP_FP_PACKED) {
+			printPackedImmediate(O, &op->fp_packed);
+			return;
+		}
 #if defined(_KERNEL_MODE)
 		SStream_concat(O, "#<float_point_unsupported>");
 		return;
 #else
-		if (inst->op_size.fpu_size == M68K_FPU_SIZE_SINGLE)
+		/* Dispatch on the operand storage type.  Extended immediates
+		 * are converted only for GNU-compatible assembly text. */
+		if (op->type == M68K_OP_FP_SINGLE)
 			SStream_concat(O, "#%f", op->simm);
-		else if (inst->op_size.fpu_size == M68K_FPU_SIZE_DOUBLE)
+		else if (op->type == M68K_OP_FP_DOUBLE)
 			SStream_concat(O, "#%f", op->dimm);
+		else if (op->type == M68K_OP_FP_EXTENDED)
+			SStream_concat(O, "#0e%g",
+				       extended_to_double(&op->fp_extended));
 		else
 			SStream_concat(O, "#<unsupported>");
 		return;
@@ -203,8 +380,7 @@ static void printImmediate(SStream *O, const cs_m68k *inst,
 	SStream_concat(O, "#$%" PRIx64, op->imm);
 }
 
-static void printIndex8BitDisp(SStream *O, unsigned int pc,
-			       const cs_m68k_op *op)
+static void printIndex8BitDisp(SStream *O, uint32_t pc, const cs_m68k_op *op)
 {
 	if (op->address_mode == M68K_AM_PCI_INDEX_8_BIT_DISP) {
 		SStream_concat(O, "$%" PRIx32 "(pc,%s", pc + 2 + op->mem.disp,
@@ -219,28 +395,31 @@ static void printIndex8BitDisp(SStream *O, unsigned int pc,
 	SStream_concat0(O, ")");
 }
 
-static void printRegAddrMode(SStream *O, unsigned int pc, const cs_m68k_op *op)
+static void printRegAddrMode(SStream *O, uint32_t pc, const cs_m68k_op *op)
 {
+	m68k_reg base_reg = op->type == M68K_OP_MEM ? op->mem.base_reg :
+						      op->reg;
+
 	switch (op->address_mode) {
 	case M68K_AM_REG_DIRECT_DATA:
-		SStream_concat(O, "d%" PRId32, (op->reg - M68K_REG_D0));
+		printRegisterName(O, op);
 		break;
 	case M68K_AM_REG_DIRECT_ADDR:
-		SStream_concat(O, "a%" PRId32, (op->reg - M68K_REG_A0));
+		printRegisterName(O, op);
 		break;
 	case M68K_AM_REGI_ADDR:
-		SStream_concat(O, "(a%" PRId32 ")", (op->reg - M68K_REG_A0));
+		SStream_concat(O, "(a%" PRId32 ")", (base_reg - M68K_REG_A0));
 		break;
 	case M68K_AM_REGI_ADDR_POST_INC:
-		SStream_concat(O, "(a%" PRId32 ")+", (op->reg - M68K_REG_A0));
+		SStream_concat(O, "(a%" PRId32 ")+", (base_reg - M68K_REG_A0));
 		break;
 	case M68K_AM_REGI_ADDR_PRE_DEC:
-		SStream_concat(O, "-(a%" PRId32 ")", (op->reg - M68K_REG_A0));
+		SStream_concat(O, "-(a%" PRId32 ")", (base_reg - M68K_REG_A0));
 		break;
 	case M68K_AM_REGI_ADDR_DISP:
 		SStream_concat(O, "%s$%" PRIx16 "(a%" PRId32 ")",
 			       op->mem.disp < 0 ? "-" : "", abs(op->mem.disp),
-			       (op->mem.base_reg - M68K_REG_A0));
+			       (base_reg - M68K_REG_A0));
 		break;
 	case M68K_AM_PCI_DISP:
 		SStream_concat(O, "$%" PRIx32 "(pc)", pc + 2 + op->mem.disp);
@@ -250,7 +429,7 @@ static void printRegAddrMode(SStream *O, unsigned int pc, const cs_m68k_op *op)
 	}
 }
 
-static void printBaseDisp(SStream *O, unsigned int pc, const cs_m68k_op *op)
+static void printBaseDisp(SStream *O, uint32_t pc, const cs_m68k_op *op)
 {
 	int is_pc = (op->address_mode == M68K_AM_PCI_INDEX_BASE_DISP);
 
@@ -282,7 +461,7 @@ static void printBaseDisp(SStream *O, unsigned int pc, const cs_m68k_op *op)
 	SStream_concat0(O, ")");
 }
 
-static void printMemIndirect(SStream *O, unsigned int pc, const cs_m68k_op *op)
+static void printMemIndirect(SStream *O, uint32_t pc, const cs_m68k_op *op)
 {
 	int is_pc = (op->address_mode == M68K_AM_PC_MEMI_POST_INDEX ||
 		     op->address_mode == M68K_AM_PC_MEMI_PRE_INDEX);
@@ -331,8 +510,8 @@ static void printMemIndirect(SStream *O, unsigned int pc, const cs_m68k_op *op)
 	SStream_concat0(O, ")");
 }
 
-static void printAddressingMode(SStream *O, unsigned int pc,
-				const cs_m68k *inst, const cs_m68k_op *op)
+static void printAddressingMode(SStream *O, uint32_t pc, const cs_m68k *inst,
+				const cs_m68k_op *op)
 {
 	switch (op->address_mode) {
 	case M68K_AM_NONE:
@@ -344,7 +523,13 @@ static void printAddressingMode(SStream *O, unsigned int pc,
 			registerPair(O, op);
 			break;
 		case M68K_OP_REG:
-			SStream_concat(O, "%s", s_reg_names[op->reg]);
+			printRegisterName(O, op);
+			break;
+		case M68K_OP_SHIFT:
+			if (op->flags & M68K_OP_FLAG_SHIFT_LEFT)
+				SStream_concat0(O, "<<");
+			else if (op->flags & M68K_OP_FLAG_SHIFT_RIGHT)
+				SStream_concat0(O, ">>");
 			break;
 		default:
 			break;
@@ -361,10 +546,10 @@ static void printAddressingMode(SStream *O, unsigned int pc,
 		printRegAddrMode(O, pc, op);
 		break;
 	case M68K_AM_ABSOLUTE_DATA_SHORT:
-		SStream_concat(O, "$%" PRIx32 ".w", (uint32_t)op->imm);
+		SStream_concat(O, "$%" PRIx32 ".w", (uint32_t)op->mem.address);
 		break;
 	case M68K_AM_ABSOLUTE_DATA_LONG:
-		SStream_concat(O, "$%" PRIx64 ".l", (uint64_t)op->imm);
+		SStream_concat(O, "$%" PRIx64 ".l", (uint64_t)op->mem.address);
 		break;
 	case M68K_AM_IMMEDIATE:
 		printImmediate(O, inst, op);
@@ -390,9 +575,11 @@ static void printAddressingMode(SStream *O, unsigned int pc,
 	}
 
 	printBitfield(O, op);
+	if (op->flags & M68K_OP_FLAG_MEM_UPDATE)
+		SStream_concat0(O, "&");
 }
 
-static void printCAS2(SStream *O, unsigned int pc, const cs_m68k *ext)
+static void printCAS2(SStream *O, uint32_t pc, const cs_m68k *ext)
 {
 	printAddressingMode(O, pc, ext, &ext->operands[0]);
 	SStream_concat0(O, ",");
@@ -404,7 +591,7 @@ static void printCAS2(SStream *O, unsigned int pc, const cs_m68k *ext)
 		       s_reg_names[ext->operands[2].reg_pair.reg_1]);
 }
 
-static void printCacheOp(SStream *O, unsigned int pc, const cs_m68k *ext)
+static void printCacheOp(SStream *O, uint32_t pc, const cs_m68k *ext)
 {
 	static const char *const cache_names[] = { "nc", "dc", "ic", "bc" };
 	unsigned int sel = (unsigned int)ext->operands[0].imm;
@@ -420,6 +607,23 @@ static void printCacheOp(SStream *O, unsigned int pc, const cs_m68k *ext)
 		printAddressingMode(O, pc, ext, &ext->operands[i]);
 	}
 }
+
+static void printPackedMoveDestination(SStream *O, uint32_t pc,
+				       const cs_m68k *ext)
+{
+	const cs_m68k_op *k_factor = &ext->operands[2];
+
+	printAddressingMode(O, pc, ext, &ext->operands[0]);
+	SStream_concat(O, ",%s", s_spacing);
+	printAddressingMode(O, pc, ext, &ext->operands[1]);
+	SStream_concat0(O, "{");
+	if (k_factor->type == M68K_OP_IMM)
+		SStream_concat(O, "#%" PRId64, (int64_t)k_factor->imm);
+	else
+		printAddressingMode(O, pc, ext, k_factor);
+	SStream_concat0(O, "}");
+}
+
 #endif
 
 static void printOpSize(SStream *O, const cs_m68k *ext)
@@ -452,6 +656,9 @@ static void printOpSize(SStream *O, const cs_m68k *ext)
 			break;
 		case M68K_FPU_SIZE_EXTENDED:
 			SStream_concat0(O, ".x");
+			break;
+		case M68K_FPU_SIZE_PACKED:
+			SStream_concat0(O, ".p");
 			break;
 		case M68K_FPU_SIZE_NONE:
 			break;
@@ -513,6 +720,14 @@ void M68K_printInst(MCInst *MI, SStream *O, void *PrinterInfo)
 		return;
 	}
 
+	if (MI->Opcode == M68K_INS_FMOVE &&
+	    ext->op_size.type == M68K_SIZE_TYPE_FPU &&
+	    ext->op_size.fpu_size == M68K_FPU_SIZE_PACKED &&
+	    ext->op_count == 3) {
+		printPackedMoveDestination(O, info->pc, ext);
+		return;
+	}
+
 	for (i = 0; i < ext->op_count; ++i) {
 		printAddressingMode(O, info->pc, ext, &ext->operands[i]);
 		if ((i + 1) != ext->op_count)
@@ -543,6 +758,9 @@ const char *M68K_insn_name(csh handle, unsigned int id)
 #ifdef CAPSTONE_DIET
 	return NULL;
 #else
+	if (id >= ARR_SIZE(s_instruction_names)) {
+		return NULL;
+	}
 	return s_instruction_names[id];
 #endif
 }

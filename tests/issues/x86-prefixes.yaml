@@ -291,3 +291,42 @@ test_cases:
         details:
           x86:
             prefix: [ X86_PREFIX_0, X86_PREFIX_DS, X86_PREFIX_0, X86_PREFIX_0 ]
+  -
+    input:
+      name: "x86-64: the rightmost of an FS and a GS override takes effect"
+      bytes: [ 0x64, 0x65, 0x8b, 0x00 ]
+      arch: "CS_ARCH_X86"
+      options: [ CS_OPT_DETAIL, CS_MODE_64 ]
+    expected:
+      insns:
+      -
+        asm_text: "mov eax, dword ptr gs:[rax]"
+        details:
+          x86:
+            prefix: [ X86_PREFIX_0, X86_PREFIX_GS, X86_PREFIX_0, X86_PREFIX_0 ]
+  -
+    input:
+      name: "x86-64: the rightmost of a GS and an FS override takes effect"
+      bytes: [ 0x65, 0x64, 0x8b, 0x00 ]
+      arch: "CS_ARCH_X86"
+      options: [ CS_OPT_DETAIL, CS_MODE_64 ]
+    expected:
+      insns:
+      -
+        asm_text: "mov eax, dword ptr fs:[rax]"
+        details:
+          x86:
+            prefix: [ X86_PREFIX_0, X86_PREFIX_FS, X86_PREFIX_0, X86_PREFIX_0 ]
+  -
+    input:
+      name: "x86-64: an ignored CS override after GS leaves GS in effect"
+      bytes: [ 0x65, 0x2e, 0x8b, 0x00 ]
+      arch: "CS_ARCH_X86"
+      options: [ CS_OPT_DETAIL, CS_MODE_64 ]
+    expected:
+      insns:
+      -
+        asm_text: "mov eax, dword ptr gs:[rax]"
+        details:
+          x86:
+            prefix: [ X86_PREFIX_0, X86_PREFIX_GS, X86_PREFIX_0, X86_PREFIX_0 ]
