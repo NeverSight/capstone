@@ -3735,7 +3735,7 @@
 },
 
 {
-	X86_CMPPDrmi, X86_INS_CMP, 0,
+	X86_CMPPDrmi, X86_INS_CMPPD, 0,
 #ifndef CAPSTONE_DIET
 	{ 0 }, { 0 }, { X86_GRP_SSE2, 0 }, 0, 0
 #endif
@@ -3749,7 +3749,7 @@
 },
 
 {
-	X86_CMPPDrri, X86_INS_CMP, 0,
+	X86_CMPPDrri, X86_INS_CMPPD, 0,
 #ifndef CAPSTONE_DIET
 	{ 0 }, { 0 }, { X86_GRP_SSE2, 0 }, 0, 0
 #endif
@@ -3763,7 +3763,7 @@
 },
 
 {
-	X86_CMPPSrmi, X86_INS_CMP, 0,
+	X86_CMPPSrmi, X86_INS_CMPPS, 0,
 #ifndef CAPSTONE_DIET
 	{ 0 }, { 0 }, { X86_GRP_SSE1, 0 }, 0, 0
 #endif
@@ -3777,7 +3777,7 @@
 },
 
 {
-	X86_CMPPSrri, X86_INS_CMP, 0,
+	X86_CMPPSrri, X86_INS_CMPPS, 0,
 #ifndef CAPSTONE_DIET
 	{ 0 }, { 0 }, { X86_GRP_SSE1, 0 }, 0, 0
 #endif
@@ -3798,7 +3798,7 @@
 },
 
 {
-	X86_CMPSDrm, X86_INS_CMP, 0,
+	X86_CMPSDrm, X86_INS_CMPSD, 0,
 #ifndef CAPSTONE_DIET
 	{ 0 }, { 0 }, { X86_GRP_SSE2, 0 }, 0, 0
 #endif
@@ -3819,7 +3819,7 @@
 },
 
 {
-	X86_CMPSDrr, X86_INS_CMP, 0,
+	X86_CMPSDrr, X86_INS_CMPSD, 0,
 #ifndef CAPSTONE_DIET
 	{ 0 }, { 0 }, { X86_GRP_SSE2, 0 }, 0, 0
 #endif
@@ -3854,7 +3854,7 @@
 },
 
 {
-	X86_CMPSSrm, X86_INS_CMP, 0,
+	X86_CMPSSrm, X86_INS_CMPSS, 0,
 #ifndef CAPSTONE_DIET
 	{ 0 }, { 0 }, { X86_GRP_SSE1, 0 }, 0, 0
 #endif
@@ -3875,14 +3875,14 @@
 },
 
 {
-	X86_CMPSSrr, X86_INS_CMP, 0,
+	X86_CMPSSrr, X86_INS_CMPSS, 0,
 #ifndef CAPSTONE_DIET
 	{ 0 }, { 0 }, { X86_GRP_SSE1, 0 }, 0, 0
 #endif
 },
 
 {
-	X86_CMPSSrr_Int, X86_INS_CMP, 0,
+	X86_CMPSSrr_Int, X86_INS_CMPSS, 0,
 #ifndef CAPSTONE_DIET
 	{ 0 }, { 0 }, { 0 }, 0, 0
 #endif
