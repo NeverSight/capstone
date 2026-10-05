@@ -5,8 +5,9 @@ Guidance for coding agents working on Capstone.
 ## Project documentation
 
 Follow [CONTRIBUTING.md](CONTRIBUTING.md), including its AI guidelines.
-Do not write commit messages or PR descriptions. Translating text written
-by the contributor is allowed.
+In the NeverSight fork, maintainer-authorized AI assistance may write code,
+documentation, commit messages, and PR descriptions. Keep descriptions concise,
+accurate, and supported by the diff and actual validation results.
 
 Read the documentation relevant to the task:
 
@@ -29,8 +30,9 @@ Read the documentation relevant to the task:
 - Keep comments focused on non-obvious behavior and constraints.
   Do not restate the code or narrate the editing process.
 - Use the repository's `.clang-format` for C and Black for Python.
-- Documentation must be written by a human. AI-generated documentation is forbidden. 
-- API changes must be documented in `docs/cs_v6_release_guide.md`. This must be done by the developer.
+- Update documentation when behavior or APIs change. AI-assisted documentation
+  follows the same maintainer authorization and review as code in this fork.
+- Document API changes in `docs/cs_v6_release_guide.md`.
 - Before editing generated code, check how the module is updated. Follow its
   workflow so the fix survives regeneration.
 
