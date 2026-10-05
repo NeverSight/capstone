@@ -286,6 +286,12 @@ Nonetheless, we hope this additional information is useful to you.
   For instructions with both an FS/GS and a ES/CS/SS/DS overrides the FS/GS override now takes priority, regardless of prefix ordering.
 - Decoding of instructions with multiple mandatory prefixes was fixed. (e.g., `shld` with a data size override and a redundant `F3` prefix, or `addss` with an additional `66` prefix)
 - Added `CS_MODE_X86_INTEL` and `CS_MODE_X86_AMD` to select ISA specific quirks.
+  In 64-bit mode, `CS_MODE_X86_AMD` decodes operand-size-prefixed relative
+  `JMP` (`66 E9`) with a 16-bit displacement and a 16-bit target. An effective
+  REX.W prefix selects the 32-bit displacement and full-width target instead.
+  Instruction length, immediate encoding details, and truncated-input rejection
+  follow that selection. Intel mode and the default mode retain their existing
+  32-bit displacement behavior; CALL is unchanged.
   Currently this is only:
   - How `66`-prefixed near conditional jumps are decoded in 64-bit mode (see flag documentation).
     Without either flag, the previous LLVM behavior is preserved.
