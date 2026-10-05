@@ -85,29 +85,23 @@ Coding style
 
 AI guidelines
 ------------
-Using AI for contributions is generally allowed (see the exceptions below).
-Please be aware that everything has to be tested thoroughly.
-The larger the PR, the more rigid our requirements are.
-We ask you to specifically check the tests. They should not be verbose
-or contain duplications but should still provide the maximum amount of coverage.
+The NeverSight fork allows maintainer-authorized AI assistance with code,
+tests, documentation, translations, commit messages, and PR descriptions.
+This permission does not by itself authorize publishing or merging a change;
+follow the maintainer's instructions for those actions.
 
-> [!NOTE]
-> We highly recommend limiting AI usage to small or repetitive changes.
-> The rule of thumb is:
->
-> _Only tasks you can very quickly check for correctness are suitable for AI._
+Contributors remain responsible for correctness, review, and license and
+attribution requirements. Keep changes focused and add meaningful tests for
+the behavior being changed. Report checks actually run, including failures,
+skips, and unavailable coverage.
 
-> [!IMPORTANT]
-> It is forbidden to let AI write the PR description or commit messages!
->
-> This rule helps us maintainers because generated text is incredibly verbose,
-> hard to read, and too time-intensive to understand.
-> This rule also serves as an indicator.
-> If you struggle to explain what the change does, AI was not the right tool.
+Commit messages, PR descriptions, and documentation should be concise and
+explain the concrete behavior and evidence. Avoid generated boilerplate and
+claims that the diff or validation cannot support. Update the documentation
+when behavior or APIs change.
 
-Translations with AI are, of course, allowed.
-If you use it, please write simple, short sentences in your native language
-so the AI doesn't translate them too floridly.
+This policy applies to this fork. Contributions submitted to another project
+must follow that project's contribution policy.
 
 Support
 -------

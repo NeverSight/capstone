@@ -1351,13 +1351,20 @@ static int getID(struct InternalInstruction *insn, cs_mode mode)
 		attrMask ^= ATTR_ADSIZE;
 
 	/*
-	 * CALL/JMP ignore 66 in 64-bit mode. Near Jcc preserve their previous
-	 * behavior unless an Intel or AMD mode is selected.
+	 * Preserve legacy decoding unless an explicit CPU mode selects its
+	 * operand-size rules for relative branches.
 	 */
 	if ((insn->mode == MODE_64BIT) && insn->hasOpSize) {
 		switch (insn->opcode) {
-		case 0xE8:
 		case 0xE9:
+			if (insn->opcodeType == ONEBYTE &&
+			    x86_has_feature(mode, CS_MODE_X86_AMD) &&
+			    !wFromREX(insn->rexPrefix)) {
+				insn->immSize = insn->immediateSize;
+				break;
+			}
+			/* fall through */
+		case 0xE8:
 			// Take care of psubsb and other mmx instructions.
 			if (insn->opcodeType == ONEBYTE) {
 				attrMask ^= ATTR_OPSIZE;

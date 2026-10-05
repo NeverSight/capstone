@@ -1,0 +1,35 @@
+/* Capstone Disassembly Engine; SPDX-License-Identifier: BSD-3-Clause */
+#ifdef CS_JUMP_VALUE
+CS_JUMP_VALUE(MaxBytes, 15)
+CS_JUMP_VALUE(Intel, CS_MODE_64 | CS_MODE_X86_INTEL)
+CS_JUMP_VALUE(AMD, CS_MODE_64 | CS_MODE_X86_AMD)
+#endif
+#ifdef CS_JUMP_WIDE_VALUE
+CS_JUMP_WIDE_VALUE(Address, 0x123450000ULL)
+#endif
+#ifdef CS_JUMP_TEXT
+CS_JUMP_TEXT(Failure, "%s syntax=%u: incorrect relative JMP extent or detail\n")
+#endif
+#ifdef CS_JUMP_CASE
+/* Name, mode, instruction size, immediate offset/size, target, input bytes. */
+CS_JUMP_CASE(Default, CS_MODE_64, 6, 2, 4, Address + 4, 0x66, 0xe9, 0xfe, 0xff,
+             0xff, 0xff)
+CS_JUMP_CASE(Intel16Prefix, Intel, 6, 2, 4, Address + 4, 0x66, 0xe9, 0xfe, 0xff,
+             0xff, 0xff)
+CS_JUMP_CASE(AMD16Prefix, AMD, 4, 2, 2, 2, 0x66, 0xe9, 0xfe, 0xff, 0xff, 0xff)
+CS_JUMP_CASE(AMD16Positive, AMD, 4, 2, 2, 132, 0x66, 0xe9, 0x80, 0, 0, 0)
+CS_JUMP_CASE(AMD16Zero, AMD, 4, 2, 2, 4, 0x66, 0xe9, 0, 0, 0, 0)
+CS_JUMP_CASE(AMD16RexW, AMD, 7, 3, 4, Address + 5, 0x66, 0x48, 0xe9, 0xfe, 0xff,
+             0xff, 0xff)
+CS_JUMP_CASE(AMD16RexB, AMD, 5, 3, 2, 3, 0x66, 0x41, 0xe9, 0xfe, 0xff, 0xff,
+             0xff)
+CS_JUMP_CASE(AMD16AfterRexW, AMD, 5, 3, 2, 3, 0x48, 0x66, 0xe9, 0xfe, 0xff,
+             0xff, 0xff)
+CS_JUMP_CASE(AMD16Address, AMD, 5, 3, 2, 3, 0x66, 0x67, 0xe9, 0xfe, 0xff, 0xff,
+             0xff)
+CS_JUMP_CASE(AMD16AddressRexW, AMD, 8, 4, 4, Address + 6, 0x66, 0x67, 0x48,
+             0xe9, 0xfe, 0xff, 0xff, 0xff)
+CS_JUMP_CASE(AMDBare, AMD, 5, 1, 4, Address + 3, 0xe9, 0xfe, 0xff, 0xff, 0xff)
+CS_JUMP_CASE(IntelRexW, Intel, 7, 3, 4, Address + 5, 0x66, 0x48, 0xe9, 0xfe,
+             0xff, 0xff, 0xff)
+#endif
