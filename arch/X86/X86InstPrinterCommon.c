@@ -182,7 +182,21 @@ void printSSEAVXCC(MCInst *MI, unsigned Op, SStream *O)
 		break;
 	}
 
-	MI->popcode_adjust = Imm + 1;
+	// Legacy SSE aliases retain their family ID. Predicate-index arithmetic
+	// collides with unrelated public IDs, including string comparisons.
+	switch (MI->flat_insn->id) {
+	case X86_INS_CMPPS:
+	case X86_INS_CMPPD:
+	case X86_INS_CMPSS:
+	case X86_INS_CMPSD:
+		op_addSseCC(MI, X86_SSE_CC_EQ + Imm);
+		if (MI->flat_insn->detail)
+			MI->flat_insn->detail->x86.avx_cc = X86_AVX_CC_INVALID;
+		break;
+	default:
+		MI->popcode_adjust = Imm + 1;
+		break;
+	}
 }
 
 void printXOPCC(MCInst *MI, unsigned Op, SStream *O)
