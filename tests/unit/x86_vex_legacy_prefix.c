@@ -21,7 +21,7 @@ static bool check_case(const prefix_case *test)
 	cs_insn *insn = NULL;
 	csh handle;
 	size_t count;
-	char actual[160] = "";
+	char actual[sizeof(insn->mnemonic) + sizeof(insn->op_str)] = "";
 	bool ok;
 
 	if (cs_open(CS_ARCH_X86, test->mode, &handle) != CS_ERR_OK)

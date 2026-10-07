@@ -1785,61 +1785,379 @@ static x86_feature_decode_result decode_apx_adx(csh handle,
 	return X86_FEATURE_DECODED;
 }
 
-static x86_feature_decode_result decode_apx_unary(csh handle,
-		const uint8_t *code, size_t code_len, MCInst *instr, uint16_t *size)
-{
-	const cs_struct *arch=(const cs_struct *)(uintptr_t)handle; const uint8_t *e;
-	size_t off=0; uint8_t segp=0,p0,p1,p2,op,m,w,pp,group; bool a32=false,bad=false,mem,nd,nf;
-	unsigned n,ndn,feature; x86_reg r=X86_REG_INVALID,d=X86_REG_INVALID,seg; x86_feature_memory memory;
-	while(off<code_len&&code[off]!=0x62){uint8_t p=code[off];if(is_apx_evex_segment_prefix(p))segp=p;else if(p==0x67)a32=true;else if(p==0x66||p==0xf0||p==0xf2||p==0xf3||is_effective_rex(code,code_len,off))bad=true;else if(p<0x40||p>0x4f)return X86_FEATURE_NOT_HANDLED;++off;}
-	if(off==code_len||code_len-off<2||(code[off+1]&7)!=4)return X86_FEATURE_NOT_HANDLED;
-	if(code_len-off<5)return X86_FEATURE_INVALID;e=&code[off];op=e[4];if(op!=0xfe&&op!=0xff&&op!=0xf6&&op!=0xf7)return X86_FEATURE_NOT_HANDLED;
-	if(!(arch->mode&CS_MODE_64)||bad||code_len-off<6||off+6>15)return X86_FEATURE_INVALID;
-	p0=e[1];p1=e[2];p2=e[3];m=e[5];pp=p1&3;group=(m>>3)&7;mem=(m&0xc0)!=0xc0;nd=(p2&0x10)!=0;nf=(p2&4)!=0;
-	if((p2&0xe3)!=0||pp>1||(!mem&&!(p1&4)))return X86_FEATURE_INVALID;
-	if(op==0xfe||op==0xff){if(group>1)return X86_FEATURE_NOT_HANDLED;feature=group?X86_FEATURE_APX_DEC:X86_FEATURE_APX_INC;}
-	else {if(group!=2&&group!=3&&group!=4&&group!=5&&group!=6&&group!=7)return X86_FEATURE_NOT_HANDLED;feature=group==2?X86_FEATURE_APX_NOT:group==3?X86_FEATURE_APX_NEG:group==4?X86_FEATURE_APX_MUL:group==5?X86_FEATURE_APX_IMUL_ONE:group==6?X86_FEATURE_APX_DIV:X86_FEATURE_APX_IDIV;if(feature==X86_FEATURE_APX_NOT&&nf)return X86_FEATURE_INVALID;if(group>=4&&nd)return X86_FEATURE_INVALID;}
-	if((op==0xfe||op==0xf6)){if(pp)return X86_FEATURE_INVALID;w=1;}else w=(p1&0x80)?8:pp?2:4;
-	ndn=((~p2&8)<<1)|((~p1&0x78)>>3);if(!nd&&ndn)return X86_FEATURE_INVALID;
-	if(nd){d=rex2_register(ndn,w);if(d==X86_REG_INVALID)return X86_FEATURE_INVALID;}
-	MCInst_clear(instr);MCInst_setOpcode(instr,feature);MCOperand_CreateImm0(instr,d);MCOperand_CreateImm0(instr,mem);
-	if(!mem){n=((~p0&0x20)>>2)|((p0&8)<<1)|(m&7);r=rex2_register(n,w);if(r==X86_REG_INVALID)return X86_FEATURE_INVALID;MCOperand_CreateImm0(instr,r);MCOperand_CreateImm0(instr,w);MCOperand_CreateImm0(instr,nd);MCOperand_CreateImm0(instr,nf);*size=(uint16_t)(off+6);set_apx_evex_encoding_detail(instr,e,off,segp,a32,NULL);return X86_FEATURE_DECODED;}
-	if(!decode_apx_evex_memory(code,code_len,off+5,p0,p1,a32,&memory))return X86_FEATURE_INVALID;
-	seg=apx_segment_register(segp);add_feature_memory_operands(instr,&memory);MCOperand_CreateImm0(instr,seg);MCOperand_CreateImm0(instr,a32?4:8);MCOperand_CreateImm0(instr,w);MCOperand_CreateImm0(instr,nd);MCOperand_CreateImm0(instr,nf);*size=(uint16_t)memory.length;set_apx_evex_encoding_detail(instr,e,off,segp,a32,&memory);return X86_FEATURE_DECODED;
+static x86_feature_decode_result
+decode_apx_unary(csh handle, const uint8_t *code, size_t code_len,
+                 MCInst *instr, uint16_t *size) {
+  const cs_struct *arch = (const cs_struct *)(uintptr_t)handle;
+  const uint8_t *e;
+  size_t off = 0;
+  uint8_t segp = 0, p0, p1, p2, op, m, w, pp, group;
+  bool a32 = false, bad = false, mem, nd, nf;
+  unsigned n, ndn, feature;
+  x86_reg r = X86_REG_INVALID, d = X86_REG_INVALID, seg;
+  x86_feature_memory memory;
+  while (off < code_len && code[off] != 0x62) {
+    uint8_t p = code[off];
+    if (is_apx_evex_segment_prefix(p))
+      segp = p;
+    else if (p == 0x67)
+      a32 = true;
+    else if (p == 0x66 || p == 0xf0 || p == 0xf2 || p == 0xf3 ||
+             is_effective_rex(code, code_len, off))
+      bad = true;
+    else if (p < 0x40 || p > 0x4f)
+      return X86_FEATURE_NOT_HANDLED;
+    ++off;
+  }
+  if (off == code_len || code_len - off < 2 || (code[off + 1] & 7) != 4)
+    return X86_FEATURE_NOT_HANDLED;
+  if (code_len - off < 5)
+    return X86_FEATURE_INVALID;
+  e = &code[off];
+  op = e[4];
+  if (op != 0xfe && op != 0xff && op != 0xf6 && op != 0xf7)
+    return X86_FEATURE_NOT_HANDLED;
+  if (!(arch->mode & CS_MODE_64) || bad || code_len - off < 6 || off + 6 > 15)
+    return X86_FEATURE_INVALID;
+  p0 = e[1];
+  p1 = e[2];
+  p2 = e[3];
+  m = e[5];
+  pp = p1 & 3;
+  group = (m >> 3) & 7;
+  mem = (m & 0xc0) != 0xc0;
+  nd = (p2 & 0x10) != 0;
+  nf = (p2 & 4) != 0;
+  if ((p2 & 0xe3) != 0 || pp > 1 || (!mem && !(p1 & 4)))
+    return X86_FEATURE_INVALID;
+  if (op == 0xfe || op == 0xff) {
+    if (group > 1)
+      return X86_FEATURE_NOT_HANDLED;
+    feature = group ? X86_FEATURE_APX_DEC : X86_FEATURE_APX_INC;
+  } else {
+    if (group != 2 && group != 3 && group != 4 && group != 5 && group != 6 &&
+        group != 7)
+      return X86_FEATURE_NOT_HANDLED;
+    feature = group == 2   ? X86_FEATURE_APX_NOT
+              : group == 3 ? X86_FEATURE_APX_NEG
+              : group == 4 ? X86_FEATURE_APX_MUL
+              : group == 5 ? X86_FEATURE_APX_IMUL_ONE
+              : group == 6 ? X86_FEATURE_APX_DIV
+                           : X86_FEATURE_APX_IDIV;
+    if (feature == X86_FEATURE_APX_NOT && nf)
+      return X86_FEATURE_INVALID;
+    if (group >= 4 && nd)
+      return X86_FEATURE_INVALID;
+  }
+  if ((op == 0xfe || op == 0xf6)) {
+    if (pp)
+      return X86_FEATURE_INVALID;
+    w = 1;
+  } else
+    w = (p1 & 0x80) ? 8 : pp ? 2 : 4;
+  ndn = ((~p2 & 8) << 1) | ((~p1 & 0x78) >> 3);
+  if (!nd && ndn)
+    return X86_FEATURE_INVALID;
+  if (nd) {
+    d = rex2_register(ndn, w);
+    if (d == X86_REG_INVALID)
+      return X86_FEATURE_INVALID;
+  }
+  MCInst_clear(instr);
+  MCInst_setOpcode(instr, feature);
+  MCOperand_CreateImm0(instr, d);
+  MCOperand_CreateImm0(instr, mem);
+  if (!mem) {
+    n = ((~p0 & 0x20) >> 2) | ((p0 & 8) << 1) | (m & 7);
+    r = rex2_register(n, w);
+    if (r == X86_REG_INVALID)
+      return X86_FEATURE_INVALID;
+    MCOperand_CreateImm0(instr, r);
+    MCOperand_CreateImm0(instr, w);
+    MCOperand_CreateImm0(instr, nd);
+    MCOperand_CreateImm0(instr, nf);
+    *size = (uint16_t)(off + 6);
+    set_apx_evex_encoding_detail(instr, e, off, segp, a32, NULL);
+    return X86_FEATURE_DECODED;
+  }
+  if (!decode_apx_evex_memory(code, code_len, off + 5, p0, p1, a32, &memory))
+    return X86_FEATURE_INVALID;
+  seg = apx_segment_register(segp);
+  add_feature_memory_operands(instr, &memory);
+  MCOperand_CreateImm0(instr, seg);
+  MCOperand_CreateImm0(instr, a32 ? 4 : 8);
+  MCOperand_CreateImm0(instr, w);
+  MCOperand_CreateImm0(instr, nd);
+  MCOperand_CreateImm0(instr, nf);
+  *size = (uint16_t)memory.length;
+  set_apx_evex_encoding_detail(instr, e, off, segp, a32, &memory);
+  return X86_FEATURE_DECODED;
 }
 
-static x86_feature_decode_result decode_apx_bmi_ternary(csh handle,const uint8_t *code,size_t len,MCInst *instr,uint16_t *size)
-{
-	const cs_struct *arch=(const cs_struct *)(uintptr_t)handle;const uint8_t *e;size_t off=0;uint8_t segp=0,p0,p1,p2,op,m,w;bool a32=false,bad=false,mem,nf;x86_reg dst,s1,s2=X86_REG_INVALID,seg;unsigned dn,sn,rn,feature;x86_feature_memory memory;
-	while(off<len&&code[off]!=0x62){uint8_t p=code[off];if(is_apx_evex_segment_prefix(p))segp=p;else if(p==0x67)a32=true;else if(p==0x66||p==0xf0||p==0xf2||p==0xf3||is_effective_rex(code,len,off))bad=true;else if(p<0x40||p>0x4f)return X86_FEATURE_NOT_HANDLED;++off;}
-	if(off==len||len-off<2||(code[off+1]&7)!=2)return X86_FEATURE_NOT_HANDLED;if(len-off<5)return X86_FEATURE_INVALID;e=&code[off];op=e[4];if(op!=0xf2&&op!=0xf5)return X86_FEATURE_NOT_HANDLED;if(!(arch->mode&CS_MODE_64)||bad||len-off<6||off+6>15)return X86_FEATURE_INVALID;
-	p0=e[1];p1=e[2];p2=e[3];m=e[5];mem=(m&0xc0)!=0xc0;nf=(p2&4)!=0;if((p1&3)!=0||(p2&0xf3)!=0||(!mem&&!(p1&4)))return X86_FEATURE_INVALID;/* ND=0, LL=0, zeroing=0; memory U is inverted X4. */
-	w=(p1&0x80)?8:4;feature=op==0xf2?X86_FEATURE_APX_ANDN:X86_FEATURE_APX_BZHI;dn=((~p0&0x80)>>4)|(~p0&0x10)|((m>>3)&7);sn=((~p2&8)<<1)|((~p1&0x78)>>3);dst=rex2_register(dn,w);s1=rex2_register(sn,w);if(dst==X86_REG_INVALID||s1==X86_REG_INVALID)return X86_FEATURE_INVALID;
-	MCInst_clear(instr);MCInst_setOpcode(instr,feature);MCOperand_CreateImm0(instr,s1);MCOperand_CreateImm0(instr,dst);MCOperand_CreateImm0(instr,mem);
-	if(!mem){rn=((~p0&0x20)>>2)|((p0&8)<<1)|(m&7);s2=rex2_register(rn,w);if(s2==X86_REG_INVALID)return X86_FEATURE_INVALID;MCOperand_CreateImm0(instr,s2);MCOperand_CreateImm0(instr,w);MCOperand_CreateImm0(instr,1);MCOperand_CreateImm0(instr,nf);*size=(uint16_t)(off+6);set_apx_evex_encoding_detail(instr,e,off,segp,a32,NULL);return X86_FEATURE_DECODED;}
-	if(!decode_apx_evex_memory(code,len,off+5,p0,p1,a32,&memory))return X86_FEATURE_INVALID;seg=apx_segment_register(segp);add_feature_memory_operands(instr,&memory);MCOperand_CreateImm0(instr,seg);MCOperand_CreateImm0(instr,a32?4:8);MCOperand_CreateImm0(instr,w);MCOperand_CreateImm0(instr,1);MCOperand_CreateImm0(instr,nf);*size=(uint16_t)memory.length;set_apx_evex_encoding_detail(instr,e,off,segp,a32,&memory);return X86_FEATURE_DECODED;
+static x86_feature_decode_result
+decode_apx_bmi_ternary(csh handle, const uint8_t *code, size_t len,
+                       MCInst *instr, uint16_t *size) {
+  const cs_struct *arch = (const cs_struct *)(uintptr_t)handle;
+  const uint8_t *e;
+  size_t off = 0;
+  uint8_t segp = 0, p0, p1, p2, op, m, w;
+  bool a32 = false, bad = false, mem, nf;
+  x86_reg dst, s1, s2 = X86_REG_INVALID, seg;
+  unsigned dn, sn, rn, feature;
+  x86_feature_memory memory;
+  while (off < len && code[off] != 0x62) {
+    uint8_t p = code[off];
+    if (is_apx_evex_segment_prefix(p))
+      segp = p;
+    else if (p == 0x67)
+      a32 = true;
+    else if (p == 0x66 || p == 0xf0 || p == 0xf2 || p == 0xf3 ||
+             is_effective_rex(code, len, off))
+      bad = true;
+    else if (p < 0x40 || p > 0x4f)
+      return X86_FEATURE_NOT_HANDLED;
+    ++off;
+  }
+  if (off == len || len - off < 2 || (code[off + 1] & 7) != 2)
+    return X86_FEATURE_NOT_HANDLED;
+  if (len - off < 5)
+    return X86_FEATURE_INVALID;
+  e = &code[off];
+  op = e[4];
+  if (op != 0xf2 && op != 0xf5)
+    return X86_FEATURE_NOT_HANDLED;
+  if (!(arch->mode & CS_MODE_64) || bad || len - off < 6 || off + 6 > 15)
+    return X86_FEATURE_INVALID;
+  p0 = e[1];
+  p1 = e[2];
+  p2 = e[3];
+  m = e[5];
+  mem = (m & 0xc0) != 0xc0;
+  nf = (p2 & 4) != 0;
+  if ((p1 & 3) != 0 || (p2 & 0xf3) != 0 || (!mem && !(p1 & 4)))
+    return X86_FEATURE_INVALID; /* ND=0, LL=0, zeroing=0; memory U is inverted
+                                   X4. */
+  w = (p1 & 0x80) ? 8 : 4;
+  feature = op == 0xf2 ? X86_FEATURE_APX_ANDN : X86_FEATURE_APX_BZHI;
+  dn = ((~p0 & 0x80) >> 4) | (~p0 & 0x10) | ((m >> 3) & 7);
+  sn = ((~p2 & 8) << 1) | ((~p1 & 0x78) >> 3);
+  dst = rex2_register(dn, w);
+  s1 = rex2_register(sn, w);
+  if (dst == X86_REG_INVALID || s1 == X86_REG_INVALID)
+    return X86_FEATURE_INVALID;
+  MCInst_clear(instr);
+  MCInst_setOpcode(instr, feature);
+  MCOperand_CreateImm0(instr, s1);
+  MCOperand_CreateImm0(instr, dst);
+  MCOperand_CreateImm0(instr, mem);
+  if (!mem) {
+    rn = ((~p0 & 0x20) >> 2) | ((p0 & 8) << 1) | (m & 7);
+    s2 = rex2_register(rn, w);
+    if (s2 == X86_REG_INVALID)
+      return X86_FEATURE_INVALID;
+    MCOperand_CreateImm0(instr, s2);
+    MCOperand_CreateImm0(instr, w);
+    MCOperand_CreateImm0(instr, 1);
+    MCOperand_CreateImm0(instr, nf);
+    *size = (uint16_t)(off + 6);
+    set_apx_evex_encoding_detail(instr, e, off, segp, a32, NULL);
+    return X86_FEATURE_DECODED;
+  }
+  if (!decode_apx_evex_memory(code, len, off + 5, p0, p1, a32, &memory))
+    return X86_FEATURE_INVALID;
+  seg = apx_segment_register(segp);
+  add_feature_memory_operands(instr, &memory);
+  MCOperand_CreateImm0(instr, seg);
+  MCOperand_CreateImm0(instr, a32 ? 4 : 8);
+  MCOperand_CreateImm0(instr, w);
+  MCOperand_CreateImm0(instr, 1);
+  MCOperand_CreateImm0(instr, nf);
+  *size = (uint16_t)memory.length;
+  set_apx_evex_encoding_detail(instr, e, off, segp, a32, &memory);
+  return X86_FEATURE_DECODED;
 }
 
-static x86_feature_decode_result decode_apx_pdep_pext(csh handle,const uint8_t *code,size_t len,MCInst *instr,uint16_t *size)
-{
-	const cs_struct *arch=(const cs_struct *)(uintptr_t)handle;const uint8_t*e;size_t off=0;uint8_t segp=0,p0,p1,p2,m,w,pp;bool a32=false,bad=false,mem;x86_reg dst,s1,s2=X86_REG_INVALID,seg;unsigned dn,sn,rn;x86_feature_memory mm;
-	while(off<len&&code[off]!=0x62){uint8_t p=code[off];if(is_apx_evex_segment_prefix(p))segp=p;else if(p==0x67)a32=true;else if(p==0x66||p==0xf0||p==0xf2||p==0xf3||is_effective_rex(code,len,off))bad=true;else if(p<0x40||p>0x4f)return X86_FEATURE_NOT_HANDLED;++off;}
-	if(off==len||len-off<2||(code[off+1]&7)!=2)return X86_FEATURE_NOT_HANDLED;if(len-off<5)return X86_FEATURE_INVALID;e=&code[off];if(e[4]!=0xf5)return X86_FEATURE_NOT_HANDLED;if(!(arch->mode&CS_MODE_64)||bad||len-off<6||off+6>15)return X86_FEATURE_INVALID;
-	p0=e[1];p1=e[2];p2=e[3];m=e[5];pp=p1&3;if(pp!=2&&pp!=3)return X86_FEATURE_NOT_HANDLED;mem=(m&0xc0)!=0xc0;if((p2&0xf7)!=0||(!mem&&!(p1&4)))return X86_FEATURE_INVALID;w=(p1&0x80)?8:4;dn=((~p0&0x80)>>4)|(~p0&0x10)|((m>>3)&7);sn=((~p2&8)<<1)|((~p1&0x78)>>3);dst=rex2_register(dn,w);s1=rex2_register(sn,w);if(dst==X86_REG_INVALID||s1==X86_REG_INVALID)return X86_FEATURE_INVALID;
-	MCInst_clear(instr);MCInst_setOpcode(instr,pp==3?X86_FEATURE_APX_PDEP:X86_FEATURE_APX_PEXT);MCOperand_CreateImm0(instr,dst);MCOperand_CreateImm0(instr,s1);MCOperand_CreateImm0(instr,mem);
-	if(!mem){rn=((~p0&0x20)>>2)|((p0&8)<<1)|(m&7);s2=rex2_register(rn,w);if(s2==X86_REG_INVALID)return X86_FEATURE_INVALID;MCOperand_CreateImm0(instr,s2);MCOperand_CreateImm0(instr,w);MCOperand_CreateImm0(instr,0);*size=(uint16_t)(off+6);set_apx_evex_encoding_detail(instr,e,off,segp,a32,NULL);return X86_FEATURE_DECODED;}
-	if(!decode_apx_evex_memory(code,len,off+5,p0,p1,a32,&mm))return X86_FEATURE_INVALID;seg=apx_segment_register(segp);add_feature_memory_operands(instr,&mm);MCOperand_CreateImm0(instr,seg);MCOperand_CreateImm0(instr,a32?4:8);MCOperand_CreateImm0(instr,w);MCOperand_CreateImm0(instr,0);*size=(uint16_t)mm.length;set_apx_evex_encoding_detail(instr,e,off,segp,a32,&mm);return X86_FEATURE_DECODED;
+static x86_feature_decode_result decode_apx_pdep_pext(csh handle,
+                                                      const uint8_t *code,
+                                                      size_t len, MCInst *instr,
+                                                      uint16_t *size) {
+  const cs_struct *arch = (const cs_struct *)(uintptr_t)handle;
+  const uint8_t *e;
+  size_t off = 0;
+  uint8_t segp = 0, p0, p1, p2, m, w, pp;
+  bool a32 = false, bad = false, mem;
+  x86_reg dst, s1, s2 = X86_REG_INVALID, seg;
+  unsigned dn, sn, rn;
+  x86_feature_memory mm;
+  while (off < len && code[off] != 0x62) {
+    uint8_t p = code[off];
+    if (is_apx_evex_segment_prefix(p))
+      segp = p;
+    else if (p == 0x67)
+      a32 = true;
+    else if (p == 0x66 || p == 0xf0 || p == 0xf2 || p == 0xf3 ||
+             is_effective_rex(code, len, off))
+      bad = true;
+    else if (p < 0x40 || p > 0x4f)
+      return X86_FEATURE_NOT_HANDLED;
+    ++off;
+  }
+  if (off == len || len - off < 2 || (code[off + 1] & 7) != 2)
+    return X86_FEATURE_NOT_HANDLED;
+  if (len - off < 5)
+    return X86_FEATURE_INVALID;
+  e = &code[off];
+  if (e[4] != 0xf5)
+    return X86_FEATURE_NOT_HANDLED;
+  if (!(arch->mode & CS_MODE_64) || bad || len - off < 6 || off + 6 > 15)
+    return X86_FEATURE_INVALID;
+  p0 = e[1];
+  p1 = e[2];
+  p2 = e[3];
+  m = e[5];
+  pp = p1 & 3;
+  if (pp != 2 && pp != 3)
+    return X86_FEATURE_NOT_HANDLED;
+  mem = (m & 0xc0) != 0xc0;
+  if ((p2 & 0xf7) != 0 || (!mem && !(p1 & 4)))
+    return X86_FEATURE_INVALID;
+  w = (p1 & 0x80) ? 8 : 4;
+  dn = ((~p0 & 0x80) >> 4) | (~p0 & 0x10) | ((m >> 3) & 7);
+  sn = ((~p2 & 8) << 1) | ((~p1 & 0x78) >> 3);
+  dst = rex2_register(dn, w);
+  s1 = rex2_register(sn, w);
+  if (dst == X86_REG_INVALID || s1 == X86_REG_INVALID)
+    return X86_FEATURE_INVALID;
+  MCInst_clear(instr);
+  MCInst_setOpcode(instr,
+                   pp == 3 ? X86_FEATURE_APX_PDEP : X86_FEATURE_APX_PEXT);
+  MCOperand_CreateImm0(instr, dst);
+  MCOperand_CreateImm0(instr, s1);
+  MCOperand_CreateImm0(instr, mem);
+  if (!mem) {
+    rn = ((~p0 & 0x20) >> 2) | ((p0 & 8) << 1) | (m & 7);
+    s2 = rex2_register(rn, w);
+    if (s2 == X86_REG_INVALID)
+      return X86_FEATURE_INVALID;
+    MCOperand_CreateImm0(instr, s2);
+    MCOperand_CreateImm0(instr, w);
+    MCOperand_CreateImm0(instr, 0);
+    *size = (uint16_t)(off + 6);
+    set_apx_evex_encoding_detail(instr, e, off, segp, a32, NULL);
+    return X86_FEATURE_DECODED;
+  }
+  if (!decode_apx_evex_memory(code, len, off + 5, p0, p1, a32, &mm))
+    return X86_FEATURE_INVALID;
+  seg = apx_segment_register(segp);
+  add_feature_memory_operands(instr, &mm);
+  MCOperand_CreateImm0(instr, seg);
+  MCOperand_CreateImm0(instr, a32 ? 4 : 8);
+  MCOperand_CreateImm0(instr, w);
+  MCOperand_CreateImm0(instr, 0);
+  *size = (uint16_t)mm.length;
+  set_apx_evex_encoding_detail(instr, e, off, segp, a32, &mm);
+  return X86_FEATURE_DECODED;
 }
 
-static x86_feature_decode_result decode_apx_double_shift(csh handle,const uint8_t*code,size_t len,MCInst*in,uint16_t*size)
-{
-	const cs_struct*arch=(const cs_struct*)(uintptr_t)handle;const uint8_t*e;size_t off=0,io;uint8_t segp=0,p0,p1,p2,op,m,pp,w,imm=0;bool a32=false,bad=false,mem,nd,nf,cl;x86_reg dst=X86_REG_INVALID,src,rm=X86_REG_INVALID,seg;unsigned dn,sn,rn;x86_feature_memory mm;
-	while(off<len&&code[off]!=0x62){uint8_t p=code[off];if(is_apx_evex_segment_prefix(p))segp=p;else if(p==0x67)a32=true;else if(p==0x66||p==0xf0||p==0xf2||p==0xf3||is_effective_rex(code,len,off))bad=true;else if(p<0x40||p>0x4f)return X86_FEATURE_NOT_HANDLED;++off;}
-	if(off==len||len-off<2||(code[off+1]&7)!=4)return X86_FEATURE_NOT_HANDLED;if(len-off<5)return X86_FEATURE_INVALID;e=&code[off];op=e[4];if(op!=0x24&&op!=0x2c&&op!=0xa5&&op!=0xad)return X86_FEATURE_NOT_HANDLED;if(!(arch->mode&CS_MODE_64)||bad||len-off<6||off+6>15)return X86_FEATURE_INVALID;
-	p0=e[1];p1=e[2];p2=e[3];m=e[5];pp=p1&3;mem=(m&0xc0)!=0xc0;nd=(p2&0x10)!=0;nf=(p2&4)!=0;cl=op>=0xa5;if(pp>1||(p2&0xe3)!=0||(!mem&&!(p1&4)))return X86_FEATURE_INVALID;w=(p1&0x80)?8:(pp?2:4);dn=((~p2&8)<<1)|((~p1&0x78)>>3);if(!nd&&dn)return X86_FEATURE_INVALID;if(nd){dst=rex2_register(dn,w);if(dst==X86_REG_INVALID)return X86_FEATURE_INVALID;}sn=((~p0&0x80)>>4)|(~p0&0x10)|((m>>3)&7);src=rex2_register(sn,w);if(src==X86_REG_INVALID)return X86_FEATURE_INVALID;
-	MCInst_clear(in);MCInst_setOpcode(in,(op==0x24||op==0xa5)?X86_FEATURE_APX_SHLD:X86_FEATURE_APX_SHRD);MCOperand_CreateImm0(in,dst);MCOperand_CreateImm0(in,src);MCOperand_CreateImm0(in,mem);MCOperand_CreateImm0(in,nd);MCOperand_CreateImm0(in,nf);
-	if(!mem){rn=((~p0&0x20)>>2)|((p0&8)<<1)|(m&7);rm=rex2_register(rn,w);if(rm==X86_REG_INVALID)return X86_FEATURE_INVALID;MCOperand_CreateImm0(in,rm);io=off+6;}else{if(!decode_apx_evex_memory(code,len,off+5,p0,p1,a32,&mm))return X86_FEATURE_INVALID;seg=apx_segment_register(segp);add_feature_memory_operands(in,&mm);MCOperand_CreateImm0(in,seg);MCOperand_CreateImm0(in,a32?4:8);io=mm.length;}
-	if(!cl){if(io>=len||io>=15)return X86_FEATURE_INVALID;imm=code[io++];in->imm_size=1;}MCOperand_CreateImm0(in,w);MCOperand_CreateImm0(in,cl);MCOperand_CreateImm0(in,imm);*size=(uint16_t)io;set_apx_evex_encoding_detail(in,e,off,segp,a32,mem?&mm:NULL);if(!cl&&in->flat_insn->detail){in->flat_insn->detail->x86.encoding.imm_offset=(uint8_t)(io-1);in->flat_insn->detail->x86.encoding.imm_size=1;}return X86_FEATURE_DECODED;
+static x86_feature_decode_result decode_apx_double_shift(csh handle,
+                                                         const uint8_t *code,
+                                                         size_t len, MCInst *in,
+                                                         uint16_t *size) {
+  const cs_struct *arch = (const cs_struct *)(uintptr_t)handle;
+  const uint8_t *e;
+  size_t off = 0, io;
+  uint8_t segp = 0, p0, p1, p2, op, m, pp, w, imm = 0;
+  bool a32 = false, bad = false, mem, nd, nf, cl;
+  x86_reg dst = X86_REG_INVALID, src, rm = X86_REG_INVALID, seg;
+  unsigned dn, sn, rn;
+  x86_feature_memory mm;
+  while (off < len && code[off] != 0x62) {
+    uint8_t p = code[off];
+    if (is_apx_evex_segment_prefix(p))
+      segp = p;
+    else if (p == 0x67)
+      a32 = true;
+    else if (p == 0x66 || p == 0xf0 || p == 0xf2 || p == 0xf3 ||
+             is_effective_rex(code, len, off))
+      bad = true;
+    else if (p < 0x40 || p > 0x4f)
+      return X86_FEATURE_NOT_HANDLED;
+    ++off;
+  }
+  if (off == len || len - off < 2 || (code[off + 1] & 7) != 4)
+    return X86_FEATURE_NOT_HANDLED;
+  if (len - off < 5)
+    return X86_FEATURE_INVALID;
+  e = &code[off];
+  op = e[4];
+  if (op != 0x24 && op != 0x2c && op != 0xa5 && op != 0xad)
+    return X86_FEATURE_NOT_HANDLED;
+  if (!(arch->mode & CS_MODE_64) || bad || len - off < 6 || off + 6 > 15)
+    return X86_FEATURE_INVALID;
+  p0 = e[1];
+  p1 = e[2];
+  p2 = e[3];
+  m = e[5];
+  pp = p1 & 3;
+  mem = (m & 0xc0) != 0xc0;
+  nd = (p2 & 0x10) != 0;
+  nf = (p2 & 4) != 0;
+  cl = op >= 0xa5;
+  if (pp > 1 || (p2 & 0xe3) != 0 || (!mem && !(p1 & 4)))
+    return X86_FEATURE_INVALID;
+  w = (p1 & 0x80) ? 8 : (pp ? 2 : 4);
+  dn = ((~p2 & 8) << 1) | ((~p1 & 0x78) >> 3);
+  if (!nd && dn)
+    return X86_FEATURE_INVALID;
+  if (nd) {
+    dst = rex2_register(dn, w);
+    if (dst == X86_REG_INVALID)
+      return X86_FEATURE_INVALID;
+  }
+  sn = ((~p0 & 0x80) >> 4) | (~p0 & 0x10) | ((m >> 3) & 7);
+  src = rex2_register(sn, w);
+  if (src == X86_REG_INVALID)
+    return X86_FEATURE_INVALID;
+  MCInst_clear(in);
+  MCInst_setOpcode(in, (op == 0x24 || op == 0xa5) ? X86_FEATURE_APX_SHLD
+                                                  : X86_FEATURE_APX_SHRD);
+  MCOperand_CreateImm0(in, dst);
+  MCOperand_CreateImm0(in, src);
+  MCOperand_CreateImm0(in, mem);
+  MCOperand_CreateImm0(in, nd);
+  MCOperand_CreateImm0(in, nf);
+  if (!mem) {
+    rn = ((~p0 & 0x20) >> 2) | ((p0 & 8) << 1) | (m & 7);
+    rm = rex2_register(rn, w);
+    if (rm == X86_REG_INVALID)
+      return X86_FEATURE_INVALID;
+    MCOperand_CreateImm0(in, rm);
+    io = off + 6;
+  } else {
+    if (!decode_apx_evex_memory(code, len, off + 5, p0, p1, a32, &mm))
+      return X86_FEATURE_INVALID;
+    seg = apx_segment_register(segp);
+    add_feature_memory_operands(in, &mm);
+    MCOperand_CreateImm0(in, seg);
+    MCOperand_CreateImm0(in, a32 ? 4 : 8);
+    io = mm.length;
+  }
+  if (!cl) {
+    if (io >= len || io >= 15)
+      return X86_FEATURE_INVALID;
+    imm = code[io++];
+    in->imm_size = 1;
+  }
+  MCOperand_CreateImm0(in, w);
+  MCOperand_CreateImm0(in, cl);
+  MCOperand_CreateImm0(in, imm);
+  *size = (uint16_t)io;
+  set_apx_evex_encoding_detail(in, e, off, segp, a32, mem ? &mm : NULL);
+  if (!cl && in->flat_insn->detail) {
+    in->flat_insn->detail->x86.encoding.imm_offset = (uint8_t)(io - 1);
+    in->flat_insn->detail->x86.encoding.imm_size = 1;
+  }
+  return X86_FEATURE_DECODED;
 }
 
 static x86_feature_decode_result
@@ -1983,12 +2301,81 @@ decode_legacy_cet_store(csh handle, const uint8_t *code, size_t code_len,
 	return X86_FEATURE_DECODED;
 }
 
-static x86_feature_decode_result decode_apx_direct_store(csh handle,const uint8_t*code,size_t len,MCInst*in,uint16_t*size)
-{
-	const cs_struct*arch=(const cs_struct*)(uintptr_t)handle;const uint8_t*e;size_t off=0;uint8_t segp=0,p0,p1,p2,op,m,pp,w;bool a32=false,bad=false;x86_reg src,seg;unsigned sn,feature;x86_feature_memory mm;
-	while(off<len&&code[off]!=0x62){uint8_t p=code[off];if(is_apx_evex_segment_prefix(p))segp=p;else if(p==0x67)a32=true;else if(p==0x66||p==0xf0||p==0xf2||p==0xf3||is_effective_rex(code,len,off))bad=true;else if(p<0x40||p>0x4f)return X86_FEATURE_NOT_HANDLED;++off;}
-	if(off==len||len-off<2||(code[off+1]&7)!=4)return X86_FEATURE_NOT_HANDLED;if(len-off<5)return X86_FEATURE_INVALID;e=&code[off];op=e[4];if(op!=0xf9&&op!=0x66&&op!=0x65)return X86_FEATURE_NOT_HANDLED;if(!(arch->mode&CS_MODE_64)||bad||len-off<6||off+6>15)return X86_FEATURE_INVALID;p0=e[1];p1=e[2];p2=e[3];m=e[5];pp=p1&3;if(op==0x66&&pp!=0)return X86_FEATURE_NOT_HANDLED;if((m&0xc0)==0xc0||(p1&0x78)!=0x78||p2!=8)return X86_FEATURE_INVALID;
-	if(op==0xf9){if(pp)return X86_FEATURE_INVALID;feature=X86_FEATURE_APX_MOVDIRI;}else if(op==0x66){if(pp)return X86_FEATURE_INVALID;feature=(p1&0x80)?X86_FEATURE_APX_WRSSQ:X86_FEATURE_APX_WRSSD;}else{if(pp!=1)return X86_FEATURE_INVALID;feature=(p1&0x80)?X86_FEATURE_APX_WRUSSQ:X86_FEATURE_APX_WRUSSD;}w=(p1&0x80)?8:4;sn=((~p0&0x80)>>4)|(~p0&0x10)|((m>>3)&7);src=rex2_register(sn,w);if(src==X86_REG_INVALID)return X86_FEATURE_INVALID;if(!decode_apx_evex_memory(code,len,off+5,p0,p1,a32,&mm))return X86_FEATURE_INVALID;seg=apx_segment_register(segp);MCInst_clear(in);MCInst_setOpcode(in,feature);MCOperand_CreateImm0(in,src);add_feature_memory_operands(in,&mm);MCOperand_CreateImm0(in,seg);MCOperand_CreateImm0(in,a32?4:8);MCOperand_CreateImm0(in,w);*size=(uint16_t)mm.length;set_apx_evex_encoding_detail(in,e,off,segp,a32,&mm);return X86_FEATURE_DECODED;
+static x86_feature_decode_result decode_apx_direct_store(csh handle,
+                                                         const uint8_t *code,
+                                                         size_t len, MCInst *in,
+                                                         uint16_t *size) {
+  const cs_struct *arch = (const cs_struct *)(uintptr_t)handle;
+  const uint8_t *e;
+  size_t off = 0;
+  uint8_t segp = 0, p0, p1, p2, op, m, pp, w;
+  bool a32 = false, bad = false;
+  x86_reg src, seg;
+  unsigned sn, feature;
+  x86_feature_memory mm;
+  while (off < len && code[off] != 0x62) {
+    uint8_t p = code[off];
+    if (is_apx_evex_segment_prefix(p))
+      segp = p;
+    else if (p == 0x67)
+      a32 = true;
+    else if (p == 0x66 || p == 0xf0 || p == 0xf2 || p == 0xf3 ||
+             is_effective_rex(code, len, off))
+      bad = true;
+    else if (p < 0x40 || p > 0x4f)
+      return X86_FEATURE_NOT_HANDLED;
+    ++off;
+  }
+  if (off == len || len - off < 2 || (code[off + 1] & 7) != 4)
+    return X86_FEATURE_NOT_HANDLED;
+  if (len - off < 5)
+    return X86_FEATURE_INVALID;
+  e = &code[off];
+  op = e[4];
+  if (op != 0xf9 && op != 0x66 && op != 0x65)
+    return X86_FEATURE_NOT_HANDLED;
+  if (!(arch->mode & CS_MODE_64) || bad || len - off < 6 || off + 6 > 15)
+    return X86_FEATURE_INVALID;
+  p0 = e[1];
+  p1 = e[2];
+  p2 = e[3];
+  m = e[5];
+  pp = p1 & 3;
+  if (op == 0x66 && pp != 0)
+    return X86_FEATURE_NOT_HANDLED;
+  if ((m & 0xc0) == 0xc0 || (p1 & 0x78) != 0x78 || p2 != 8)
+    return X86_FEATURE_INVALID;
+  if (op == 0xf9) {
+    if (pp)
+      return X86_FEATURE_INVALID;
+    feature = X86_FEATURE_APX_MOVDIRI;
+  } else if (op == 0x66) {
+    if (pp)
+      return X86_FEATURE_INVALID;
+    feature = (p1 & 0x80) ? X86_FEATURE_APX_WRSSQ : X86_FEATURE_APX_WRSSD;
+  } else {
+    if (pp != 1)
+      return X86_FEATURE_INVALID;
+    feature = (p1 & 0x80) ? X86_FEATURE_APX_WRUSSQ : X86_FEATURE_APX_WRUSSD;
+  }
+  w = (p1 & 0x80) ? 8 : 4;
+  sn = ((~p0 & 0x80) >> 4) | (~p0 & 0x10) | ((m >> 3) & 7);
+  src = rex2_register(sn, w);
+  if (src == X86_REG_INVALID)
+    return X86_FEATURE_INVALID;
+  if (!decode_apx_evex_memory(code, len, off + 5, p0, p1, a32, &mm))
+    return X86_FEATURE_INVALID;
+  seg = apx_segment_register(segp);
+  MCInst_clear(in);
+  MCInst_setOpcode(in, feature);
+  MCOperand_CreateImm0(in, src);
+  add_feature_memory_operands(in, &mm);
+  MCOperand_CreateImm0(in, seg);
+  MCOperand_CreateImm0(in, a32 ? 4 : 8);
+  MCOperand_CreateImm0(in, w);
+  *size = (uint16_t)mm.length;
+  set_apx_evex_encoding_detail(in, e, off, segp, a32, &mm);
+  return X86_FEATURE_DECODED;
 }
 
 static x86_feature_decode_result
@@ -2143,70 +2530,429 @@ static x86_feature_decode_result decode_apx_cmpccxadd(csh handle,const uint8_t*c
 	const cs_struct*arch=(const cs_struct*)(uintptr_t)handle;const uint8_t*e;size_t off=0;uint8_t segp=0,p0,p1,p2,op,m,w;x86_reg cmp,add,seg;bool a32=false,bad=false;unsigned cn,an;x86_feature_memory mm;while(off<len&&code[off]!=0x62){uint8_t p=code[off];if(is_apx_evex_segment_prefix(p))segp=p;else if(p==0x67)a32=true;else if(p==0x66||p==0xf0||p==0xf2||p==0xf3||is_effective_rex(code,len,off))bad=true;else if(p<0x40||p>0x4f)return X86_FEATURE_NOT_HANDLED;++off;}if(off==len||len-off<2||(code[off+1]&7)!=2)return X86_FEATURE_NOT_HANDLED;if(len-off<5)return X86_FEATURE_INVALID;e=&code[off];op=e[4];if(op<0xe0||op>0xef)return X86_FEATURE_NOT_HANDLED;if(!(arch->mode&CS_MODE_64)||bad||len-off<6||off+6>15)return X86_FEATURE_INVALID;p0=e[1];p1=e[2];p2=e[3];m=e[5];if((p1&3)!=1||(m&0xc0)==0xc0||(p2&0xf7)!=0)return X86_FEATURE_INVALID;w=(p1&0x80)?8:4;cn=((~p0&0x80)>>4)|(~p0&0x10)|((m>>3)&7);an=((~p2&8)<<1)|((~p1&0x78)>>3);cmp=rex2_register(cn,w);add=rex2_register(an,w);if(cmp==X86_REG_INVALID||add==X86_REG_INVALID||!decode_apx_evex_memory(code,len,off+5,p0,p1,a32,&mm))return X86_FEATURE_INVALID;seg=apx_segment_register(segp);MCInst_clear(in);MCInst_setOpcode(in,X86_FEATURE_APX_CMPCCXADD_BASE+(op-0xe0));MCOperand_CreateImm0(in,cmp);MCOperand_CreateImm0(in,add);add_feature_memory_operands(in,&mm);MCOperand_CreateImm0(in,seg);MCOperand_CreateImm0(in,a32?4:8);MCOperand_CreateImm0(in,w);*size=(uint16_t)mm.length;set_apx_evex_encoding_detail(in,e,off,segp,a32,&mm);return X86_FEATURE_DECODED;
 }
 
-static x86_feature_decode_result decode_apx_ccmp(csh handle,const uint8_t*code,size_t len,MCInst*in,uint16_t*size)
-{
-	const cs_struct*arch=(const cs_struct*)(uintptr_t)handle;const uint8_t*e;size_t off=0,io;uint8_t segp=0,p0,p1,p2,op,m,w,dfv,imm_size=0;bool a32=false,bad=false,mem,imm=false,rm_first=true;x86_reg rr=X86_REG_INVALID,rm=X86_REG_INVALID,seg=X86_REG_INVALID;unsigned rn;int64_t iv=0;x86_feature_memory mm;
-	while(off<len&&code[off]!=0x62){uint8_t p=code[off];if(is_apx_evex_segment_prefix(p))segp=p;else if(p==0x67)a32=true;else if(p==0x66||p==0xf0||p==0xf2||p==0xf3||is_effective_rex(code,len,off))bad=true;else if(p<0x40||p>0x4f)return X86_FEATURE_NOT_HANDLED;++off;}
-	if(off==len||len-off<2||(code[off+1]&7)!=4)return X86_FEATURE_NOT_HANDLED;if(len-off<6)return X86_FEATURE_INVALID;e=&code[off];op=e[4];if(op!=0x38&&op!=0x39&&op!=0x3a&&op!=0x3b&&op!=0x80&&op!=0x81&&op!=0x83)return X86_FEATURE_NOT_HANDLED;
-	/* Of the immediate group only /7 is CCMP; /0../6 are the ALU forms. */
-	if (op >= 0x80 && ((e[5] >> 3) & 7) != 7)
-		return X86_FEATURE_NOT_HANDLED;
-	if(!(arch->mode&CS_MODE_64)||bad||off+6>15)return X86_FEATURE_INVALID;p0=e[1];p1=e[2];p2=e[3];m=e[5];mem=(m&0xc0)!=0xc0;dfv=(p1>>3)&15;
-	/* SCC occupies all of P2; ND, NF, zeroing, VL and EVEX.b are reserved here. */
-	if(p2&0xf0)return X86_FEATURE_INVALID;
-	/* As in the other promoted ALU forms, byte forms ignore W, and W
-	 * selects 64-bit operands over a 66 prefix. */
-	if(!mem&&!(p1&4))return X86_FEATURE_INVALID;if(op==0x38||op==0x3a||op==0x80){if((p1&3)!=0)return X86_FEATURE_INVALID;w=1;}else{if((p1&3)>1)return X86_FEATURE_INVALID;w=(p1&0x80)?8:(p1&1)?2:4;}
-	imm = op >= 0x80;
-	if (!imm) {
-		rn = ((~p0 & 0x80) >> 4) | (~p0 & 0x10) | ((m >> 3) & 7);
-		rr = rex2_register(rn, w);
-		if (rr == X86_REG_INVALID)
-			return X86_FEATURE_INVALID;
-		rm_first = op == 0x38 || op == 0x39;
-	}
-	MCInst_clear(in);MCInst_setOpcode(in,X86_FEATURE_APX_CCMP_BASE+(p2&15));MCOperand_CreateImm0(in,mem);MCOperand_CreateImm0(in,rm_first);MCOperand_CreateImm0(in,rr);
-	if(!mem){rn=((~p0&0x20)>>2)|((p0&8)<<1)|(m&7);rm=rex2_register(rn,w);if(rm==X86_REG_INVALID)return X86_FEATURE_INVALID;MCOperand_CreateImm0(in,rm);io=off+6;}else{if(!decode_apx_evex_memory(code,len,off+5,p0,p1,a32,&mm))return X86_FEATURE_INVALID;seg=apx_segment_register(segp);add_feature_memory_operands(in,&mm);MCOperand_CreateImm0(in,seg);MCOperand_CreateImm0(in,a32?4:8);io=mm.length;}
-	if(imm){imm_size=op==0x81?(w==2?2:4):1;if(io+imm_size>len||io+imm_size>15)return X86_FEATURE_INVALID;if(imm_size==1)iv=w==1?(int64_t)code[io]:(int64_t)(int8_t)code[io];else if(imm_size==2)iv=(uint16_t)(code[io]|code[io+1]<<8);else{uint32_t raw=(uint32_t)code[io]|(uint32_t)code[io+1]<<8|(uint32_t)code[io+2]<<16|(uint32_t)code[io+3]<<24;iv=w==8?(int64_t)(int32_t)raw:(int64_t)raw;}io+=imm_size;in->imm_size=imm_size;}
-	MCOperand_CreateImm0(in,imm);MCOperand_CreateImm0(in,iv);MCOperand_CreateImm0(in,w);MCOperand_CreateImm0(in,dfv);*size=(uint16_t)io;set_apx_evex_encoding_detail(in,e,off,segp,a32,mem?&mm:NULL);if(in->flat_insn->detail&&imm){in->flat_insn->detail->x86.encoding.imm_offset=(uint8_t)(io-imm_size);in->flat_insn->detail->x86.encoding.imm_size=imm_size;}return X86_FEATURE_DECODED;
+static x86_feature_decode_result decode_apx_ccmp(csh handle,
+                                                 const uint8_t *code,
+                                                 size_t len, MCInst *in,
+                                                 uint16_t *size) {
+  const cs_struct *arch = (const cs_struct *)(uintptr_t)handle;
+  const uint8_t *e;
+  size_t off = 0, io;
+  uint8_t segp = 0, p0, p1, p2, op, m, w, dfv, imm_size = 0;
+  bool a32 = false, bad = false, mem, imm = false, rm_first = true;
+  x86_reg rr = X86_REG_INVALID, rm = X86_REG_INVALID, seg = X86_REG_INVALID;
+  unsigned rn;
+  int64_t iv = 0;
+  x86_feature_memory mm;
+  while (off < len && code[off] != 0x62) {
+    uint8_t p = code[off];
+    if (is_apx_evex_segment_prefix(p))
+      segp = p;
+    else if (p == 0x67)
+      a32 = true;
+    else if (p == 0x66 || p == 0xf0 || p == 0xf2 || p == 0xf3 ||
+             is_effective_rex(code, len, off))
+      bad = true;
+    else if (p < 0x40 || p > 0x4f)
+      return X86_FEATURE_NOT_HANDLED;
+    ++off;
+  }
+  if (off == len || len - off < 2 || (code[off + 1] & 7) != 4)
+    return X86_FEATURE_NOT_HANDLED;
+  if (len - off < 6)
+    return X86_FEATURE_INVALID;
+  e = &code[off];
+  op = e[4];
+  if (op != 0x38 && op != 0x39 && op != 0x3a && op != 0x3b && op != 0x80 &&
+      op != 0x81 && op != 0x83)
+    return X86_FEATURE_NOT_HANDLED;
+  /* Of the immediate group only /7 is CCMP; /0../6 are the ALU forms. */
+  if (op >= 0x80 && ((e[5] >> 3) & 7) != 7)
+    return X86_FEATURE_NOT_HANDLED;
+  if (!(arch->mode & CS_MODE_64) || bad || off + 6 > 15)
+    return X86_FEATURE_INVALID;
+  p0 = e[1];
+  p1 = e[2];
+  p2 = e[3];
+  m = e[5];
+  mem = (m & 0xc0) != 0xc0;
+  dfv = (p1 >> 3) & 15;
+  /* SCC occupies all of P2; ND, NF, zeroing, VL and EVEX.b are reserved here.
+   */
+  if (p2 & 0xf0)
+    return X86_FEATURE_INVALID;
+  /* As in the other promoted ALU forms, byte forms ignore W, and W
+   * selects 64-bit operands over a 66 prefix. */
+  if (!mem && !(p1 & 4))
+    return X86_FEATURE_INVALID;
+  if (op == 0x38 || op == 0x3a || op == 0x80) {
+    if ((p1 & 3) != 0)
+      return X86_FEATURE_INVALID;
+    w = 1;
+  } else {
+    if ((p1 & 3) > 1)
+      return X86_FEATURE_INVALID;
+    w = (p1 & 0x80) ? 8 : (p1 & 1) ? 2 : 4;
+  }
+  imm = op >= 0x80;
+  if (!imm) {
+    rn = ((~p0 & 0x80) >> 4) | (~p0 & 0x10) | ((m >> 3) & 7);
+    rr = rex2_register(rn, w);
+    if (rr == X86_REG_INVALID)
+      return X86_FEATURE_INVALID;
+    rm_first = op == 0x38 || op == 0x39;
+  }
+  MCInst_clear(in);
+  MCInst_setOpcode(in, X86_FEATURE_APX_CCMP_BASE + (p2 & 15));
+  MCOperand_CreateImm0(in, mem);
+  MCOperand_CreateImm0(in, rm_first);
+  MCOperand_CreateImm0(in, rr);
+  if (!mem) {
+    rn = ((~p0 & 0x20) >> 2) | ((p0 & 8) << 1) | (m & 7);
+    rm = rex2_register(rn, w);
+    if (rm == X86_REG_INVALID)
+      return X86_FEATURE_INVALID;
+    MCOperand_CreateImm0(in, rm);
+    io = off + 6;
+  } else {
+    if (!decode_apx_evex_memory(code, len, off + 5, p0, p1, a32, &mm))
+      return X86_FEATURE_INVALID;
+    seg = apx_segment_register(segp);
+    add_feature_memory_operands(in, &mm);
+    MCOperand_CreateImm0(in, seg);
+    MCOperand_CreateImm0(in, a32 ? 4 : 8);
+    io = mm.length;
+  }
+  if (imm) {
+    imm_size = op == 0x81 ? (w == 2 ? 2 : 4) : 1;
+    if (io + imm_size > len || io + imm_size > 15)
+      return X86_FEATURE_INVALID;
+    if (imm_size == 1)
+      iv = w == 1 ? (int64_t)code[io] : (int64_t)(int8_t)code[io];
+    else if (imm_size == 2)
+      iv = (uint16_t)(code[io] | code[io + 1] << 8);
+    else {
+      uint32_t raw = (uint32_t)code[io] | (uint32_t)code[io + 1] << 8 |
+                     (uint32_t)code[io + 2] << 16 |
+                     (uint32_t)code[io + 3] << 24;
+      iv = w == 8 ? (int64_t)(int32_t)raw : (int64_t)raw;
+    }
+    io += imm_size;
+    in->imm_size = imm_size;
+  }
+  MCOperand_CreateImm0(in, imm);
+  MCOperand_CreateImm0(in, iv);
+  MCOperand_CreateImm0(in, w);
+  MCOperand_CreateImm0(in, dfv);
+  *size = (uint16_t)io;
+  set_apx_evex_encoding_detail(in, e, off, segp, a32, mem ? &mm : NULL);
+  if (in->flat_insn->detail && imm) {
+    in->flat_insn->detail->x86.encoding.imm_offset = (uint8_t)(io - imm_size);
+    in->flat_insn->detail->x86.encoding.imm_size = imm_size;
+  }
+  return X86_FEATURE_DECODED;
 }
 
-static x86_feature_decode_result decode_apx_ctest(csh handle,const uint8_t*code,size_t len,MCInst*in,uint16_t*size)
-{
-	const cs_struct*arch=(const cs_struct*)(uintptr_t)handle;const uint8_t*e;size_t off=0,io;uint8_t segp=0,p0,p1,p2,op,m,w,dfv,imm_size=0;bool a32=false,bad=false,mem,imm;x86_reg rr=X86_REG_INVALID,rm=X86_REG_INVALID,seg=X86_REG_INVALID;unsigned rn,group;int64_t iv=0;x86_feature_memory mm;
-	while(off<len&&code[off]!=0x62){uint8_t p=code[off];if(is_apx_evex_segment_prefix(p))segp=p;else if(p==0x67)a32=true;else if(p==0x66||p==0xf0||p==0xf2||p==0xf3||is_effective_rex(code,len,off))bad=true;else if(p<0x40||p>0x4f)return X86_FEATURE_NOT_HANDLED;++off;}
-	if(off==len||len-off<2||(code[off+1]&7)!=4)return X86_FEATURE_NOT_HANDLED;if(len-off<6)return X86_FEATURE_INVALID;e=&code[off];op=e[4];if(op!=0x84&&op!=0x85&&op!=0xf6&&op!=0xf7)return X86_FEATURE_NOT_HANDLED;if(!(arch->mode&CS_MODE_64)||bad||off+6>15)return X86_FEATURE_INVALID;
-	p0=e[1];p1=e[2];p2=e[3];m=e[5];mem=(m&0xc0)!=0xc0;imm=op==0xf6||op==0xf7;group=(m>>3)&7;if(imm&&group>1)return X86_FEATURE_NOT_HANDLED;dfv=(p1>>3)&15;if((p2&0xf0)||(!mem&&!(p1&4)))return X86_FEATURE_INVALID;
-	/* Byte forms ignore W; W selects 64-bit operands over a 66 prefix. */
-	if(op==0x84||op==0xf6){if(p1&3)return X86_FEATURE_INVALID;w=1;}else{if((p1&3)>1)return X86_FEATURE_INVALID;w=(p1&0x80)?8:(p1&1)?2:4;}
-	if(!imm){rn=((~p0&0x80)>>4)|(~p0&0x10)|group;rr=rex2_register(rn,w);if(rr==X86_REG_INVALID)return X86_FEATURE_INVALID;}
-	MCInst_clear(in);MCInst_setOpcode(in,X86_FEATURE_APX_CTEST_BASE+(p2&15));MCOperand_CreateImm0(in,mem);MCOperand_CreateImm0(in,1);MCOperand_CreateImm0(in,rr);
-	if(!mem){rn=((~p0&0x20)>>2)|((p0&8)<<1)|(m&7);rm=rex2_register(rn,w);if(rm==X86_REG_INVALID)return X86_FEATURE_INVALID;MCOperand_CreateImm0(in,rm);io=off+6;}else{if(!decode_apx_evex_memory(code,len,off+5,p0,p1,a32,&mm))return X86_FEATURE_INVALID;seg=apx_segment_register(segp);add_feature_memory_operands(in,&mm);MCOperand_CreateImm0(in,seg);MCOperand_CreateImm0(in,a32?4:8);io=mm.length;}
-	if(imm){imm_size=op==0xf7?(w==2?2:4):1;if(io+imm_size>len||io+imm_size>15)return X86_FEATURE_INVALID;if(imm_size==1)iv=w==1?(int64_t)code[io]:(int64_t)(int8_t)code[io];else if(imm_size==2)iv=(uint16_t)(code[io]|code[io+1]<<8);else{uint32_t raw=(uint32_t)code[io]|(uint32_t)code[io+1]<<8|(uint32_t)code[io+2]<<16|(uint32_t)code[io+3]<<24;iv=w==8?(int64_t)(int32_t)raw:(int64_t)raw;}io+=imm_size;in->imm_size=imm_size;}
-	MCOperand_CreateImm0(in,imm);MCOperand_CreateImm0(in,iv);MCOperand_CreateImm0(in,w);MCOperand_CreateImm0(in,dfv);*size=(uint16_t)io;set_apx_evex_encoding_detail(in,e,off,segp,a32,mem?&mm:NULL);if(in->flat_insn->detail&&imm){in->flat_insn->detail->x86.encoding.imm_offset=(uint8_t)(io-imm_size);in->flat_insn->detail->x86.encoding.imm_size=imm_size;}return X86_FEATURE_DECODED;
+static x86_feature_decode_result decode_apx_ctest(csh handle,
+                                                  const uint8_t *code,
+                                                  size_t len, MCInst *in,
+                                                  uint16_t *size) {
+  const cs_struct *arch = (const cs_struct *)(uintptr_t)handle;
+  const uint8_t *e;
+  size_t off = 0, io;
+  uint8_t segp = 0, p0, p1, p2, op, m, w, dfv, imm_size = 0;
+  bool a32 = false, bad = false, mem, imm;
+  x86_reg rr = X86_REG_INVALID, rm = X86_REG_INVALID, seg = X86_REG_INVALID;
+  unsigned rn, group;
+  int64_t iv = 0;
+  x86_feature_memory mm;
+  while (off < len && code[off] != 0x62) {
+    uint8_t p = code[off];
+    if (is_apx_evex_segment_prefix(p))
+      segp = p;
+    else if (p == 0x67)
+      a32 = true;
+    else if (p == 0x66 || p == 0xf0 || p == 0xf2 || p == 0xf3 ||
+             is_effective_rex(code, len, off))
+      bad = true;
+    else if (p < 0x40 || p > 0x4f)
+      return X86_FEATURE_NOT_HANDLED;
+    ++off;
+  }
+  if (off == len || len - off < 2 || (code[off + 1] & 7) != 4)
+    return X86_FEATURE_NOT_HANDLED;
+  if (len - off < 6)
+    return X86_FEATURE_INVALID;
+  e = &code[off];
+  op = e[4];
+  if (op != 0x84 && op != 0x85 && op != 0xf6 && op != 0xf7)
+    return X86_FEATURE_NOT_HANDLED;
+  if (!(arch->mode & CS_MODE_64) || bad || off + 6 > 15)
+    return X86_FEATURE_INVALID;
+  p0 = e[1];
+  p1 = e[2];
+  p2 = e[3];
+  m = e[5];
+  mem = (m & 0xc0) != 0xc0;
+  imm = op == 0xf6 || op == 0xf7;
+  group = (m >> 3) & 7;
+  if (imm && group > 1)
+    return X86_FEATURE_NOT_HANDLED;
+  dfv = (p1 >> 3) & 15;
+  if ((p2 & 0xf0) || (!mem && !(p1 & 4)))
+    return X86_FEATURE_INVALID;
+  /* Byte forms ignore W; W selects 64-bit operands over a 66 prefix. */
+  if (op == 0x84 || op == 0xf6) {
+    if (p1 & 3)
+      return X86_FEATURE_INVALID;
+    w = 1;
+  } else {
+    if ((p1 & 3) > 1)
+      return X86_FEATURE_INVALID;
+    w = (p1 & 0x80) ? 8 : (p1 & 1) ? 2 : 4;
+  }
+  if (!imm) {
+    rn = ((~p0 & 0x80) >> 4) | (~p0 & 0x10) | group;
+    rr = rex2_register(rn, w);
+    if (rr == X86_REG_INVALID)
+      return X86_FEATURE_INVALID;
+  }
+  MCInst_clear(in);
+  MCInst_setOpcode(in, X86_FEATURE_APX_CTEST_BASE + (p2 & 15));
+  MCOperand_CreateImm0(in, mem);
+  MCOperand_CreateImm0(in, 1);
+  MCOperand_CreateImm0(in, rr);
+  if (!mem) {
+    rn = ((~p0 & 0x20) >> 2) | ((p0 & 8) << 1) | (m & 7);
+    rm = rex2_register(rn, w);
+    if (rm == X86_REG_INVALID)
+      return X86_FEATURE_INVALID;
+    MCOperand_CreateImm0(in, rm);
+    io = off + 6;
+  } else {
+    if (!decode_apx_evex_memory(code, len, off + 5, p0, p1, a32, &mm))
+      return X86_FEATURE_INVALID;
+    seg = apx_segment_register(segp);
+    add_feature_memory_operands(in, &mm);
+    MCOperand_CreateImm0(in, seg);
+    MCOperand_CreateImm0(in, a32 ? 4 : 8);
+    io = mm.length;
+  }
+  if (imm) {
+    imm_size = op == 0xf7 ? (w == 2 ? 2 : 4) : 1;
+    if (io + imm_size > len || io + imm_size > 15)
+      return X86_FEATURE_INVALID;
+    if (imm_size == 1)
+      iv = w == 1 ? (int64_t)code[io] : (int64_t)(int8_t)code[io];
+    else if (imm_size == 2)
+      iv = (uint16_t)(code[io] | code[io + 1] << 8);
+    else {
+      uint32_t raw = (uint32_t)code[io] | (uint32_t)code[io + 1] << 8 |
+                     (uint32_t)code[io + 2] << 16 |
+                     (uint32_t)code[io + 3] << 24;
+      iv = w == 8 ? (int64_t)(int32_t)raw : (int64_t)raw;
+    }
+    io += imm_size;
+    in->imm_size = imm_size;
+  }
+  MCOperand_CreateImm0(in, imm);
+  MCOperand_CreateImm0(in, iv);
+  MCOperand_CreateImm0(in, w);
+  MCOperand_CreateImm0(in, dfv);
+  *size = (uint16_t)io;
+  set_apx_evex_encoding_detail(in, e, off, segp, a32, mem ? &mm : NULL);
+  if (in->flat_insn->detail && imm) {
+    in->flat_insn->detail->x86.encoding.imm_offset = (uint8_t)(io - imm_size);
+    in->flat_insn->detail->x86.encoding.imm_size = imm_size;
+  }
+  return X86_FEATURE_DECODED;
 }
 
-static x86_feature_decode_result decode_apx_kmov(csh handle,const uint8_t*code,size_t len,MCInst*in,uint16_t*size)
-{
-	const cs_struct*arch=(const cs_struct*)(uintptr_t)handle;const uint8_t*e;size_t off=0;uint8_t segp=0,p0,p1,p2,op,m,pp,w,fi;bool a32=false,bad=false,mem;x86_reg reg,rm=X86_REG_INVALID,seg=X86_REG_INVALID;unsigned rn,mn;x86_feature_memory mm;
-	while(off<len&&code[off]!=0x62){uint8_t p=code[off];if(is_apx_evex_segment_prefix(p))segp=p;else if(p==0x67)a32=true;else if(p==0x66||p==0xf0||p==0xf2||p==0xf3||is_effective_rex(code,len,off))bad=true;else if(p<0x40||p>0x4f)return X86_FEATURE_NOT_HANDLED;++off;}
-	if(off==len||len-off<2||(code[off+1]&7)!=1)return X86_FEATURE_NOT_HANDLED;if(len-off<6)return X86_FEATURE_INVALID;e=&code[off];op=e[4];if(op<0x90||op>0x93)return X86_FEATURE_NOT_HANDLED;if(!(arch->mode&CS_MODE_64)||bad||off+6>15)return X86_FEATURE_INVALID;
-	p0=e[1];p1=e[2];p2=e[3];m=e[5];pp=p1&3;mem=(m&0xc0)!=0xc0;if((p1&0x78)!=0x78||(!mem&&!(p1&4))||p2!=8)return X86_FEATURE_INVALID;
-	if(op<=0x91){if(pp==1&&!(p1&0x80)){w=1;fi=0;}else if(pp==0&&!(p1&0x80)){w=2;fi=3;}else if(pp==1&&(p1&0x80)){w=4;fi=1;}else if(pp==0&&(p1&0x80)){w=8;fi=2;}else return X86_FEATURE_INVALID;}else{if(pp==1&&!(p1&0x80)){w=1;fi=0;}else if(pp==0&&!(p1&0x80)){w=2;fi=3;}else if(pp==3&&!(p1&0x80)){w=4;fi=1;}else if(pp==3&&(p1&0x80)){w=8;fi=2;}else return X86_FEATURE_INVALID;}
-	if((op==0x91&&!mem)||((op==0x92||op==0x93)&&mem))return X86_FEATURE_INVALID;rn=((~p0&0x80)>>4)|(~p0&0x10)|((m>>3)&7);mn=((~p0&0x20)>>2)|((p0&8)<<1)|(m&7);
-	if(op==0x93)reg=rex2_register(rn,w==8?8:4);else{if(rn>7)return X86_FEATURE_INVALID;reg=(x86_reg)(X86_REG_K0+rn);}if(reg==X86_REG_INVALID)return X86_FEATURE_INVALID;
-	MCInst_clear(in);MCInst_setOpcode(in,X86_FEATURE_APX_KMOV_BASE+fi);MCOperand_CreateImm0(in,op);MCOperand_CreateImm0(in,reg);MCOperand_CreateImm0(in,mem);
-	if(!mem){if(op==0x92)rm=rex2_register(mn,w==8?8:4);else{if(mn>7)return X86_FEATURE_INVALID;rm=(x86_reg)(X86_REG_K0+mn);}if(rm==X86_REG_INVALID)return X86_FEATURE_INVALID;MCOperand_CreateImm0(in,rm);MCOperand_CreateImm0(in,w);*size=(uint16_t)(off+6);set_apx_evex_encoding_detail(in,e,off,segp,a32,NULL);return X86_FEATURE_DECODED;}
-	if(!decode_apx_evex_memory(code,len,off+5,p0,p1,a32,&mm))return X86_FEATURE_INVALID;seg=apx_segment_register(segp);add_feature_memory_operands(in,&mm);MCOperand_CreateImm0(in,seg);MCOperand_CreateImm0(in,a32?4:8);MCOperand_CreateImm0(in,w);*size=(uint16_t)mm.length;set_apx_evex_encoding_detail(in,e,off,segp,a32,&mm);return X86_FEATURE_DECODED;
+static x86_feature_decode_result decode_apx_kmov(csh handle,
+                                                 const uint8_t *code,
+                                                 size_t len, MCInst *in,
+                                                 uint16_t *size) {
+  const cs_struct *arch = (const cs_struct *)(uintptr_t)handle;
+  const uint8_t *e;
+  size_t off = 0;
+  uint8_t segp = 0, p0, p1, p2, op, m, pp, w, fi;
+  bool a32 = false, bad = false, mem;
+  x86_reg reg, rm = X86_REG_INVALID, seg = X86_REG_INVALID;
+  unsigned rn, mn;
+  x86_feature_memory mm;
+  while (off < len && code[off] != 0x62) {
+    uint8_t p = code[off];
+    if (is_apx_evex_segment_prefix(p))
+      segp = p;
+    else if (p == 0x67)
+      a32 = true;
+    else if (p == 0x66 || p == 0xf0 || p == 0xf2 || p == 0xf3 ||
+             is_effective_rex(code, len, off))
+      bad = true;
+    else if (p < 0x40 || p > 0x4f)
+      return X86_FEATURE_NOT_HANDLED;
+    ++off;
+  }
+  if (off == len || len - off < 2 || (code[off + 1] & 7) != 1)
+    return X86_FEATURE_NOT_HANDLED;
+  if (len - off < 6)
+    return X86_FEATURE_INVALID;
+  e = &code[off];
+  op = e[4];
+  if (op < 0x90 || op > 0x93)
+    return X86_FEATURE_NOT_HANDLED;
+  if (!(arch->mode & CS_MODE_64) || bad || off + 6 > 15)
+    return X86_FEATURE_INVALID;
+  p0 = e[1];
+  p1 = e[2];
+  p2 = e[3];
+  m = e[5];
+  pp = p1 & 3;
+  mem = (m & 0xc0) != 0xc0;
+  if ((p1 & 0x78) != 0x78 || (!mem && !(p1 & 4)) || p2 != 8)
+    return X86_FEATURE_INVALID;
+  if (op <= 0x91) {
+    if (pp == 1 && !(p1 & 0x80)) {
+      w = 1;
+      fi = 0;
+    } else if (pp == 0 && !(p1 & 0x80)) {
+      w = 2;
+      fi = 3;
+    } else if (pp == 1 && (p1 & 0x80)) {
+      w = 4;
+      fi = 1;
+    } else if (pp == 0 && (p1 & 0x80)) {
+      w = 8;
+      fi = 2;
+    } else
+      return X86_FEATURE_INVALID;
+  } else {
+    if (pp == 1 && !(p1 & 0x80)) {
+      w = 1;
+      fi = 0;
+    } else if (pp == 0 && !(p1 & 0x80)) {
+      w = 2;
+      fi = 3;
+    } else if (pp == 3 && !(p1 & 0x80)) {
+      w = 4;
+      fi = 1;
+    } else if (pp == 3 && (p1 & 0x80)) {
+      w = 8;
+      fi = 2;
+    } else
+      return X86_FEATURE_INVALID;
+  }
+  if ((op == 0x91 && !mem) || ((op == 0x92 || op == 0x93) && mem))
+    return X86_FEATURE_INVALID;
+  rn = ((~p0 & 0x80) >> 4) | (~p0 & 0x10) | ((m >> 3) & 7);
+  mn = ((~p0 & 0x20) >> 2) | ((p0 & 8) << 1) | (m & 7);
+  if (op == 0x93)
+    reg = rex2_register(rn, w == 8 ? 8 : 4);
+  else {
+    if (rn > 7)
+      return X86_FEATURE_INVALID;
+    reg = (x86_reg)(X86_REG_K0 + rn);
+  }
+  if (reg == X86_REG_INVALID)
+    return X86_FEATURE_INVALID;
+  MCInst_clear(in);
+  MCInst_setOpcode(in, X86_FEATURE_APX_KMOV_BASE + fi);
+  MCOperand_CreateImm0(in, op);
+  MCOperand_CreateImm0(in, reg);
+  MCOperand_CreateImm0(in, mem);
+  if (!mem) {
+    if (op == 0x92)
+      rm = rex2_register(mn, w == 8 ? 8 : 4);
+    else {
+      if (mn > 7)
+        return X86_FEATURE_INVALID;
+      rm = (x86_reg)(X86_REG_K0 + mn);
+    }
+    if (rm == X86_REG_INVALID)
+      return X86_FEATURE_INVALID;
+    MCOperand_CreateImm0(in, rm);
+    MCOperand_CreateImm0(in, w);
+    *size = (uint16_t)(off + 6);
+    set_apx_evex_encoding_detail(in, e, off, segp, a32, NULL);
+    return X86_FEATURE_DECODED;
+  }
+  if (!decode_apx_evex_memory(code, len, off + 5, p0, p1, a32, &mm))
+    return X86_FEATURE_INVALID;
+  seg = apx_segment_register(segp);
+  add_feature_memory_operands(in, &mm);
+  MCOperand_CreateImm0(in, seg);
+  MCOperand_CreateImm0(in, a32 ? 4 : 8);
+  MCOperand_CreateImm0(in, w);
+  *size = (uint16_t)mm.length;
+  set_apx_evex_encoding_detail(in, e, off, segp, a32, &mm);
+  return X86_FEATURE_DECODED;
 }
 
-static x86_feature_decode_result decode_apx_movrs(csh handle,const uint8_t*code,size_t len,MCInst*in,uint16_t*size)
-{
-	const cs_struct*arch=(const cs_struct*)(uintptr_t)handle;const uint8_t*e;size_t off=0;uint8_t segp=0,p0,p1,p2,op,m,w;bool a32=false,bad=false;x86_reg dst,seg;unsigned rn;x86_feature_memory mm;
-	while(off<len&&code[off]!=0x62){uint8_t p=code[off];if(is_apx_evex_segment_prefix(p))segp=p;else if(p==0x67)a32=true;else if(p==0x66||p==0xf0||p==0xf2||p==0xf3||is_effective_rex(code,len,off))bad=true;else if(p<0x40||p>0x4f)return X86_FEATURE_NOT_HANDLED;++off;}
-	if(off==len||len-off<2||(code[off+1]&7)!=4)return X86_FEATURE_NOT_HANDLED;if(len-off<6)return X86_FEATURE_INVALID;e=&code[off];op=e[4];if(op!=0x8a&&op!=0x8b)return X86_FEATURE_NOT_HANDLED;if(!(arch->mode&CS_MODE_64)||bad||off+6>15)return X86_FEATURE_INVALID;
-	p0=e[1];p1=e[2];p2=e[3];m=e[5];if((m&0xc0)==0xc0||(p1&0x78)!=0x78||p2!=8)return X86_FEATURE_INVALID;if(op==0x8a){if(p1&0x83)return X86_FEATURE_INVALID;w=1;}else{if((p1&3)>1)return X86_FEATURE_INVALID;w=(p1&0x80)?8:(p1&1)?2:4;}
-	rn=((~p0&0x80)>>4)|(~p0&0x10)|((m>>3)&7);dst=rex2_register(rn,w);if(dst==X86_REG_INVALID||!decode_apx_evex_memory(code,len,off+5,p0,p1,a32,&mm))return X86_FEATURE_INVALID;seg=apx_segment_register(segp);MCInst_clear(in);MCInst_setOpcode(in,X86_FEATURE_APX_MOVRS);MCOperand_CreateImm0(in,dst);add_feature_memory_operands(in,&mm);MCOperand_CreateImm0(in,seg);MCOperand_CreateImm0(in,a32?4:8);MCOperand_CreateImm0(in,w);*size=(uint16_t)mm.length;set_apx_evex_encoding_detail(in,e,off,segp,a32,&mm);return X86_FEATURE_DECODED;
+static x86_feature_decode_result decode_apx_movrs(csh handle,
+                                                  const uint8_t *code,
+                                                  size_t len, MCInst *in,
+                                                  uint16_t *size) {
+  const cs_struct *arch = (const cs_struct *)(uintptr_t)handle;
+  const uint8_t *e;
+  size_t off = 0;
+  uint8_t segp = 0, p0, p1, p2, op, m, w;
+  bool a32 = false, bad = false;
+  x86_reg dst, seg;
+  unsigned rn;
+  x86_feature_memory mm;
+  while (off < len && code[off] != 0x62) {
+    uint8_t p = code[off];
+    if (is_apx_evex_segment_prefix(p))
+      segp = p;
+    else if (p == 0x67)
+      a32 = true;
+    else if (p == 0x66 || p == 0xf0 || p == 0xf2 || p == 0xf3 ||
+             is_effective_rex(code, len, off))
+      bad = true;
+    else if (p < 0x40 || p > 0x4f)
+      return X86_FEATURE_NOT_HANDLED;
+    ++off;
+  }
+  if (off == len || len - off < 2 || (code[off + 1] & 7) != 4)
+    return X86_FEATURE_NOT_HANDLED;
+  if (len - off < 6)
+    return X86_FEATURE_INVALID;
+  e = &code[off];
+  op = e[4];
+  if (op != 0x8a && op != 0x8b)
+    return X86_FEATURE_NOT_HANDLED;
+  if (!(arch->mode & CS_MODE_64) || bad || off + 6 > 15)
+    return X86_FEATURE_INVALID;
+  p0 = e[1];
+  p1 = e[2];
+  p2 = e[3];
+  m = e[5];
+  if ((m & 0xc0) == 0xc0 || (p1 & 0x78) != 0x78 || p2 != 8)
+    return X86_FEATURE_INVALID;
+  if (op == 0x8a) {
+    if (p1 & 0x83)
+      return X86_FEATURE_INVALID;
+    w = 1;
+  } else {
+    if ((p1 & 3) > 1)
+      return X86_FEATURE_INVALID;
+    w = (p1 & 0x80) ? 8 : (p1 & 1) ? 2 : 4;
+  }
+  rn = ((~p0 & 0x80) >> 4) | (~p0 & 0x10) | ((m >> 3) & 7);
+  dst = rex2_register(rn, w);
+  if (dst == X86_REG_INVALID ||
+      !decode_apx_evex_memory(code, len, off + 5, p0, p1, a32, &mm))
+    return X86_FEATURE_INVALID;
+  seg = apx_segment_register(segp);
+  MCInst_clear(in);
+  MCInst_setOpcode(in, X86_FEATURE_APX_MOVRS);
+  MCOperand_CreateImm0(in, dst);
+  add_feature_memory_operands(in, &mm);
+  MCOperand_CreateImm0(in, seg);
+  MCOperand_CreateImm0(in, a32 ? 4 : 8);
+  MCOperand_CreateImm0(in, w);
+  *size = (uint16_t)mm.length;
+  set_apx_evex_encoding_detail(in, e, off, segp, a32, &mm);
+  return X86_FEATURE_DECODED;
 }
 
 static x86_feature_decode_result decode_apx_invalidate(csh handle,const uint8_t*code,size_t len,MCInst*in,uint16_t*size)
@@ -2597,74 +3343,503 @@ decode_apx_msr(csh handle, const uint8_t *code, size_t code_len,
 	return X86_FEATURE_DECODED;
 }
 
-static x86_feature_decode_result decode_apx_bls(csh handle,const uint8_t *code,size_t len,MCInst *instr,uint16_t *size)
-{
-	const cs_struct *arch=(const cs_struct *)(uintptr_t)handle;const uint8_t *e;size_t off=0;uint8_t segp=0,p0,p1,p2,m,w,g;bool a32=false,bad=false,mem,nf;x86_reg dst,src=X86_REG_INVALID,seg;unsigned dn,rn,feature;x86_feature_memory memory;
-	while(off<len&&code[off]!=0x62){uint8_t p=code[off];if(is_apx_evex_segment_prefix(p))segp=p;else if(p==0x67)a32=true;else if(p==0x66||p==0xf0||p==0xf2||p==0xf3||is_effective_rex(code,len,off))bad=true;else if(p<0x40||p>0x4f)return X86_FEATURE_NOT_HANDLED;++off;}
-	if(off==len||len-off<2||(code[off+1]&7)!=2)return X86_FEATURE_NOT_HANDLED;if(len-off<5)return X86_FEATURE_INVALID;e=&code[off];if(e[4]!=0xf3)return X86_FEATURE_NOT_HANDLED;if(!(arch->mode&CS_MODE_64)||bad||len-off<6||off+6>15)return X86_FEATURE_INVALID;
-	p0=e[1];p1=e[2];p2=e[3];m=e[5];g=(m>>3)&7;if(g<1||g>3)return X86_FEATURE_NOT_HANDLED;mem=(m&0xc0)!=0xc0;nf=(p2&4)!=0;if((p1&3)!=0||(p2&0xf3)!=0||(!mem&&!(p1&4)))return X86_FEATURE_INVALID;
-	w=(p1&0x80)?8:4;dn=((~p2&8)<<1)|((~p1&0x78)>>3);dst=rex2_register(dn,w);if(dst==X86_REG_INVALID)return X86_FEATURE_INVALID;feature=g==1?X86_FEATURE_APX_BLSR:g==2?X86_FEATURE_APX_BLSMSK:X86_FEATURE_APX_BLSI;
-	MCInst_clear(instr);MCInst_setOpcode(instr,feature);MCOperand_CreateImm0(instr,dst);MCOperand_CreateImm0(instr,mem);
-	if(!mem){rn=((~p0&0x20)>>2)|((p0&8)<<1)|(m&7);src=rex2_register(rn,w);if(src==X86_REG_INVALID)return X86_FEATURE_INVALID;MCOperand_CreateImm0(instr,src);MCOperand_CreateImm0(instr,w);MCOperand_CreateImm0(instr,1);MCOperand_CreateImm0(instr,nf);*size=(uint16_t)(off+6);set_apx_evex_encoding_detail(instr,e,off,segp,a32,NULL);return X86_FEATURE_DECODED;}
-	if(!decode_apx_evex_memory(code,len,off+5,p0,p1,a32,&memory))return X86_FEATURE_INVALID;seg=apx_segment_register(segp);add_feature_memory_operands(instr,&memory);MCOperand_CreateImm0(instr,seg);MCOperand_CreateImm0(instr,a32?4:8);MCOperand_CreateImm0(instr,w);MCOperand_CreateImm0(instr,1);MCOperand_CreateImm0(instr,nf);*size=(uint16_t)memory.length;set_apx_evex_encoding_detail(instr,e,off,segp,a32,&memory);return X86_FEATURE_DECODED;
+static x86_feature_decode_result decode_apx_bls(csh handle, const uint8_t *code,
+                                                size_t len, MCInst *instr,
+                                                uint16_t *size) {
+  const cs_struct *arch = (const cs_struct *)(uintptr_t)handle;
+  const uint8_t *e;
+  size_t off = 0;
+  uint8_t segp = 0, p0, p1, p2, m, w, g;
+  bool a32 = false, bad = false, mem, nf;
+  x86_reg dst, src = X86_REG_INVALID, seg;
+  unsigned dn, rn, feature;
+  x86_feature_memory memory;
+  while (off < len && code[off] != 0x62) {
+    uint8_t p = code[off];
+    if (is_apx_evex_segment_prefix(p))
+      segp = p;
+    else if (p == 0x67)
+      a32 = true;
+    else if (p == 0x66 || p == 0xf0 || p == 0xf2 || p == 0xf3 ||
+             is_effective_rex(code, len, off))
+      bad = true;
+    else if (p < 0x40 || p > 0x4f)
+      return X86_FEATURE_NOT_HANDLED;
+    ++off;
+  }
+  if (off == len || len - off < 2 || (code[off + 1] & 7) != 2)
+    return X86_FEATURE_NOT_HANDLED;
+  if (len - off < 5)
+    return X86_FEATURE_INVALID;
+  e = &code[off];
+  if (e[4] != 0xf3)
+    return X86_FEATURE_NOT_HANDLED;
+  if (!(arch->mode & CS_MODE_64) || bad || len - off < 6 || off + 6 > 15)
+    return X86_FEATURE_INVALID;
+  p0 = e[1];
+  p1 = e[2];
+  p2 = e[3];
+  m = e[5];
+  g = (m >> 3) & 7;
+  if (g < 1 || g > 3)
+    return X86_FEATURE_NOT_HANDLED;
+  mem = (m & 0xc0) != 0xc0;
+  nf = (p2 & 4) != 0;
+  if ((p1 & 3) != 0 || (p2 & 0xf3) != 0 || (!mem && !(p1 & 4)))
+    return X86_FEATURE_INVALID;
+  w = (p1 & 0x80) ? 8 : 4;
+  dn = ((~p2 & 8) << 1) | ((~p1 & 0x78) >> 3);
+  dst = rex2_register(dn, w);
+  if (dst == X86_REG_INVALID)
+    return X86_FEATURE_INVALID;
+  feature = g == 1   ? X86_FEATURE_APX_BLSR
+            : g == 2 ? X86_FEATURE_APX_BLSMSK
+                     : X86_FEATURE_APX_BLSI;
+  MCInst_clear(instr);
+  MCInst_setOpcode(instr, feature);
+  MCOperand_CreateImm0(instr, dst);
+  MCOperand_CreateImm0(instr, mem);
+  if (!mem) {
+    rn = ((~p0 & 0x20) >> 2) | ((p0 & 8) << 1) | (m & 7);
+    src = rex2_register(rn, w);
+    if (src == X86_REG_INVALID)
+      return X86_FEATURE_INVALID;
+    MCOperand_CreateImm0(instr, src);
+    MCOperand_CreateImm0(instr, w);
+    MCOperand_CreateImm0(instr, 1);
+    MCOperand_CreateImm0(instr, nf);
+    *size = (uint16_t)(off + 6);
+    set_apx_evex_encoding_detail(instr, e, off, segp, a32, NULL);
+    return X86_FEATURE_DECODED;
+  }
+  if (!decode_apx_evex_memory(code, len, off + 5, p0, p1, a32, &memory))
+    return X86_FEATURE_INVALID;
+  seg = apx_segment_register(segp);
+  add_feature_memory_operands(instr, &memory);
+  MCOperand_CreateImm0(instr, seg);
+  MCOperand_CreateImm0(instr, a32 ? 4 : 8);
+  MCOperand_CreateImm0(instr, w);
+  MCOperand_CreateImm0(instr, 1);
+  MCOperand_CreateImm0(instr, nf);
+  *size = (uint16_t)memory.length;
+  set_apx_evex_encoding_detail(instr, e, off, segp, a32, &memory);
+  return X86_FEATURE_DECODED;
 }
 
-static x86_feature_decode_result decode_apx_bextr(csh handle,const uint8_t *code,size_t len,MCInst *instr,uint16_t *size)
-{
-	const cs_struct *arch=(const cs_struct *)(uintptr_t)handle;const uint8_t *e;size_t off=0;uint8_t segp=0,p0,p1,p2,m,w;bool a32=false,bad=false,mem,nf;x86_reg dst,ctl,data=X86_REG_INVALID,seg;unsigned dn,cn,rn;x86_feature_memory memory;
-	while(off<len&&code[off]!=0x62){uint8_t p=code[off];if(is_apx_evex_segment_prefix(p))segp=p;else if(p==0x67)a32=true;else if(p==0x66||p==0xf0||p==0xf2||p==0xf3||is_effective_rex(code,len,off))bad=true;else if(p<0x40||p>0x4f)return X86_FEATURE_NOT_HANDLED;++off;}
-	if(off==len||len-off<2||(code[off+1]&7)!=2)return X86_FEATURE_NOT_HANDLED;if(len-off<5)return X86_FEATURE_INVALID;e=&code[off];if(e[4]!=0xf7)return X86_FEATURE_NOT_HANDLED;if(!(arch->mode&CS_MODE_64)||bad||len-off<6||off+6>15)return X86_FEATURE_INVALID;
-	p0=e[1];p1=e[2];p2=e[3];m=e[5];mem=(m&0xc0)!=0xc0;nf=(p2&4)!=0;if((p2&0xf3)!=0||(!mem&&!(p1&4)))return X86_FEATURE_INVALID;unsigned feature=(p1&3)==0?X86_FEATURE_APX_BEXTR:(p1&3)==2?X86_FEATURE_APX_SARX:(p1&3)==1?X86_FEATURE_APX_SHLX:X86_FEATURE_APX_SHRX;if(feature!=X86_FEATURE_APX_BEXTR&&nf)return X86_FEATURE_INVALID;w=(p1&0x80)?8:4;dn=((~p0&0x80)>>4)|(~p0&0x10)|((m>>3)&7);cn=((~p2&8)<<1)|((~p1&0x78)>>3);dst=rex2_register(dn,w);ctl=rex2_register(cn,w);if(dst==X86_REG_INVALID||ctl==X86_REG_INVALID)return X86_FEATURE_INVALID;
-	MCInst_clear(instr);MCInst_setOpcode(instr,feature);MCOperand_CreateImm0(instr,dst);MCOperand_CreateImm0(instr,ctl);MCOperand_CreateImm0(instr,mem);
-	if(!mem){rn=((~p0&0x20)>>2)|((p0&8)<<1)|(m&7);data=rex2_register(rn,w);if(data==X86_REG_INVALID)return X86_FEATURE_INVALID;MCOperand_CreateImm0(instr,data);MCOperand_CreateImm0(instr,w);MCOperand_CreateImm0(instr,nf);*size=(uint16_t)(off+6);set_apx_evex_encoding_detail(instr,e,off,segp,a32,NULL);return X86_FEATURE_DECODED;}
-	if(!decode_apx_evex_memory(code,len,off+5,p0,p1,a32,&memory))return X86_FEATURE_INVALID;seg=apx_segment_register(segp);add_feature_memory_operands(instr,&memory);MCOperand_CreateImm0(instr,seg);MCOperand_CreateImm0(instr,a32?4:8);MCOperand_CreateImm0(instr,w);MCOperand_CreateImm0(instr,nf);*size=(uint16_t)memory.length;set_apx_evex_encoding_detail(instr,e,off,segp,a32,&memory);return X86_FEATURE_DECODED;
+static x86_feature_decode_result decode_apx_bextr(csh handle,
+                                                  const uint8_t *code,
+                                                  size_t len, MCInst *instr,
+                                                  uint16_t *size) {
+  const cs_struct *arch = (const cs_struct *)(uintptr_t)handle;
+  const uint8_t *e;
+  size_t off = 0;
+  uint8_t segp = 0, p0, p1, p2, m, w;
+  bool a32 = false, bad = false, mem, nf;
+  x86_reg dst, ctl, data = X86_REG_INVALID, seg;
+  unsigned dn, cn, rn;
+  x86_feature_memory memory;
+  while (off < len && code[off] != 0x62) {
+    uint8_t p = code[off];
+    if (is_apx_evex_segment_prefix(p))
+      segp = p;
+    else if (p == 0x67)
+      a32 = true;
+    else if (p == 0x66 || p == 0xf0 || p == 0xf2 || p == 0xf3 ||
+             is_effective_rex(code, len, off))
+      bad = true;
+    else if (p < 0x40 || p > 0x4f)
+      return X86_FEATURE_NOT_HANDLED;
+    ++off;
+  }
+  if (off == len || len - off < 2 || (code[off + 1] & 7) != 2)
+    return X86_FEATURE_NOT_HANDLED;
+  if (len - off < 5)
+    return X86_FEATURE_INVALID;
+  e = &code[off];
+  if (e[4] != 0xf7)
+    return X86_FEATURE_NOT_HANDLED;
+  if (!(arch->mode & CS_MODE_64) || bad || len - off < 6 || off + 6 > 15)
+    return X86_FEATURE_INVALID;
+  p0 = e[1];
+  p1 = e[2];
+  p2 = e[3];
+  m = e[5];
+  mem = (m & 0xc0) != 0xc0;
+  nf = (p2 & 4) != 0;
+  if ((p2 & 0xf3) != 0 || (!mem && !(p1 & 4)))
+    return X86_FEATURE_INVALID;
+  unsigned feature = (p1 & 3) == 0   ? X86_FEATURE_APX_BEXTR
+                     : (p1 & 3) == 2 ? X86_FEATURE_APX_SARX
+                     : (p1 & 3) == 1 ? X86_FEATURE_APX_SHLX
+                                     : X86_FEATURE_APX_SHRX;
+  if (feature != X86_FEATURE_APX_BEXTR && nf)
+    return X86_FEATURE_INVALID;
+  w = (p1 & 0x80) ? 8 : 4;
+  dn = ((~p0 & 0x80) >> 4) | (~p0 & 0x10) | ((m >> 3) & 7);
+  cn = ((~p2 & 8) << 1) | ((~p1 & 0x78) >> 3);
+  dst = rex2_register(dn, w);
+  ctl = rex2_register(cn, w);
+  if (dst == X86_REG_INVALID || ctl == X86_REG_INVALID)
+    return X86_FEATURE_INVALID;
+  MCInst_clear(instr);
+  MCInst_setOpcode(instr, feature);
+  MCOperand_CreateImm0(instr, dst);
+  MCOperand_CreateImm0(instr, ctl);
+  MCOperand_CreateImm0(instr, mem);
+  if (!mem) {
+    rn = ((~p0 & 0x20) >> 2) | ((p0 & 8) << 1) | (m & 7);
+    data = rex2_register(rn, w);
+    if (data == X86_REG_INVALID)
+      return X86_FEATURE_INVALID;
+    MCOperand_CreateImm0(instr, data);
+    MCOperand_CreateImm0(instr, w);
+    MCOperand_CreateImm0(instr, nf);
+    *size = (uint16_t)(off + 6);
+    set_apx_evex_encoding_detail(instr, e, off, segp, a32, NULL);
+    return X86_FEATURE_DECODED;
+  }
+  if (!decode_apx_evex_memory(code, len, off + 5, p0, p1, a32, &memory))
+    return X86_FEATURE_INVALID;
+  seg = apx_segment_register(segp);
+  add_feature_memory_operands(instr, &memory);
+  MCOperand_CreateImm0(instr, seg);
+  MCOperand_CreateImm0(instr, a32 ? 4 : 8);
+  MCOperand_CreateImm0(instr, w);
+  MCOperand_CreateImm0(instr, nf);
+  *size = (uint16_t)memory.length;
+  set_apx_evex_encoding_detail(instr, e, off, segp, a32, &memory);
+  return X86_FEATURE_DECODED;
 }
 
-static x86_feature_decode_result decode_apx_count(csh handle,const uint8_t *code,size_t len,MCInst *instr,uint16_t *size)
-{
-	const cs_struct *arch=(const cs_struct *)(uintptr_t)handle;const uint8_t *e;size_t off=0;uint8_t segp=0,p0,p1,p2,op,m,w,pp;bool a32=false,bad=false,mem,nf;x86_reg dst,src=X86_REG_INVALID,seg;unsigned dn,rn,feature;x86_feature_memory memory;
-	while(off<len&&code[off]!=0x62){uint8_t p=code[off];if(is_apx_evex_segment_prefix(p))segp=p;else if(p==0x67)a32=true;else if(p==0x66||p==0xf0||p==0xf2||p==0xf3||is_effective_rex(code,len,off))bad=true;else if(p<0x40||p>0x4f)return X86_FEATURE_NOT_HANDLED;++off;}
-	if(off==len||len-off<2||(code[off+1]&7)!=4)return X86_FEATURE_NOT_HANDLED;if(len-off<5)return X86_FEATURE_INVALID;e=&code[off];op=e[4];if(op!=0xf5&&op!=0xf4&&op!=0x88)return X86_FEATURE_NOT_HANDLED;if(!(arch->mode&CS_MODE_64)||bad||len-off<6||off+6>15)return X86_FEATURE_INVALID;
-	p0=e[1];p1=e[2];p2=e[3];m=e[5];pp=p1&3;mem=(m&0xc0)!=0xc0;nf=(p2&4)!=0;if(pp>1||(p1&0x78)!=0x78||!(p2&8)||(p2&0xf3)!=0||(!mem&&!(p1&4)))return X86_FEATURE_INVALID;w=(p1&0x80)?8:pp?2:4;feature=op==0xf5?X86_FEATURE_APX_LZCNT:op==0xf4?X86_FEATURE_APX_TZCNT:X86_FEATURE_APX_POPCNT;dn=((~p0&0x80)>>4)|(~p0&0x10)|((m>>3)&7);dst=rex2_register(dn,w);if(dst==X86_REG_INVALID)return X86_FEATURE_INVALID;
-	MCInst_clear(instr);MCInst_setOpcode(instr,feature);MCOperand_CreateImm0(instr,dst);MCOperand_CreateImm0(instr,mem);
-	if(!mem){rn=((~p0&0x20)>>2)|((p0&8)<<1)|(m&7);src=rex2_register(rn,w);if(src==X86_REG_INVALID)return X86_FEATURE_INVALID;MCOperand_CreateImm0(instr,src);MCOperand_CreateImm0(instr,w);MCOperand_CreateImm0(instr,1);MCOperand_CreateImm0(instr,nf);*size=(uint16_t)(off+6);set_apx_evex_encoding_detail(instr,e,off,segp,a32,NULL);return X86_FEATURE_DECODED;}
-	if(!decode_apx_evex_memory(code,len,off+5,p0,p1,a32,&memory))return X86_FEATURE_INVALID;seg=apx_segment_register(segp);add_feature_memory_operands(instr,&memory);MCOperand_CreateImm0(instr,seg);MCOperand_CreateImm0(instr,a32?4:8);MCOperand_CreateImm0(instr,w);MCOperand_CreateImm0(instr,1);MCOperand_CreateImm0(instr,nf);*size=(uint16_t)memory.length;set_apx_evex_encoding_detail(instr,e,off,segp,a32,&memory);return X86_FEATURE_DECODED;
+static x86_feature_decode_result decode_apx_count(csh handle,
+                                                  const uint8_t *code,
+                                                  size_t len, MCInst *instr,
+                                                  uint16_t *size) {
+  const cs_struct *arch = (const cs_struct *)(uintptr_t)handle;
+  const uint8_t *e;
+  size_t off = 0;
+  uint8_t segp = 0, p0, p1, p2, op, m, w, pp;
+  bool a32 = false, bad = false, mem, nf;
+  x86_reg dst, src = X86_REG_INVALID, seg;
+  unsigned dn, rn, feature;
+  x86_feature_memory memory;
+  while (off < len && code[off] != 0x62) {
+    uint8_t p = code[off];
+    if (is_apx_evex_segment_prefix(p))
+      segp = p;
+    else if (p == 0x67)
+      a32 = true;
+    else if (p == 0x66 || p == 0xf0 || p == 0xf2 || p == 0xf3 ||
+             is_effective_rex(code, len, off))
+      bad = true;
+    else if (p < 0x40 || p > 0x4f)
+      return X86_FEATURE_NOT_HANDLED;
+    ++off;
+  }
+  if (off == len || len - off < 2 || (code[off + 1] & 7) != 4)
+    return X86_FEATURE_NOT_HANDLED;
+  if (len - off < 5)
+    return X86_FEATURE_INVALID;
+  e = &code[off];
+  op = e[4];
+  if (op != 0xf5 && op != 0xf4 && op != 0x88)
+    return X86_FEATURE_NOT_HANDLED;
+  if (!(arch->mode & CS_MODE_64) || bad || len - off < 6 || off + 6 > 15)
+    return X86_FEATURE_INVALID;
+  p0 = e[1];
+  p1 = e[2];
+  p2 = e[3];
+  m = e[5];
+  pp = p1 & 3;
+  mem = (m & 0xc0) != 0xc0;
+  nf = (p2 & 4) != 0;
+  if (pp > 1 || (p1 & 0x78) != 0x78 || !(p2 & 8) || (p2 & 0xf3) != 0 ||
+      (!mem && !(p1 & 4)))
+    return X86_FEATURE_INVALID;
+  w = (p1 & 0x80) ? 8 : pp ? 2 : 4;
+  feature = op == 0xf5   ? X86_FEATURE_APX_LZCNT
+            : op == 0xf4 ? X86_FEATURE_APX_TZCNT
+                         : X86_FEATURE_APX_POPCNT;
+  dn = ((~p0 & 0x80) >> 4) | (~p0 & 0x10) | ((m >> 3) & 7);
+  dst = rex2_register(dn, w);
+  if (dst == X86_REG_INVALID)
+    return X86_FEATURE_INVALID;
+  MCInst_clear(instr);
+  MCInst_setOpcode(instr, feature);
+  MCOperand_CreateImm0(instr, dst);
+  MCOperand_CreateImm0(instr, mem);
+  if (!mem) {
+    rn = ((~p0 & 0x20) >> 2) | ((p0 & 8) << 1) | (m & 7);
+    src = rex2_register(rn, w);
+    if (src == X86_REG_INVALID)
+      return X86_FEATURE_INVALID;
+    MCOperand_CreateImm0(instr, src);
+    MCOperand_CreateImm0(instr, w);
+    MCOperand_CreateImm0(instr, 1);
+    MCOperand_CreateImm0(instr, nf);
+    *size = (uint16_t)(off + 6);
+    set_apx_evex_encoding_detail(instr, e, off, segp, a32, NULL);
+    return X86_FEATURE_DECODED;
+  }
+  if (!decode_apx_evex_memory(code, len, off + 5, p0, p1, a32, &memory))
+    return X86_FEATURE_INVALID;
+  seg = apx_segment_register(segp);
+  add_feature_memory_operands(instr, &memory);
+  MCOperand_CreateImm0(instr, seg);
+  MCOperand_CreateImm0(instr, a32 ? 4 : 8);
+  MCOperand_CreateImm0(instr, w);
+  MCOperand_CreateImm0(instr, 1);
+  MCOperand_CreateImm0(instr, nf);
+  *size = (uint16_t)memory.length;
+  set_apx_evex_encoding_detail(instr, e, off, segp, a32, &memory);
+  return X86_FEATURE_DECODED;
 }
 
-static x86_feature_decode_result decode_apx_rorx(csh handle,const uint8_t *code,size_t len,MCInst *instr,uint16_t *size)
-{
-	const cs_struct *arch=(const cs_struct *)(uintptr_t)handle;const uint8_t *e;size_t off=0,io;uint8_t segp=0,p0,p1,p2,m,w,imm;bool a32=false,bad=false,mem;x86_reg dst,src=X86_REG_INVALID,seg;unsigned dn,rn;x86_feature_memory memory;
-	while(off<len&&code[off]!=0x62){uint8_t p=code[off];if(is_apx_evex_segment_prefix(p))segp=p;else if(p==0x67)a32=true;else if(p==0x66||p==0xf0||p==0xf2||p==0xf3||is_effective_rex(code,len,off))bad=true;else if(p<0x40||p>0x4f)return X86_FEATURE_NOT_HANDLED;++off;}
-	if(off==len||len-off<2||(code[off+1]&7)!=3)return X86_FEATURE_NOT_HANDLED;if(len-off<5)return X86_FEATURE_INVALID;e=&code[off];if(e[4]!=0xf0)return X86_FEATURE_NOT_HANDLED;if(!(arch->mode&CS_MODE_64)||bad||len-off<7||off+7>15)return X86_FEATURE_INVALID;
-	p0=e[1];p1=e[2];p2=e[3];m=e[5];mem=(m&0xc0)!=0xc0;if((p1&0x7b)!=0x7b||(!mem&&!(p1&4))||p2!=8)return X86_FEATURE_INVALID;w=(p1&0x80)?8:4;dn=((~p0&0x80)>>4)|(~p0&0x10)|((m>>3)&7);dst=rex2_register(dn,w);if(dst==X86_REG_INVALID)return X86_FEATURE_INVALID;
-	MCInst_clear(instr);MCInst_setOpcode(instr,X86_FEATURE_APX_RORX);MCOperand_CreateImm0(instr,dst);MCOperand_CreateImm0(instr,mem);
-	if(!mem){rn=((~p0&0x20)>>2)|((p0&8)<<1)|(m&7);src=rex2_register(rn,w);if(src==X86_REG_INVALID)return X86_FEATURE_INVALID;io=off+6;}else{if(!decode_apx_evex_memory(code,len,off+5,p0,p1,a32,&memory))return X86_FEATURE_INVALID;seg=apx_segment_register(segp);add_feature_memory_operands(instr,&memory);MCOperand_CreateImm0(instr,seg);MCOperand_CreateImm0(instr,a32?4:8);io=memory.length;}
-	if(io>=len||io>=15)return X86_FEATURE_INVALID;imm=code[io];if(!mem)MCOperand_CreateImm0(instr,src);MCOperand_CreateImm0(instr,w);MCOperand_CreateImm0(instr,imm);*size=(uint16_t)(io+1);set_apx_evex_encoding_detail(instr,e,off,segp,a32,mem?&memory:NULL);instr->imm_size=1;if(instr->flat_insn->detail){instr->flat_insn->detail->x86.encoding.imm_offset=(uint8_t)io;instr->flat_insn->detail->x86.encoding.imm_size=1;}return X86_FEATURE_DECODED;
+static x86_feature_decode_result decode_apx_rorx(csh handle,
+                                                 const uint8_t *code,
+                                                 size_t len, MCInst *instr,
+                                                 uint16_t *size) {
+  const cs_struct *arch = (const cs_struct *)(uintptr_t)handle;
+  const uint8_t *e;
+  size_t off = 0, io;
+  uint8_t segp = 0, p0, p1, p2, m, w, imm;
+  bool a32 = false, bad = false, mem;
+  x86_reg dst, src = X86_REG_INVALID, seg;
+  unsigned dn, rn;
+  x86_feature_memory memory;
+  while (off < len && code[off] != 0x62) {
+    uint8_t p = code[off];
+    if (is_apx_evex_segment_prefix(p))
+      segp = p;
+    else if (p == 0x67)
+      a32 = true;
+    else if (p == 0x66 || p == 0xf0 || p == 0xf2 || p == 0xf3 ||
+             is_effective_rex(code, len, off))
+      bad = true;
+    else if (p < 0x40 || p > 0x4f)
+      return X86_FEATURE_NOT_HANDLED;
+    ++off;
+  }
+  if (off == len || len - off < 2 || (code[off + 1] & 7) != 3)
+    return X86_FEATURE_NOT_HANDLED;
+  if (len - off < 5)
+    return X86_FEATURE_INVALID;
+  e = &code[off];
+  if (e[4] != 0xf0)
+    return X86_FEATURE_NOT_HANDLED;
+  if (!(arch->mode & CS_MODE_64) || bad || len - off < 7 || off + 7 > 15)
+    return X86_FEATURE_INVALID;
+  p0 = e[1];
+  p1 = e[2];
+  p2 = e[3];
+  m = e[5];
+  mem = (m & 0xc0) != 0xc0;
+  if ((p1 & 0x7b) != 0x7b || (!mem && !(p1 & 4)) || p2 != 8)
+    return X86_FEATURE_INVALID;
+  w = (p1 & 0x80) ? 8 : 4;
+  dn = ((~p0 & 0x80) >> 4) | (~p0 & 0x10) | ((m >> 3) & 7);
+  dst = rex2_register(dn, w);
+  if (dst == X86_REG_INVALID)
+    return X86_FEATURE_INVALID;
+  MCInst_clear(instr);
+  MCInst_setOpcode(instr, X86_FEATURE_APX_RORX);
+  MCOperand_CreateImm0(instr, dst);
+  MCOperand_CreateImm0(instr, mem);
+  if (!mem) {
+    rn = ((~p0 & 0x20) >> 2) | ((p0 & 8) << 1) | (m & 7);
+    src = rex2_register(rn, w);
+    if (src == X86_REG_INVALID)
+      return X86_FEATURE_INVALID;
+    io = off + 6;
+  } else {
+    if (!decode_apx_evex_memory(code, len, off + 5, p0, p1, a32, &memory))
+      return X86_FEATURE_INVALID;
+    seg = apx_segment_register(segp);
+    add_feature_memory_operands(instr, &memory);
+    MCOperand_CreateImm0(instr, seg);
+    MCOperand_CreateImm0(instr, a32 ? 4 : 8);
+    io = memory.length;
+  }
+  if (io >= len || io >= 15)
+    return X86_FEATURE_INVALID;
+  imm = code[io];
+  if (!mem)
+    MCOperand_CreateImm0(instr, src);
+  MCOperand_CreateImm0(instr, w);
+  MCOperand_CreateImm0(instr, imm);
+  *size = (uint16_t)(io + 1);
+  set_apx_evex_encoding_detail(instr, e, off, segp, a32, mem ? &memory : NULL);
+  instr->imm_size = 1;
+  if (instr->flat_insn->detail) {
+    instr->flat_insn->detail->x86.encoding.imm_offset = (uint8_t)io;
+    instr->flat_insn->detail->x86.encoding.imm_size = 1;
+  }
+  return X86_FEATURE_DECODED;
 }
 
-static x86_feature_decode_result decode_apx_mulx(csh handle,const uint8_t *code,size_t len,MCInst *instr,uint16_t *size)
-{
-	const cs_struct *arch=(const cs_struct *)(uintptr_t)handle;const uint8_t *e;size_t off=0;uint8_t segp=0,p0,p1,p2,m,w;bool a32=false,bad=false,mem;x86_reg d1,d2,src=X86_REG_INVALID,seg;unsigned n1,n2,rn;x86_feature_memory memory;
-	while(off<len&&code[off]!=0x62){uint8_t p=code[off];if(is_apx_evex_segment_prefix(p))segp=p;else if(p==0x67)a32=true;else if(p==0x66||p==0xf0||p==0xf2||p==0xf3||is_effective_rex(code,len,off))bad=true;else if(p<0x40||p>0x4f)return X86_FEATURE_NOT_HANDLED;++off;}
-	if(off==len||len-off<2||(code[off+1]&7)!=2)return X86_FEATURE_NOT_HANDLED;if(len-off<5)return X86_FEATURE_INVALID;e=&code[off];if(e[4]!=0xf6)return X86_FEATURE_NOT_HANDLED;if(!(arch->mode&CS_MODE_64)||bad||len-off<6||off+6>15)return X86_FEATURE_INVALID;
-	p0=e[1];p1=e[2];p2=e[3];m=e[5];mem=(m&0xc0)!=0xc0;if((p1&3)!=3||(!mem&&!(p1&4))||(p2&0xf7)!=0)return X86_FEATURE_INVALID;w=(p1&0x80)?8:4;n1=((~p0&0x80)>>4)|(~p0&0x10)|((m>>3)&7);n2=((~p2&8)<<1)|((~p1&0x78)>>3);d1=rex2_register(n1,w);d2=rex2_register(n2,w);if(d1==X86_REG_INVALID||d2==X86_REG_INVALID)return X86_FEATURE_INVALID;
-	MCInst_clear(instr);MCInst_setOpcode(instr,X86_FEATURE_APX_MULX);MCOperand_CreateImm0(instr,d1);MCOperand_CreateImm0(instr,d2);MCOperand_CreateImm0(instr,mem);
-	if(!mem){rn=((~p0&0x20)>>2)|((p0&8)<<1)|(m&7);src=rex2_register(rn,w);if(src==X86_REG_INVALID)return X86_FEATURE_INVALID;MCOperand_CreateImm0(instr,src);MCOperand_CreateImm0(instr,w);*size=(uint16_t)(off+6);set_apx_evex_encoding_detail(instr,e,off,segp,a32,NULL);return X86_FEATURE_DECODED;}
-	if(!decode_apx_evex_memory(code,len,off+5,p0,p1,a32,&memory))return X86_FEATURE_INVALID;seg=apx_segment_register(segp);add_feature_memory_operands(instr,&memory);MCOperand_CreateImm0(instr,seg);MCOperand_CreateImm0(instr,a32?4:8);MCOperand_CreateImm0(instr,w);*size=(uint16_t)memory.length;set_apx_evex_encoding_detail(instr,e,off,segp,a32,&memory);return X86_FEATURE_DECODED;
+static x86_feature_decode_result decode_apx_mulx(csh handle,
+                                                 const uint8_t *code,
+                                                 size_t len, MCInst *instr,
+                                                 uint16_t *size) {
+  const cs_struct *arch = (const cs_struct *)(uintptr_t)handle;
+  const uint8_t *e;
+  size_t off = 0;
+  uint8_t segp = 0, p0, p1, p2, m, w;
+  bool a32 = false, bad = false, mem;
+  x86_reg d1, d2, src = X86_REG_INVALID, seg;
+  unsigned n1, n2, rn;
+  x86_feature_memory memory;
+  while (off < len && code[off] != 0x62) {
+    uint8_t p = code[off];
+    if (is_apx_evex_segment_prefix(p))
+      segp = p;
+    else if (p == 0x67)
+      a32 = true;
+    else if (p == 0x66 || p == 0xf0 || p == 0xf2 || p == 0xf3 ||
+             is_effective_rex(code, len, off))
+      bad = true;
+    else if (p < 0x40 || p > 0x4f)
+      return X86_FEATURE_NOT_HANDLED;
+    ++off;
+  }
+  if (off == len || len - off < 2 || (code[off + 1] & 7) != 2)
+    return X86_FEATURE_NOT_HANDLED;
+  if (len - off < 5)
+    return X86_FEATURE_INVALID;
+  e = &code[off];
+  if (e[4] != 0xf6)
+    return X86_FEATURE_NOT_HANDLED;
+  if (!(arch->mode & CS_MODE_64) || bad || len - off < 6 || off + 6 > 15)
+    return X86_FEATURE_INVALID;
+  p0 = e[1];
+  p1 = e[2];
+  p2 = e[3];
+  m = e[5];
+  mem = (m & 0xc0) != 0xc0;
+  if ((p1 & 3) != 3 || (!mem && !(p1 & 4)) || (p2 & 0xf7) != 0)
+    return X86_FEATURE_INVALID;
+  w = (p1 & 0x80) ? 8 : 4;
+  n1 = ((~p0 & 0x80) >> 4) | (~p0 & 0x10) | ((m >> 3) & 7);
+  n2 = ((~p2 & 8) << 1) | ((~p1 & 0x78) >> 3);
+  d1 = rex2_register(n1, w);
+  d2 = rex2_register(n2, w);
+  if (d1 == X86_REG_INVALID || d2 == X86_REG_INVALID)
+    return X86_FEATURE_INVALID;
+  MCInst_clear(instr);
+  MCInst_setOpcode(instr, X86_FEATURE_APX_MULX);
+  MCOperand_CreateImm0(instr, d1);
+  MCOperand_CreateImm0(instr, d2);
+  MCOperand_CreateImm0(instr, mem);
+  if (!mem) {
+    rn = ((~p0 & 0x20) >> 2) | ((p0 & 8) << 1) | (m & 7);
+    src = rex2_register(rn, w);
+    if (src == X86_REG_INVALID)
+      return X86_FEATURE_INVALID;
+    MCOperand_CreateImm0(instr, src);
+    MCOperand_CreateImm0(instr, w);
+    *size = (uint16_t)(off + 6);
+    set_apx_evex_encoding_detail(instr, e, off, segp, a32, NULL);
+    return X86_FEATURE_DECODED;
+  }
+  if (!decode_apx_evex_memory(code, len, off + 5, p0, p1, a32, &memory))
+    return X86_FEATURE_INVALID;
+  seg = apx_segment_register(segp);
+  add_feature_memory_operands(instr, &memory);
+  MCOperand_CreateImm0(instr, seg);
+  MCOperand_CreateImm0(instr, a32 ? 4 : 8);
+  MCOperand_CreateImm0(instr, w);
+  *size = (uint16_t)memory.length;
+  set_apx_evex_encoding_detail(instr, e, off, segp, a32, &memory);
+  return X86_FEATURE_DECODED;
 }
 
-static x86_feature_decode_result decode_apx_convert(csh handle,const uint8_t *code,size_t len,MCInst *instr,uint16_t *size)
-{
-	const cs_struct *arch=(const cs_struct *)(uintptr_t)handle;const uint8_t *e;size_t off=0;uint8_t segp=0,p0,p1,p2,op,m,pp,dw,sw;bool a32=false,bad=false,mem,crc,store;x86_reg d,s=X86_REG_INVALID,seg;unsigned dn,rn;x86_feature_memory mm;
-	while(off<len&&code[off]!=0x62){uint8_t p=code[off];if(is_apx_evex_segment_prefix(p))segp=p;else if(p==0x67)a32=true;else if(p==0x66||p==0xf0||p==0xf2||p==0xf3||is_effective_rex(code,len,off))bad=true;else if(p<0x40||p>0x4f)return X86_FEATURE_NOT_HANDLED;++off;}
-	if(off==len||len-off<2||(code[off+1]&7)!=4)return X86_FEATURE_NOT_HANDLED;if(len-off<5)return X86_FEATURE_INVALID;e=&code[off];op=e[4];if(op!=0x60&&op!=0x61&&op!=0xf0&&op!=0xf1)return X86_FEATURE_NOT_HANDLED;if(!(arch->mode&CS_MODE_64)||bad||len-off<6||off+6>15)return X86_FEATURE_INVALID;
-	p0=e[1];p1=e[2];p2=e[3];m=e[5];pp=p1&3;mem=(m&0xc0)!=0xc0;crc=op>=0xf0;store=op==0x61;if(pp>1||(p1&0x78)!=0x78||p2!=8||(!mem&&!(p1&4)))return X86_FEATURE_INVALID;
-	/* As in the other promoted forms, W selects 64-bit operands over 66. */
-	if(crc){if(op==0xf0&&pp)return X86_FEATURE_INVALID;dw=(p1&0x80)?8:4;sw=op==0xf0?1:(p1&0x80)?8:(pp?2:4);store=false;}else{dw=sw=(p1&0x80)?8:(pp?2:4);}
-	dn=((~p0&0x80)>>4)|(~p0&0x10)|((m>>3)&7);d=rex2_register(dn,store?sw:dw);if(d==X86_REG_INVALID)return X86_FEATURE_INVALID;
-	MCInst_clear(instr);MCInst_setOpcode(instr,crc?X86_FEATURE_APX_CRC32:X86_FEATURE_APX_MOVBE);MCOperand_CreateImm0(instr,d);MCOperand_CreateImm0(instr,mem);MCOperand_CreateImm0(instr,store);
-	if(!mem){rn=((~p0&0x20)>>2)|((p0&8)<<1)|(m&7);s=rex2_register(rn,store?dw:sw);if(s==X86_REG_INVALID)return X86_FEATURE_INVALID;MCOperand_CreateImm0(instr,s);MCOperand_CreateImm0(instr,dw);MCOperand_CreateImm0(instr,sw);*size=(uint16_t)(off+6);set_apx_evex_encoding_detail(instr,e,off,segp,a32,NULL);return X86_FEATURE_DECODED;}
-	if(!decode_apx_evex_memory(code,len,off+5,p0,p1,a32,&mm))return X86_FEATURE_INVALID;seg=apx_segment_register(segp);add_feature_memory_operands(instr,&mm);MCOperand_CreateImm0(instr,seg);MCOperand_CreateImm0(instr,a32?4:8);MCOperand_CreateImm0(instr,dw);MCOperand_CreateImm0(instr,sw);*size=(uint16_t)mm.length;set_apx_evex_encoding_detail(instr,e,off,segp,a32,&mm);return X86_FEATURE_DECODED;
+static x86_feature_decode_result decode_apx_convert(csh handle,
+                                                    const uint8_t *code,
+                                                    size_t len, MCInst *instr,
+                                                    uint16_t *size) {
+  const cs_struct *arch = (const cs_struct *)(uintptr_t)handle;
+  const uint8_t *e;
+  size_t off = 0;
+  uint8_t segp = 0, p0, p1, p2, op, m, pp, dw, sw;
+  bool a32 = false, bad = false, mem, crc, store;
+  x86_reg d, s = X86_REG_INVALID, seg;
+  unsigned dn, rn;
+  x86_feature_memory mm;
+  while (off < len && code[off] != 0x62) {
+    uint8_t p = code[off];
+    if (is_apx_evex_segment_prefix(p))
+      segp = p;
+    else if (p == 0x67)
+      a32 = true;
+    else if (p == 0x66 || p == 0xf0 || p == 0xf2 || p == 0xf3 ||
+             is_effective_rex(code, len, off))
+      bad = true;
+    else if (p < 0x40 || p > 0x4f)
+      return X86_FEATURE_NOT_HANDLED;
+    ++off;
+  }
+  if (off == len || len - off < 2 || (code[off + 1] & 7) != 4)
+    return X86_FEATURE_NOT_HANDLED;
+  if (len - off < 5)
+    return X86_FEATURE_INVALID;
+  e = &code[off];
+  op = e[4];
+  if (op != 0x60 && op != 0x61 && op != 0xf0 && op != 0xf1)
+    return X86_FEATURE_NOT_HANDLED;
+  if (!(arch->mode & CS_MODE_64) || bad || len - off < 6 || off + 6 > 15)
+    return X86_FEATURE_INVALID;
+  p0 = e[1];
+  p1 = e[2];
+  p2 = e[3];
+  m = e[5];
+  pp = p1 & 3;
+  mem = (m & 0xc0) != 0xc0;
+  crc = op >= 0xf0;
+  store = op == 0x61;
+  if (pp > 1 || (p1 & 0x78) != 0x78 || p2 != 8 || (!mem && !(p1 & 4)))
+    return X86_FEATURE_INVALID;
+  /* As in the other promoted forms, W selects 64-bit operands over 66. */
+  if (crc) {
+    if (op == 0xf0 && pp)
+      return X86_FEATURE_INVALID;
+    dw = (p1 & 0x80) ? 8 : 4;
+    sw = op == 0xf0 ? 1 : (p1 & 0x80) ? 8 : (pp ? 2 : 4);
+    store = false;
+  } else {
+    dw = sw = (p1 & 0x80) ? 8 : (pp ? 2 : 4);
+  }
+  dn = ((~p0 & 0x80) >> 4) | (~p0 & 0x10) | ((m >> 3) & 7);
+  d = rex2_register(dn, store ? sw : dw);
+  if (d == X86_REG_INVALID)
+    return X86_FEATURE_INVALID;
+  MCInst_clear(instr);
+  MCInst_setOpcode(instr, crc ? X86_FEATURE_APX_CRC32 : X86_FEATURE_APX_MOVBE);
+  MCOperand_CreateImm0(instr, d);
+  MCOperand_CreateImm0(instr, mem);
+  MCOperand_CreateImm0(instr, store);
+  if (!mem) {
+    rn = ((~p0 & 0x20) >> 2) | ((p0 & 8) << 1) | (m & 7);
+    s = rex2_register(rn, store ? dw : sw);
+    if (s == X86_REG_INVALID)
+      return X86_FEATURE_INVALID;
+    MCOperand_CreateImm0(instr, s);
+    MCOperand_CreateImm0(instr, dw);
+    MCOperand_CreateImm0(instr, sw);
+    *size = (uint16_t)(off + 6);
+    set_apx_evex_encoding_detail(instr, e, off, segp, a32, NULL);
+    return X86_FEATURE_DECODED;
+  }
+  if (!decode_apx_evex_memory(code, len, off + 5, p0, p1, a32, &mm))
+    return X86_FEATURE_INVALID;
+  seg = apx_segment_register(segp);
+  add_feature_memory_operands(instr, &mm);
+  MCOperand_CreateImm0(instr, seg);
+  MCOperand_CreateImm0(instr, a32 ? 4 : 8);
+  MCOperand_CreateImm0(instr, dw);
+  MCOperand_CreateImm0(instr, sw);
+  *size = (uint16_t)mm.length;
+  set_apx_evex_encoding_detail(instr, e, off, segp, a32, &mm);
+  return X86_FEATURE_DECODED;
 }
 
 static x86_feature_decode_result
@@ -4944,10 +6119,131 @@ static bool print_apx_cmpccxadd(MCInst*in,SStream*s,bool att)
 	static const char*const names[]={"cmpoxadd","cmpnoxadd","cmpbxadd","cmpnbxadd","cmpzxadd","cmpnzxadd","cmpbexadd","cmpnbexadd","cmpsxadd","cmpnsxadd","cmppxadd","cmpnpxadd","cmplxadd","cmpnlxadd","cmplexadd","cmpnlexadd"};unsigned op=MCInst_getOpcode(in),idx,i;x86_reg cmp,add,seg;x86_feature_memory m;uint8_t w;cs_detail*d;cs_x86*x;if(op<X86_FEATURE_APX_CMPCCXADD_BASE||op>=X86_FEATURE_APX_CMPCCXADD_BASE+16)return false;idx=op-X86_FEATURE_APX_CMPCCXADD_BASE;if(MCInst_getNumOperands(in)!=9||!get_feature_memory(in,2,&m))return false;cmp=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,0));add=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,1));seg=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,6));w=(uint8_t)MCOperand_getImm(MCInst_getOperand(in,8));SStream_concat(s,att?"%s%c\t":"%s\t",names[idx],w==4?'l':'q');for(i=0;i<3;i++){unsigned k=att?2-i:i;if(i)SStream_concat0(s,", ");if(k==0){if(!att)SStream_concat0(s,w==4?"dword ptr ":"qword ptr ");if(seg!=X86_REG_INVALID)SStream_concat(s,att?"%%%s:":"%s:",feature_register_name(seg));if(!print_feature_memory(s,&m,att))return false;}else SStream_concat(s,att?"%%%s":"%s",X86_reg_name((csh)in->csh,k==1?cmp:add));}if(!in->flat_insn->detail)return true;d=in->flat_insn->detail;x=&d->x86;for(i=0;i<3;i++){unsigned k=att?2-i:i;cs_x86_op*o=&x->operands[i];if(k==0){set_feature_memory_operand(o,&m,w,CS_AC_READ_WRITE);o->mem.segment=seg;}else{o->type=X86_OP_REG;o->reg=k==1?cmp:add;o->size=w;o->access=k==1?CS_AC_READ_WRITE:CS_AC_READ;}}x->op_count=3;d->regs_write[d->regs_write_count++]=X86_REG_EFLAGS;x->eflags=X86_EFLAGS_MODIFY_OF|X86_EFLAGS_MODIFY_SF|X86_EFLAGS_MODIFY_ZF|X86_EFLAGS_MODIFY_AF|X86_EFLAGS_MODIFY_PF|X86_EFLAGS_MODIFY_CF;return true;
 }
 
-static bool print_apx_ccmp(MCInst*in,SStream*s,bool att)
-{
-static const char*const ccmp_names[]={"ccmpo","ccmpno","ccmpb","ccmpnb","ccmpz","ccmpnz","ccmpbe","ccmpnbe","ccmps","ccmpns","ccmpt","ccmpf","ccmpl","ccmpnl","ccmple","ccmpnle"};static const char*const ctest_names[]={"ctesto","ctestno","ctestb","ctestnb","ctestz","ctestnz","ctestbe","ctestnbe","ctests","ctestns","ctestt","ctestf","ctestl","ctestnl","ctestle","ctestnle"};static const char*const dfvs[]={"","cf","zf","zf,cf","sf","sf,cf","sf,zf","sf,zf,cf","of","of,cf","of,zf","of,zf,cf","of,sf","of,sf,cf","of,sf,zf","of,sf,zf,cf"};unsigned op=MCInst_getOpcode(in),i,n,idx;bool mem,rmfirst,imm,ctest;x86_reg rr,rm=X86_REG_INVALID,seg=X86_REG_INVALID;x86_feature_memory m;uint8_t w,dfv;int64_t iv;cs_detail*d;cs_x86*x;ctest=op>=X86_FEATURE_APX_CTEST_BASE&&op<X86_FEATURE_APX_CTEST_BASE+16;if(!ctest&&(op<X86_FEATURE_APX_CCMP_BASE||op>=X86_FEATURE_APX_CCMP_BASE+16))return false;idx=op-(ctest?X86_FEATURE_APX_CTEST_BASE:X86_FEATURE_APX_CCMP_BASE);mem=MCOperand_getImm(MCInst_getOperand(in,0))!=0;rmfirst=MCOperand_getImm(MCInst_getOperand(in,1))!=0;rr=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,2));memset(&m,0,sizeof(m));if(mem){if(MCInst_getNumOperands(in)!=13||!get_feature_memory(in,3,&m))return false;seg=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,7));imm=MCOperand_getImm(MCInst_getOperand(in,9))!=0;iv=MCOperand_getImm(MCInst_getOperand(in,10));w=(uint8_t)MCOperand_getImm(MCInst_getOperand(in,11));dfv=(uint8_t)MCOperand_getImm(MCInst_getOperand(in,12));}else{if(MCInst_getNumOperands(in)!=8)return false;rm=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,3));imm=MCOperand_getImm(MCInst_getOperand(in,4))!=0;iv=MCOperand_getImm(MCInst_getOperand(in,5));w=(uint8_t)MCOperand_getImm(MCInst_getOperand(in,6));dfv=(uint8_t)MCOperand_getImm(MCInst_getOperand(in,7));}if(w!=1&&w!=2&&w!=4&&w!=8)return false;if(att)SStream_concat(s,"%s%c\t{dfv=%s} ",(ctest?ctest_names:ccmp_names)[idx],w==1?'b':w==2?'w':w==4?'l':'q',dfvs[dfv]);else SStream_concat(s,"%s\t{dfv=%s} ",(ctest?ctest_names:ccmp_names)[idx],dfvs[dfv]);n=2;for(i=0;i<n;i++){unsigned k=att?1-i:i;bool isrm=imm?k==0:(rmfirst?k==0:k==1);if(i)SStream_concat0(s,", ");if(!isrm){if(imm)print_apx_scalar_immediate(in,s,iv,w,att);else SStream_concat(s,att?"%%%s":"%s",X86_reg_name((csh)in->csh,rr));}else if(mem){if(!att)SStream_concat0(s,w==1?"byte ptr ":w==2?"word ptr ":w==4?"dword ptr ":"qword ptr ");if(seg!=X86_REG_INVALID)SStream_concat(s,att?"%%%s:":"%s:",feature_register_name(seg));if(!print_feature_memory(s,&m,att))return false;}else SStream_concat(s,att?"%%%s":"%s",X86_reg_name((csh)in->csh,rm));}
-	if(!in->flat_insn->detail)return true;d=in->flat_insn->detail;x=&d->x86;for(i=0;i<n;i++){unsigned k=att?1-i:i;bool isrm=imm?k==0:(rmfirst?k==0:k==1);cs_x86_op*o=&x->operands[i];if(!isrm){if(imm){o->type=X86_OP_IMM;o->imm=iv;o->size=w;o->access=CS_AC_READ;}else{o->type=X86_OP_REG;o->reg=rr;o->size=w;o->access=CS_AC_READ;}}else if(mem){set_feature_memory_operand(o,&m,w,CS_AC_READ);o->mem.segment=seg;}else{o->type=X86_OP_REG;o->reg=rm;o->size=w;o->access=CS_AC_READ;}}x->op_count=2;d->regs_read[d->regs_read_count++]=X86_REG_EFLAGS;d->regs_write[d->regs_write_count++]=X86_REG_EFLAGS;x->eflags=ctest?(X86_EFLAGS_RESET_OF|X86_EFLAGS_MODIFY_SF|X86_EFLAGS_MODIFY_ZF|X86_EFLAGS_UNDEFINED_AF|X86_EFLAGS_MODIFY_PF|X86_EFLAGS_RESET_CF):(X86_EFLAGS_MODIFY_OF|X86_EFLAGS_MODIFY_SF|X86_EFLAGS_MODIFY_ZF|X86_EFLAGS_MODIFY_AF|X86_EFLAGS_MODIFY_PF|X86_EFLAGS_MODIFY_CF);return true;
+static bool print_apx_ccmp(MCInst *in, SStream *s, bool att) {
+  static const char *const ccmp_names[] = {
+      "ccmpo",  "ccmpno",  "ccmpb",  "ccmpnb", "ccmpz", "ccmpnz",
+      "ccmpbe", "ccmpnbe", "ccmps",  "ccmpns", "ccmpt", "ccmpf",
+      "ccmpl",  "ccmpnl",  "ccmple", "ccmpnle"};
+  static const char *const ctest_names[] = {
+      "ctesto",  "ctestno",  "ctestb",  "ctestnb", "ctestz", "ctestnz",
+      "ctestbe", "ctestnbe", "ctests",  "ctestns", "ctestt", "ctestf",
+      "ctestl",  "ctestnl",  "ctestle", "ctestnle"};
+  static const char *const dfvs[] = {
+      "",      "cf",       "zf",       "zf,cf",      "sf",    "sf,cf",
+      "sf,zf", "sf,zf,cf", "of",       "of,cf",      "of,zf", "of,zf,cf",
+      "of,sf", "of,sf,cf", "of,sf,zf", "of,sf,zf,cf"};
+  unsigned op = MCInst_getOpcode(in), i, n, idx;
+  bool mem, rmfirst, imm, ctest;
+  x86_reg rr, rm = X86_REG_INVALID, seg = X86_REG_INVALID;
+  x86_feature_memory m;
+  uint8_t w, dfv;
+  int64_t iv;
+  cs_detail *d;
+  cs_x86 *x;
+  ctest =
+      op >= X86_FEATURE_APX_CTEST_BASE && op < X86_FEATURE_APX_CTEST_BASE + 16;
+  if (!ctest &&
+      (op < X86_FEATURE_APX_CCMP_BASE || op >= X86_FEATURE_APX_CCMP_BASE + 16))
+    return false;
+  idx = op - (ctest ? X86_FEATURE_APX_CTEST_BASE : X86_FEATURE_APX_CCMP_BASE);
+  mem = MCOperand_getImm(MCInst_getOperand(in, 0)) != 0;
+  rmfirst = MCOperand_getImm(MCInst_getOperand(in, 1)) != 0;
+  rr = (x86_reg)MCOperand_getImm(MCInst_getOperand(in, 2));
+  memset(&m, 0, sizeof(m));
+  if (mem) {
+    if (MCInst_getNumOperands(in) != 13 || !get_feature_memory(in, 3, &m))
+      return false;
+    seg = (x86_reg)MCOperand_getImm(MCInst_getOperand(in, 7));
+    imm = MCOperand_getImm(MCInst_getOperand(in, 9)) != 0;
+    iv = MCOperand_getImm(MCInst_getOperand(in, 10));
+    w = (uint8_t)MCOperand_getImm(MCInst_getOperand(in, 11));
+    dfv = (uint8_t)MCOperand_getImm(MCInst_getOperand(in, 12));
+  } else {
+    if (MCInst_getNumOperands(in) != 8)
+      return false;
+    rm = (x86_reg)MCOperand_getImm(MCInst_getOperand(in, 3));
+    imm = MCOperand_getImm(MCInst_getOperand(in, 4)) != 0;
+    iv = MCOperand_getImm(MCInst_getOperand(in, 5));
+    w = (uint8_t)MCOperand_getImm(MCInst_getOperand(in, 6));
+    dfv = (uint8_t)MCOperand_getImm(MCInst_getOperand(in, 7));
+  }
+  if (w != 1 && w != 2 && w != 4 && w != 8)
+    return false;
+  if (att)
+    SStream_concat(s, "%s%c\t{dfv=%s} ",
+                   (ctest ? ctest_names : ccmp_names)[idx],
+                   w == 1   ? 'b'
+                   : w == 2 ? 'w'
+                   : w == 4 ? 'l'
+                            : 'q',
+                   dfvs[dfv]);
+  else
+    SStream_concat(s, "%s\t{dfv=%s} ", (ctest ? ctest_names : ccmp_names)[idx],
+                   dfvs[dfv]);
+  n = 2;
+  for (i = 0; i < n; i++) {
+    unsigned k = att ? 1 - i : i;
+    bool isrm = imm ? k == 0 : (rmfirst ? k == 0 : k == 1);
+    if (i)
+      SStream_concat0(s, ", ");
+    if (!isrm) {
+      if (imm)
+        print_apx_scalar_immediate(in, s, iv, w, att);
+      else
+        SStream_concat(s, att ? "%%%s" : "%s", X86_reg_name((csh)in->csh, rr));
+    } else if (mem) {
+      if (!att)
+        SStream_concat0(s, w == 1   ? "byte ptr "
+                           : w == 2 ? "word ptr "
+                           : w == 4 ? "dword ptr "
+                                    : "qword ptr ");
+      if (seg != X86_REG_INVALID)
+        SStream_concat(s, att ? "%%%s:" : "%s:", feature_register_name(seg));
+      if (!print_feature_memory(s, &m, att))
+        return false;
+    } else
+      SStream_concat(s, att ? "%%%s" : "%s", X86_reg_name((csh)in->csh, rm));
+  }
+  if (!in->flat_insn->detail)
+    return true;
+  d = in->flat_insn->detail;
+  x = &d->x86;
+  for (i = 0; i < n; i++) {
+    unsigned k = att ? 1 - i : i;
+    bool isrm = imm ? k == 0 : (rmfirst ? k == 0 : k == 1);
+    cs_x86_op *o = &x->operands[i];
+    if (!isrm) {
+      if (imm) {
+        o->type = X86_OP_IMM;
+        o->imm = iv;
+        o->size = w;
+        o->access = CS_AC_READ;
+      } else {
+        o->type = X86_OP_REG;
+        o->reg = rr;
+        o->size = w;
+        o->access = CS_AC_READ;
+      }
+    } else if (mem) {
+      set_feature_memory_operand(o, &m, w, CS_AC_READ);
+      o->mem.segment = seg;
+    } else {
+      o->type = X86_OP_REG;
+      o->reg = rm;
+      o->size = w;
+      o->access = CS_AC_READ;
+    }
+  }
+  x->op_count = 2;
+  d->regs_read[d->regs_read_count++] = X86_REG_EFLAGS;
+  d->regs_write[d->regs_write_count++] = X86_REG_EFLAGS;
+  x->eflags = ctest ? (X86_EFLAGS_RESET_OF | X86_EFLAGS_MODIFY_SF |
+                       X86_EFLAGS_MODIFY_ZF | X86_EFLAGS_UNDEFINED_AF |
+                       X86_EFLAGS_MODIFY_PF | X86_EFLAGS_RESET_CF)
+                    : (X86_EFLAGS_MODIFY_OF | X86_EFLAGS_MODIFY_SF |
+                       X86_EFLAGS_MODIFY_ZF | X86_EFLAGS_MODIFY_AF |
+                       X86_EFLAGS_MODIFY_PF | X86_EFLAGS_MODIFY_CF);
+  return true;
 }
 
 static bool print_apx_kmov(MCInst*in,SStream*s,bool att)
@@ -5354,16 +6650,189 @@ static bool print_apx_bls(MCInst *instr, SStream *s, bool att)
 	return true;
 }
 
-static bool print_apx_unary(MCInst *instr, SStream *s, bool att)
-{
-	unsigned op=MCInst_getOpcode(instr); const char *mn; uint64_t flags; const MCOperand *d,*mf,*wo,*ndo,*nfo; bool mem,nd,nf; uint8_t w,i,count; x86_reg dst,src=X86_REG_INVALID,seg=X86_REG_INVALID; x86_feature_memory m; cs_x86 *x; cs_detail *detail;
-	switch(op){case X86_FEATURE_APX_INC:mn="inc";flags=X86_EFLAGS_MODIFY_OF|X86_EFLAGS_MODIFY_SF|X86_EFLAGS_MODIFY_ZF|X86_EFLAGS_MODIFY_AF|X86_EFLAGS_MODIFY_PF;break;case X86_FEATURE_APX_DEC:mn="dec";flags=X86_EFLAGS_MODIFY_OF|X86_EFLAGS_MODIFY_SF|X86_EFLAGS_MODIFY_ZF|X86_EFLAGS_MODIFY_AF|X86_EFLAGS_MODIFY_PF;break;case X86_FEATURE_APX_NEG:mn="neg";flags=X86_EFLAGS_MODIFY_OF|X86_EFLAGS_MODIFY_SF|X86_EFLAGS_MODIFY_ZF|X86_EFLAGS_MODIFY_AF|X86_EFLAGS_MODIFY_PF|X86_EFLAGS_MODIFY_CF;break;case X86_FEATURE_APX_NOT:mn="not";flags=0;break;case X86_FEATURE_APX_MUL:mn="mul";flags=X86_EFLAGS_MODIFY_OF|X86_EFLAGS_UNDEFINED_SF|X86_EFLAGS_UNDEFINED_ZF|X86_EFLAGS_UNDEFINED_AF|X86_EFLAGS_UNDEFINED_PF|X86_EFLAGS_MODIFY_CF;break;case X86_FEATURE_APX_IMUL_ONE:mn="imul";flags=X86_EFLAGS_MODIFY_OF|X86_EFLAGS_UNDEFINED_SF|X86_EFLAGS_UNDEFINED_ZF|X86_EFLAGS_UNDEFINED_AF|X86_EFLAGS_UNDEFINED_PF|X86_EFLAGS_MODIFY_CF;break;case X86_FEATURE_APX_DIV:mn="div";flags=X86_EFLAGS_UNDEFINED_OF|X86_EFLAGS_UNDEFINED_SF|X86_EFLAGS_UNDEFINED_ZF|X86_EFLAGS_UNDEFINED_AF|X86_EFLAGS_UNDEFINED_PF|X86_EFLAGS_UNDEFINED_CF;break;case X86_FEATURE_APX_IDIV:mn="idiv";flags=X86_EFLAGS_UNDEFINED_OF|X86_EFLAGS_UNDEFINED_SF|X86_EFLAGS_UNDEFINED_ZF|X86_EFLAGS_UNDEFINED_AF|X86_EFLAGS_UNDEFINED_PF|X86_EFLAGS_UNDEFINED_CF;break;default:return false;}
-	if(MCInst_getNumOperands(instr)<6)return false; d=MCInst_getOperand(instr,0);mf=MCInst_getOperand(instr,1);if(!MCOperand_isImm(d)||!MCOperand_isImm(mf))return false;dst=(x86_reg)MCOperand_getImm(d);mem=MCOperand_getImm(mf)!=0;memset(&m,0,sizeof(m));
-	if(mem){const MCOperand *so;if(MCInst_getNumOperands(instr)!=11||!get_feature_memory(instr,2,&m))return false;so=MCInst_getOperand(instr,6);wo=MCInst_getOperand(instr,8);ndo=MCInst_getOperand(instr,9);nfo=MCInst_getOperand(instr,10);if(!MCOperand_isImm(so))return false;seg=(x86_reg)MCOperand_getImm(so);}else{const MCOperand *ro;if(MCInst_getNumOperands(instr)!=6)return false;ro=MCInst_getOperand(instr,2);wo=MCInst_getOperand(instr,3);ndo=MCInst_getOperand(instr,4);nfo=MCInst_getOperand(instr,5);if(!MCOperand_isImm(ro))return false;src=(x86_reg)MCOperand_getImm(ro);}
-	if(!MCOperand_isImm(wo)||!MCOperand_isImm(ndo)||!MCOperand_isImm(nfo))return false;w=(uint8_t)MCOperand_getImm(wo);nd=MCOperand_getImm(ndo)!=0;nf=MCOperand_getImm(nfo)!=0;if((w!=1&&w!=2&&w!=4&&w!=8)||(nd?dst==X86_REG_INVALID:dst!=X86_REG_INVALID))return false;
-	if(nf)SStream_concat0(s,"{nf}|");if(att)SStream_concat(s,"%s%c\t",mn,w==1?'b':w==2?'w':w==4?'l':'q');else SStream_concat(s,"%s\t",mn);count=nd?2:1;
-	for(i=0;i<count;++i){bool isdst=nd&&(att?i==1:i==0);if(i)SStream_concat0(s,", ");if(isdst){const char*n=X86_reg_name((csh)instr->csh,dst);if(!n)return false;SStream_concat(s,att?"%%%s":"%s",n);}else if(mem){if(!att)SStream_concat0(s,w==1?"byte ptr ":w==2?"word ptr ":w==4?"dword ptr ":"qword ptr ");if(seg!=X86_REG_INVALID)SStream_concat(s,att?"%%%s:":"%s:",feature_register_name(seg));if(!print_feature_memory(s,&m,att))return false;}else{const char*n=X86_reg_name((csh)instr->csh,src);if(!n)return false;SStream_concat(s,att?"%%%s":"%s",n);}}
-	if(!instr->flat_insn->detail)return true;detail=instr->flat_insn->detail;x=&detail->x86;for(i=0;i<count;++i){bool isdst=nd&&(att?i==1:i==0);bool implicit=op==X86_FEATURE_APX_MUL||op==X86_FEATURE_APX_IMUL_ONE||op==X86_FEATURE_APX_DIV||op==X86_FEATURE_APX_IDIV;cs_ac_type a=(nd||implicit)?CS_AC_READ:CS_AC_READ|CS_AC_WRITE;cs_x86_op*o=&x->operands[i];if(isdst){o->type=X86_OP_REG;o->reg=dst;o->size=w;o->access=CS_AC_WRITE;}else if(mem){set_feature_memory_operand(o,&m,w,a);o->mem.segment=seg;}else{o->type=X86_OP_REG;o->reg=src;o->size=w;o->access=a;}}x->op_count=count;if(op==X86_FEATURE_APX_MUL||op==X86_FEATURE_APX_IMUL_ONE||op==X86_FEATURE_APX_DIV||op==X86_FEATURE_APX_IDIV){x86_reg lo=w==1?X86_REG_AL:w==2?X86_REG_AX:w==4?X86_REG_EAX:X86_REG_RAX;x86_reg hi=w==1?X86_REG_AH:w==2?X86_REG_DX:w==4?X86_REG_EDX:X86_REG_RDX;detail->regs_read[detail->regs_read_count++]=lo;if(op==X86_FEATURE_APX_DIV||op==X86_FEATURE_APX_IDIV)detail->regs_read[detail->regs_read_count++]=hi;detail->regs_write[detail->regs_write_count++]=lo;detail->regs_write[detail->regs_write_count++]=hi;}if(!nf&&flags){detail->regs_write[detail->regs_write_count++]=X86_REG_EFLAGS;x->eflags=flags;}return true;
+static bool print_apx_unary(MCInst *instr, SStream *s, bool att) {
+  unsigned op = MCInst_getOpcode(instr);
+  const char *mn;
+  uint64_t flags;
+  const MCOperand *d, *mf, *wo, *ndo, *nfo;
+  bool mem, nd, nf;
+  uint8_t w, i, count;
+  x86_reg dst, src = X86_REG_INVALID, seg = X86_REG_INVALID;
+  x86_feature_memory m;
+  cs_x86 *x;
+  cs_detail *detail;
+  switch (op) {
+  case X86_FEATURE_APX_INC:
+    mn = "inc";
+    flags = X86_EFLAGS_MODIFY_OF | X86_EFLAGS_MODIFY_SF | X86_EFLAGS_MODIFY_ZF |
+            X86_EFLAGS_MODIFY_AF | X86_EFLAGS_MODIFY_PF;
+    break;
+  case X86_FEATURE_APX_DEC:
+    mn = "dec";
+    flags = X86_EFLAGS_MODIFY_OF | X86_EFLAGS_MODIFY_SF | X86_EFLAGS_MODIFY_ZF |
+            X86_EFLAGS_MODIFY_AF | X86_EFLAGS_MODIFY_PF;
+    break;
+  case X86_FEATURE_APX_NEG:
+    mn = "neg";
+    flags = X86_EFLAGS_MODIFY_OF | X86_EFLAGS_MODIFY_SF | X86_EFLAGS_MODIFY_ZF |
+            X86_EFLAGS_MODIFY_AF | X86_EFLAGS_MODIFY_PF | X86_EFLAGS_MODIFY_CF;
+    break;
+  case X86_FEATURE_APX_NOT:
+    mn = "not";
+    flags = 0;
+    break;
+  case X86_FEATURE_APX_MUL:
+    mn = "mul";
+    flags = X86_EFLAGS_MODIFY_OF | X86_EFLAGS_UNDEFINED_SF |
+            X86_EFLAGS_UNDEFINED_ZF | X86_EFLAGS_UNDEFINED_AF |
+            X86_EFLAGS_UNDEFINED_PF | X86_EFLAGS_MODIFY_CF;
+    break;
+  case X86_FEATURE_APX_IMUL_ONE:
+    mn = "imul";
+    flags = X86_EFLAGS_MODIFY_OF | X86_EFLAGS_UNDEFINED_SF |
+            X86_EFLAGS_UNDEFINED_ZF | X86_EFLAGS_UNDEFINED_AF |
+            X86_EFLAGS_UNDEFINED_PF | X86_EFLAGS_MODIFY_CF;
+    break;
+  case X86_FEATURE_APX_DIV:
+    mn = "div";
+    flags = X86_EFLAGS_UNDEFINED_OF | X86_EFLAGS_UNDEFINED_SF |
+            X86_EFLAGS_UNDEFINED_ZF | X86_EFLAGS_UNDEFINED_AF |
+            X86_EFLAGS_UNDEFINED_PF | X86_EFLAGS_UNDEFINED_CF;
+    break;
+  case X86_FEATURE_APX_IDIV:
+    mn = "idiv";
+    flags = X86_EFLAGS_UNDEFINED_OF | X86_EFLAGS_UNDEFINED_SF |
+            X86_EFLAGS_UNDEFINED_ZF | X86_EFLAGS_UNDEFINED_AF |
+            X86_EFLAGS_UNDEFINED_PF | X86_EFLAGS_UNDEFINED_CF;
+    break;
+  default:
+    return false;
+  }
+  if (MCInst_getNumOperands(instr) < 6)
+    return false;
+  d = MCInst_getOperand(instr, 0);
+  mf = MCInst_getOperand(instr, 1);
+  if (!MCOperand_isImm(d) || !MCOperand_isImm(mf))
+    return false;
+  dst = (x86_reg)MCOperand_getImm(d);
+  mem = MCOperand_getImm(mf) != 0;
+  memset(&m, 0, sizeof(m));
+  if (mem) {
+    const MCOperand *so;
+    if (MCInst_getNumOperands(instr) != 11 || !get_feature_memory(instr, 2, &m))
+      return false;
+    so = MCInst_getOperand(instr, 6);
+    wo = MCInst_getOperand(instr, 8);
+    ndo = MCInst_getOperand(instr, 9);
+    nfo = MCInst_getOperand(instr, 10);
+    if (!MCOperand_isImm(so))
+      return false;
+    seg = (x86_reg)MCOperand_getImm(so);
+  } else {
+    const MCOperand *ro;
+    if (MCInst_getNumOperands(instr) != 6)
+      return false;
+    ro = MCInst_getOperand(instr, 2);
+    wo = MCInst_getOperand(instr, 3);
+    ndo = MCInst_getOperand(instr, 4);
+    nfo = MCInst_getOperand(instr, 5);
+    if (!MCOperand_isImm(ro))
+      return false;
+    src = (x86_reg)MCOperand_getImm(ro);
+  }
+  if (!MCOperand_isImm(wo) || !MCOperand_isImm(ndo) || !MCOperand_isImm(nfo))
+    return false;
+  w = (uint8_t)MCOperand_getImm(wo);
+  nd = MCOperand_getImm(ndo) != 0;
+  nf = MCOperand_getImm(nfo) != 0;
+  if ((w != 1 && w != 2 && w != 4 && w != 8) ||
+      (nd ? dst == X86_REG_INVALID : dst != X86_REG_INVALID))
+    return false;
+  if (nf)
+    SStream_concat0(s, "{nf}|");
+  if (att)
+    SStream_concat(s, "%s%c\t", mn,
+                   w == 1   ? 'b'
+                   : w == 2 ? 'w'
+                   : w == 4 ? 'l'
+                            : 'q');
+  else
+    SStream_concat(s, "%s\t", mn);
+  count = nd ? 2 : 1;
+  for (i = 0; i < count; ++i) {
+    bool isdst = nd && (att ? i == 1 : i == 0);
+    if (i)
+      SStream_concat0(s, ", ");
+    if (isdst) {
+      const char *n = X86_reg_name((csh)instr->csh, dst);
+      if (!n)
+        return false;
+      SStream_concat(s, att ? "%%%s" : "%s", n);
+    } else if (mem) {
+      if (!att)
+        SStream_concat0(s, w == 1   ? "byte ptr "
+                           : w == 2 ? "word ptr "
+                           : w == 4 ? "dword ptr "
+                                    : "qword ptr ");
+      if (seg != X86_REG_INVALID)
+        SStream_concat(s, att ? "%%%s:" : "%s:", feature_register_name(seg));
+      if (!print_feature_memory(s, &m, att))
+        return false;
+    } else {
+      const char *n = X86_reg_name((csh)instr->csh, src);
+      if (!n)
+        return false;
+      SStream_concat(s, att ? "%%%s" : "%s", n);
+    }
+  }
+  if (!instr->flat_insn->detail)
+    return true;
+  detail = instr->flat_insn->detail;
+  x = &detail->x86;
+  for (i = 0; i < count; ++i) {
+    bool isdst = nd && (att ? i == 1 : i == 0);
+    bool implicit = op == X86_FEATURE_APX_MUL ||
+                    op == X86_FEATURE_APX_IMUL_ONE ||
+                    op == X86_FEATURE_APX_DIV || op == X86_FEATURE_APX_IDIV;
+    cs_ac_type a = (nd || implicit) ? CS_AC_READ : CS_AC_READ | CS_AC_WRITE;
+    cs_x86_op *o = &x->operands[i];
+    if (isdst) {
+      o->type = X86_OP_REG;
+      o->reg = dst;
+      o->size = w;
+      o->access = CS_AC_WRITE;
+    } else if (mem) {
+      set_feature_memory_operand(o, &m, w, a);
+      o->mem.segment = seg;
+    } else {
+      o->type = X86_OP_REG;
+      o->reg = src;
+      o->size = w;
+      o->access = a;
+    }
+  }
+  x->op_count = count;
+  if (op == X86_FEATURE_APX_MUL || op == X86_FEATURE_APX_IMUL_ONE ||
+      op == X86_FEATURE_APX_DIV || op == X86_FEATURE_APX_IDIV) {
+    x86_reg lo = w == 1   ? X86_REG_AL
+                 : w == 2 ? X86_REG_AX
+                 : w == 4 ? X86_REG_EAX
+                          : X86_REG_RAX;
+    x86_reg hi = w == 1   ? X86_REG_AH
+                 : w == 2 ? X86_REG_DX
+                 : w == 4 ? X86_REG_EDX
+                          : X86_REG_RDX;
+    detail->regs_read[detail->regs_read_count++] = lo;
+    if (op == X86_FEATURE_APX_DIV || op == X86_FEATURE_APX_IDIV)
+      detail->regs_read[detail->regs_read_count++] = hi;
+    detail->regs_write[detail->regs_write_count++] = lo;
+    detail->regs_write[detail->regs_write_count++] = hi;
+  }
+  if (!nf && flags) {
+    detail->regs_write[detail->regs_write_count++] = X86_REG_EFLAGS;
+    x->eflags = flags;
+  }
+  return true;
 }
 
 static bool print_apx_imul(MCInst *instr, SStream *stream, bool att_syntax)
