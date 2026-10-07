@@ -82,43 +82,43 @@ void test_detail_riscv_op_free(TestDetailRISCVOp *op)
 }
 
 bool test_expected_riscv(csh *handle, const cs_riscv *actual,
-			 const TestDetailRISCV *expected)
-{
-	assert(handle && actual && expected);
+                         const TestDetailRISCV *expected) {
+  assert(handle && actual && expected);
 
-	compare_uint8_ret(actual->op_count, expected->operands_count, false);
-	for (size_t i = 0; i < actual->op_count; ++i) {
-		const cs_riscv_op *op = &actual->operands[i];
-		TestDetailRISCVOp *eop = expected->operands[i];
-		compare_enum_ret(op->type, eop->type, false);
-		compare_enum_ret(op->access, eop->access, false);
-		switch (op->type) {
-		default:
-			fprintf(stderr, "sh op type %" PRId32 " not handled.\n",
-				op->type);
-			return false;
-		case RISCV_OP_REG:
-			compare_reg_ret(*handle, op->reg, eop->reg, false);
-			break;
-		case RISCV_OP_IMM:
-			compare_uint64_ret(op->imm, eop->imm, false);
-			break;
-		case RISCV_OP_FP:
-			compare_fp_ret(op->dimm, eop->dimm, false);
-			break;
-		case RISCV_OP_MEM:
-			compare_reg_ret(*handle, op->mem.base, eop->mem_base,
-					false);
-			compare_int64_ret(op->mem.disp, eop->mem_disp, false);
-			break;
-		case RISCV_OP_CSR:
-			compare_string_from_int_ret(op->csr, eop->csr,
-						    getSysRegName, false);
-			break;
-		}
-	}
+  compare_uint8_ret(actual->op_count, expected->operands_count, false);
+  for (size_t i = 0; i < actual->op_count; ++i) {
+    const cs_riscv_op *op = &actual->operands[i];
+    TestDetailRISCVOp *eop = expected->operands[i];
+    compare_enum_ret(op->type, eop->type, false);
+    compare_enum_ret(op->access, eop->access, false);
+    switch (op->type) {
+    default:
+      fprintf(stderr, "sh op type %" PRId32 " not handled.\n", op->type);
+      return false;
+    case RISCV_OP_REG:
+      compare_reg_ret(*handle, op->reg, eop->reg, false);
+      break;
+    case RISCV_OP_IMM:
+      compare_uint64_ret(op->imm, eop->imm, false);
+      break;
+    case RISCV_OP_FP:
+      compare_fp_ret(op->dimm, eop->dimm, false);
+      break;
+    case RISCV_OP_MEM:
+      compare_reg_ret(*handle, op->mem.base, eop->mem_base, false);
+      compare_int64_ret(op->mem.disp, eop->mem_disp, false);
+      break;
+    case RISCV_OP_CSR:
+#ifdef CAPSTONE_HAS_RISCV
+      compare_string_from_int_ret(op->csr, eop->csr, getSysRegName, false);
+      break;
+#else
+      return false;
+#endif
+    }
+  }
 
-	compare_enum_ret(actual->rounding_mode, expected->rounding_mode, false);
+  compare_enum_ret(actual->rounding_mode, expected->rounding_mode, false);
 
-	return true;
+  return true;
 }
