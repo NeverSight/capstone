@@ -102,7 +102,7 @@ static void encode_evex(uint8_t code[6], unsigned int cc, bool nd, bool nf,
 	code[5] = 0xc0 | ((reg & 7) << 3) | (rm & 7);
 }
 
-static bool has_register(const cs_regs registers, uint8_t count, x86_reg reg)
+static bool has_register(const uint16_t *registers, uint8_t count, x86_reg reg)
 {
 	uint8_t i;
 

@@ -21,19 +21,58 @@ static bool ck(csh h,const uint8_t*b,size_t n,unsigned id,const char*mn,const ch
     cs_free(i,1);return ok;
 }
 
-int main(void)
-{
-    csh h;cs_insn*i=NULL;bool ok=true;uint8_t b[]={0x62,0xec,0x7e,8,0xf0,0x11};
-    const unsigned ids[]={X86_INS_INVEPT,X86_INS_INVVPID,X86_INS_INVPCID};
-    const char*mn[]={"invept","invvpid","invpcid"};
-    if(cs_open(CS_ARCH_X86,CS_MODE_64,&h))return 1;cs_option(h,CS_OPT_DETAIL,CS_OPT_ON);
-    for(unsigned k=0;k<3;k++){b[4]=(uint8_t)(0xf0+k);ok&=ck(h,b,6,ids[k],mn[k],
-      k==0?"r18, xmmword ptr [r17]":k==1?"r18, xmmword ptr [r17]":"r18, xmmword ptr [r17]");}
-    b[2]=0xfe;b[4]=0xf0;ok&=ck(h,b,6,X86_INS_INVEPT,"invept","r18, xmmword ptr [r17]");
-    {const uint8_t a[]={0x64,0x67,0x62,0xec,0x7a,8,0xf2,0x11};
-      ok&=ck(h,a,sizeof(a),X86_INS_INVPCID,"invpcid","r18, xmmword ptr fs:[r17d]");
-      cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_ATT);ok&=ck(h,a,sizeof(a),X86_INS_INVPCID,
-        "invpcid","%fs:(%r17d), %r18");cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_INTEL);}
-    {uint8_t x[]={0x62,0xec,0x7e,8,0xf0,0xd1};if(cs_disasm(h,x,6,0,1,&i)){ok=false;cs_free(i,1);}x[5]=0x11;x[3]=9;if(cs_disasm(h,x,6,0,1,&i)){ok=false;cs_free(i,1);}x[3]=8;x[2]=0x7f;if(cs_disasm(h,x,6,0,1,&i)){ok=false;cs_free(i,1);}x[2]=0x76;if(cs_disasm(h,x,6,0,1,&i)){ok=false;cs_free(i,1);}}
-    cs_close(&h);return ok?0:1;
+int main(void) {
+  csh h;
+  cs_insn *i = NULL;
+  bool ok = true;
+  uint8_t b[] = {0x62, 0xec, 0x7e, 8, 0xf0, 0x11};
+  const unsigned ids[] = {X86_INS_INVEPT, X86_INS_INVVPID, X86_INS_INVPCID};
+  const char *mn[] = {"invept", "invvpid", "invpcid"};
+  if (cs_open(CS_ARCH_X86, CS_MODE_64, &h))
+    return 1;
+  cs_option(h, CS_OPT_DETAIL, CS_OPT_ON);
+  for (unsigned k = 0; k < 3; k++) {
+    b[4] = (uint8_t)(0xf0 + k);
+    ok &= ck(h, b, 6, ids[k], mn[k],
+             k == 0   ? "r18, xmmword ptr [r17]"
+             : k == 1 ? "r18, xmmword ptr [r17]"
+                      : "r18, xmmword ptr [r17]");
+  }
+  b[2] = 0xfe;
+  b[4] = 0xf0;
+  ok &= ck(h, b, 6, X86_INS_INVEPT, "invept", "r18, xmmword ptr [r17]");
+  {
+    const uint8_t a[] = {0x64, 0x67, 0x62, 0xec, 0x7a, 8, 0xf2, 0x11};
+    ok &= ck(h, a, sizeof(a), X86_INS_INVPCID, "invpcid",
+             "r18, xmmword ptr fs:[r17d]");
+    cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
+    ok &= ck(h, a, sizeof(a), X86_INS_INVPCID, "invpcid", "%fs:(%r17d), %r18");
+    cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_INTEL);
+  }
+  {
+    uint8_t x[] = {0x62, 0xec, 0x7e, 8, 0xf0, 0xd1};
+    if (cs_disasm(h, x, 6, 0, 1, &i)) {
+      ok = false;
+      cs_free(i, 1);
+    }
+    x[5] = 0x11;
+    x[3] = 9;
+    if (cs_disasm(h, x, 6, 0, 1, &i)) {
+      ok = false;
+      cs_free(i, 1);
+    }
+    x[3] = 8;
+    x[2] = 0x7f;
+    if (cs_disasm(h, x, 6, 0, 1, &i)) {
+      ok = false;
+      cs_free(i, 1);
+    }
+    x[2] = 0x76;
+    if (cs_disasm(h, x, 6, 0, 1, &i)) {
+      ok = false;
+      cs_free(i, 1);
+    }
+  }
+  cs_close(&h);
+  return ok ? 0 : 1;
 }

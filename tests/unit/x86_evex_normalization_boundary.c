@@ -266,16 +266,16 @@ static bool check_scalar_compare_llig(csh handle)
 					   0xc2,
 					   0xcb,
 					   0x00 };
-			char name[64];
+			char case_name[sizeof(name)];
 
-			snprintf(name, sizeof(name), "%s-ll%zu",
+			snprintf(case_name, sizeof(case_name), "%s-ll%zu",
 				 packed_families[family].name, length);
 			if (length == 3)
-				ok &= check_rejected(handle, name, code,
+				ok &= check_rejected(handle, case_name, code,
 						     sizeof(code));
 			else
 				ok &= check_packed_compare_length(
-					handle, name, code, sizeof(code),
+					handle, case_name, code, sizeof(code),
 					packed_left[length],
 					packed_right[length], false);
 		}

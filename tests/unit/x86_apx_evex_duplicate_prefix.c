@@ -19,7 +19,7 @@ static bool decodes(csh handle, const uint8_t *code, size_t size,
 {
 	cs_insn *instruction = NULL;
 	size_t count = cs_disasm(handle, code, size, 0, 1, &instruction);
-	char actual[160] = "";
+	char actual[sizeof(instruction->mnemonic) + sizeof(instruction->op_str)] = "";
 	bool ok;
 
 	if (count == 1)

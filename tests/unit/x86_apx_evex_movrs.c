@@ -21,32 +21,70 @@ static bool ck(csh h,const uint8_t*b,size_t n,const char*mn,const char*ops,
     cs_free(i,1);return ok;
 }
 
-int main(void)
-{
-    csh h;cs_insn*i=NULL;bool ok=true;
-    const uint8_t b8[]={0x64,0x62,0xec,0x7c,8,0x8a,0x11};
-    const uint8_t b16[]={0x62,0xec,0x7d,8,0x8b,0x11};
-    const uint8_t b32[]={0x67,0x62,0xec,0x7c,8,0x8b,0x11};
-    const uint8_t b64[]={0x64,0x67,0x62,0xec,0xfc,8,0x8b,0x11};
-    const uint8_t x4[]={0x64,0x62,0x0c,0x78,8,0x8b,0x54,0xa5,0x20};
-    const uint8_t x4a32[]={0x67,0x64,0x62,0x0c,0x78,8,0x8b,0x54,0xa5,0x20};
-    if(cs_open(CS_ARCH_X86,CS_MODE_64,&h))return 1;cs_option(h,CS_OPT_DETAIL,CS_OPT_ON);
-    ok&=ck(h,b8,sizeof(b8),"movrs","r18b, byte ptr fs:[r17]",X86_REG_R18B,1);
-    ok&=ck(h,b16,sizeof(b16),"movrs","r18w, word ptr [r17]",X86_REG_R18W,2);
-    ok&=ck(h,b32,sizeof(b32),"movrs","r18d, dword ptr [r17d]",X86_REG_R18D,4);
-    ok&=ck(h,b64,sizeof(b64),"movrs","r18, qword ptr fs:[r17d]",X86_REG_R18,8);
-    ok&=ck(h,x4,sizeof(x4),"movrs",
-      "r26d, dword ptr fs:[r29 + r28*4 + 0x20]",X86_REG_R26D,4);
-    ok&=ck(h,x4a32,sizeof(x4a32),"movrs",
-      "r26d, dword ptr fs:[r29d + r28d*4 + 0x20]",X86_REG_R26D,4);
-    cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_ATT);
-    ok&=ck(h,b64,sizeof(b64),"movrsq","%fs:(%r17d), %r18",X86_REG_R18,8);
-    cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_INTEL);
-    /* W selects 64-bit operands over 66, as in XED; the byte form is W0. */
-    {const uint8_t w66[]={0x62,0xec,0xfd,8,0x8b,0x11};
-      ok&=ck(h,w66,sizeof(w66),"movrs","r18, qword ptr [r17]",X86_REG_R18,8);
-      const uint8_t w8[]={0x62,0xec,0xfc,8,0x8a,0x11};
-      if(cs_disasm(h,w8,sizeof(w8),0,1,&i)){ok=false;cs_free(i,1);}}
-    {uint8_t x[]={0x62,0xec,0x7c,8,0x8b,0xd1};if(cs_disasm(h,x,6,0,1,&i)){ok=false;cs_free(i,1);}x[2]=0x78;if(cs_disasm(h,x,6,0,1,&i)){ok=false;cs_free(i,1);}x[5]=0x11;x[3]=9;if(cs_disasm(h,x,6,0,1,&i)){ok=false;cs_free(i,1);}x[3]=8;x[2]=0x7e;if(cs_disasm(h,x,6,0,1,&i)){ok=false;cs_free(i,1);}}
-    cs_close(&h);return ok?0:1;
+int main(void) {
+  csh h;
+  cs_insn *i = NULL;
+  bool ok = true;
+  const uint8_t b8[] = {0x64, 0x62, 0xec, 0x7c, 8, 0x8a, 0x11};
+  const uint8_t b16[] = {0x62, 0xec, 0x7d, 8, 0x8b, 0x11};
+  const uint8_t b32[] = {0x67, 0x62, 0xec, 0x7c, 8, 0x8b, 0x11};
+  const uint8_t b64[] = {0x64, 0x67, 0x62, 0xec, 0xfc, 8, 0x8b, 0x11};
+  const uint8_t x4[] = {0x64, 0x62, 0x0c, 0x78, 8, 0x8b, 0x54, 0xa5, 0x20};
+  const uint8_t x4a32[] = {0x67, 0x64, 0x62, 0x0c, 0x78,
+                           8,    0x8b, 0x54, 0xa5, 0x20};
+  if (cs_open(CS_ARCH_X86, CS_MODE_64, &h))
+    return 1;
+  cs_option(h, CS_OPT_DETAIL, CS_OPT_ON);
+  ok &= ck(h, b8, sizeof(b8), "movrs", "r18b, byte ptr fs:[r17]", X86_REG_R18B,
+           1);
+  ok &=
+      ck(h, b16, sizeof(b16), "movrs", "r18w, word ptr [r17]", X86_REG_R18W, 2);
+  ok &= ck(h, b32, sizeof(b32), "movrs", "r18d, dword ptr [r17d]", X86_REG_R18D,
+           4);
+  ok &= ck(h, b64, sizeof(b64), "movrs", "r18, qword ptr fs:[r17d]",
+           X86_REG_R18, 8);
+  ok &= ck(h, x4, sizeof(x4), "movrs",
+           "r26d, dword ptr fs:[r29 + r28*4 + 0x20]", X86_REG_R26D, 4);
+  ok &= ck(h, x4a32, sizeof(x4a32), "movrs",
+           "r26d, dword ptr fs:[r29d + r28d*4 + 0x20]", X86_REG_R26D, 4);
+  cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
+  ok &= ck(h, b64, sizeof(b64), "movrsq", "%fs:(%r17d), %r18", X86_REG_R18, 8);
+  cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_INTEL);
+  /* W selects 64-bit operands over 66, as in XED; the byte form is W0. */
+  {
+    const uint8_t w66[] = {0x62, 0xec, 0xfd, 8, 0x8b, 0x11};
+    ok &= ck(h, w66, sizeof(w66), "movrs", "r18, qword ptr [r17]", X86_REG_R18,
+             8);
+    const uint8_t w8[] = {0x62, 0xec, 0xfc, 8, 0x8a, 0x11};
+    if (cs_disasm(h, w8, sizeof(w8), 0, 1, &i)) {
+      ok = false;
+      cs_free(i, 1);
+    }
+  }
+  {
+    uint8_t x[] = {0x62, 0xec, 0x7c, 8, 0x8b, 0xd1};
+    if (cs_disasm(h, x, 6, 0, 1, &i)) {
+      ok = false;
+      cs_free(i, 1);
+    }
+    x[2] = 0x78;
+    if (cs_disasm(h, x, 6, 0, 1, &i)) {
+      ok = false;
+      cs_free(i, 1);
+    }
+    x[5] = 0x11;
+    x[3] = 9;
+    if (cs_disasm(h, x, 6, 0, 1, &i)) {
+      ok = false;
+      cs_free(i, 1);
+    }
+    x[3] = 8;
+    x[2] = 0x7e;
+    if (cs_disasm(h, x, 6, 0, 1, &i)) {
+      ok = false;
+      cs_free(i, 1);
+    }
+  }
+  cs_close(&h);
+  return ok ? 0 : 1;
 }

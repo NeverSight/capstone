@@ -63,7 +63,7 @@ static void encode_register(uint8_t code[6], unsigned int cc, bool zu,
 	code[5] = 0xc0 | (number & 7);
 }
 
-static bool has_register(const cs_regs registers, uint8_t count, x86_reg reg)
+static bool has_register(const uint16_t *registers, uint8_t count, x86_reg reg)
 {
 	uint8_t i;
 
