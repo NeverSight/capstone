@@ -11140,6 +11140,13 @@ static const insn_op insn_ops[] = {
 const uint8_t *X86_get_op_access(cs_struct *h, unsigned int id,
 				 uint64_t *eflags)
 {
+	/* Match the explicit UD1 descriptor in readOperands, including reduce
+	 * builds whose generated access table has no operands for UD1. */
+	static const uint8_t ud1_access[] = { CS_AC_READ, CS_AC_READ, 0 };
+	if (id == X86_UD1) {
+		*eflags = 0;
+		return ud1_access;
+	}
 	unsigned int i = find_insn_h(h, id);
 	if (i != -1) {
 		*eflags = insn_ops[i].flags;

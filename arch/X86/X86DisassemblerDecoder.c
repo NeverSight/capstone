@@ -2171,9 +2171,25 @@ static int readMaskRegister(struct InternalInstruction *insn)
  */
 static int readOperands(struct InternalInstruction *insn)
 {
+	static const OperandSpecifier ud1Operands[2][X86_MAX_OPERANDS] = {
+		{ { ENCODING_REG, TYPE_R32 }, { ENCODING_RM, TYPE_R32 } },
+		{ { ENCODING_REG, TYPE_R32 }, { ENCODING_RM, TYPE_M } },
+	};
 	int hasVVVV, needVVVV;
 	int sawRegImm = 0;
 	int i;
+
+	insn->operands = &x86OperandSets[insn->spec->operands][0];
+	if (insn->instructionID == X86_UD1) {
+		/* The older generated descriptor omits UD1's r32/rm32 operands.
+		 * Reuse the normal addressing reader, including REX2 map 1, and
+		 * keep operand width independent of 66 and REX.W (SDM UD). */
+		insn->registerSize = insn->operandSize = 4;
+		insn->displacementSize = insn->addressSize == 2 ? 2 : 4;
+		if (readModRM(insn))
+			return -1;
+		insn->operands = ud1Operands[modFromModRM(insn->modRM) != 3];
+	}
 
 	/* If non-zero vvvv specified, need to make sure one of the operands
 	   uses it. */
@@ -2181,8 +2197,7 @@ static int readOperands(struct InternalInstruction *insn)
 	needVVVV = hasVVVV && (insn->vvvv != 0);
 
 	for (i = 0; i < X86_MAX_OPERANDS; ++i) {
-		const OperandSpecifier *op =
-			&x86OperandSets[insn->spec->operands][i];
+		const OperandSpecifier *op = &insn->operands[i];
 		switch (op->encoding) {
 		case ENCODING_NONE:
 		case ENCODING_SI:
@@ -2446,8 +2461,7 @@ static int vectorIndexNumber(SIBIndex index)
  */
 static int checkGatherRegisters(const struct InternalInstruction *insn)
 {
-	const OperandSpecifier *operands =
-		&x86OperandSets[insn->spec->operands][0];
+	const OperandSpecifier *operands = insn->operands;
 	int destination, index, mask = -1;
 	bool reg = false, vsib = false;
 	int i;
@@ -2519,9 +2533,6 @@ static bool checkPrefix(struct InternalInstruction *insn)
 			// invalid LOCK
 			return true;
 
-		// nop dword [rax]
-		case X86_NOOPL:
-
 		// DEC
 		case X86_DEC16m:
 		case X86_DEC32m:
@@ -2541,10 +2552,6 @@ static bool checkPrefix(struct InternalInstruction *insn)
 		case X86_ADC8mi:
 		case X86_ADC8mi8:
 		case X86_ADC8mr:
-		case X86_ADC8rm:
-		case X86_ADC16rm:
-		case X86_ADC32rm:
-		case X86_ADC64rm:
 
 		// ADD
 		case X86_ADD16mi:
@@ -2559,10 +2566,6 @@ static bool checkPrefix(struct InternalInstruction *insn)
 		case X86_ADD8mi:
 		case X86_ADD8mi8:
 		case X86_ADD8mr:
-		case X86_ADD8rm:
-		case X86_ADD16rm:
-		case X86_ADD32rm:
-		case X86_ADD64rm:
 
 		// AND
 		case X86_AND16mi:
@@ -2577,10 +2580,6 @@ static bool checkPrefix(struct InternalInstruction *insn)
 		case X86_AND8mi:
 		case X86_AND8mi8:
 		case X86_AND8mr:
-		case X86_AND8rm:
-		case X86_AND16rm:
-		case X86_AND32rm:
-		case X86_AND64rm:
 
 		// BTC
 		case X86_BTC16mi8:
@@ -2645,10 +2644,6 @@ static bool checkPrefix(struct InternalInstruction *insn)
 		case X86_OR8mi8:
 		case X86_OR8mi:
 		case X86_OR8mr:
-		case X86_OR8rm:
-		case X86_OR16rm:
-		case X86_OR32rm:
-		case X86_OR64rm:
 
 		// SBB
 		case X86_SBB16mi:
@@ -2677,10 +2672,6 @@ static bool checkPrefix(struct InternalInstruction *insn)
 		case X86_SUB8mi8:
 		case X86_SUB8mi:
 		case X86_SUB8mr:
-		case X86_SUB8rm:
-		case X86_SUB16rm:
-		case X86_SUB32rm:
-		case X86_SUB64rm:
 
 		// XADD
 		case X86_XADD16rm:
@@ -2707,10 +2698,6 @@ static bool checkPrefix(struct InternalInstruction *insn)
 		case X86_XOR8mi8:
 		case X86_XOR8mi:
 		case X86_XOR8mr:
-		case X86_XOR8rm:
-		case X86_XOR16rm:
-		case X86_XOR32rm:
-		case X86_XOR64rm:
 
 			// this instruction can be used with LOCK prefix
 			return false;
@@ -2767,6 +2754,12 @@ int decodeInstruction(struct InternalInstruction *insn, byteReader_t reader,
 	    checkGatherRegisters(insn))
 		return -1;
 
+	/* MOV can read CS (8C /1), but loading CS (8E /1) always raises #UD.
+	 * Segment selectors ignore REX/REX2 register extension bits. */
+	if (insn->opcodeType == ONEBYTE && insn->opcode == 0x8e &&
+	    regFromModRM(insn->orgModRM) == 1)
+		return -1;
+
 	insn->length = (size_t)(insn->readerCursor - insn->startLocation);
 
 	// instruction length must be <= 15 to be valid
@@ -2775,8 +2768,6 @@ int decodeInstruction(struct InternalInstruction *insn, byteReader_t reader,
 
 	if (insn->operandSize == 0)
 		insn->operandSize = insn->registerSize;
-
-	insn->operands = &x86OperandSets[insn->spec->operands][0];
 
 	return 0;
 }
