@@ -1075,7 +1075,17 @@ void X86_ATT_printInst(MCInst *MI, SStream *OS, void *info)
 	}
 
 	X86_lockrep(MI, OS);
-	printInstruction(MI, OS);
+	if (MCInst_getOpcode(MI) == X86_UD1) {
+		SStream_concat0(OS, "ud1\t");
+		if (MCInst_getNumOperands(MI) == 2)
+			printOperand(MI, 1, OS);
+		else
+			printi32mem(MI, 1, OS);
+		SStream_concat0(OS, ", ");
+		printOperand(MI, 0, OS);
+	} else {
+		printInstruction(MI, OS);
+	}
 
 	if (MI->has_imm) {
 		// if op_count > 1, then this operand's size is taken from the destination op

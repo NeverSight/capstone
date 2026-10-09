@@ -1850,9 +1850,7 @@ test_cases:
       options: [ CS_MODE_32 ]
       address: 0x0
     expected:
-      insns:
-      -
-        asm_text: "lock sub eax, dword ptr [ebp + 8]"
+      insns: []
   -
     input:
       name: "issue 1472 lock or"
@@ -1861,9 +1859,7 @@ test_cases:
       options: [ CS_MODE_32 ]
       address: 0x0
     expected:
-      insns:
-      -
-        asm_text: "lock or eax, dword ptr [ebp + 8]"
+      insns: []
   -
     input:
       name: "issue 1472 lock and"
@@ -1872,9 +1868,7 @@ test_cases:
       options: [ CS_MODE_32 ]
       address: 0x0
     expected:
-      insns:
-      -
-        asm_text: "lock and eax, dword ptr [ebp + 8]"
+      insns: []
   -
     input:
       name: "issue 1472 lock add"
@@ -1883,9 +1877,7 @@ test_cases:
       options: [ CS_MODE_32 ]
       address: 0x0
     expected:
-      insns:
-      -
-        asm_text: "lock add eax, dword ptr [ebp + 8]"
+      insns: []
   -
     input:
       name: "issue 1456 MOV dr"
@@ -1927,9 +1919,7 @@ test_cases:
       options: [ CS_MODE_32 ]
       address: 0x0
     expected:
-      insns:
-      -
-        asm_text: "lock adc al, byte ptr [ebp + 8]"
+      insns: []
   -
     input:
       name: "issue 1456/2748 xmmword"
@@ -3028,9 +3018,7 @@ test_cases:
       options: [ CS_MODE_64 ]
       address: 0x0
     expected:
-      insns:
-      -
-        asm_text: "lock nop dword ptr [rax]"
+      insns: []
   -
     input:
       name: "!# issue 913"

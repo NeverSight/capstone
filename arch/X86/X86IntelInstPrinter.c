@@ -808,7 +808,17 @@ void X86_Intel_printInst(MCInst *MI, SStream *O, void *Info)
 	}
 
 	X86_lockrep(MI, O);
-	printInstruction(MI, O);
+	if (MCInst_getOpcode(MI) == X86_UD1) {
+		SStream_concat0(O, "ud1\t");
+		printOperand(MI, 0, O);
+		SStream_concat0(O, ", ");
+		if (MCInst_getNumOperands(MI) == 2)
+			printOperand(MI, 1, O);
+		else
+			printi32mem(MI, 1, O);
+	} else {
+		printInstruction(MI, O);
+	}
 
 	if (MI->csh->detail_opt) {
 #ifndef CAPSTONE_DIET
