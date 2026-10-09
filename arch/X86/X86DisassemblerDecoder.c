@@ -1335,6 +1335,11 @@ static int getID(struct InternalInstruction *insn, cs_mode mode)
 			attrMask =
 				resolveMandatoryPrefixConflict(insn, attrMask);
 		}
+
+		/* F2/F3 select the opcode independently of the address size.
+		 * Address-dependent opcodes restore ATTR_ADSIZE below. */
+		if (attrMask & (ATTR_XD | ATTR_XS))
+			attrMask &= ~ATTR_ADSIZE;
 	}
 
 	if (insn->rexPrefix & 0x08) {
