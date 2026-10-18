@@ -7662,3 +7662,27 @@ test_cases:
                 access: CS_AC_READ_WRITE
           regs_read: [ cl, rdx, rax ]
           regs_write: [ rflags ]
+  -
+    input:
+      name: "ARMv8 A-profile decodes CP15 MRC and MCR"
+      bytes: [ 0x70, 0x0f, 0x1d, 0xee, 0xba, 0x1f, 0x07, 0xee ]
+      arch: "CS_ARCH_ARM"
+      options: [ CS_MODE_ARM, CS_MODE_V8 ]
+      address: 0x0
+    expected:
+      insns:
+      -
+        asm_text: "mrc p15, #0, r0, c13, c0, #3"
+      -
+        asm_text: "mcr p15, #0, r1, c7, c10, #5"
+  -
+    input:
+      name: "ARMv8 A-profile Thumb decodes CP15 MRC"
+      bytes: [ 0x1d, 0xee, 0x70, 0x0f ]
+      arch: "CS_ARCH_ARM"
+      options: [ CS_MODE_THUMB, CS_MODE_V8 ]
+      address: 0x0
+    expected:
+      insns:
+      -
+        asm_text: "mrc p15, #0, r0, c13, c0, #3"

@@ -128,7 +128,11 @@ bool isValidCoprocessorNumber(MCInst *Inst, unsigned Num)
 
 	// Armv8.1-M disallows 100x (CP8,CP9) and 111x (CP14,CP15)
 	// which clash with MVE.
+	// CS_MODE_V8 enables the Armv8.1-M Mainline features as well, but MVE
+	// only decodes with CS_MODE_MCLASS. Without it the code is A-profile,
+	// where CP14 and CP15 are the valid coprocessors.
 	if (ARM_getFeatureBits(Inst->csh->mode, ARM_HasV8_1MMainlineOps) &&
+	    ARM_getFeatureBits(Inst->csh->mode, ARM_FeatureMClass) &&
 	    ((Num & 0xE) == 0x8 || (Num & 0xE) == 0xE))
 		return false;
 
