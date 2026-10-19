@@ -346,31 +346,31 @@ static bool test_encoding_anchors(void)
 		X86_EFLAGS_UNDEFINED_AF | X86_EFLAGS_RESET_CF |
 		X86_EFLAGS_RESET_OF | X86_EFLAGS_MODIFY_PF |
 		X86_EFLAGS_MODIFY_SF | X86_EFLAGS_MODIFY_ZF;
-	static const alu_operation add = {
+	const alu_operation add = {
 		X86_INS_ADD,
 		"add",
 		0x00,
 		arithmetic_flags,
 	};
-	static const alu_operation sub = {
+	const alu_operation sub = {
 		X86_INS_SUB,
 		"sub",
 		0x28,
 		arithmetic_flags,
 	};
-	static const alu_operation or_op = {
+	const alu_operation or_op = {
 		X86_INS_OR,
 		"or",
 		0x08,
 		logical_flags,
 	};
-	static const alu_operation and_op = {
+	const alu_operation and_op = {
 		X86_INS_AND,
 		"and",
 		0x20,
 		logical_flags,
 	};
-	static const alu_operation xor_op = {
+	const alu_operation xor_op = {
 		X86_INS_XOR,
 		"xor",
 		0x30,
