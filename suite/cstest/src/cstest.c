@@ -1,7 +1,7 @@
 // Copyright © 2024 Rot127 <unisono@quyllur.org>
 // SPDX-License-Identifier: BSD-3
 
-#define _XOPEN_SOURCE 500
+#define _XOPEN_SOURCE 600
 #include "../../../utils.h"
 #include "test_run.h"
 #include <capstone/platform.h>
