@@ -19,6 +19,7 @@
 #ifndef CS_MCINST_H
 #define CS_MCINST_H
 
+#include <assert.h>
 #include "include/capstone/capstone.h"
 #include "MCAsmInfo.h"
 #include "MCInstrDesc.h"
@@ -65,20 +66,41 @@ bool MCOperand_isExpr(const MCOperand *op);
 bool MCOperand_isInst(const MCOperand *op);
 
 /// getReg - Returns the register number.
-unsigned MCOperand_getReg(const MCOperand *op);
+static inline unsigned MCOperand_getReg(const MCOperand *op)
+{
+	return op->RegVal;
+}
 
 /// setReg - Set the register number.
-void MCOperand_setReg(MCOperand *op, unsigned Reg);
+static inline void MCOperand_setReg(MCOperand *op, unsigned Reg)
+{
+	op->RegVal = Reg;
+}
 
-int64_t MCOperand_getImm(const MCOperand *op);
+static inline int64_t MCOperand_getImm(const MCOperand *op)
+{
+	return op->ImmVal;
+}
 
-void MCOperand_setImm(MCOperand *op, int64_t Val);
+static inline void MCOperand_setImm(MCOperand *op, int64_t Val)
+{
+	op->ImmVal = Val;
+}
 
-int64_t MCOperand_getExpr(const MCOperand *op);
+static inline int64_t MCOperand_getExpr(const MCOperand *op)
+{
+	return op->ImmVal;
+}
 
-double MCOperand_getFPImm(const MCOperand *op);
+static inline double MCOperand_getFPImm(const MCOperand *op)
+{
+	return op->FPImmVal;
+}
 
-void MCOperand_setFPImm(MCOperand *op, double Val);
+static inline void MCOperand_setFPImm(MCOperand *op, double Val)
+{
+	op->FPImmVal = Val;
+}
 
 const MCInst *MCOperand_getInst(const MCOperand *op);
 
@@ -143,22 +165,44 @@ struct MCInst {
 
 void MCInst_Init(MCInst *inst, cs_arch arch);
 
-void MCInst_clear(MCInst *inst);
+static inline void MCInst_clear(MCInst *inst)
+{
+	inst->size = 0;
+}
 
 // do not free operand after inserting
 void MCInst_insert0(MCInst *inst, int index, MCOperand *Op);
 
-void MCInst_setOpcode(MCInst *inst, unsigned Op);
+static inline void MCInst_setOpcode(MCInst *inst, unsigned Op)
+{
+	inst->Opcode = Op;
+}
 
-unsigned MCInst_getOpcode(const MCInst *);
+static inline unsigned MCInst_getOpcode(const MCInst *inst)
+{
+	return inst->Opcode;
+}
 
-void MCInst_setOpcodePub(MCInst *inst, unsigned Op);
+static inline void MCInst_setOpcodePub(MCInst *inst, unsigned Op)
+{
+	inst->OpcodePub = Op;
+}
 
-unsigned MCInst_getOpcodePub(const MCInst *);
+static inline unsigned MCInst_getOpcodePub(const MCInst *inst)
+{
+	return inst->OpcodePub;
+}
 
-MCOperand *MCInst_getOperand(MCInst *inst, unsigned i);
+static inline MCOperand *MCInst_getOperand(MCInst *inst, unsigned i)
+{
+	assert(i < MAX_MC_OPS);
+	return &inst->Operands[i];
+}
 
-unsigned MCInst_getNumOperands(const MCInst *inst);
+static inline unsigned MCInst_getNumOperands(const MCInst *inst)
+{
+	return inst->size;
+}
 
 // This addOperand2 function doesn't free Op
 void MCInst_addOperand2(MCInst *inst, MCOperand *Op);
