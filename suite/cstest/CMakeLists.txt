@@ -97,6 +97,7 @@ set_target_properties(libcyaml PROPERTIES IMPORTED_LOCATION "${LIBCYAML_LIB_FILE
 set_target_properties(libcyaml PROPERTIES INCLUDE_DIRECTORIES "${LIBCYAML_INCLUDE_DIR}")
 set_target_properties(libcyaml PROPERTIES LIBRARY_DIRECTORIES "${LIBCYAML_LIBRARY_DIR}")
 if (USE_BUILT_LIBYAML)
+    add_dependencies(libcyaml_ext libyaml_ext)
     add_dependencies(libcyaml libyaml_ext)
     add_dependencies(libcyaml libyaml_built)
     target_link_libraries(libcyaml INTERFACE libyaml_built)
