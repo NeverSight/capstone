@@ -11961,6 +11961,25 @@ static void repair_kmask_access(csh handle, cs_insn *insn)
 	}
 }
 
+static void repair_x87_environment_detail(csh handle, cs_insn *insn)
+{
+	const bool registers = insn->id == X86_INS_FNSAVE ||
+			       insn->id == X86_INS_FRSTOR;
+	if (!registers && insn->id != X86_INS_FNSTENV &&
+	    insn->id != X86_INS_FLDENV)
+		return;
+	cs_x86 *x86 = &insn->detail->x86;
+	if (x86->op_count != 1 || x86->operands[0].type != X86_OP_MEM)
+		return;
+	const cs_struct *capstone = (const cs_struct *)(uintptr_t)handle;
+	x86->operands[0].size = x86_x87_environment_size(
+		capstone->mode, x86->prefix[2] == 0x66, registers);
+	x86->operands[0].access = insn->id == X86_INS_FLDENV ||
+						  insn->id == X86_INS_FRSTOR ?
+					  CS_AC_READ :
+					  CS_AC_WRITE;
+}
+
 /// The post-printer function. Used to fixup flaws in the disassembly information
 /// of certain instructions.
 void X86_postprinter(csh handle, cs_insn *insn, SStream *mnem, MCInst *mci)
@@ -11985,6 +12004,7 @@ void X86_postprinter(csh handle, cs_insn *insn, SStream *mnem, MCInst *mci)
 	repair_vector_mask_conversion_access(&insn->detail->x86, insn->id);
 	repair_vector_narrow_access(&insn->detail->x86, insn->id);
 	repair_kmask_access(handle, insn);
+	repair_x87_environment_detail(handle, insn);
 	repair_vfpclass_mask_access(handle, insn);
 	switch (insn->id) {
 	default:

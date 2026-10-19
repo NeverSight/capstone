@@ -215,18 +215,12 @@ static void printf32mem(MCInst *MI, unsigned OpNo, SStream *O)
 		break;
 	case X86_FSTENVm:
 	case X86_FLDENVm:
-		// TODO: fix this in tablegen instead
-		switch (x86_get_bit_mode(MI->csh->mode)) {
-		default: // never reach
-			break;
-		case CS_MODE_16:
-			MI->x86opsize = 14;
-			break;
-		case CS_MODE_32:
-		case CS_MODE_64:
-			MI->x86opsize = 28;
-			break;
-		}
+	case X86_FSAVEm:
+	case X86_FRSTORm:
+		MI->x86opsize = x86_x87_environment_size(
+			MI->csh->mode, MI->x86_prefix[2] == 0x66,
+			MCInst_getOpcode(MI) == X86_FSAVEm ||
+				MCInst_getOpcode(MI) == X86_FRSTORm);
 		break;
 	}
 

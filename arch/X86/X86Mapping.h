@@ -114,6 +114,14 @@ static inline int x86_get_bit_mode(cs_mode mode)
 	return mode & (CS_MODE_64 | CS_MODE_32 | CS_MODE_16);
 }
 
+static inline uint8_t
+x86_x87_environment_size(cs_mode mode, bool operand_override, bool registers)
+{
+	const bool short_environment = (x86_get_bit_mode(mode) == CS_MODE_16) !=
+				       operand_override;
+	return (short_environment ? 14 : 28) + (registers ? 80 : 0);
+}
+
 static inline uint64_t x86_get_address_mask(cs_mode mode)
 {
 	if (x86_has_feature(mode, CS_MODE_16))

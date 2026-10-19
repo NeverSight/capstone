@@ -713,3 +713,12 @@ Meaning, if a memory operand has the `CS_AC_READ` attribute set, it means the me
 Please note though, `writeback` registers are correctly added to the `regs_write` list if `cs_reg_access` is called.
 
 These issues will be addressed in the next releases. For a more detailed descriptions see: https://github.com/capstone-engine/capstone/issues/2472#issuecomment-2335226281 (starting at "eor and the others").
+
+## x86 legacy x87 environment details
+
+`FLDENV` and `FNSTENV` report a 14- or 28-byte memory operand according to
+the effective operand size, including the `66` override. `FRSTOR` and
+`FNSAVE` include the eight saved binary80 registers, reporting 94 or 108 bytes.
+These extents are independent of address size and REX.W. Loads report memory
+read access; saves report memory write access. Both Intel and AT&T syntax
+provide the same detail, without a scalar `dword ptr` label for saved state.
