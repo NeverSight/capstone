@@ -33,7 +33,8 @@ set_target_properties(cmocka PROPERTIES IMPORTED_LOCATION "${CMOCKA_LIB_FILE}")
 # So it builds it optionally as well.
 set(USE_BUILT_LIBYAML false)
 find_library(libyaml NAMES libyaml yaml)
-if (NOT libyaml)
+find_path(LIBYAML_INCLUDE_DIRS NAMES yaml.h)
+if (NOT libyaml OR NOT LIBYAML_INCLUDE_DIRS)
     # Build libyaml
     set(USE_BUILT_LIBYAML true)
     message("System libyaml: NO - Building it.")
