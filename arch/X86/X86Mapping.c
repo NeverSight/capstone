@@ -7932,6 +7932,9 @@ static bool print_sha512_vex(MCInst *instr, SStream *stream, bool att_syntax)
 
 bool X86_printFeatureExtension(MCInst *instr, SStream *stream, bool att_syntax)
 {
+	// Source-owned extensions have a disjoint range above generated opcodes.
+	if (MCInst_getOpcode(instr) < X86_FEATURE_TILEZERO)
+		return false;
 	return print_sha512_vex(instr, stream, att_syntax) ||
 	       print_apx_msr(instr, stream, att_syntax) ||
 	       print_apx_evex_vector_gpr(instr, stream, att_syntax) ||
@@ -11599,7 +11602,19 @@ static void repair_vector_mask_sizes(cs_x86 *x86, const SStream *assembly,
 	uint8_t element_size;
 	uint8_t mask_size;
 	bool scalar = false;
+	bool has_mask_operand = false;
 	uint8_t i;
+
+	// Every repair below changes only explicit mask-register operand sizes.
+	for (i = 0; i < x86->op_count; ++i) {
+		if (x86->operands[i].type == X86_OP_REG &&
+		    is_mask_register(x86->operands[i].reg)) {
+			has_mask_operand = true;
+			break;
+		}
+	}
+	if (!has_mask_operand)
+		return;
 
 	element_size = vector_narrow_source_element_size(instruction_id);
 	if (element_size != 0) {
@@ -11760,15 +11775,18 @@ static void repair_vfpclass_mask_access(csh handle, cs_insn *insn)
 static void repair_avx_broadcast(cs_x86 *x86, const SStream *assembly)
 {
 	x86_avx_bcast broadcast = X86_AVX_BCAST_INVALID;
+	const char *decorators = strchr(assembly->buffer, '{');
 	uint8_t i;
 
-	if (strstr(assembly->buffer, "{1to16}") != NULL)
+	if (!decorators)
+		return;
+	if (strstr(decorators, "{1to16}") != NULL)
 		broadcast = X86_AVX_BCAST_16;
-	else if (strstr(assembly->buffer, "{1to8}") != NULL)
+	else if (strstr(decorators, "{1to8}") != NULL)
 		broadcast = X86_AVX_BCAST_8;
-	else if (strstr(assembly->buffer, "{1to4}") != NULL)
+	else if (strstr(decorators, "{1to4}") != NULL)
 		broadcast = X86_AVX_BCAST_4;
-	else if (strstr(assembly->buffer, "{1to2}") != NULL)
+	else if (strstr(decorators, "{1to2}") != NULL)
 		broadcast = X86_AVX_BCAST_2;
 	if (broadcast == X86_AVX_BCAST_INVALID)
 		return;

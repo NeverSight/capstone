@@ -1897,16 +1897,12 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 	 * VSIB continues to use V4 for its vector index; X4 is ignored there.
 	 * A register r/m has no index, so U=0 remains #UD there, as in XED. */
 	{
-		const size_t limit = code_len < sizeof(normalized_code) ?
-					     code_len : sizeof(normalized_code);
-		unsigned int segment_count = 0, address_size_count = 0;
-		bool invalid_prefix = false;
-		const bool has_evex = scan_x86_evex_prefix(
-			code, limit, (handle->mode & CS_MODE_64) != 0,
-			&apx_evex_offset, &segment_count, &address_size_count,
-			&invalid_prefix);
+		const size_t limit = evex_normalization_limit;
+		// Both normalizations inspect the original bytes, not info.code.
+		apx_evex_offset = evex_normalization_offset;
 
-		if (has_evex && limit - apx_evex_offset >= 6 &&
+		if (has_evex_normalization_prefix &&
+		    limit - apx_evex_offset >= 6 &&
 		    code[apx_evex_offset] == 0x62 &&
 		    (code[apx_evex_offset + 1] & 7) >= 1 &&
 		    (code[apx_evex_offset + 1] & 7) <= 3 &&
@@ -1914,8 +1910,9 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 		     (code[apx_evex_offset + 2] & 0x04) == 0)) {
 			const uint8_t modrm = code[apx_evex_offset + 5];
 
-			if (!(handle->mode & CS_MODE_64) || invalid_prefix ||
-			    segment_count > 1 || address_size_count > 1 ||
+			if (!(handle->mode & CS_MODE_64) ||
+			    evex_invalid_prefix || evex_segment_count > 1 ||
+			    evex_address_size_count > 1 ||
 			    ((modrm & 0xc0) == 0xc0 &&
 			     (code[apx_evex_offset + 2] & 0x04) == 0))
 				return false;
