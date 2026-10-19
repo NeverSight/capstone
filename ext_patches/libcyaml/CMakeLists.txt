@@ -32,3 +32,6 @@ include_directories(${LIBYAML_INCLUDE_DIRS})
 link_directories(${LIBYAML_LIBRARY_DIRS})
 
 add_library(cyaml_static STATIC ${LIBCYAML_SRC})
+if (USE_BUILT_LIBYAML)
+  target_compile_definitions(cyaml_static PRIVATE YAML_DECLARE_STATIC)
+endif()

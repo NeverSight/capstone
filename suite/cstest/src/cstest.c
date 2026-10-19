@@ -5,12 +5,25 @@
 #include "../../../utils.h"
 #include "test_run.h"
 #include <capstone/platform.h>
+#ifdef _WIN32
+#include <io.h>
+#else
 #include <dirent.h>
+#endif
 #include <sys/stat.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+
+#ifdef _WIN32
+#ifndef S_ISDIR
+#define S_ISDIR(mode) (((mode) & _S_IFMT) == _S_IFDIR)
+#endif
+#ifndef S_ISREG
+#define S_ISREG(mode) (((mode) & _S_IFMT) == _S_IFREG)
+#endif
+#endif
 
 static void help(const char *self)
 {
@@ -79,10 +92,10 @@ static bool get_file_stat(const char *fpath, struct stat *sb)
 /// 1 - skip
 /// 0 - valid file or dir
 /// -1 - error abort
-static int check_path(const struct dirent *dir, const char *fpath,
+static int check_path(const char *name, const char *fpath,
 		      void /*struct stat OR struct _stat*/ *sb)
 {
-	if (dir && (strstr(dir->d_name, "..") || !strcmp(dir->d_name, "."))) {
+	if (name && (strstr(name, "..") || !strcmp(name, "."))) {
 		return 1;
 	}
 
@@ -112,11 +125,24 @@ static bool collect_yaml_tests(const char *path, char ***test_files,
 #endif
 
 	char *fpath = NULL;
+#ifdef _WIN32
+	struct _finddata_t dir;
+	size_t pattern_size = strlen(path) + 3;
+	char *pattern = cs_mem_malloc(pattern_size);
+	if (!pattern) {
+		return false;
+	}
+	snprintf(pattern, pattern_size, "%s/*", path);
+	intptr_t d = _findfirst(pattern, &dir);
+	cs_mem_free(pattern);
+	if (d == -1) {
+#else
 	DIR *d = NULL;
 	struct dirent *dir = NULL;
 	d = opendir(path);
 	if (!d) {
-		if (check_path(dir, path, &sb) == 0 && S_ISREG(sb.st_mode)) {
+#endif
+		if (check_path(NULL, path, &sb) == 0 && S_ISREG(sb.st_mode)) {
 			bool added =
 				add_yaml_file_path(path, test_files, file_count,
 						   ".yaml") == 0 ||
@@ -130,18 +156,23 @@ static bool collect_yaml_tests(const char *path, char ***test_files,
 			"[!] '%s' is not a yaml file nor a directory.\n", path);
 		return false;
 	}
+#ifdef _WIN32
+	do {
+		const char *name = dir.name;
+#else
 	while ((dir = readdir(d)) != NULL) {
-		size_t plen = strlen(path) + strlen(dir->d_name) + 1;
+		const char *name = dir->d_name;
+#endif
+		size_t plen = strlen(path) + strlen(name) + 1;
 		fpath = cs_mem_calloc(plen + 1, sizeof(char));
 		if (!fpath) {
 			goto error;
 		}
-		if (snprintf(fpath, plen + 1, "%s/%s", path, dir->d_name) !=
-		    plen) {
+		if (snprintf(fpath, plen + 1, "%s/%s", path, name) != plen) {
 			fprintf(stderr, "[!] snprintf failed.\n");
 			goto error;
 		}
-		switch (check_path(dir, fpath, &sb)) {
+		switch (check_path(name, fpath, &sb)) {
 		case 0:
 			break;
 		case 1:
@@ -170,15 +201,24 @@ static bool collect_yaml_tests(const char *path, char ***test_files,
 			}
 		}
 		cs_mem_free(fpath);
+#ifdef _WIN32
+	} while (_findnext(d, &dir) == 0);
+	if (_findclose(d)) {
+#else
 	}
 	if (closedir(d)) {
+#endif
 		fprintf(stderr, "[!] closedir on '%s' failed.\n", path);
 		return false;
 	}
 	return true;
 error:
 	cs_mem_free(fpath);
+#ifdef _WIN32
+	_findclose(d);
+#else
 	closedir(d);
+#endif
 	return false;
 }
 

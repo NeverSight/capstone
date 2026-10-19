@@ -7,14 +7,26 @@
 from __future__ import annotations
 import sys
 import subprocess as sp
+import tempfile
 from pathlib import Path
 
 
-def check(cmd: list[str], expected_stdout: str, expected_stderr: str, fail_msg: str):
+def check(
+    cmd: list[str],
+    expected_stdout: str,
+    expected_stderr: str,
+    fail_msg: str,
+    expected_returncode: int | None = None,
+):
     print(f"Run: {' '.join(cmd)}")
     result = sp.run(cmd, capture_output=True)
     stderr = result.stderr.decode("utf8")
     stdout = result.stdout.decode("utf8")
+    if expected_returncode is not None and result.returncode != expected_returncode:
+        print(stdout)
+        print(stderr)
+        print(f"{fail_msg}: exit {result.returncode}, expected {expected_returncode}")
+        exit(1)
     if expected_stderr and expected_stderr not in stderr:
         print(f"STDERR mismatch: '{expected_stderr}' not in stderr")
         print("\n###################### STDERR ######################\n")
@@ -89,6 +101,39 @@ def run_tests(cmd: str):
         expected_stderr="",
         fail_msg="Test: Detecting file in directory failed.",
     )
+
+    if "cstest_py" not in cmd:
+        with tempfile.TemporaryDirectory(prefix="cstest paths ") as directory:
+            root = Path(directory)
+            nested = root / "nested directory"
+            nested.mkdir()
+            (nested / "empty").mkdir()
+            valid = path.joinpath("min_valid_test_file.yaml").read_bytes()
+            (root / "one.yaml").write_bytes(valid)
+            (nested / "two.yml").write_bytes(valid)
+            (nested / "ignored.txt").write_text("not a test")
+            for inputs in ([str(root)], [str(root / "one.yaml"), str(nested)]):
+                check(
+                    cmd + inputs,
+                    expected_stdout="Test files found: 2",
+                    expected_stderr="",
+                    fail_msg="Test: Recursive YAML discovery with spaces failed.",
+                    expected_returncode=0,
+                )
+            check(
+                cmd + [str(nested / "empty")],
+                expected_stdout="",
+                expected_stderr="Arguments are invalid. No files found.",
+                fail_msg="Test: An empty directory must not pass silently.",
+                expected_returncode=1,
+            )
+            check(
+                cmd + [str(root / "missing.yaml")],
+                expected_stdout="",
+                expected_stderr="is not a yaml file nor a directory.",
+                fail_msg="Test: A missing input must fail.",
+                expected_returncode=1,
+            )
 
     if "cstest_py" in cmd:
         check(
