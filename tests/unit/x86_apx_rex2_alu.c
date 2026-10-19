@@ -554,7 +554,7 @@ int main(void)
 		X86_EFLAGS_UNDEFINED_AF | X86_EFLAGS_RESET_CF |
 		X86_EFLAGS_RESET_OF | X86_EFLAGS_MODIFY_PF |
 		X86_EFLAGS_MODIFY_SF | X86_EFLAGS_MODIFY_ZF;
-	static const rex2_binary_kind kinds[] = {
+	const rex2_binary_kind kinds[] = {
 		{ X86_INS_MOV, "mov", 0x88, 0x89, 0x8a, 0x8b, CS_AC_WRITE,
 		  0 },
 		{ X86_INS_ADD, "add", 0x00, 0x01, 0x02, 0x03,

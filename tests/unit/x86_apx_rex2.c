@@ -364,7 +364,7 @@ int main(void)
 	static const uint8_t addd[] = { 0xd5, 0x55, 0x01, 0xc7 };
 	static const uint8_t addq[] = { 0xd5, 0x5d, 0x01, 0xc7 };
 	static const uint8_t subd[] = { 0xd5, 0x55, 0x29, 0xc7 };
-	static const rex2_case test_cases[] = {
+	const rex2_case test_cases[] = {
 		{ movb, sizeof(movb), X86_INS_MOV, "mov", "r26b, r25b",
 		  X86_REG_R26B, X86_REG_R25B, "r26b", "r25b", 1,
 		  CS_AC_WRITE, 0x88, 0xca, 3, false, 0 },
