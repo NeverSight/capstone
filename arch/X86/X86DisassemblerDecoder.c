@@ -2475,9 +2475,14 @@ static int vectorIndexNumber(SIBIndex index)
 static int checkGatherRegisters(const struct InternalInstruction *insn)
 {
 	const OperandSpecifier *operands = insn->operands;
-	int destination, index, mask = -1;
+	int destination, mask = -1;
+	const int index = vectorIndexNumber(insn->sibIndex);
 	bool reg = false, vsib = false;
 	int i;
+
+	/* Only a decoded VSIB index can participate in a gather conflict. */
+	if (index < 0)
+		return 0;
 
 	/* A gather lists its ModRM.reg destination before its VSIB source; a
 	 * scatter lists its VSIB destination first. */
@@ -2501,8 +2506,7 @@ CASE_ENCODING_VSIB:
 	if (!vsib)
 		return 0;
 	destination = vectorRegisterNumber(insn->reg);
-	index = vectorIndexNumber(insn->sibIndex);
-	if (destination < 0 || index < 0)
+	if (destination < 0)
 		return 0;
 	if (destination == index ||
 	    (mask >= 0 && (mask == destination || mask == index)))
