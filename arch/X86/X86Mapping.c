@@ -7972,6 +7972,9 @@ bool X86_printFeatureExtension(MCInst *instr, SStream *stream, bool att_syntax)
 
 bool X86_mapFeatureExtension(cs_insn *insn, unsigned int opcode)
 {
+	if (opcode < X86_FEATURE_TILEZERO)
+		return false;
+
 	static const x86_insn cmov_ids[] = {
 		X86_INS_CMOVO, X86_INS_CMOVNO, X86_INS_CMOVB,  X86_INS_CMOVAE,
 		X86_INS_CMOVE, X86_INS_CMOVNE, X86_INS_CMOVBE, X86_INS_CMOVA,
