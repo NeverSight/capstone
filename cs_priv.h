@@ -122,6 +122,8 @@ struct cs_struct {
 	struct insn_mnem
 		*mnem_list; // linked list of customized instruction mnemonic
 	uint32_t LITBASE; ///< The LITBASE register content. Bit 0 (LSB) indicatess if it is set. Bit[23:8] are the literal base address.
+	const void *alias_opcode_table; // immutable alias table
+	size_t alias_opcode_count; // cached sorted prefix length
 };
 
 #define MAX_ARCH CS_ARCH_MAX

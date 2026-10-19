@@ -133,24 +133,36 @@ static inline bool validOpToPatter(const PatternsForOpcode *P)
 
 const char *matchAliasPatterns(MCInst *MI, const AliasMatchingData *M)
 {
-	// TODO Rewrite to C
-
-	// auto It = lower_bound(M.OpToPatterns, MI->getOpcode(),
-	//                       [](const PatternsForOpcode &L, unsigned Opcode) {
-	//                         return L.Opcode < Opcode;
-	//                       });
-	// if (It == M.OpToPatterns.end() || It->Opcode != MI->getOpcode())
-	//   return nullptr;
-
-	// Binary search by opcode. Return false if there are no aliases for this
-	// opcode.
+	// Generated tables are sorted, immutable, and end in an all-zero sentinel.
+	// Cache only the prefix needed by previous lookups so a new handle does
+	// not scan the entire table when decoding a short instruction sequence.
+	cs_struct *handle = MI->csh;
+	size_t count = 0;
+	if (handle && handle->alias_opcode_table == M->OpToPatterns)
+		count = handle->alias_opcode_count;
 	unsigned MIOpcode = MI->Opcode;
 	size_t i = 0;
-	uint32_t PatternOpcode = M->OpToPatterns[i].Opcode;
-	while (PatternOpcode < MIOpcode && validOpToPatter(&M->OpToPatterns[i]))
-		PatternOpcode = M->OpToPatterns[++i].Opcode;
-	if (PatternOpcode != MI->Opcode ||
-	    !validOpToPatter(&M->OpToPatterns[i]))
+	if (!count || M->OpToPatterns[count - 1].Opcode < MIOpcode) {
+		i = count;
+		while (validOpToPatter(&M->OpToPatterns[i]) &&
+		       M->OpToPatterns[i].Opcode < MIOpcode)
+			++i;
+		count = i + validOpToPatter(&M->OpToPatterns[i]);
+		if (handle) {
+			handle->alias_opcode_table = M->OpToPatterns;
+			handle->alias_opcode_count = count;
+		}
+	} else {
+		size_t end = count;
+		while (i < end) {
+			size_t middle = i + (end - i) / 2;
+			if (M->OpToPatterns[middle].Opcode < MIOpcode)
+				i = middle + 1;
+			else
+				end = middle;
+		}
+	}
+	if (i == count || M->OpToPatterns[i].Opcode != MIOpcode)
 		return NULL;
 
 	// // Try all patterns for this opcode.
