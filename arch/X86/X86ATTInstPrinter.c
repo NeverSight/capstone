@@ -849,8 +849,10 @@ static void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
 						.operands[MI->flat_insn->detail
 								  ->x86.op_count]
 						.size = opsize;
-					MI->flat_insn->detail->x86.encoding
-						.imm_size = encsize;
+					// Missing table entries retain the decoder's byte extent.
+					if (encsize != 0)
+						MI->flat_insn->detail->x86.encoding
+							.imm_size = encsize;
 				} else if (MI->op1_size > 0)
 					MI->flat_insn->detail->x86
 						.operands[MI->flat_insn->detail

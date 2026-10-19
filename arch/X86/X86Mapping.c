@@ -11231,6 +11231,9 @@ static const struct size_id {
 // given the instruction name, return the size of its immediate operand (or 0)
 uint8_t X86_immediate_size(unsigned int id, uint8_t *enc_size)
 {
+	if (enc_size != NULL)
+		*enc_size = 0;
+
 	// binary searching since the IDs are sorted in order
 	unsigned int left, right, m;
 
