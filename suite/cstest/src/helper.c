@@ -33,17 +33,26 @@ void add_str(char **src, const char *format, ...)
 {
 	char *tmp;
 	size_t len1, len2;
+	int length;
 	va_list args;
 
-	tmp = (char *)malloc(sizeof(char) * 1000);
 	va_start(args, format);
-	vsprintf(tmp, format, args);
+	length = vsnprintf(NULL, 0, format, args);
 	va_end(args);
+	assert_true(length >= 0);
+	len2 = (size_t)length;
+	tmp = (char *)malloc(len2 + 1);
+	assert_non_null(tmp);
+	va_start(args, format);
+	length = vsnprintf(tmp, len2 + 1, format, args);
+	va_end(args);
+	assert_true(length >= 0 && (size_t)length == len2);
 
 	len1 = strlen(*src);
-	len2 = strlen(tmp);
-
-	*src = (char *)realloc(*src, sizeof(char) * (len1 + len2 + 10));
+	assert_true(len1 <= SIZE_MAX - len2 - 1);
+	char *grown = (char *)realloc(*src, len1 + len2 + 1);
+	assert_non_null(grown);
+	*src = grown;
 	memcpy(*src + len1, tmp, len2 + 1);
 	free(tmp);
 }

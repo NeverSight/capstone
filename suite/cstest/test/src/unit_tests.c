@@ -4,7 +4,29 @@
 #include "../../../utils.h"
 #include "../../../Mapping.h"
 #include "test_mapping.h"
+#include "helper.h"
 #include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+
+static bool test_add_str_long_and_aliased(void)
+{
+	char payload[2049];
+	memset(payload, 'x', sizeof(payload) - 1);
+	payload[sizeof(payload) - 1] = '\0';
+	char *text = malloc(1);
+	if (!text)
+		return false;
+	text[0] = '\0';
+	add_str(&text, "%s:%d", payload, 42);
+	bool success = strlen(text) == 2051 &&
+		       memcmp(text, payload, 2048) == 0 &&
+		       strcmp(text + 2048, ":42") == 0;
+	add_str(&text, "%s", text);
+	success &= strlen(text) == 4102 && memcmp(text, text + 2051, 2051) == 0;
+	free(text);
+	return success;
+}
 
 bool test_cs_enum_get_val()
 {
@@ -89,5 +111,9 @@ int main()
 	bool success = true;
 	success &= test_cs_enum_get_val();
 	printf("test_cs_enum_get_val: %s\n", success ? "ok" : "fail");
+	const bool append_success = test_add_str_long_and_aliased();
+	printf("test_add_str_long_and_aliased: %s\n",
+	       append_success ? "ok" : "fail");
+	success &= append_success;
 	return success ? 0 : 1;
 }
