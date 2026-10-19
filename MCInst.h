@@ -105,6 +105,7 @@ struct MCInst {
 	uint8_t size; // number of operands
 	bool has_imm; // indicate this instruction has an X86_OP_IMM operand - used for ATT syntax
 	uint8_t op1_size; // size of 1st operand - for X86 Intel syntax
+	uint8_t tied_op_idx_size; // Upper bound of populated tied_op_idx slots
 	unsigned Opcode; // private opcode
 	MCOperand Operands[MAX_MC_OPS];
 	cs_insn *flat_insn; // insn to be exposed to public

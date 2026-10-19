@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.15)
 
 enable_testing()
-set(UNIT_TEST_SOURCES sstream.c utils.c api.c)
+set(UNIT_TEST_SOURCES sstream.c utils.c api.c mcinst.c)
 if(CAPSTONE_X86_SUPPORT)
     list(APPEND UNIT_TEST_SOURCES x86_far_immediate_encoding.c)
     list(APPEND UNIT_TEST_SOURCES x86_buffer_bounds.c)

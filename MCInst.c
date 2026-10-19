@@ -264,6 +264,8 @@ void MCInst_handleWriteback(MCInst *MI, const MCInstrDesc *InstDescTable,
 				       "Maximum number of MC operands reached.");
 			}
 			MI->tied_op_idx[i] = idx;
+			if (i >= MI->tied_op_idx_size)
+				MI->tied_op_idx_size = i + 1;
 
 			if (MI->flat_insn->detail)
 				MI->flat_insn->detail->writeback = true;
@@ -276,7 +278,7 @@ void MCInst_handleWriteback(MCInst *MI, const MCInstrDesc *InstDescTable,
 bool MCInst_opIsTied(const MCInst *MI, unsigned OpNum)
 {
 	assert(OpNum < MAX_MC_OPS && "Maximum number of MC operands exceeded.");
-	for (int i = 0; i < MAX_MC_OPS; ++i) {
+	for (unsigned i = 0; i < MI->tied_op_idx_size; ++i) {
 		if (MI->tied_op_idx[i] == OpNum)
 			return true;
 	}
