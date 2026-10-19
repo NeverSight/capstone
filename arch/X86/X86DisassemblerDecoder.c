@@ -271,11 +271,22 @@ static const struct InstructionSpecifier *specifierForUID(InstrUID uid)
 	return &INSTRUCTIONS_SYM[uid];
 }
 
+/* Keep virtual-address subtraction unsigned: the instruction may cross zero. */
+static int readByte(const struct reader_info *info, uint8_t *byte,
+		    uint64_t address)
+{
+	const uint64_t offset = address - info->offset;
+	if (offset >= info->size)
+		return -1;
+	*byte = info->code[offset];
+	return 0;
+}
+
 /*
- * consumeByte - Uses the reader function provided by the user to consume one
+ * consumeByte - Uses the bounded input buffer to consume one
  *   byte from the instruction's memory and advance the cursor.
  *
- * @param insn  - The instruction with the reader function to use.  The cursor
+ * @param insn  - The instruction with the input buffer to use.  The cursor
  *                for this instruction is advanced.
  * @param byte  - A pointer to a pre-allocated memory buffer to be populated
  *                with the data read.
@@ -283,7 +294,7 @@ static const struct InstructionSpecifier *specifierForUID(InstrUID uid)
  */
 static int consumeByte(struct InternalInstruction *insn, uint8_t *byte)
 {
-	int ret = insn->reader(insn->readerArg, byte, insn->readerCursor);
+	int ret = readByte(insn->reader, byte, insn->readerCursor);
 
 	if (!ret)
 		++(insn->readerCursor);
@@ -300,7 +311,7 @@ static int consumeByte(struct InternalInstruction *insn, uint8_t *byte)
  */
 static int lookAtByte(struct InternalInstruction *insn, uint8_t *byte)
 {
-	return insn->reader(insn->readerArg, byte, insn->readerCursor);
+	return readByte(insn->reader, byte, insn->readerCursor);
 }
 
 static void unconsumeByte(struct InternalInstruction *insn)
@@ -311,24 +322,23 @@ static void unconsumeByte(struct InternalInstruction *insn)
 #define CONSUME_FUNC(name, type) \
 	static int name(struct InternalInstruction *insn, type *ptr) \
 	{ \
+		const struct reader_info *info = insn->reader; \
+		const uint64_t start = insn->readerCursor - info->offset; \
 		type combined = 0; \
 		unsigned offset; \
-		for (offset = 0; offset < sizeof(type); ++offset) { \
-			uint8_t byte; \
-			int ret = insn->reader(insn->readerArg, &byte, \
-					       insn->readerCursor + offset); \
-			if (ret) \
-				return ret; \
+		if (start > info->size || sizeof(type) > info->size - start) \
+			return -1; \
+		for (offset = 0; offset < sizeof(type); ++offset) \
 			combined = combined | \
-				   ((uint64_t)byte << (offset * 8)); \
-		} \
+				   ((uint64_t)info->code[start + offset] \
+				    << (offset * 8)); \
 		*ptr = combined; \
 		insn->readerCursor += sizeof(type); \
 		return 0; \
 	}
 
 /*
- * consume* - Use the reader function provided by the user to consume data
+ * consume* - Use the bounded input buffer to consume data
  *   values of various sizes from the instruction's memory and advance the
  *   cursor appropriately.  These readers perform endian conversion.
  *
@@ -2728,19 +2738,17 @@ static bool checkPrefix(struct InternalInstruction *insn)
  *
  * @param insn      - A pointer to the instruction to be populated.  Must be
  *                    pre-allocated.
- * @param reader    - The function to be used to read the instruction's bytes.
- * @param readerArg - A generic argument to be passed to the reader to store
- *                    any internal state.
+ * @param reader    - The bounded instruction buffer.
  * @param startLoc  - The address (in the reader's address space) of the first
  *                    byte in the instruction.
  * @param mode      - Capstone mode flags.
  * @return          - 0 if instruction is valid; nonzero if not.
  */
-int decodeInstruction(struct InternalInstruction *insn, byteReader_t reader,
-		      const void *readerArg, uint64_t startLoc, cs_mode mode)
+int decodeInstruction(struct InternalInstruction *insn,
+		      const struct reader_info *reader, uint64_t startLoc,
+		      cs_mode mode)
 {
 	insn->reader = reader;
-	insn->readerArg = readerArg;
 	insn->startLocation = startLoc;
 	insn->readerCursor = startLoc;
 	if (x86_has_feature(mode, CS_MODE_16))

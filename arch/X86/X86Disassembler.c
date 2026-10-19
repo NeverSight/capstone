@@ -1461,18 +1461,6 @@ static bool translateInstruction(MCInst *mcInst, InternalInstruction *insn)
 	return false;
 }
 
-static int reader(const struct reader_info *info, uint8_t *byte,
-		  uint64_t address)
-{
-	if (address - info->offset >= info->size)
-		// out of buffer range
-		return -1;
-
-	*byte = info->code[address - info->offset];
-
-	return 0;
-}
-
 // copy x86 detail information from internal structure to public structure
 static void update_pub_insn(cs_insn *pub, InternalInstruction *inter)
 {
@@ -1931,7 +1919,7 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 		}
 	}
 
-	ret = decodeInstruction(&insn, reader, &info, address, handle->mode);
+	ret = decodeInstruction(&insn, &info, address, handle->mode);
 
 	if (ret) {
 		// *size = (uint16_t)(insn.readerCursor - address);
