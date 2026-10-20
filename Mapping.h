@@ -26,6 +26,8 @@ cs_err populate_insn_map_cache(cs_struct *handle);
 // ID.
 const insn_map *lookup_insn_map(cs_struct *handle, unsigned short id);
 
+// Search IDs sorted in nondecreasing order. Returns an index or (unsigned)-1
+// when absent, including an empty map. Duplicate IDs use binary-search order.
 unsigned int find_cs_id(unsigned MC_Opcode, const insn_map *imap,
 			unsigned imap_size);
 

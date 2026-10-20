@@ -275,6 +275,17 @@ const void *map_get_suppl_info(MCInst *MI, const insn_map *imap)
 unsigned int find_cs_id(unsigned MC_Opcode, const insn_map *imap,
 			unsigned imap_size)
 {
+	if (imap_size == 0)
+		return -1;
+
+	// Auto-sync maps normally use the opcode as their index. Check the key
+	// and its neighbours so sparse maps and duplicate IDs retain the binary
+	// search's selection below.
+	if (MC_Opcode < imap_size && imap[MC_Opcode].id == MC_Opcode &&
+	    (MC_Opcode == 0 || imap[MC_Opcode - 1].id < MC_Opcode) &&
+	    (MC_Opcode + 1 == imap_size || imap[MC_Opcode + 1].id > MC_Opcode))
+		return MC_Opcode;
+
 	// binary searching since the IDs are sorted in order
 	unsigned int left, right, m;
 	unsigned int max = imap_size;
