@@ -369,10 +369,10 @@ static void printImm(MCInst *MI, SStream *O, int64_t imm, bool positive)
 					}
 				}
 
-				SStream_concat(O, "0x%" PRIx64, imm);
+				SStream_concat_hex64(O, imm, false);
 			} else {
 				if (imm > HEX_THRESHOLD)
-					SStream_concat(O, "0x%" PRIx64, imm);
+					SStream_concat_hex64(O, imm, false);
 				else
 					SStream_concat(O, "%" PRIu64, imm);
 			}
@@ -411,13 +411,14 @@ static void printImm(MCInst *MI, SStream *O, int64_t imm, bool positive)
 					SStream_concat0(O,
 							"0x8000000000000000");
 				else if (imm < -HEX_THRESHOLD)
-					SStream_concat(O, "-0x%" PRIx64, -imm);
+					SStream_concat_hex64(O, (uint64_t)-imm,
+							     true);
 				else
 					SStream_concat(O, "-%" PRIu64, -imm);
 
 			} else {
 				if (imm > HEX_THRESHOLD)
-					SStream_concat(O, "0x%" PRIx64, imm);
+					SStream_concat_hex64(O, imm, false);
 				else
 					SStream_concat(O, "%" PRIu64, imm);
 			}

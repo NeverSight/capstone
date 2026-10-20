@@ -96,6 +96,109 @@ static bool test_truncating_appends()
 	return true;
 }
 
+static bool test_hex64_formatting(void)
+{
+	const uint64_t values[] = { 0,
+				    1,
+				    9,
+				    10,
+				    15,
+				    16,
+				    255,
+				    256,
+				    UINT32_MAX,
+				    (uint64_t)UINT32_MAX + 1,
+				    INT64_MAX,
+				    (uint64_t)INT64_MAX + 1,
+				    UINT64_MAX,
+				    UINT64_C(0x0123456789abcdef),
+				    UINT64_C(0xfedcba9876543210) };
+	for (size_t v = 0; v < sizeof(values) / sizeof(values[0]); ++v) {
+		for (unsigned negative = 0; negative < 2; ++negative) {
+			char expected[32];
+			snprintf(expected, sizeof(expected),
+				 negative ? "-0x%" PRIx64 : "0x%" PRIx64,
+				 values[v]);
+			for (size_t remaining = 0; remaining < sizeof(expected);
+			     ++remaining) {
+				for (unsigned markup = 0; markup < 2;
+				     ++markup) {
+					SStream actual, reference;
+					SStream_Init(&actual);
+					memset(actual.buffer, 'A',
+					       SSTREAM_BUF_LEN - remaining - 1);
+					actual.index =
+						SSTREAM_BUF_LEN - remaining - 1;
+					actual.markup_stream = markup;
+					actual.prefixed_by_markup = markup;
+					reference = actual;
+					SStream_concat0(&reference, expected);
+					SStream_concat_hex64(&actual, values[v],
+							     negative);
+					CHECK_OS_EQUAL_RET_FALSE(
+						actual, reference.buffer);
+					CS_ASSERT_RET_VAL(
+						actual.index == reference.index,
+						false);
+				}
+			}
+			SStream closed;
+			SStream_Init(&closed);
+			SStream_Close(&closed);
+			SStream_concat_hex64(&closed, values[v], negative);
+			CHECK_OS_EQUAL_RET_FALSE(closed, "");
+			CHECK_INT_EQUAL_RET_FALSE(closed.index, 0);
+		}
+	}
+	return true;
+}
+
+static unsigned hex64_hook_calls;
+static char hex64_hook_format[32];
+static uint64_t hex64_hook_value;
+
+static int hex64_vsnprintf(char *str, size_t size, const char *fmt, va_list ap)
+{
+	++hex64_hook_calls;
+	snprintf(hex64_hook_format, sizeof(hex64_hook_format), "%s", fmt);
+	hex64_hook_value = va_arg(ap, uint64_t);
+	return snprintf(str, size, "custom");
+}
+
+static bool test_hex64_custom_formatter(void)
+{
+	cs_opt_mem mem = { .malloc = malloc,
+			   .calloc = calloc,
+			   .realloc = realloc,
+			   .free = free,
+			   .vsnprintf = hex64_vsnprintf };
+	for (unsigned negative = 0; negative < 2; ++negative) {
+		SStream OS;
+		SStream_Init(&OS);
+		OS.markup_stream = true;
+		OS.prefixed_by_markup = true;
+		hex64_hook_calls = 0;
+		mem.vsnprintf = hex64_vsnprintf;
+		CS_ASSERT_RET_VAL(cs_option(0, CS_OPT_MEM, (size_t)&mem) ==
+					  CS_ERR_OK,
+				  false);
+		SStream_concat_hex64(&OS, UINT64_MAX, negative);
+		mem.vsnprintf = vsnprintf;
+		CS_ASSERT_RET_VAL(cs_option(0, CS_OPT_MEM, (size_t)&mem) ==
+					  CS_ERR_OK,
+				  false);
+		CHECK_OS_EQUAL_RET_FALSE(OS, "custom>");
+		CHECK_INT_EQUAL_RET_FALSE(OS.index, 7);
+		CS_ASSERT_RET_VAL(hex64_hook_calls == 1, false);
+		CS_ASSERT_RET_VAL(hex64_hook_value == UINT64_MAX, false);
+		CS_ASSERT_RET_VAL(strcmp(hex64_hook_format,
+					 negative ? "-0x%" PRIx64 :
+						    "0x%" PRIx64) == 0,
+				  false);
+	}
+	return true;
+}
+
 static bool test_markup_os()
 {
 	printf("Test test_markup_os\n");
@@ -697,6 +800,8 @@ bool test_underflow_in_sstream(void)
 	SStream OS;
 	SStream_Init(&OS);
 	SStream_concat(&OS, "%s", "AAAA"); // index += -1
+	SStream_concat_hex64(&OS, UINT64_MAX, false);
+	SStream_concat_hex64(&OS, UINT64_MAX, true);
 	SStream_concat1(&OS, 'B'); // writes before buffer => crash/ASan hit
 	CHECK_OS_EQUAL_RET_FALSE(OS, "B");
 	CHECK_INT_EQUAL_RET_FALSE(OS.index, 1);
@@ -709,6 +814,8 @@ int main()
 	result &= test_markup_os();
 	result &= test_overflow_check();
 	result &= test_truncating_appends();
+	result &= test_hex64_formatting();
+	result &= test_hex64_custom_formatter();
 	result &= test_printint8();
 	result &= test_printint16();
 	result &= test_printint32();

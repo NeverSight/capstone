@@ -277,6 +277,34 @@ void SStream_concat(SStream *ss, const char *fmt, ...)
 #endif
 }
 
+void SStream_concat_hex64(SStream *ss, uint64_t value, bool negative)
+{
+#if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
+	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
+	!defined(_WIN32_WCE)
+	// CS_OPT_MEM may install a formatter with its own output/error behavior.
+	if (cs_vsnprintf == vsnprintf) {
+		assert(ss);
+		SSTREAM_RETURN_IF_CLOSED(ss);
+		char buffer[19]; // sign, 0x, and up to 16 hexadecimal digits
+		char *end = buffer + sizeof(buffer);
+		char *p = end;
+		do {
+			*--p = "0123456789abcdef"[value & 15];
+			value >>= 4;
+		} while (value);
+		*--p = 'x';
+		*--p = '0';
+		if (negative)
+			*--p = '-';
+		SStream_concat_raw(ss, p, (size_t)(end - p));
+		SStream_close_markup(ss);
+		return;
+	}
+#endif
+	SStream_concat(ss, negative ? "-0x%" PRIx64 : "0x%" PRIx64, value);
+}
+
 // print number with prefix #
 void printInt64Bang(SStream *ss, int64_t val)
 {
@@ -309,17 +337,16 @@ void printInt64(SStream *ss, int64_t val)
 	SSTREAM_RETURN_IF_CLOSED(ss);
 	if (val >= 0) {
 		if (val > HEX_THRESHOLD)
-			SStream_concat(ss, "0x%" PRIx64, val);
+			SStream_concat_hex64(ss, val, false);
 		else
 			SStream_concat(ss, "%" PRIu64, val);
 	} else {
 		if (val < -HEX_THRESHOLD) {
 			if (val == INT64_MIN)
-				SStream_concat(ss, "-0x%" PRIx64,
-					       (uint64_t)INT64_MAX + 1);
+				SStream_concat_hex64(
+					ss, (uint64_t)INT64_MAX + 1, true);
 			else
-				SStream_concat(ss, "-0x%" PRIx64,
-					       (uint64_t)-val);
+				SStream_concat_hex64(ss, (uint64_t)-val, true);
 		} else
 			SStream_concat(ss, "-%" PRIu64, -val);
 	}
@@ -330,7 +357,7 @@ void printUInt64(SStream *ss, uint64_t val)
 	assert(ss);
 	SSTREAM_RETURN_IF_CLOSED(ss);
 	if (val > HEX_THRESHOLD)
-		SStream_concat(ss, "0x%" PRIx64, val);
+		SStream_concat_hex64(ss, val, false);
 	else
 		SStream_concat(ss, "%" PRIu64, val);
 }
