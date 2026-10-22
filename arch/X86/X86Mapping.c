@@ -3023,15 +3023,139 @@ decode_system_legacy_vex(csh handle, const uint8_t *code, size_t code_len,
 	if (encoding_offset == code_len)
 		return X86_FEATURE_NOT_HANDLED;
 
-	/* FRED and UINTR use refining prefixes on older system opcodes. Until
-	 * their own contracts are decoded, never let the generated legacy tables
-	 * discard those prefixes and report CLAC, RDPKRU or WRPKRU instead. */
+	/* FRED returns still need their own nonlocal control-transfer contract.
+	 * Do not let the generated tables discard the prefix and report CLAC. */
 	if (code_len - encoding_offset >= 3 && code[encoding_offset] == 0x0f &&
-	    code[encoding_offset + 1] == 0x01 &&
-	    ((mandatory_prefix && code[encoding_offset + 2] == 0xca) ||
-	     (mandatory_prefix == 0xf3 && (code[encoding_offset + 2] == 0xee ||
-					   code[encoding_offset + 2] == 0xef))))
+	    code[encoding_offset + 1] == 0x01 && mandatory_prefix &&
+	    code[encoding_offset + 2] == 0xca)
 		return X86_FEATURE_INVALID;
+
+	if (code_len - encoding_offset >= 3 && code[encoding_offset] == 0x0f) {
+		const uint8_t map = code[encoding_offset + 1];
+		const uint8_t last = code[encoding_offset + 2];
+		const bool mode64 = (arch->mode & CS_MODE_64) != 0;
+		const uint8_t address_width = mode64 ? (address32 ? 4 : 8) :
+					      (arch->mode & CS_MODE_32) ?
+						       (address32 ? 2 : 4) :
+						       (address32 ? 4 : 2);
+		unsigned int feature = 0;
+		uint8_t modrm_offset = (uint8_t)(encoding_offset + 2);
+		x86_feature_memory memory;
+		bool memory_form = false;
+		cs_x86 *x86;
+
+		if (map == 0x01 && mandatory_prefix == 0xf3) {
+			if (last == 0xee)
+				feature = X86_FEATURE_CLUI;
+			else if (last == 0xef)
+				feature = X86_FEATURE_STUI;
+			else if (last == 0xed)
+				feature = X86_FEATURE_TESTUI;
+		} else if (map == 0x01 && (last == 0xfe || last == 0xff)) {
+			if (mandatory_prefix || operand_size ||
+			    (last == 0xfe && address_width == 2))
+				return X86_FEATURE_INVALID;
+			feature = last == 0xfe ? X86_FEATURE_INVLPGB :
+						 X86_FEATURE_TLBSYNC;
+		} else if (map == 0xc7 && (last & 0xf8) == 0xf0 &&
+			   mandatory_prefix == 0xf3) {
+			feature = X86_FEATURE_SENDUIPI;
+		} else if (map == 0x00 && (last & 0x38) == 0x30 &&
+			   mandatory_prefix == 0xf2) {
+			feature = X86_FEATURE_LKGS;
+		} else if (map == 0x3a && last == 0xf0) {
+			if (mandatory_prefix != 0xf3 ||
+			    code_len - encoding_offset < 5 ||
+			    code[encoding_offset + 3] != 0xc0)
+				return X86_FEATURE_INVALID;
+			feature = X86_FEATURE_HRESET;
+			++modrm_offset;
+		}
+		if (feature) {
+			if (lock_prefix ||
+			    (!mode64 && feature <= X86_FEATURE_LKGS))
+				return X86_FEATURE_INVALID;
+			modrm = code[modrm_offset];
+			instruction_size =
+				encoding_offset +
+				(feature == X86_FEATURE_HRESET ? 5 : 3);
+			memory_form = feature == X86_FEATURE_LKGS &&
+				      (modrm & 0xc0) != 0xc0;
+			if (memory_form) {
+				if (!decode_feature_memory(
+					    code, code_len, modrm_offset, false,
+					    address_width == 4,
+					    (rex & 1) ? 8 : 0,
+					    (rex & 2) ? 8 : 0, &memory))
+					return X86_FEATURE_INVALID;
+				instruction_size = memory.length;
+			}
+			if (instruction_size > 15)
+				return X86_FEATURE_INVALID;
+			MCInst_clear(instr);
+			MCInst_setOpcode(instr, feature);
+			if (feature == X86_FEATURE_SENDUIPI ||
+			    feature == X86_FEATURE_LKGS) {
+				if (memory_form) {
+					add_feature_memory_operands(instr,
+								    &memory);
+					MCOperand_CreateImm0(
+						instr, apx_segment_register(
+							       segment_prefix));
+				} else {
+					b_register = rex2_register(
+						(modrm & 7) |
+							((rex & 1) ? 8 : 0),
+						feature == X86_FEATURE_LKGS ?
+							2 :
+							8);
+					MCOperand_CreateImm0(instr, b_register);
+				}
+			} else if (feature == X86_FEATURE_HRESET) {
+				MCOperand_CreateImm0(instr,
+						     code[modrm_offset + 1]);
+				instr->imm_size = 1;
+			}
+			*size = (uint16_t)instruction_size;
+			if (!instr->flat_insn->detail)
+				return X86_FEATURE_DECODED;
+			x86 = &instr->flat_insn->detail->x86;
+			x86->prefix[0] = mandatory_prefix;
+			x86->prefix[1] = segment_prefix;
+			x86->prefix[2] = operand_size ? 0x66 : 0;
+			x86->prefix[3] = address32 ? 0x67 : 0;
+			memcpy(instr->x86_prefix, x86->prefix,
+			       sizeof(x86->prefix));
+			x86->rex = rex;
+			x86->opcode[0] = 0x0f;
+			x86->opcode[1] = map;
+			x86->opcode[2] = feature == X86_FEATURE_HRESET ? 0xf0 :
+									 0;
+			x86->addr_size = address_width;
+			x86->modrm = modrm;
+			x86->encoding.modrm_offset = modrm_offset;
+			if (feature == X86_FEATURE_HRESET) {
+				x86->encoding.imm_offset = modrm_offset + 1;
+				x86->encoding.imm_size = 1;
+			} else if (memory_form) {
+				x86->sib = memory.sib;
+				x86->sib_base = memory.has_sib ?
+							memory.base :
+							X86_REG_INVALID;
+				x86->sib_index = memory.has_sib ?
+							 memory.index :
+							 X86_REG_INVALID;
+				x86->sib_scale = memory.has_sib ? memory.scale :
+								  0;
+				x86->disp = memory.displacement;
+				x86->encoding.disp_offset =
+					memory.displacement_offset;
+				x86->encoding.disp_size =
+					memory.displacement_size;
+			}
+			return X86_FEATURE_DECODED;
+		}
+	}
 
 	if (code_len - encoding_offset >= 3 && code[encoding_offset] == 0x0f &&
 	    code[encoding_offset + 1] == 0x01 &&
@@ -4366,9 +4490,18 @@ static bool may_be_feature_extension(const uint8_t *code, size_t code_len,
 		return false;
 	case 0x0f:
 		return (code_len - offset >= 2 && code[offset + 1] == 0x38) ||
+		       (code_len - offset >= 3 &&
+			((code[offset + 1] == 0x00 &&
+			  (code[offset + 2] & 0x38) == 0x30) ||
+			 (code[offset + 1] == 0xc7 &&
+			  (code[offset + 2] & 0xf8) == 0xf0) ||
+			 (code[offset + 1] == 0x3a &&
+			  code[offset + 2] == 0xf0))) ||
 		       (code_len - offset >= 3 && code[offset + 1] == 0x01 &&
 			(code[offset + 2] == 0xc6 || code[offset + 2] == 0xca ||
-			 code[offset + 2] == 0xee || code[offset + 2] == 0xef));
+			 code[offset + 2] == 0xed || code[offset + 2] == 0xee ||
+			 code[offset + 2] == 0xef || code[offset + 2] == 0xfe ||
+			 code[offset + 2] == 0xff));
 	case 0x62:
 	case 0xc4:
 	case 0xd5:
@@ -7811,6 +7944,81 @@ static bool print_apx_evex_vector_gpr(MCInst *instr, SStream *stream,
 	return true;
 }
 
+static const struct {
+	unsigned int opcode, id;
+	const char *name;
+} system_extensions[] = {
+	{ X86_FEATURE_CLUI, X86_INS_CLUI, "clui" },
+	{ X86_FEATURE_STUI, X86_INS_STUI, "stui" },
+	{ X86_FEATURE_TESTUI, X86_INS_TESTUI, "testui" },
+	{ X86_FEATURE_SENDUIPI, X86_INS_SENDUIPI, "senduipi" },
+	{ X86_FEATURE_LKGS, X86_INS_LKGS, "lkgs" },
+	{ X86_FEATURE_HRESET, X86_INS_HRESET, "hreset" },
+	{ X86_FEATURE_INVLPGB, X86_INS_INVLPGB, "invlpgb" },
+	{ X86_FEATURE_TLBSYNC, X86_INS_TLBSYNC, "tlbsync" },
+};
+
+static bool print_system_extension(MCInst *instr, SStream *stream, bool att)
+{
+	const unsigned int opcode = MCInst_getOpcode(instr);
+	const char *name = NULL;
+	cs_x86 *x86 = instr->flat_insn->detail ?
+			      &instr->flat_insn->detail->x86 :
+			      NULL;
+	cs_x86_op operand = { 0 };
+	unsigned int i;
+	for (i = 0; i < ARR_SIZE(system_extensions); ++i)
+		if (opcode == system_extensions[i].opcode)
+			name = system_extensions[i].name;
+	if (!name)
+		return false;
+	SStream_concat0(stream, name);
+	if (!MCInst_getNumOperands(instr))
+		return true;
+	SStream_concat0(stream, "\t");
+	if (opcode == X86_FEATURE_LKGS && MCInst_getNumOperands(instr) == 5) {
+		x86_feature_memory memory;
+		x86_reg segment =
+			(x86_reg)MCOperand_getImm(MCInst_getOperand(instr, 4));
+		if (!get_feature_memory(instr, 0, &memory))
+			return false;
+		if (!att)
+			SStream_concat0(stream, "word ptr ");
+		if (segment != X86_REG_INVALID)
+			SStream_concat(stream, att ? "%%%s:" : "%s:",
+				       feature_register_name(segment));
+		if (!print_feature_memory(stream, &memory, att))
+			return false;
+		set_feature_memory_operand(&operand, &memory, 2, CS_AC_READ);
+		operand.mem.segment = segment;
+	} else if (MCInst_getNumOperands(instr) == 1) {
+		const int64_t value =
+			MCOperand_getImm(MCInst_getOperand(instr, 0));
+		operand.access = CS_AC_READ;
+		if (opcode == X86_FEATURE_HRESET) {
+			operand.type = X86_OP_IMM;
+			operand.imm = value;
+			operand.size = 1;
+			SStream_concat(stream, att ? "$0x%llx" : "0x%llx",
+				       (unsigned long long)value);
+		} else {
+			operand.type = X86_OP_REG;
+			operand.reg = (x86_reg)value;
+			operand.size = opcode == X86_FEATURE_LKGS ? 2 : 8;
+			SStream_concat(stream, att ? "%%%s" : "%s",
+				       X86_reg_name((csh)instr->csh,
+						    operand.reg));
+		}
+	} else {
+		return false;
+	}
+	if (x86) {
+		x86->operands[0] = operand;
+		x86->op_count = 1;
+	}
+	return true;
+}
+
 static bool print_implicit_msr(MCInst *instr, SStream *stream)
 {
 	const char *mnemonic;
@@ -8039,6 +8247,7 @@ bool X86_printFeatureExtension(MCInst *instr, SStream *stream, bool att_syntax)
 	if (MCInst_getOpcode(instr) < X86_FEATURE_OPCODE_BASE)
 		return false;
 	return print_sha512_vex(instr, stream, att_syntax) ||
+	       print_system_extension(instr, stream, att_syntax) ||
 	       print_implicit_msr(instr, stream) ||
 	       print_apx_msr(instr, stream, att_syntax) ||
 	       print_apx_evex_vector_gpr(instr, stream, att_syntax) ||
@@ -8478,6 +8687,50 @@ bool X86_mapFeatureExtension(cs_insn *insn, unsigned int opcode)
 			insn->detail->groups_count = 1;
 		}
 		return true;
+	case X86_FEATURE_CLUI:
+	case X86_FEATURE_STUI:
+	case X86_FEATURE_TESTUI:
+	case X86_FEATURE_SENDUIPI:
+	case X86_FEATURE_LKGS:
+	case X86_FEATURE_HRESET:
+	case X86_FEATURE_INVLPGB:
+	case X86_FEATURE_TLBSYNC: {
+		unsigned int i;
+		for (i = 0; i < ARR_SIZE(system_extensions); ++i)
+			if (opcode == system_extensions[i].opcode)
+				insn->id = system_extensions[i].id;
+		if (insn->detail) {
+			cs_detail *d = insn->detail;
+			if (opcode >= X86_FEATURE_LKGS) {
+				d->groups[0] = X86_GRP_PRIVILEGE;
+				d->groups_count = 1;
+			}
+			if (opcode == X86_FEATURE_TESTUI) {
+				d->regs_write[0] = X86_REG_EFLAGS;
+				d->regs_write_count = 1;
+				d->x86.eflags = X86_EFLAGS_MODIFY_CF |
+						X86_EFLAGS_RESET_ZF |
+						X86_EFLAGS_RESET_AF |
+						X86_EFLAGS_RESET_OF |
+						X86_EFLAGS_RESET_PF |
+						X86_EFLAGS_RESET_SF;
+			} else if (opcode == X86_FEATURE_LKGS) {
+				d->regs_write[0] = X86_REG_GS;
+				d->regs_write_count = 1;
+			} else if (opcode == X86_FEATURE_HRESET) {
+				d->regs_read[0] = X86_REG_EAX;
+				d->regs_read_count = 1;
+			} else if (opcode == X86_FEATURE_INVLPGB) {
+				d->regs_read[0] = d->x86.addr_size == 8 ?
+							  X86_REG_RAX :
+							  X86_REG_EAX;
+				d->regs_read[1] = X86_REG_EDX;
+				d->regs_read[2] = X86_REG_ECX;
+				d->regs_read_count = 3;
+			}
+		}
+		return true;
+	}
 	case X86_FEATURE_WRMSRNS:
 	case X86_FEATURE_RDMSRLIST:
 	case X86_FEATURE_WRMSRLIST: {
@@ -8689,6 +8942,9 @@ const char *X86_featureExtensionInstructionName(unsigned int id)
 
 	if (id >= X86_INS_CFCMOVO && id <= X86_INS_CFCMOVG)
 		return cfcmov_names[id - X86_INS_CFCMOVO];
+	for (unsigned int i = 0; i < ARR_SIZE(system_extensions); ++i)
+		if (id == system_extensions[i].id)
+			return system_extensions[i].name;
 	if (id >= X86_INS_SETZUO && id <= X86_INS_SETZUG)
 		return setzu_names[id - X86_INS_SETZUO];
 	if (id >= X86_INS_CMPOXADD && id <= X86_INS_CMPNLEXADD)

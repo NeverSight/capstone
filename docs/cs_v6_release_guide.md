@@ -54,10 +54,30 @@ instruction values and public structure layouts are unchanged. The Python,
 Java and OCaml x86 constants are regenerated from the current public header,
 including the earlier APX/AMX extensions that were absent from those bindings.
 
-The unmodeled `ERETS`, `ERETU`, `CLUI` and `STUI` refining-prefix forms now
-fail decoding instead of being mislabeled as `CLAC`, `RDPKRU` or `WRPKRU`.
-The unprefixed legacy instructions remain supported. This rejection does not
-implement FRED or user-interrupt semantics.
+The unmodeled `ERETS` and `ERETU` refining-prefix forms fail decoding
+instead of being mislabeled as `CLAC`. Bare CLAC remains supported.
+
+## x86 bounded system extensions
+
+Append public instruction IDs for CLUI, STUI, TESTUI, SENDUIPI, LKGS, HRESET,
+INVLPGB and TLBSYNC. Existing IDs and structure layouts are unchanged; Python,
+Java and OCaml constants are regenerated. CLUI/STUI now decode with their own
+identities instead of being rejected or aliased to RDPKRU/WRPKRU.
+
+UINTR and LKGS are long-mode only. SENDUIPI always reads a 64-bit register;
+LKGS reads a 16-bit register or memory selector and reports an implicit GS
+write. TESTUI writes CF and clears the other five arithmetic flags; CLUI/STUI
+modify the hidden UIF, not EFLAGS. HRESET reports its imm8 and implicit EAX
+read. INVLPGB reports address-width EAX/RAX plus EDX/ECX reads and rejects
+16-bit effective addressing. TLBSYNC has no GPR operands. LKGS/HRESET and
+both TLB instructions carry the privilege group. Hidden MSRs, UIF, descriptor
+caches and interrupt-target memory are not additional public registers.
+
+Details preserve ignored operand-size prefixes on mandatory-prefix forms,
+REX selection, segments, SIB/displacements and immediate offsets. LOCK,
+truncation, excessive length, invalid modes and reserved prefix forms fail.
+Decoder recognition does not assert that the runtime CPU or OS enables the
+instruction; FRED/UIRET returns are still outside this addition.
 
 ## Overview
 
