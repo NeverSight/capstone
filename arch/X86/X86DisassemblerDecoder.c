@@ -1645,7 +1645,7 @@ static int readModRM(struct InternalInstruction *insn)
 	/*
 	 * This goes by insn->registerSize to pick the correct register, which messes
 	 * up if we're using (say) XMM or 8-bit register operands.  That gets fixed in
-	 * fixupReg().
+	 * readOperands().
 	 */
 	switch (insn->registerSize) {
 	case 2:
@@ -1864,51 +1864,6 @@ GENERIC_FIXUP_FUNC(fixupRegValue, insn->regBase, MODRM_REG, 0x1f, false)
 GENERIC_FIXUP_FUNC(fixupRMValue, insn->eaRegBase, EA_REG, 0xf, true)
 
 /*
- * fixupReg - Consults an operand specifier to determine which of the
- *   fixup*Value functions to use in correcting readModRM()'ss interpretation.
- *
- * @param insn  - See fixup*Value().
- * @param op    - The operand specifier.
- * @return      - 0 if fixup was successful; -1 if the register returned was
- *                invalid for its class.
- */
-static int fixupReg(struct InternalInstruction *insn,
-		    const struct OperandSpecifier *op)
-{
-	uint8_t valid;
-
-	switch ((OperandEncoding)op->encoding) {
-	default:
-		// debug("Expected a REG or R/M encoding in fixupReg");
-		return -1;
-	case ENCODING_VVVV:
-		insn->vvvv = (Reg)fixupRegValue(insn, (OperandType)op->type,
-						insn->vvvv, &valid);
-		if (!valid)
-			return -1;
-		break;
-	case ENCODING_REG:
-		insn->reg = (Reg)fixupRegValue(insn, (OperandType)op->type,
-					       insn->reg - insn->regBase,
-					       &valid);
-		if (!valid)
-			return -1;
-		break;
-CASE_ENCODING_RM:
-		if (insn->eaBase >= insn->eaRegBase) {
-			insn->eaBase = (EABase)fixupRMValue(
-				insn, (OperandType)op->type,
-				insn->eaBase - insn->eaRegBase, &valid);
-			if (!valid)
-				return -1;
-		}
-		break;
-	}
-
-	return 0;
-}
-
-/*
  * readOpcodeRegister - Reads an operand from the opcode field of an
  *   instruction and interprets it appropriately given the operand width.
  *   Handles AddRegFrm instructions.
@@ -2081,6 +2036,7 @@ static int readOperands(struct InternalInstruction *insn)
 	};
 	int hasVVVV, needVVVV;
 	int sawRegImm = 0;
+	uint8_t valid;
 	int i;
 
 	insn->operands = &x86OperandSets[insn->spec->operands][0];
@@ -2167,16 +2123,28 @@ CASE_ENCODING_VSIB:
 			break;
 
 		case ENCODING_REG:
+			if (readModRM(insn))
+				return -1;
+			insn->reg = (Reg)fixupRegValue(
+				insn, (OperandType)op->type,
+				insn->reg - insn->regBase, &valid);
+			if (!valid)
+				return -1;
+			break;
+
 CASE_ENCODING_RM:
 			if (readModRM(insn))
 				return -1;
-
-			if (fixupReg(insn, op))
-				return -1;
+			if (insn->eaBase >= insn->eaRegBase) {
+				insn->eaBase = (EABase)fixupRMValue(
+					insn, (OperandType)op->type,
+					insn->eaBase - insn->eaRegBase, &valid);
+				if (!valid)
+					return -1;
+			}
 
 			// Apply the AVX512 compressed displacement scaling factor.
-			if (op->encoding != ENCODING_REG &&
-			    insn->eaDisplacement == EA_DISP_8)
+			if (insn->eaDisplacement == EA_DISP_8)
 				insn->displacement *=
 					1 << (op->encoding - ENCODING_RM);
 			break;
@@ -2280,7 +2248,10 @@ CASE_ENCODING_RM:
 			if (insn->mode != MODE_64BIT)
 				insn->vvvv = (Reg)(insn->vvvv & 0x7);
 
-			if (fixupReg(insn, op))
+			insn->vvvv = (Reg)fixupRegValue(insn,
+							(OperandType)op->type,
+							insn->vvvv, &valid);
+			if (!valid)
 				return -1;
 			break;
 

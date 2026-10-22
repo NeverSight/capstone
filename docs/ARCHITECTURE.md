@@ -40,6 +40,11 @@ There exist two structs which represent an instruction:
 The `MCInst` is used by the disassembler component for storing the decoded instruction.
 The mapping component on the other hand, uses the `MCInst` to populate the `cs_insn`.
 
+Hot opcode accessors and checked operand append operations are defined in
+`MCInst.h` for inlining. `MCInst.c` emits the same bodies as external functions,
+preserving their symbols. The shared assertion policy lives in `cs_assert.h`;
+operand capacity remains defined by `MAX_MC_OPS` in `MCInst.h`.
+
 The `cs_insn` is meant to be used by the Capstone core.
 It is distinct from the `MCInst`. It uses different instruction identifiers, other operand representation
 and holds more details about an instruction.
