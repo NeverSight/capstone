@@ -4528,12 +4528,15 @@ static bool has_duplicate_feature_evex_prefixes(const uint8_t *code,
 	       (code[prefix_offset + 1] & 7) <= 4;
 }
 
-x86_feature_decode_result
-X86_decodeFeatureExtension(csh handle, const uint8_t *code, size_t code_len,
-			   MCInst *instr, uint16_t *size)
+#if defined(_MSC_VER)
+__declspec(noinline)
+#elif defined(__GNUC__)
+__attribute__((noinline))
+#endif
+static x86_feature_decode_result
+decode_feature_extension(csh handle, const uint8_t *code, size_t code_len,
+			 MCInst *instr, uint16_t *size)
 {
-	if (!may_be_feature_extension(code, code_len))
-		return X86_FEATURE_NOT_HANDLED;
 	/* In 16/32-bit modes 0x40..0x4f are INC/DEC opcodes, not REX
 	 * prefixes.  Do not let a later EVEX-looking byte sequence make a
 	 * feature decoder reinterpret the current legacy instruction. */
@@ -4657,6 +4660,16 @@ X86_decodeFeatureExtension(csh handle, const uint8_t *code, size_t code_len,
 	if (result != X86_FEATURE_NOT_HANDLED)
 		return result;
 	return X86_FEATURE_NOT_HANDLED;
+}
+
+x86_feature_decode_result
+X86_decodeFeatureExtension(csh handle, const uint8_t *code, size_t code_len,
+			   MCInst *instr, uint16_t *size)
+{
+	// Keep the common rejection path outside the extension decoders' stack frame.
+	if (!may_be_feature_extension(code, code_len))
+		return X86_FEATURE_NOT_HANDLED;
+	return decode_feature_extension(handle, code, code_len, instr, size);
 }
 
 static bool print_tilezero(MCInst *instr, SStream *stream, bool att_syntax)
