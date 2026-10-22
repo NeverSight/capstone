@@ -919,7 +919,22 @@ static int str_replace(char *result, char *target, const char *str1, char *str2)
 }
 #endif
 
-// fill insn with mnemonic & operands info
+static void init_disasm_mcinst(MCInst *mci, const cs_struct *handle)
+{
+	if (handle->arch == CS_ARCH_X86 && handle->no_text &&
+	    !handle->detail_opt) {
+		/* The x86 decoder constructs each operand before use. With no
+		 * printer or detail consumer, only the opcode state needs a reset;
+		 * the caller sets the handle, address and public instruction. */
+		mci->Opcode = 0;
+		mci->OpcodePub = 0;
+		mci->size = 0;
+		mci->popcode_adjust = 0;
+	} else {
+		MCInst_Init(mci, handle->arch);
+	}
+}
+
 // fill the parts of insn that do not come from printing it, for a handle
 // with CS_OPT_TEXT off
 static void fill_insn_without_text(cs_insn *insn, MCInst *mci,
@@ -1324,7 +1339,7 @@ size_t CAPSTONE_API cs_disasm(csh ud, const uint8_t *buffer, size_t size,
 	insn_cache = total;
 
 	while (size > 0) {
-		MCInst_Init(&mci, handle->arch);
+		init_disasm_mcinst(&mci, handle);
 		mci.csh = handle;
 
 		// relative branches need to know the address & size of current insn
@@ -1565,7 +1580,7 @@ static bool disasm_iter(struct cs_struct *handle, csh ud, const uint8_t **code,
 
 	handle->errnum = CS_ERR_OK;
 
-	MCInst_Init(&mci, handle->arch);
+	init_disasm_mcinst(&mci, handle);
 	mci.csh = handle;
 
 	// relative branches need to know the address & size of current insn

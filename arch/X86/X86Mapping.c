@@ -4532,10 +4532,10 @@ static bool has_duplicate_feature_evex_prefixes(const uint8_t *code,
 
 x86_feature_decode_result
 X86_decodeFeatureExtension(csh handle, const uint8_t *code, size_t code_len,
-			   MCInst *instr, uint16_t *size)
+			   MCInst *instr, uint16_t *size, uint8_t *opcode)
 {
-	uint8_t opcode;
-	if (!may_be_feature_extension(code, code_len, &opcode))
+	*opcode = 0;
+	if (!may_be_feature_extension(code, code_len, opcode))
 		return X86_FEATURE_NOT_HANDLED;
 	/* In 16/32-bit modes 0x40..0x4f are INC/DEC opcodes, not REX
 	 * prefixes.  Do not let a later EVEX-looking byte sequence make a
@@ -4559,9 +4559,9 @@ X86_decodeFeatureExtension(csh handle, const uint8_t *code, size_t code_len,
 	result = decode_sha512_vex(handle, code, code_len, instr, size);
 	if (result != X86_FEATURE_NOT_HANDLED)
 		return result;
-	if (opcode == 0xc4)
+	if (*opcode == 0xc4)
 		return decode_amx(handle, code, code_len, instr, size);
-	if (opcode == 0xd5) {
+	if (*opcode == 0xd5) {
 		result = decode_rex2_push_pop(handle, code, code_len, instr,
 					      size);
 		if (result != X86_FEATURE_NOT_HANDLED)
@@ -4569,7 +4569,7 @@ X86_decodeFeatureExtension(csh handle, const uint8_t *code, size_t code_len,
 		return decode_apx_jmpabs(handle, code, code_len, instr, size);
 	}
 	/* Legacy and VEX encodings cannot match the EVEX decoders below. */
-	if (opcode != 0x62)
+	if (*opcode != 0x62)
 		return X86_FEATURE_NOT_HANDLED;
 	result = decode_apx_evex_vector_gpr(handle, code, code_len, instr, size);
 	if (result != X86_FEATURE_NOT_HANDLED)

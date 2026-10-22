@@ -1648,6 +1648,7 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 	uint8_t apx_evex_p0 = 0, apx_evex_p1 = 0;
 	bool apx_evex_normalized = false;
 	bool apx_evex_b4 = false, apx_evex_x4 = false;
+	uint8_t extension_opcode;
 	x86_feature_decode_result extension_result;
 	int ret;
 	bool result;
@@ -1671,8 +1672,8 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 		//memset(instr->flat_insn->detail, 0, offsetof(cs_detail, x86)+offsetof(cs_x86, operands));
 	}
 
-	extension_result =
-		X86_decodeFeatureExtension(ud, code, code_len, instr, size);
+	extension_result = X86_decodeFeatureExtension(ud, code, code_len, instr,
+						      size, &extension_opcode);
 	if (extension_result == X86_FEATURE_DECODED) {
 		return true;
 	}
@@ -1682,11 +1683,12 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 	evex_normalization_limit = code_len < sizeof(normalized_code) ?
 					   code_len :
 					   sizeof(normalized_code);
-	has_evex_normalization_prefix = scan_x86_evex_prefix(
-		code, evex_normalization_limit,
-		(handle->mode & CS_MODE_64) != 0, &evex_normalization_offset,
-		&evex_segment_count, &evex_address_size_count,
-		&evex_invalid_prefix);
+	if (extension_opcode == 0x62)
+		has_evex_normalization_prefix = scan_x86_evex_prefix(
+			code, evex_normalization_limit,
+			(handle->mode & CS_MODE_64) != 0,
+			&evex_normalization_offset, &evex_segment_count,
+			&evex_address_size_count, &evex_invalid_prefix);
 
 	/* Packed VCMPPS/PD uses EVEX.L'L as its vector length unless EVEX.b
 	 * selects SAE and a fixed 512-bit length for a register source.  The

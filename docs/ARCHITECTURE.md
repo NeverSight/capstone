@@ -44,6 +44,13 @@ The `cs_insn` is meant to be used by the Capstone core.
 It is distinct from the `MCInst`. It uses different instruction identifiers, other operand representation
 and holds more details about an instruction.
 
+For x86 with both text and detail disabled, the core initializes only the
+`MCInst` opcode fields and operand count, then sets its handle, address and
+public instruction pointer. The decoder still validates and constructs its
+operands before using them. Printer state and unused operand slots are not
+initialized in this mode and must not be read by a decoder. Other option
+combinations use the complete initializer.
+
 ### Disassembling process
 
 There are two steps in disassembling an instruction.

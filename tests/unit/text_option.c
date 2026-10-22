@@ -65,11 +65,13 @@ static bool test_x86(void)
 	success &= check(success && expected[0].detail->x86.op_count == 2,
 			 "the printed decode fills operand detail");
 
-	// cs_disasm_iter reads the same way.
-	{
+	// Scans keep the same IDs and boundaries with or without detail.
+	for (unsigned detail = 0; detail < 2; ++detail) {
 		const uint8_t *code = x86_code;
 		size_t size = sizeof(x86_code);
 		uint64_t address = 0x1000;
+		cs_option(bare, CS_OPT_DETAIL,
+			  detail ? CS_OPT_ON : CS_OPT_OFF);
 		cs_insn *insn = cs_malloc(bare);
 
 		for (i = 0; success && i < X86_COUNT; i++) {

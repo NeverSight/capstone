@@ -148,9 +148,11 @@ typedef enum x86_feature_decode_result {
 	X86_FEATURE_INVALID,
 } x86_feature_decode_result;
 
+/* opcode receives the first byte after legacy/REX prefixes, or zero if absent,
+ * including when no feature decoder handles the instruction. */
 x86_feature_decode_result X86_decodeFeatureExtension(
 	csh handle, const uint8_t *code, size_t code_len, MCInst *instr,
-	uint16_t *size);
+	uint16_t *size, uint8_t *opcode);
 bool X86_printFeatureExtension(MCInst *instr, SStream *stream,
 			       bool att_syntax);
 bool X86_mapFeatureExtension(cs_insn *insn, unsigned int opcode);
