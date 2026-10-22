@@ -1000,7 +1000,7 @@ static void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
 			MI->op1_size =
 				MI->csh->regsize_map[X86_register_map(reg)];
 	} else if (MCOperand_isImm(Op)) {
-		uint8_t encsize;
+		uint8_t encsize = 0;
 		int64_t imm = MCOperand_getImm(Op);
 		uint8_t opsize =
 			X86_immediate_size(MCInst_getOpcode(MI), &encsize);
@@ -1085,8 +1085,12 @@ static void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
 						.operands[MI->flat_insn->detail
 								  ->x86.op_count]
 						.size = opsize;
-					MI->flat_insn->detail->x86.encoding
-						.imm_size = encsize;
+					/* Preserve the decoder's width on a table miss,
+					 * including multi-immediate far pointers. */
+					if (encsize)
+						MI->flat_insn->detail->x86
+							.encoding.imm_size =
+							encsize;
 				} else if (MI->flat_insn->detail->x86.op_count >
 					   0) {
 					if (MI->flat_insn->id !=

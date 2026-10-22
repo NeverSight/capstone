@@ -56,6 +56,71 @@ struct reader_case {
 	int64_t value;
 };
 
+static bool check_far_pointer_encoding(csh handle, cs_mode mode, bool detail)
+{
+	static const struct {
+		cs_mode mode;
+		uint8_t bytes[8];
+		size_t size;
+	} cases[] = {
+		{ CS_MODE_16, { 0x9a, 0x21, 0x4c, 0x94, 0xdb }, 5 },
+		{ CS_MODE_32, { 0x9a, 0x21, 0x4c, 0x78, 0x56, 0x94, 0xdb }, 7 },
+		{ CS_MODE_16,
+		  { 0x66, 0x9a, 0x21, 0x4c, 0x78, 0x56, 0x94, 0xdb },
+		  8 },
+		{ CS_MODE_32, { 0x66, 0x9a, 0x21, 0x4c, 0x94, 0xdb }, 6 },
+	};
+	bool ok = true;
+	for (size_t c = 0; c < sizeof(cases) / sizeof(cases[0]); ++c) {
+		if (cases[c].mode != mode)
+			continue;
+		for (unsigned jump = 0; jump != 2; ++jump) {
+			uint8_t bytes[sizeof(cases[c].bytes)];
+			memcpy(bytes, cases[c].bytes, sizeof(bytes));
+			bytes[bytes[0] == 0x66 ? 1 : 0] = jump ? 0xea : 0x9a;
+			const uint8_t *cursor = bytes;
+			size_t remaining = cases[c].size;
+			uint64_t address = 0x1000;
+			cs_insn *batch = NULL, *iter = cs_malloc(handle);
+			size_t count = cs_disasm(handle, bytes, remaining,
+						 address, 1, &batch);
+			bool decoded = iter && cs_disasm_iter(handle, &cursor,
+							      &remaining,
+							      &address, iter);
+			bool match = count == 1 && decoded;
+			if (match) {
+				unsigned id = jump ? X86_INS_LJMP :
+						     X86_INS_LCALL;
+				const cs_insn *results[] = { batch, iter };
+				for (size_t r = 0; r != 2; ++r) {
+					const cs_insn *insn = results[r];
+					match &= insn->id == id &&
+						 insn->size == cases[c].size;
+					if (detail) {
+						const cs_x86_encoding *encoding =
+							&insn->detail->x86
+								 .encoding;
+						/* The final immediate is the 16-bit selector. */
+						match &= encoding->imm_offset +
+								 2 ==
+							 cases[c].size;
+						match &= encoding->imm_size ==
+							 2;
+					}
+				}
+			}
+			if (!match)
+				fprintf(stderr,
+					"far pointer encoding: case=%zu jump=%u\n",
+					c, jump);
+			ok &= match;
+			cs_free(batch, count);
+			cs_free(iter, 1);
+		}
+	}
+	return ok;
+}
+
 static bool check_reader_input(csh handle, cs_insn *iter,
 			       const struct reader_case *test,
 			       const uint8_t *bytes, size_t available,
@@ -669,6 +734,8 @@ int main(void)
 					ok &= check_reader_bounds(
 						handle, modes[m],
 						detail && text);
+					ok &= check_far_pointer_encoding(
+						handle, modes[m], detail);
 					ok &= check_lock(handle, modes[m]);
 					ok &= check_segments(handle, modes[m]);
 					const uint8_t ud0[] = { 0x0f, 0xff };

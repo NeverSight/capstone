@@ -709,7 +709,7 @@ static void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
 		}
 	} else if (MCOperand_isImm(Op)) {
 		// Print X86 immediates as signed values.
-		uint8_t encsize;
+		uint8_t encsize = 0;
 		int64_t imm = MCOperand_getImm(Op);
 		uint8_t opsize =
 			X86_immediate_size(MCInst_getOpcode(MI), &encsize);
@@ -849,8 +849,12 @@ static void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
 						.operands[MI->flat_insn->detail
 								  ->x86.op_count]
 						.size = opsize;
-					MI->flat_insn->detail->x86.encoding
-						.imm_size = encsize;
+					/* Preserve the decoder's width on a table miss,
+					 * including multi-immediate far pointers. */
+					if (encsize)
+						MI->flat_insn->detail->x86
+							.encoding.imm_size =
+							encsize;
 				} else if (MI->op1_size > 0)
 					MI->flat_insn->detail->x86
 						.operands[MI->flat_insn->detail
