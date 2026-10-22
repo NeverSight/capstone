@@ -601,15 +601,13 @@ typedef struct InternalInstruction {
 	/* Input bytes; no padding or alignment is required. */
 	const uint8_t *code;
 	size_t codeSize;
-	/* The address of the next byte to read. */
-	uint64_t readerCursor;
+	/* The offset of the next byte within code. */
+	size_t readerCursor;
 
 	/* General instruction information */
 
 	/* The mode to disassemble for (64-bit, protected, real) */
 	DisassemblerMode mode;
-	/* The start of the instruction, usable with the reader */
-	uint64_t startLocation;
 	/* The length of the instruction, in bytes */
 	size_t length;
 
@@ -688,13 +686,11 @@ typedef struct InternalInstruction {
  *                    consumer.
  * @param code      - The instruction bytes.
  * @param codeSize  - The number of readable bytes.
- * @param startLoc  - The address (in the reader's address space) of the first
- *                    byte in the instruction.
  * @param mode      - Capstone mode flags.
  * @return          - Nonzero if there was an error during decode, 0 otherwise.
  */
 int decodeInstruction(struct InternalInstruction *insn, const uint8_t *code,
-		      size_t codeSize, uint64_t startLoc, cs_mode mode);
+		      size_t codeSize, cs_mode mode);
 
 //const char *x86DisassemblerGetInstrName(unsigned Opcode, const void *mii);
 

@@ -184,7 +184,7 @@ static const struct InstructionSpecifier *specifierForUID(InstrUID uid)
  */
 static int consumeByte(struct InternalInstruction *insn, uint8_t *byte)
 {
-	uint64_t offset = insn->readerCursor - insn->startLocation;
+	size_t offset = insn->readerCursor;
 	if (offset >= insn->codeSize)
 		return -1;
 	*byte = insn->code[offset];
@@ -201,7 +201,7 @@ static int consumeByte(struct InternalInstruction *insn, uint8_t *byte)
  */
 static int lookAtByte(struct InternalInstruction *insn, uint8_t *byte)
 {
-	uint64_t offset = insn->readerCursor - insn->startLocation;
+	size_t offset = insn->readerCursor;
 	if (offset >= insn->codeSize)
 		return -1;
 	*byte = insn->code[offset];
@@ -217,7 +217,7 @@ static void unconsumeByte(struct InternalInstruction *insn)
 	static int name(struct InternalInstruction *insn, type *ptr) \
 	{ \
 		uint64_t combined = 0; \
-		uint64_t cursor = insn->readerCursor - insn->startLocation; \
+		size_t cursor = insn->readerCursor; \
 		unsigned offset; \
 		if (cursor > insn->codeSize || \
 		    sizeof(type) > insn->codeSize - cursor) \
@@ -338,8 +338,7 @@ static int readPrefixes(struct InternalInstruction *insn)
 		if (consumeByte(insn, &byte))
 			return -1;
 
-		if (insn->readerCursor - 1 == insn->startLocation &&
-		    (byte == 0xf2 || byte == 0xf3)) {
+		if (insn->readerCursor == 1 && (byte == 0xf2 || byte == 0xf3)) {
 			// prefix requires next byte
 			if (lookAtByte(insn, &nextByte))
 				return -1;
@@ -1579,7 +1578,7 @@ static int readDisplacement(struct InternalInstruction *insn)
 		return 0;
 
 	insn->consumedDisplacement = true;
-	insn->displacementOffset = insn->readerCursor - insn->startLocation;
+	insn->displacementOffset = insn->readerCursor;
 
 	switch (insn->eaDisplacement) {
 	case EA_DISP_NONE:
@@ -1624,7 +1623,7 @@ static int readModRM(struct InternalInstruction *insn)
 	if (insn->consumedModRM)
 		return 0;
 
-	insn->modRMOffset = (uint8_t)(insn->readerCursor - insn->startLocation);
+	insn->modRMOffset = (uint8_t)insn->readerCursor;
 
 	if (consumeByte(insn, &insn->modRM))
 		return -1;
@@ -1985,7 +1984,7 @@ static int readImmediate(struct InternalInstruction *insn, uint8_t size)
 	else
 		insn->immediateSize = size;
 
-	insn->immediateOffset = insn->readerCursor - insn->startLocation;
+	insn->immediateOffset = insn->readerCursor;
 
 	switch (size) {
 	case 1:
@@ -2101,10 +2100,11 @@ static int readOperands(struct InternalInstruction *insn)
 	hasVVVV = !readVVVV(insn);
 	needVVVV = hasVVVV && (insn->vvvv != 0);
 
-	for (i = 0; i < X86_MAX_OPERANDS; ++i) {
+	for (i = 0; i < X86_MAX_OPERANDS &&
+		    insn->operands[i].encoding != ENCODING_NONE;
+	     ++i) {
 		const OperandSpecifier *op = &insn->operands[i];
 		switch (op->encoding) {
-		case ENCODING_NONE:
 		case ENCODING_SI:
 		case ENCODING_DI:
 			break;
@@ -2633,18 +2633,15 @@ static bool checkPrefix(struct InternalInstruction *insn)
  *                    pre-allocated.
  * @param code      - The instruction bytes.
  * @param codeSize  - The number of readable bytes.
- * @param startLoc  - The address (in the reader's address space) of the first
- *                    byte in the instruction.
  * @param mode      - Capstone mode flags.
  * @return          - 0 if instruction is valid; nonzero if not.
  */
 int decodeInstruction(struct InternalInstruction *insn, const uint8_t *code,
-		      size_t codeSize, uint64_t startLoc, cs_mode mode)
+		      size_t codeSize, cs_mode mode)
 {
 	insn->code = code;
 	insn->codeSize = codeSize;
-	insn->startLocation = startLoc;
-	insn->readerCursor = startLoc;
+	insn->readerCursor = 0;
 	if (x86_has_feature(mode, CS_MODE_16))
 		insn->mode = MODE_16BIT;
 	else if (x86_has_feature(mode, CS_MODE_32))
@@ -2665,7 +2662,7 @@ int decodeInstruction(struct InternalInstruction *insn, const uint8_t *code,
 	    regFromModRM(insn->orgModRM) == 1)
 		return -1;
 
-	insn->length = (size_t)(insn->readerCursor - insn->startLocation);
+	insn->length = insn->readerCursor;
 
 	// instruction length must be <= 15 to be valid
 	if (insn->length > 15)

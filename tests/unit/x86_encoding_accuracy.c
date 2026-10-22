@@ -8,6 +8,34 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../../arch/X86/X86DisassemblerDecoder.h"
+#ifdef CAPSTONE_X86_REDUCE
+#include "../../arch/X86/X86GenDisassemblerTables_reduce.inc"
+#else
+#include "../../arch/X86/X86GenDisassemblerTables.inc"
+#endif
+
+/* The operand readers stop at the first padding entry. Keep this contract
+ * checked when the generated tables are updated. */
+static bool check_operand_sets(void)
+{
+	for (size_t set = 0;
+	     set < sizeof(x86OperandSets) / sizeof(x86OperandSets[0]); ++set) {
+		bool padding = false;
+		for (size_t op = 0; op < X86_MAX_OPERANDS; ++op) {
+			if (x86OperandSets[set][op].encoding == ENCODING_NONE)
+				padding = true;
+			else if (padding) {
+				fprintf(stderr,
+					"operand set %zu has an operand after padding at %zu\n",
+					set, op);
+				return false;
+			}
+		}
+	}
+	return true;
+}
+
 static bool decode(csh handle, const uint8_t *bytes, size_t size, unsigned id,
 		   size_t length)
 {
@@ -707,7 +735,7 @@ int main(void)
 	};
 	const cs_mode modes[] = { CS_MODE_16, CS_MODE_32, CS_MODE_64 };
 	const unsigned syntaxes[] = { CS_OPT_SYNTAX_INTEL, CS_OPT_SYNTAX_ATT };
-	bool ok = true;
+	bool ok = check_operand_sets();
 	for (size_t m = 0; m < sizeof(modes) / sizeof(modes[0]); ++m)
 		for (size_t s = 0; s < sizeof(syntaxes) / sizeof(syntaxes[0]);
 		     ++s)

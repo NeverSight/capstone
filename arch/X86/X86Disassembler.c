@@ -366,7 +366,6 @@ static void translateImmediate(MCInst *mcInst, uint64_t immediate,
 	type = (OperandType)operand->type;
 	if (type == TYPE_REL) {
 		//isBranch = true;
-		//pcrel = insn->startLocation + insn->immediateOffset + insn->immediateSize;
 		switch (operand->encoding) {
 		default:
 			break;
@@ -1449,13 +1448,11 @@ static bool translateInstruction(MCInst *mcInst, InternalInstruction *insn)
 
 	insn->numImmediatesTranslated = 0;
 
-	for (index = 0; index < X86_MAX_OPERANDS; ++index) {
-		if (insn->operands[index].encoding != ENCODING_NONE) {
-			if (translateOperand(mcInst, &insn->operands[index],
-					     insn)) {
-				return true;
-			}
-		}
+	for (index = 0; index < X86_MAX_OPERANDS &&
+			insn->operands[index].encoding != ENCODING_NONE;
+	     ++index) {
+		if (translateOperand(mcInst, &insn->operands[index], insn))
+			return true;
 	}
 
 	return false;
@@ -1915,11 +1912,9 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 		}
 	}
 
-	ret = decodeInstruction(&insn, decode_code, decode_size, address,
-				handle->mode);
+	ret = decodeInstruction(&insn, decode_code, decode_size, handle->mode);
 
 	if (ret) {
-		// *size = (uint16_t)(insn.readerCursor - address);
 		return false;
 	} else {
 		*size = (uint16_t)insn.length;
