@@ -8,7 +8,8 @@
 #include "../../SStream.h"
 
 // Keep source-owned instruction extensions outside the generated opcode range.
-#define X86_FEATURE_TILEZERO 0x10000U
+#define X86_FEATURE_OPCODE_BASE 0x10000U
+#define X86_FEATURE_TILEZERO X86_FEATURE_OPCODE_BASE
 #define X86_FEATURE_REX2_MOV 0x10001U
 #define X86_FEATURE_REX2_ADD 0x10002U
 #define X86_FEATURE_LDTILECFG 0x10003U
@@ -147,9 +148,11 @@ typedef enum x86_feature_decode_result {
 	X86_FEATURE_INVALID,
 } x86_feature_decode_result;
 
+/* opcode receives the first byte after legacy/REX prefixes, or zero if absent,
+ * including when no feature decoder handles the instruction. */
 x86_feature_decode_result X86_decodeFeatureExtension(
 	csh handle, const uint8_t *code, size_t code_len, MCInst *instr,
-	uint16_t *size);
+	uint16_t *size, uint8_t *opcode);
 bool X86_printFeatureExtension(MCInst *instr, SStream *stream,
 			       bool att_syntax);
 bool X86_mapFeatureExtension(cs_insn *insn, unsigned int opcode);

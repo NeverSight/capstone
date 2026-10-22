@@ -709,7 +709,7 @@ static void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
 		}
 	} else if (MCOperand_isImm(Op)) {
 		// Print X86 immediates as signed values.
-		uint8_t encsize;
+		uint8_t encsize = 0;
 		int64_t imm = MCOperand_getImm(Op);
 		uint8_t opsize =
 			X86_immediate_size(MCInst_getOpcode(MI), &encsize);

@@ -4,9 +4,7 @@
 #ifndef CS_PRIV_H
 #define CS_PRIV_H
 
-#ifdef CAPSTONE_DEBUG
-#include <assert.h>
-#endif
+#include "cs_assert.h"
 #include <capstone/capstone.h>
 
 #include "MCInst.h"
@@ -149,80 +147,5 @@ static inline bool cs_mem_is_setup()
 	return cs_mem_malloc && cs_mem_calloc && cs_mem_realloc &&
 	       cs_mem_free && cs_vsnprintf;
 }
-
-/// Capstone assert macros. They can be configured to print warnings
-/// when the `expr` is false.
-/// This can be enabled by defining CAPSTONE_ASSERTION_WARNINGS.
-/// Debug builds will always include an `assert(expr)` and hard fail
-/// if `!expr`.
-/// Release builds will not have `assert(expr)` code.
-
-/// An simple assert.
-#if defined(CAPSTONE_DEBUG) && !defined(CAPSTONE_ASSERTION_WARNINGS)
-#define CS_ASSERT(expr) assert(expr)
-#elif defined(CAPSTONE_DEBUG) && defined(CAPSTONE_ASSERTION_WARNINGS)
-#define CS_ASSERT(expr) \
-	do { \
-		if (!(expr)) { \
-			fprintf(stderr, \
-				"Capstone hit the assert: \"" #expr \
-				"\": %s:%" PRIu32 "\n", \
-				__FILE__, __LINE__); \
-			assert(expr) \
-		} \
-	} while (0)
-#elif defined(CAPSTONE_ASSERTION_WARNINGS)
-#define CS_ASSERT(expr) \
-	do { \
-		if (!(expr)) { \
-			fprintf(stderr, \
-				"Capstone hit the assert: \"" #expr \
-				"\": %s:%" PRIu32 "\n", \
-				__FILE__, __LINE__); \
-		} \
-	} while (0)
-#else
-#define CS_ASSERT(expr)
-#endif
-
-/// An assert which returns the value in release builds if `!expr`.
-#if defined(CAPSTONE_DEBUG) && !defined(CAPSTONE_ASSERTION_WARNINGS)
-#define CS_ASSERT_RET_VAL(expr, val) assert(expr)
-#elif defined(CAPSTONE_ASSERTION_WARNINGS)
-#define CS_ASSERT_RET_VAL(expr, val) \
-	do { \
-		if (!(expr)) { \
-			CS_ASSERT(expr); \
-			return val; \
-		} \
-	} while (0)
-#else
-#define CS_ASSERT_RET_VAL(expr, val) \
-	do { \
-		if (!(expr)) { \
-			return val; \
-		} \
-	} while (0)
-#endif
-
-/// An assert which returns in release builds if `!expr`.
-#if defined(CAPSTONE_DEBUG) && !defined(CAPSTONE_ASSERTION_WARNINGS)
-#define CS_ASSERT_RET(expr) assert(expr)
-#elif defined(CAPSTONE_ASSERTION_WARNINGS)
-#define CS_ASSERT_RET(expr) \
-	do { \
-		if (!(expr)) { \
-			CS_ASSERT(expr); \
-			return; \
-		} \
-	} while (0)
-#else
-#define CS_ASSERT_RET(expr) \
-	do { \
-		if (!(expr)) { \
-			return; \
-		} \
-	} while (0)
-#endif
 
 #endif

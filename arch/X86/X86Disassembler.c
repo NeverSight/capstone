@@ -366,7 +366,6 @@ static void translateImmediate(MCInst *mcInst, uint64_t immediate,
 	type = (OperandType)operand->type;
 	if (type == TYPE_REL) {
 		//isBranch = true;
-		//pcrel = insn->startLocation + insn->immediateOffset + insn->immediateSize;
 		switch (operand->encoding) {
 		default:
 			break;
@@ -1449,13 +1448,11 @@ static bool translateInstruction(MCInst *mcInst, InternalInstruction *insn)
 
 	insn->numImmediatesTranslated = 0;
 
-	for (index = 0; index < X86_MAX_OPERANDS; ++index) {
-		if (insn->operands[index].encoding != ENCODING_NONE) {
-			if (translateOperand(mcInst, &insn->operands[index],
-					     insn)) {
-				return true;
-			}
-		}
+	for (index = 0; index < X86_MAX_OPERANDS &&
+			insn->operands[index].encoding != ENCODING_NONE;
+	     ++index) {
+		if (translateOperand(mcInst, &insn->operands[index], insn))
+			return true;
 	}
 
 	return false;
@@ -1635,7 +1632,8 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 {
 	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
 	InternalInstruction insn = { 0 };
-	struct reader_info info;
+	const uint8_t *decode_code = code;
+	size_t decode_size = code_len;
 	uint8_t normalized_code[15];
 	size_t evex_normalization_limit = 0;
 	size_t evex_normalization_offset = 0;
@@ -1644,17 +1642,13 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 	bool evex_invalid_prefix = false;
 	bool has_evex_normalization_prefix = false;
 	bool scalar_compare_p2_normalized = false;
-	size_t apx_evex_offset = 0;
 	uint8_t apx_evex_p0 = 0, apx_evex_p1 = 0;
 	bool apx_evex_normalized = false;
 	bool apx_evex_b4 = false, apx_evex_x4 = false;
+	uint8_t extension_opcode;
 	x86_feature_decode_result extension_result;
 	int ret;
 	bool result;
-
-	info.code = code;
-	info.size = code_len;
-	info.offset = address;
 
 	if (instr->flat_insn->detail) {
 		// instr->flat_insn->detail initialization: 3 alternatives
@@ -1675,8 +1669,8 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 		//memset(instr->flat_insn->detail, 0, offsetof(cs_detail, x86)+offsetof(cs_x86, operands));
 	}
 
-	extension_result =
-		X86_decodeFeatureExtension(ud, code, code_len, instr, size);
+	extension_result = X86_decodeFeatureExtension(ud, code, code_len, instr,
+						      size, &extension_opcode);
 	if (extension_result == X86_FEATURE_DECODED) {
 		return true;
 	}
@@ -1686,11 +1680,12 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 	evex_normalization_limit = code_len < sizeof(normalized_code) ?
 					   code_len :
 					   sizeof(normalized_code);
-	has_evex_normalization_prefix = scan_x86_evex_prefix(
-		code, evex_normalization_limit,
-		(handle->mode & CS_MODE_64) != 0, &evex_normalization_offset,
-		&evex_segment_count, &evex_address_size_count,
-		&evex_invalid_prefix);
+	if (extension_opcode == 0x62)
+		has_evex_normalization_prefix = scan_x86_evex_prefix(
+			code, evex_normalization_limit,
+			(handle->mode & CS_MODE_64) != 0,
+			&evex_normalization_offset, &evex_segment_count,
+			&evex_address_size_count, &evex_invalid_prefix);
 
 	/* Packed VCMPPS/PD uses EVEX.L'L as its vector length unless EVEX.b
 	 * selects SAE and a fixed 512-bit length for a register source.  The
@@ -1735,11 +1730,11 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 		    (!b && ll == 3))
 			return false;
 		if (!b && ll != 0) {
-			memcpy(normalized_code, info.code,
+			memcpy(normalized_code, decode_code,
 			       evex_normalization_limit);
 			normalized_code[evex_normalization_offset + 3] &= ~0x60;
-			info.code = normalized_code;
-			info.size = evex_normalization_limit;
+			decode_code = normalized_code;
+			decode_size = evex_normalization_limit;
 			scalar_compare_p2_normalized = true;
 		}
 	}
@@ -1773,12 +1768,12 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 			if ((memory && b) || (!b && ll == 3))
 				return false;
 			if (!b && ll != 0) {
-				memcpy(normalized_code, info.code,
+				memcpy(normalized_code, decode_code,
 				       evex_normalization_limit);
 				normalized_code[evex_normalization_offset + 3] &=
 					~0x60;
-				info.code = normalized_code;
-				info.size = evex_normalization_limit;
+				decode_code = normalized_code;
+				decode_size = evex_normalization_limit;
 			}
 		} else if (!(b && !memory) && ll != 2) {
 			return false;
@@ -1810,11 +1805,11 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 		if (ll == 3 || (b && (!memory || scalar)))
 			return false;
 		if (scalar && ll != 0) {
-			memcpy(normalized_code, info.code,
+			memcpy(normalized_code, decode_code,
 			       evex_normalization_limit);
 			normalized_code[evex_normalization_offset + 3] &= ~0x60;
-			info.code = normalized_code;
-			info.size = evex_normalization_limit;
+			decode_code = normalized_code;
+			decode_size = evex_normalization_limit;
 		}
 	}
 	/* Scalar VFPCLASSSS/SD treats EVEX.L'L as LLIG for its register and
@@ -1836,11 +1831,11 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 		if (ll == 3 || b)
 			return false;
 		if (ll != 0) {
-			memcpy(normalized_code, info.code,
+			memcpy(normalized_code, decode_code,
 			       evex_normalization_limit);
 			normalized_code[evex_normalization_offset + 3] &= ~0x60;
-			info.code = normalized_code;
-			info.size = evex_normalization_limit;
+			decode_code = normalized_code;
+			decode_size = evex_normalization_limit;
 		}
 	}
 	/* Scalar AVX512_4FMAPS encodings are EVEX.LLIG, except that the
@@ -1867,12 +1862,12 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 			    (zeroing && mask == 0) || ll == 3)
 				return false;
 			if (ll != 0) {
-				memcpy(normalized_code, info.code,
+				memcpy(normalized_code, decode_code,
 				       evex_normalization_limit);
 				normalized_code[evex_normalization_offset + 3] &=
 					~0x60;
-				info.code = normalized_code;
-				info.size = evex_normalization_limit;
+				decode_code = normalized_code;
+				decode_size = evex_normalization_limit;
 			}
 		}
 	}
@@ -1885,44 +1880,41 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 	 * VSIB continues to use V4 for its vector index; X4 is ignored there.
 	 * A register r/m has no index, so U=0 remains #UD there, as in XED. */
 	{
-		const size_t limit = evex_normalization_limit;
-		// Both normalizations inspect the original bytes, not info.code.
-		apx_evex_offset = evex_normalization_offset;
-
 		if (has_evex_normalization_prefix &&
-		    limit - apx_evex_offset >= 6 &&
-		    code[apx_evex_offset] == 0x62 &&
-		    (code[apx_evex_offset + 1] & 7) >= 1 &&
-		    (code[apx_evex_offset + 1] & 7) <= 3 &&
-		    ((code[apx_evex_offset + 1] & 0x08) != 0 ||
-		     (code[apx_evex_offset + 2] & 0x04) == 0)) {
-			const uint8_t modrm = code[apx_evex_offset + 5];
+		    evex_normalization_limit - evex_normalization_offset >= 6 &&
+		    code[evex_normalization_offset] == 0x62 &&
+		    (code[evex_normalization_offset + 1] & 7) >= 1 &&
+		    (code[evex_normalization_offset + 1] & 7) <= 3 &&
+		    ((code[evex_normalization_offset + 1] & 0x08) != 0 ||
+		     (code[evex_normalization_offset + 2] & 0x04) == 0)) {
+			const uint8_t modrm =
+				code[evex_normalization_offset + 5];
 
 			if (!(handle->mode & CS_MODE_64) ||
 			    evex_invalid_prefix || evex_segment_count > 1 ||
 			    evex_address_size_count > 1 ||
 			    ((modrm & 0xc0) == 0xc0 &&
-			     (code[apx_evex_offset + 2] & 0x04) == 0))
+			     (code[evex_normalization_offset + 2] & 0x04) == 0))
 				return false;
-			apx_evex_p0 = code[apx_evex_offset + 1];
-			apx_evex_p1 = code[apx_evex_offset + 2];
+			apx_evex_p0 = code[evex_normalization_offset + 1];
+			apx_evex_p1 = code[evex_normalization_offset + 2];
 			apx_evex_b4 = (apx_evex_p0 & 0x08) != 0;
 			apx_evex_x4 = (modrm & 0xc0) != 0xc0 &&
 				      (apx_evex_p1 & 0x04) == 0;
-			if (info.code != normalized_code)
-				memcpy(normalized_code, info.code, limit);
-			normalized_code[apx_evex_offset + 1] &= ~0x08;
-			normalized_code[apx_evex_offset + 2] |= 0x04;
-			info.code = normalized_code;
-			info.size = limit;
+			if (decode_code != normalized_code)
+				memcpy(normalized_code, decode_code,
+				       evex_normalization_limit);
+			normalized_code[evex_normalization_offset + 1] &= ~0x08;
+			normalized_code[evex_normalization_offset + 2] |= 0x04;
+			decode_code = normalized_code;
+			decode_size = evex_normalization_limit;
 			apx_evex_normalized = true;
 		}
 	}
 
-	ret = decodeInstruction(&insn, &info, address, handle->mode);
+	ret = decodeInstruction(&insn, decode_code, decode_size, handle->mode);
 
 	if (ret) {
-		// *size = (uint16_t)(insn.readerCursor - address);
 		return false;
 	} else {
 		*size = (uint16_t)insn.length;
@@ -1941,6 +1933,10 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 
 		result = (!translateInstruction(instr, &insn)) ? true : false;
 		if (result) {
+			/* Translation still validates operands and selects the opcode;
+			 * a scan does not consume printer metadata or public detail. */
+			if (handle->no_text && !handle->detail_opt)
+				return true;
 			unsigned Flags = X86_IP_NO_PREFIX;
 			if (scalar_compare_p2_normalized)
 				insn.vectorExtensionPrefix[3] =

@@ -207,6 +207,7 @@ set(SOURCES_ENGINE
     utils.c
 )
 set(HEADERS_ENGINE
+    cs_assert.h
     cs_simple_types.h
     cs_priv.h
     LEB128.h

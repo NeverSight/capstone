@@ -21,6 +21,7 @@
 
 #include <assert.h>
 #include "include/capstone/capstone.h"
+#include "cs_assert.h"
 #include "MCAsmInfo.h"
 #include "MCInstrDesc.h"
 #include "MCRegisterInfo.h"
@@ -106,14 +107,8 @@ const MCInst *MCOperand_getInst(const MCOperand *op);
 
 void MCOperand_setInst(MCOperand *op, const MCInst *Val);
 
-// create Reg operand in the next slot
-void MCOperand_CreateReg0(MCInst *inst, unsigned Reg);
-
 // create Reg operand use the last-unused slot
 MCOperand *MCOperand_CreateReg1(MCInst *inst, unsigned Reg);
-
-// create Imm operand in the next slot
-void MCOperand_CreateImm0(MCInst *inst, int64_t Val);
 
 // create Imm operand in the last-unused slot
 MCOperand *MCOperand_CreateImm1(MCInst *inst, int64_t Val);
@@ -163,9 +158,48 @@ struct MCInst {
 	MCAsmInfo MAI; ///< The equivalent to MCAsmInfo in LLVM. It holds flags relevant for the asm style to print.
 };
 
+/* MCInst.c emits the external definitions from these same bodies. */
+#ifdef CS_MCINST_DEFINE_INLINE
+#define CS_MCINST_INLINE
+#else
+#define CS_MCINST_INLINE static inline
+#endif
+
+// create Reg operand in the next slot
+CS_MCINST_INLINE void MCOperand_CreateReg0(MCInst *mcInst, unsigned Reg)
+{
+	CS_ASSERT_RET(mcInst->size < MAX_MC_OPS);
+	MCOperand *op = &(mcInst->Operands[mcInst->size]);
+	mcInst->size++;
+
+#ifdef __cplusplus
+	op->MachineOperandType = MCOperand::kRegister;
+#else
+	op->MachineOperandType = kRegister;
+#endif
+	op->Kind = op->MachineOperandType;
+	op->RegVal = Reg;
+}
+
+// create Imm operand in the next slot
+CS_MCINST_INLINE void MCOperand_CreateImm0(MCInst *mcInst, int64_t Val)
+{
+	CS_ASSERT_RET(mcInst->size < MAX_MC_OPS);
+	MCOperand *op = &(mcInst->Operands[mcInst->size]);
+	mcInst->size++;
+
+#ifdef __cplusplus
+	op->MachineOperandType = MCOperand::kImmediate;
+#else
+	op->MachineOperandType = kImmediate;
+#endif
+	op->Kind = op->MachineOperandType;
+	op->ImmVal = Val;
+}
+
 void MCInst_Init(MCInst *inst, cs_arch arch);
 
-static inline void MCInst_clear(MCInst *inst)
+CS_MCINST_INLINE void MCInst_clear(MCInst *inst)
 {
 	inst->size = 0;
 }
@@ -173,25 +207,27 @@ static inline void MCInst_clear(MCInst *inst)
 // do not free operand after inserting
 void MCInst_insert0(MCInst *inst, int index, MCOperand *Op);
 
-static inline void MCInst_setOpcode(MCInst *inst, unsigned Op)
+CS_MCINST_INLINE void MCInst_setOpcode(MCInst *inst, unsigned Op)
 {
 	inst->Opcode = Op;
 }
 
-static inline unsigned MCInst_getOpcode(const MCInst *inst)
+CS_MCINST_INLINE unsigned MCInst_getOpcode(const MCInst *inst)
 {
 	return inst->Opcode;
 }
 
-static inline void MCInst_setOpcodePub(MCInst *inst, unsigned Op)
+CS_MCINST_INLINE void MCInst_setOpcodePub(MCInst *inst, unsigned Op)
 {
 	inst->OpcodePub = Op;
 }
 
-static inline unsigned MCInst_getOpcodePub(const MCInst *inst)
+CS_MCINST_INLINE unsigned MCInst_getOpcodePub(const MCInst *inst)
 {
 	return inst->OpcodePub;
 }
+
+#undef CS_MCINST_INLINE
 
 static inline MCOperand *MCInst_getOperand(MCInst *inst, unsigned i)
 {

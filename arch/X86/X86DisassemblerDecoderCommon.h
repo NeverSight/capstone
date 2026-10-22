@@ -542,6 +542,8 @@ typedef enum { TYPES TYPE_max } OperandType;
 
 /*
  * The specification for how to extract and interpret one operand.
+ * TableGen packs operands at the beginning of each set; ENCODING_NONE pads
+ * the unused tail. Readers may stop at the first such entry.
  */
 typedef struct OperandSpecifier {
 	uint8_t encoding;

@@ -11,7 +11,9 @@
 #include <assert.h>
 
 #include "MCInstrDesc.h"
+#define CS_MCINST_DEFINE_INLINE
 #include "MCInst.h"
+#undef CS_MCINST_DEFINE_INLINE
 #include "utils.h"
 
 #define MCINST_CACHE (ARR_SIZE(mcInst->Operands) - 1)
@@ -118,17 +120,6 @@ MCOperand *MCOperand_CreateReg1(MCInst *mcInst, unsigned Reg)
 	return op;
 }
 
-void MCOperand_CreateReg0(MCInst *mcInst, unsigned Reg)
-{
-	CS_ASSERT_RET(mcInst->size < MAX_MC_OPS);
-	MCOperand *op = &(mcInst->Operands[mcInst->size]);
-	mcInst->size++;
-
-	op->MachineOperandType = kRegister;
-	op->Kind = kRegister;
-	op->RegVal = Reg;
-}
-
 MCOperand *MCOperand_CreateImm1(MCInst *mcInst, int64_t Val)
 {
 	MCOperand *op = &(mcInst->Operands[MCINST_CACHE]);
@@ -138,17 +129,6 @@ MCOperand *MCOperand_CreateImm1(MCInst *mcInst, int64_t Val)
 	op->ImmVal = Val;
 
 	return op;
-}
-
-void MCOperand_CreateImm0(MCInst *mcInst, int64_t Val)
-{
-	CS_ASSERT_RET(mcInst->size < MAX_MC_OPS);
-	MCOperand *op = &(mcInst->Operands[mcInst->size]);
-	mcInst->size++;
-
-	op->MachineOperandType = kImmediate;
-	op->Kind = kImmediate;
-	op->ImmVal = Val;
 }
 
 /// Check if any operand of the MCInstrDesc is predicable

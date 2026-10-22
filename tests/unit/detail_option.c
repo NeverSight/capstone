@@ -62,6 +62,7 @@ static bool test_iter(cs_arch arch, cs_mode mode, const uint8_t *insn_code,
 
 	cs_option(handle, CS_OPT_DETAIL, CS_OPT_OFF);
 	for (i = 0; success && i < 64; i++) {
+		cs_option(handle, CS_OPT_TEXT, i % 2 ? CS_OPT_ON : CS_OPT_OFF);
 		cursor = insn_code;
 		left = insn_size;
 		address = 0x1000;

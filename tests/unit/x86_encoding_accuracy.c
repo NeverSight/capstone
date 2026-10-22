@@ -5,7 +5,36 @@
 
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+
+#include "../../arch/X86/X86DisassemblerDecoder.h"
+#ifdef CAPSTONE_X86_REDUCE
+#include "../../arch/X86/X86GenDisassemblerTables_reduce.inc"
+#else
+#include "../../arch/X86/X86GenDisassemblerTables.inc"
+#endif
+
+/* The operand readers stop at the first padding entry. Keep this contract
+ * checked when the generated tables are updated. */
+static bool check_operand_sets(void)
+{
+	for (size_t set = 0;
+	     set < sizeof(x86OperandSets) / sizeof(x86OperandSets[0]); ++set) {
+		bool padding = false;
+		for (size_t op = 0; op < X86_MAX_OPERANDS; ++op) {
+			if (x86OperandSets[set][op].encoding == ENCODING_NONE)
+				padding = true;
+			else if (padding) {
+				fprintf(stderr,
+					"operand set %zu has an operand after padding at %zu\n",
+					set, op);
+				return false;
+			}
+		}
+	}
+	return true;
+}
 
 static bool decode(csh handle, const uint8_t *bytes, size_t size, unsigned id,
 		   size_t length)
@@ -43,6 +72,231 @@ static bool decode(csh handle, const uint8_t *bytes, size_t size, unsigned id,
 	}
 	cs_free(batch, count);
 	cs_free(iter, iter ? 1 : 0);
+	return ok;
+}
+
+struct reader_case {
+	cs_mode mode;
+	uint8_t bytes[10];
+	size_t size;
+	unsigned id;
+	bool memory;
+	int64_t value;
+};
+
+static bool check_far_pointer_encoding(csh handle, cs_mode mode, bool detail)
+{
+	static const struct {
+		cs_mode mode;
+		uint8_t bytes[8];
+		size_t size;
+	} cases[] = {
+		{ CS_MODE_16, { 0x9a, 0x21, 0x4c, 0x94, 0xdb }, 5 },
+		{ CS_MODE_32, { 0x9a, 0x21, 0x4c, 0x78, 0x56, 0x94, 0xdb }, 7 },
+		{ CS_MODE_16,
+		  { 0x66, 0x9a, 0x21, 0x4c, 0x78, 0x56, 0x94, 0xdb },
+		  8 },
+		{ CS_MODE_32, { 0x66, 0x9a, 0x21, 0x4c, 0x94, 0xdb }, 6 },
+	};
+	bool ok = true;
+	for (size_t c = 0; c < sizeof(cases) / sizeof(cases[0]); ++c) {
+		if (cases[c].mode != mode)
+			continue;
+		for (unsigned jump = 0; jump != 2; ++jump) {
+			uint8_t bytes[sizeof(cases[c].bytes)];
+			memcpy(bytes, cases[c].bytes, sizeof(bytes));
+			bytes[bytes[0] == 0x66 ? 1 : 0] = jump ? 0xea : 0x9a;
+			const uint8_t *cursor = bytes;
+			size_t remaining = cases[c].size;
+			uint64_t address = 0x1000;
+			cs_insn *batch = NULL, *iter = cs_malloc(handle);
+			size_t count = cs_disasm(handle, bytes, remaining,
+						 address, 1, &batch);
+			bool decoded = iter && cs_disasm_iter(handle, &cursor,
+							      &remaining,
+							      &address, iter);
+			bool match = count == 1 && decoded;
+			if (match) {
+				unsigned id = jump ? X86_INS_LJMP :
+						     X86_INS_LCALL;
+				const cs_insn *results[] = { batch, iter };
+				for (size_t r = 0; r != 2; ++r) {
+					const cs_insn *insn = results[r];
+					match &= insn->id == id &&
+						 insn->size == cases[c].size;
+					if (detail) {
+						const cs_x86_encoding *encoding =
+							&insn->detail->x86
+								 .encoding;
+						/* The final immediate is the 16-bit selector. */
+						match &= encoding->imm_offset +
+								 2 ==
+							 cases[c].size;
+						match &= encoding->imm_size ==
+							 2;
+					}
+				}
+			}
+			if (!match)
+				fprintf(stderr,
+					"far pointer encoding: case=%zu jump=%u\n",
+					c, jump);
+			ok &= match;
+			cs_free(batch, count);
+			cs_free(iter, 1);
+		}
+	}
+	return ok;
+}
+
+static bool check_reader_input(csh handle, cs_insn *iter,
+			       const struct reader_case *test,
+			       const uint8_t *bytes, size_t available,
+			       uint64_t start, bool detail)
+{
+	const uint8_t *cursor = bytes;
+	size_t remaining = available;
+	uint64_t address = start;
+	bool expected = available == test->size;
+	bool decoded =
+		cs_disasm_iter(handle, &cursor, &remaining, &address, iter);
+	bool match = decoded == expected;
+
+	if (decoded) {
+		match &= iter->id == test->id && iter->size == available &&
+			 iter->address == start &&
+			 cursor == bytes + available && remaining == 0 &&
+			 address == start + available &&
+			 memcmp(iter->bytes, bytes, available) == 0;
+	} else {
+		match &= cursor == bytes && remaining == available &&
+			 address == start;
+	}
+	if (decoded && detail) {
+		const cs_x86 *x86 = &iter->detail->x86;
+		bool found = false;
+		for (unsigned op = 0; op < x86->op_count; ++op) {
+			const cs_x86_op *operand = &x86->operands[op];
+			if (test->memory)
+				found |= operand->type == X86_OP_MEM &&
+					 operand->mem.disp == test->value;
+			else
+				found |= operand->type == X86_OP_IMM &&
+					 operand->imm == test->value;
+		}
+		match &= found;
+	}
+	cs_insn *batch = NULL;
+	size_t count = cs_disasm(handle, bytes, available, start, 1, &batch);
+	match &= count == (expected ? 1 : 0);
+	if (count)
+		match &= batch[0].id == test->id &&
+			 batch[0].size == available &&
+			 batch[0].address == start &&
+			 memcmp(batch[0].bytes, bytes, available) == 0;
+	cs_free(batch, count);
+	return match;
+}
+
+/* Exact-size allocations also make these checks sensitive to overreads in
+ * sanitizer builds. Exercise every truncation and several input alignments. */
+static bool check_reader_bounds(csh handle, cs_mode mode, bool detail)
+{
+	static const struct reader_case cases[] = {
+		{ CS_MODE_16,
+		  { 0xb8, 0x34, 0x12 },
+		  3,
+		  X86_INS_MOV,
+		  false,
+		  0x1234 },
+		{ CS_MODE_16,
+		  { 0x8b, 0x86, 0x98, 0xfe },
+		  4,
+		  X86_INS_MOV,
+		  true,
+		  -360 },
+		{ CS_MODE_32,
+		  { 0xb8, 0x78, 0x56, 0x34, 0x12 },
+		  5,
+		  X86_INS_MOV,
+		  false,
+		  0x12345678 },
+		{ CS_MODE_32,
+		  { 0x8b, 0x83, 0x98, 0xba, 0xdc, 0xfe },
+		  6,
+		  X86_INS_MOV,
+		  true,
+		  -19088744 },
+		{ CS_MODE_64,
+		  { 0x48, 0xb8, 0xef, 0xcd, 0xab, 0x89, 0x67, 0x45, 0x23,
+		    0x01 },
+		  10,
+		  X86_INS_MOVABS,
+		  false,
+		  INT64_C(0x0123456789abcdef) },
+		{ CS_MODE_64,
+		  { 0x48, 0xa1, 0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02,
+		    0x01 },
+		  10,
+		  X86_INS_MOVABS,
+		  true,
+		  INT64_C(0x0102030405060708) },
+		{ CS_MODE_64,
+		  { 0x48, 0x8b, 0x84, 0x8b, 0x98, 0xba, 0xdc, 0xfe },
+		  8,
+		  X86_INS_MOV,
+		  true,
+		  -19088744 },
+		{ CS_MODE_64,
+		  { 0x48, 0x83, 0xc0, 0x81 },
+		  4,
+		  X86_INS_ADD,
+		  false,
+		  -127 },
+	};
+	static const uint64_t addresses[] = { 0, 0x1000, UINT64_MAX - 4,
+					      UINT64_MAX };
+	cs_insn *iter = cs_malloc(handle);
+	bool ok = iter != NULL;
+	if (!iter)
+		return false;
+
+	for (size_t c = 0; c < sizeof(cases) / sizeof(cases[0]); ++c) {
+		if (cases[c].mode != mode)
+			continue;
+		for (size_t available = 0; available <= cases[c].size;
+		     ++available) {
+			for (size_t alignment = 0; alignment != 8;
+			     ++alignment) {
+				size_t allocation_size = available + alignment;
+				uint8_t *allocation = malloc(
+					allocation_size ? allocation_size : 1);
+				if (!allocation) {
+					cs_free(iter, 1);
+					return false;
+				}
+				uint8_t *bytes = allocation + alignment;
+				memcpy(bytes, cases[c].bytes, available);
+				for (size_t a = 0;
+				     a <
+				     sizeof(addresses) / sizeof(addresses[0]);
+				     ++a) {
+					bool match = check_reader_input(
+						handle, iter, &cases[c], bytes,
+						available, addresses[a],
+						detail);
+					if (!match)
+						fprintf(stderr,
+							"reader bounds: case=%zu size=%zu alignment=%zu address=%zu\n",
+							c, available, alignment,
+							a);
+					ok &= match;
+				}
+				free(allocation);
+			}
+		}
+	}
+	cs_free(iter, 1);
 	return ok;
 }
 
@@ -481,7 +735,7 @@ int main(void)
 	};
 	const cs_mode modes[] = { CS_MODE_16, CS_MODE_32, CS_MODE_64 };
 	const unsigned syntaxes[] = { CS_OPT_SYNTAX_INTEL, CS_OPT_SYNTAX_ATT };
-	bool ok = true;
+	bool ok = check_operand_sets();
 	for (size_t m = 0; m < sizeof(modes) / sizeof(modes[0]); ++m)
 		for (size_t s = 0; s < sizeof(syntaxes) / sizeof(syntaxes[0]);
 		     ++s)
@@ -505,6 +759,11 @@ int main(void)
 							detail) == CS_ERR_OK;
 					ok &= cs_option(handle, CS_OPT_TEXT,
 							text) == CS_ERR_OK;
+					ok &= check_reader_bounds(
+						handle, modes[m],
+						detail && text);
+					ok &= check_far_pointer_encoding(
+						handle, modes[m], detail);
 					ok &= check_lock(handle, modes[m]);
 					ok &= check_segments(handle, modes[m]);
 					const uint8_t ud0[] = { 0x0f, 0xff };

@@ -525,12 +525,6 @@ typedef enum {
 	TYPE_XOP = 0x4
 } VectorExtensionType;
 
-struct reader_info {
-	const uint8_t *code;
-	uint64_t size;
-	uint64_t offset;
-};
-
 /// The specification for how to extract and interpret a full instruction and
 /// its operands.
 struct InstructionSpecifier {
@@ -604,17 +598,16 @@ typedef struct InternalInstruction {
 
 	// end-of-zero-members
 
-	/* Bounded instruction bytes supplied by X86_getInstruction. */
-	const struct reader_info *reader;
-	/* The address of the next byte to read via the reader */
-	uint64_t readerCursor;
+	/* Input bytes; no padding or alignment is required. */
+	const uint8_t *code;
+	size_t codeSize;
+	/* The offset of the next byte within code. */
+	size_t readerCursor;
 
 	/* General instruction information */
 
 	/* The mode to disassemble for (64-bit, protected, real) */
 	DisassemblerMode mode;
-	/* The start of the instruction, usable with the reader */
-	uint64_t startLocation;
 	/* The length of the instruction, in bytes */
 	size_t length;
 
@@ -691,15 +684,13 @@ typedef struct InternalInstruction {
  *   a buffer provided by the consumer.
  * @param insn      - The buffer to store the instruction in.  Allocated by the
  *                    consumer.
- * @param reader    - The bounded instruction buffer.
- * @param startLoc  - The address (in the reader's address space) of the first
- *                    byte in the instruction.
+ * @param code      - The instruction bytes.
+ * @param codeSize  - The number of readable bytes.
  * @param mode      - Capstone mode flags.
  * @return          - Nonzero if there was an error during decode, 0 otherwise.
  */
-int decodeInstruction(struct InternalInstruction *insn,
-		      const struct reader_info *reader, uint64_t startLoc,
-		      cs_mode mode);
+int decodeInstruction(struct InternalInstruction *insn, const uint8_t *code,
+		      size_t codeSize, cs_mode mode);
 
 //const char *x86DisassemblerGetInstrName(unsigned Opcode, const void *mii);
 

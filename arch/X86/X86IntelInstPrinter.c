@@ -1001,7 +1001,7 @@ static void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
 			MI->op1_size =
 				MI->csh->regsize_map[X86_register_map(reg)];
 	} else if (MCOperand_isImm(Op)) {
-		uint8_t encsize;
+		uint8_t encsize = 0;
 		int64_t imm = MCOperand_getImm(Op);
 		uint8_t opsize =
 			X86_immediate_size(MCInst_getOpcode(MI), &encsize);
