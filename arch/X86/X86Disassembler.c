@@ -1069,27 +1069,11 @@ static bool translateRMRegister(MCInst *mcInst, InternalInstruction *insn,
 		return false;
 	}
 
-	switch (insn->eaBase) {
-	case EA_BASE_NONE:
-		//debug("EA_BASE_NONE for ModR/M base");
+	/* EABase and Reg enumerate their register ranges with ALL_REGS. */
+	const unsigned int reg = (unsigned int)insn->eaBase - EA_REG_AL;
+	if (reg >= MODRM_REG_max)
 		return true;
-#define ENTRY(x) case EA_BASE_##x:
-		ALL_EA_BASES
-#undef ENTRY
-		//debug("A R/M register operand may not have a base; "
-		//      "the operand must be a register.");
-		return true;
-#define ENTRY(x) \
-	case EA_REG_##x: \
-		MCOperand_CreateReg0(mcInst, X86_##x); \
-		break;
-		ALL_REGS
-#undef ENTRY
-	default:
-		//debug("Unexpected EA base register");
-		return true;
-	}
-
+	translateRegister(mcInst, (Reg)reg);
 	return false;
 }
 
