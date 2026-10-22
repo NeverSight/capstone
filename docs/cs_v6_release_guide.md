@@ -30,6 +30,15 @@ For a full list of all the developers, please see the release page.
 
 With all that said, we hope you enjoy the new release!
 
+## x86 explicit MSR decoding
+
+VEX MAP7 immediate `RDMSR` and `WRMSRNS` are decoded in 64-bit mode using
+the existing public instruction IDs. Their 32-bit immediate selectors and
+64-bit register operands carry exact access metadata and the privilege group.
+The legacy/VEX USER_MSR and EVEX forms retain their existing identities.
+Reserved VEX fields, register-only ModRM violations and truncated immediates
+are rejected. No public enum or structure layout changes are required.
+
 ## Overview
 
 For `v6` we _updated_ the following architectures: `ARM`, `AArch64`, `Mips` (adding `NanoMips`!), `RISC-V`, `SystemZ`, `PPC`.

@@ -30,8 +30,11 @@ static bool check_case(csh handle, const msr_case *test, bool att)
 	unsigned int register_write_count = 0;
 	unsigned int i;
 
-	if (!ok)
+	if (!ok) {
+		fprintf(stderr, "cannot decode %s %s\n", test->mnemonic,
+			test->intel);
 		return false;
+	}
 	ok = instruction->id == test->id &&
 	     strcmp(instruction->mnemonic, test->mnemonic) == 0 &&
 	     strcmp(instruction->op_str, att ? test->att : test->intel) == 0 &&
@@ -40,6 +43,8 @@ static bool check_case(csh handle, const msr_case *test, bool att)
 	     instruction->detail && instruction->detail->x86.op_count == 2;
 	if (ok) {
 		const cs_x86 *x86 = &instruction->detail->x86;
+		cs_regs reads, writes;
+		uint8_t reads_count, writes_count;
 		for (i = 0; i < x86->op_count; ++i) {
 			immediate_count += x86->operands[i].type == X86_OP_IMM;
 			register_read_count +=
@@ -51,17 +56,38 @@ static bool check_case(csh handle, const msr_case *test, bool att)
 			ok &= x86->operands[i].size ==
 			      (x86->operands[i].type == X86_OP_IMM ? 4 : 8);
 		}
-		ok = immediate_count == (unsigned int)test->immediate &&
-		     register_read_count == test->register_reads &&
-		     register_write_count ==
-			     (unsigned int)test->register_write &&
-		     x86->encoding.modrm_offset == test->modrm_offset &&
-		     x86->encoding.imm_offset == test->immediate_offset &&
-		     x86->encoding.imm_size == (test->immediate ? 4 : 0) &&
-		     (instruction->detail->groups_count == 1) ==
-			     test->privileged &&
-		     (!test->privileged ||
-		      instruction->detail->groups[0] == X86_GRP_PRIVILEGE);
+		ok &= immediate_count == (unsigned int)test->immediate &&
+		      register_read_count == test->register_reads &&
+		      register_write_count ==
+			      (unsigned int)test->register_write &&
+		      x86->encoding.modrm_offset == test->modrm_offset &&
+		      x86->encoding.imm_offset == test->immediate_offset &&
+		      x86->encoding.imm_size == (test->immediate ? 4 : 0) &&
+		      (instruction->detail->groups_count == 1) ==
+			      test->privileged &&
+		      (!test->privileged ||
+		       instruction->detail->groups[0] == X86_GRP_PRIVILEGE);
+		ok &= x86->eflags == 0 &&
+		      cs_regs_access(handle, instruction, reads, &reads_count,
+				     writes, &writes_count) == CS_ERR_OK;
+		if (ok) {
+			ok &= reads_count == test->register_reads &&
+			      writes_count ==
+				      (unsigned int)test->register_write;
+			for (i = 0; i < x86->op_count; ++i) {
+				const cs_x86_op *op = &x86->operands[i];
+				if (op->type != X86_OP_REG)
+					continue;
+				if (op->access & CS_AC_READ)
+					ok &= (reads_count > 0 &&
+					       reads[0] == op->reg) ||
+					      (reads_count > 1 &&
+					       reads[1] == op->reg);
+				if (op->access & CS_AC_WRITE)
+					ok &= writes_count == 1 &&
+					      writes[0] == op->reg;
+			}
+		}
 	}
 	if (!ok)
 		fprintf(stderr, "%s %s\n", instruction->mnemonic,
@@ -123,34 +149,40 @@ int main(void)
 	static const uint8_t vex_uwr_imm[] = {
 		0xc4, 0x07, 0x7a, 0xf8, 0xc7, 0x01, 0x1b, 0x00, 0x00
 	};
+	static const uint8_t vex_rd_imm[] = { 0xc4, 0x07, 0x7b, 0xf6, 0xc7,
+					      0x78, 0x56, 0x34, 0x92 };
+	static const uint8_t vex_wr_imm[] = { 0xc4, 0x07, 0x7a, 0xf6, 0xc7,
+					      0x78, 0x56, 0x34, 0x92 };
 	static const msr_case tests[] = {
 		{ rd_imm, sizeof(rd_imm), X86_INS_RDMSR, "rdmsr",
-		  "r17, 0x12345678", "$0x12345678, %r17", true, true, 0,
-		  true, 5, 6 },
-		{ wr_imm, sizeof(wr_imm), X86_INS_WRMSRNS, "wrmsrns",
-		  "0x12345678, r18", "%r18, $0x12345678", true, false, 1,
-		  true, 5, 6 },
-		{ urd_imm, sizeof(urd_imm), X86_INS_URDMSR, "urdmsr",
-		  "r19, 0x1b00", "$0x1b00, %r19", false, true, 0, true, 5,
-		  6 },
-		{ uwr_imm, sizeof(uwr_imm), X86_INS_UWRMSR, "uwrmsr",
-		  "0x1b01, r20", "%r20, $0x1b01", false, false, 1, true,
+		  "r17, 0x12345678", "$0x12345678, %r17", true, true, 0, true,
 		  5, 6 },
+		{ wr_imm, sizeof(wr_imm), X86_INS_WRMSRNS, "wrmsrns",
+		  "0x12345678, r18", "%r18, $0x12345678", true, false, 1, true,
+		  5, 6 },
+		{ urd_imm, sizeof(urd_imm), X86_INS_URDMSR, "urdmsr",
+		  "r19, 0x1b00", "$0x1b00, %r19", false, true, 0, true, 5, 6 },
+		{ uwr_imm, sizeof(uwr_imm), X86_INS_UWRMSR, "uwrmsr",
+		  "0x1b01, r20", "%r20, $0x1b01", false, false, 1, true, 5, 6 },
 		{ urd_reg, sizeof(urd_reg), X86_INS_URDMSR, "urdmsr",
 		  "r21, r22", "%r22, %r21", false, true, 1, false, 5, 0 },
 		{ uwr_reg, sizeof(uwr_reg), X86_INS_UWRMSR, "uwrmsr",
 		  "r23, r24", "%r24, %r23", false, false, 2, false, 5, 0 },
 		{ legacy_urd_reg, sizeof(legacy_urd_reg), X86_INS_URDMSR,
-		  "urdmsr", "r15, r8", "%r8, %r15", false, true, 1, false,
-		  5, 0 },
+		  "urdmsr", "r15, r8", "%r8, %r15", false, true, 1, false, 5,
+		  0 },
 		{ legacy_uwr_reg, sizeof(legacy_uwr_reg), X86_INS_UWRMSR,
-		  "uwrmsr", "r8, r15", "%r15, %r8", false, false, 2, false,
-		  5, 0 },
+		  "uwrmsr", "r8, r15", "%r15, %r8", false, false, 2, false, 5,
+		  0 },
 		{ vex_urd_imm, sizeof(vex_urd_imm), X86_INS_URDMSR, "urdmsr",
-		  "r15, 0x1b00", "$0x1b00, %r15", false, true, 0, true, 4,
-		  5 },
+		  "r15, 0x1b00", "$0x1b00, %r15", false, true, 0, true, 4, 5 },
 		{ vex_uwr_imm, sizeof(vex_uwr_imm), X86_INS_UWRMSR, "uwrmsr",
-		  "0x1b01, r15", "%r15, $0x1b01", false, false, 1, true,
+		  "0x1b01, r15", "%r15, $0x1b01", false, false, 1, true, 4, 5 },
+		{ vex_rd_imm, sizeof(vex_rd_imm), X86_INS_RDMSR, "rdmsr",
+		  "r15, 0x92345678", "$0x92345678, %r15", true, true, 0, true,
+		  4, 5 },
+		{ vex_wr_imm, sizeof(vex_wr_imm), X86_INS_WRMSRNS, "wrmsrns",
+		  "0x92345678, r15", "%r15, $0x92345678", true, false, 1, true,
 		  4, 5 },
 	};
 	csh handle;
@@ -211,21 +243,24 @@ int main(void)
 		invalid[3] |= 0x10; /* ND is reserved. */
 		ok &= rejects(handle, invalid, sizeof(invalid));
 	}
-	{
+	for (i = 8; i < sizeof(tests) / sizeof(tests[0]); ++i) {
 		uint8_t invalid[sizeof(vex_urd_imm)];
-		memcpy(invalid, vex_urd_imm, sizeof(invalid));
+		memcpy(invalid, tests[i].bytes, sizeof(invalid));
 		invalid[2] |= 0x80; /* VEX.W must be zero. */
 		ok &= rejects(handle, invalid, sizeof(invalid));
-		memcpy(invalid, vex_urd_imm, sizeof(invalid));
+		memcpy(invalid, tests[i].bytes, sizeof(invalid));
 		invalid[2] |= 0x04; /* VEX.L must be zero. */
 		ok &= rejects(handle, invalid, sizeof(invalid));
-		memcpy(invalid, vex_urd_imm, sizeof(invalid));
+		memcpy(invalid, tests[i].bytes, sizeof(invalid));
 		invalid[2] &= (uint8_t)~0x08; /* VEX.vvvv is reserved. */
 		ok &= rejects(handle, invalid, sizeof(invalid));
-		memcpy(invalid, vex_urd_imm, sizeof(invalid));
+		memcpy(invalid, tests[i].bytes, sizeof(invalid));
 		invalid[4] = 0xc8; /* VEX MAP7 requires ModRM.reg=/0. */
 		ok &= rejects(handle, invalid, sizeof(invalid));
-		ok &= rejects(handle, vex_urd_imm, sizeof(vex_urd_imm) - 1);
+		memcpy(invalid, tests[i].bytes, sizeof(invalid));
+		invalid[4] = 0x00; /* Memory operands are not encodable. */
+		ok &= rejects(handle, invalid, sizeof(invalid));
+		ok &= rejects(handle, tests[i].bytes, tests[i].size - 1);
 	}
 	{
 		uint8_t prefixed[sizeof(rd_imm) + 1];

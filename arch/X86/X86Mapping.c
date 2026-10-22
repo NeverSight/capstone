@@ -3024,7 +3024,7 @@ decode_user_msr_legacy_vex(csh handle, const uint8_t *code, size_t code_len,
 		return X86_FEATURE_NOT_HANDLED;
 
 	if (code[encoding_offset] == 0xc4) {
-		uint8_t p0, p1, pp;
+		uint8_t p0, p1, pp, opcode;
 		uint32_t immediate;
 
 		if (code_len - encoding_offset < 4)
@@ -3032,7 +3032,8 @@ decode_user_msr_legacy_vex(csh handle, const uint8_t *code, size_t code_len,
 		p0 = code[encoding_offset + 1];
 		p1 = code[encoding_offset + 2];
 		pp = p1 & 3;
-		if ((p0 & 0x1f) != 7 || code[encoding_offset + 3] != 0xf8 ||
+		opcode = code[encoding_offset + 3];
+		if ((p0 & 0x1f) != 7 || (opcode != 0xf8 && opcode != 0xf6) ||
 		    (pp != 2 && pp != 3))
 			return X86_FEATURE_NOT_HANDLED;
 		instruction_size = encoding_offset + 9;
@@ -3053,8 +3054,12 @@ decode_user_msr_legacy_vex(csh handle, const uint8_t *code, size_t code_len,
 			    ((uint32_t)code[encoding_offset + 8] << 24);
 
 		MCInst_clear(instr);
-		MCInst_setOpcode(instr, pp == 2 ? X86_FEATURE_APX_UWRMSR :
-					       X86_FEATURE_APX_URDMSR);
+		MCInst_setOpcode(
+			instr, opcode == 0xf6 ?
+				       (pp == 2 ? X86_FEATURE_APX_WRMSRNS_IMM :
+						  X86_FEATURE_APX_RDMSR_IMM) :
+				       (pp == 2 ? X86_FEATURE_APX_UWRMSR :
+						  X86_FEATURE_APX_URDMSR));
 		MCOperand_CreateImm0(instr, 1);
 		MCOperand_CreateImm0(instr, b_register);
 		MCOperand_CreateImm0(instr, (int64_t)immediate);
