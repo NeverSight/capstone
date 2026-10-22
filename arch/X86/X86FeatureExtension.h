@@ -8,7 +8,8 @@
 #include "../../SStream.h"
 
 // Keep source-owned instruction extensions outside the generated opcode range.
-#define X86_FEATURE_TILEZERO 0x10000U
+#define X86_FEATURE_OPCODE_BASE 0x10000U
+#define X86_FEATURE_TILEZERO X86_FEATURE_OPCODE_BASE
 #define X86_FEATURE_REX2_MOV 0x10001U
 #define X86_FEATURE_REX2_ADD 0x10002U
 #define X86_FEATURE_LDTILECFG 0x10003U

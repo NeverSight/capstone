@@ -4298,7 +4298,8 @@ static bool is_rex2_leading_prefix(uint8_t byte)
  * prefixes, which is an EVEX, VEX or REX2 escape or the 0F 38 of a legacy
  * map-2 opcode.  Most instructions start with none of them and need not run
  * the decoders at all. */
-static bool may_be_feature_extension(const uint8_t *code, size_t code_len)
+static bool may_be_feature_extension(const uint8_t *code, size_t code_len,
+				     uint8_t *opcode)
 {
 	size_t offset = 0;
 
@@ -4306,7 +4307,8 @@ static bool may_be_feature_extension(const uint8_t *code, size_t code_len)
 		++offset;
 	if (offset == code_len)
 		return false;
-	switch (code[offset]) {
+	*opcode = code[offset];
+	switch (*opcode) {
 	default:
 		return false;
 	case 0x0f:
@@ -4532,7 +4534,8 @@ x86_feature_decode_result
 X86_decodeFeatureExtension(csh handle, const uint8_t *code, size_t code_len,
 			   MCInst *instr, uint16_t *size)
 {
-	if (!may_be_feature_extension(code, code_len))
+	uint8_t opcode;
+	if (!may_be_feature_extension(code, code_len, &opcode))
 		return X86_FEATURE_NOT_HANDLED;
 	/* In 16/32-bit modes 0x40..0x4f are INC/DEC opcodes, not REX
 	 * prefixes.  Do not let a later EVEX-looking byte sequence make a
@@ -4556,6 +4559,18 @@ X86_decodeFeatureExtension(csh handle, const uint8_t *code, size_t code_len,
 	result = decode_sha512_vex(handle, code, code_len, instr, size);
 	if (result != X86_FEATURE_NOT_HANDLED)
 		return result;
+	if (opcode == 0xc4)
+		return decode_amx(handle, code, code_len, instr, size);
+	if (opcode == 0xd5) {
+		result = decode_rex2_push_pop(handle, code, code_len, instr,
+					      size);
+		if (result != X86_FEATURE_NOT_HANDLED)
+			return result;
+		return decode_apx_jmpabs(handle, code, code_len, instr, size);
+	}
+	/* Legacy and VEX encodings cannot match the EVEX decoders below. */
+	if (opcode != 0x62)
+		return X86_FEATURE_NOT_HANDLED;
 	result = decode_apx_evex_vector_gpr(handle, code, code_len, instr, size);
 	if (result != X86_FEATURE_NOT_HANDLED)
 		return result;
@@ -4651,9 +4666,6 @@ X86_decodeFeatureExtension(csh handle, const uint8_t *code, size_t code_len,
 	if (result != X86_FEATURE_NOT_HANDLED)
 		return result;
 	result = decode_apx_map4_reserved(code, code_len);
-	if (result != X86_FEATURE_NOT_HANDLED)
-		return result;
-	result = decode_apx_jmpabs(handle, code, code_len, instr, size);
 	if (result != X86_FEATURE_NOT_HANDLED)
 		return result;
 	return X86_FEATURE_NOT_HANDLED;
@@ -7932,6 +7944,8 @@ static bool print_sha512_vex(MCInst *instr, SStream *stream, bool att_syntax)
 
 bool X86_printFeatureExtension(MCInst *instr, SStream *stream, bool att_syntax)
 {
+	if (MCInst_getOpcode(instr) < X86_FEATURE_OPCODE_BASE)
+		return false;
 	return print_sha512_vex(instr, stream, att_syntax) ||
 	       print_apx_msr(instr, stream, att_syntax) ||
 	       print_apx_evex_vector_gpr(instr, stream, att_syntax) ||
@@ -7969,6 +7983,8 @@ bool X86_printFeatureExtension(MCInst *instr, SStream *stream, bool att_syntax)
 
 bool X86_mapFeatureExtension(cs_insn *insn, unsigned int opcode)
 {
+	if (opcode < X86_FEATURE_OPCODE_BASE)
+		return false;
 	static const x86_insn cmov_ids[] = {
 		X86_INS_CMOVO, X86_INS_CMOVNO, X86_INS_CMOVB,  X86_INS_CMOVAE,
 		X86_INS_CMOVE, X86_INS_CMOVNE, X86_INS_CMOVBE, X86_INS_CMOVA,

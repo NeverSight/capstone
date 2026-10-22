@@ -525,26 +525,6 @@ typedef enum {
 	TYPE_XOP = 0x4
 } VectorExtensionType;
 
-struct reader_info {
-	const uint8_t *code;
-	uint64_t size;
-	uint64_t offset;
-};
-
-/*
- * byteReader_t - Type for the byte reader that the consumer must provide to
- *   the decoder.  Reads a single byte from the instruction's address space.
- * @param arg     - A baton that the consumer can associate with any internal
- *                  state that it needs.
- * @param byte    - A pointer to a single byte in memory that should be set to
- *                  contain the value at address.
- * @param address - The address in the instruction's address space that should
- *                  be read from.
- * @return        - -1 if the byte cannot be read for any reason; 0 otherwise.
- */
-typedef int (*byteReader_t)(const struct reader_info *arg, uint8_t *byte,
-			    uint64_t address);
-
 /// The specification for how to extract and interpret a full instruction and
 /// its operands.
 struct InstructionSpecifier {
@@ -618,12 +598,10 @@ typedef struct InternalInstruction {
 
 	// end-of-zero-members
 
-	/* Reader interface (C) */
-	byteReader_t reader;
-
-	/* Opaque value passed to the reader */
-	const void *readerArg;
-	/* The address of the next byte to read via the reader */
+	/* Input bytes; no padding or alignment is required. */
+	const uint8_t *code;
+	size_t codeSize;
+	/* The address of the next byte to read. */
 	uint64_t readerCursor;
 
 	/* General instruction information */
@@ -708,20 +686,15 @@ typedef struct InternalInstruction {
  *   a buffer provided by the consumer.
  * @param insn      - The buffer to store the instruction in.  Allocated by the
  *                    consumer.
- * @param reader    - The byteReader_t for the bytes to be read.
- * @param readerArg - An argument to pass to the reader for storing context
- *                    specific to the consumer.  May be NULL.
- * @param logger    - The dlog_t to be used in printing status messages from the
- *                    disassembler.  May be NULL.
- * @param loggerArg - An argument to pass to the logger for storing context
- *                    specific to the logger.  May be NULL.
+ * @param code      - The instruction bytes.
+ * @param codeSize  - The number of readable bytes.
  * @param startLoc  - The address (in the reader's address space) of the first
  *                    byte in the instruction.
  * @param mode      - Capstone mode flags.
  * @return          - Nonzero if there was an error during decode, 0 otherwise.
  */
-int decodeInstruction(struct InternalInstruction *insn, byteReader_t reader,
-		      const void *readerArg, uint64_t startLoc, cs_mode mode);
+int decodeInstruction(struct InternalInstruction *insn, const uint8_t *code,
+		      size_t codeSize, uint64_t startLoc, cs_mode mode);
 
 //const char *x86DisassemblerGetInstrName(unsigned Opcode, const void *mii);
 

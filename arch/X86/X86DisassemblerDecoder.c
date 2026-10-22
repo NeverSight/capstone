@@ -79,27 +79,19 @@ static InstructionContext contextForAttrs(uint16_t attrMask)
 	return CONTEXTS_SYM[attrMask];
 }
 
-/*
- * modRMRequired - Reads the appropriate instruction table to determine whether
- *   the ModR/M byte is required to decode a particular instruction.
- *
- * @param type        - The opcode type (i.e., how many bytes it has).
- * @param insnContext - The context for the instruction, as returned by
- *                      contextForAttrs.
- * @param opcode      - The last byte of the instruction's opcode, not counting
- *                      ModR/M extensions and escapes.
- * @return            - true if the ModR/M byte is required, false otherwise.
- */
-static int modRMRequired(OpcodeType type, InstructionContext insnContext,
-			 uint16_t opcode)
+/* Resolve the context/opcode table once, before consuming ModR/M. */
+static const struct ModRMDecision *
+getModRMDecision(OpcodeType type, InstructionContext insnContext,
+		 uint8_t opcode)
 {
-	const struct OpcodeDecision *decision = NULL;
-	const uint8_t *indextable = NULL;
+	const struct OpcodeDecision *decision;
+	const uint8_t *indextable;
+	static const struct ModRMDecision emptyDecision = { 0 };
 	unsigned int index;
 
 	switch (type) {
 	default:
-		return false;
+		return NULL;
 	case ONEBYTE:
 		decision = ONEBYTE_SYM;
 		indextable = index_x86DisassemblerOneByteOpcodes;
@@ -130,109 +122,19 @@ static int modRMRequired(OpcodeType type, InstructionContext insnContext,
 		indextable = index_x86DisassemblerXOPAOpcodes;
 		break;
 	case THREEDNOW_MAP:
-		// 3DNow instructions always have ModRM byte
-		return true;
+		decision = THREEDNOW_MAP_SYM;
+		indextable = index_x86Disassembler3DNowOpcodes;
+		break;
 #endif
 	}
 
-	// return decision->opcodeDecisions[insnContext].modRMDecisions[opcode].modrm_type != MODRM_ONEENTRY;
 	index = indextable[insnContext];
-	if (index)
-		return decision[index - 1].modRMDecisions[opcode].modrm_type !=
-		       MODRM_ONEENTRY;
-	else
-		return false;
+	return index ? &decision[index - 1].modRMDecisions[opcode] :
+		       &emptyDecision;
 }
 
-/*
- * decode - Reads the appropriate instruction table to obtain the unique ID of
- *   an instruction.
- *
- * @param type        - See modRMRequired().
- * @param insnContext - See modRMRequired().
- * @param opcode      - See modRMRequired().
- * @param modRM       - The ModR/M byte if required, or any value if not.
- * @return            - The UID of the instruction, or 0 on failure.
- */
-static InstrUID decode(OpcodeType type, InstructionContext insnContext,
-		       uint8_t opcode, uint8_t modRM)
+static InstrUID decode(const struct ModRMDecision *dec, uint8_t modRM)
 {
-	const struct ModRMDecision *dec = NULL;
-	unsigned int index;
-	static const struct OpcodeDecision emptyDecision = { 0 };
-
-	switch (type) {
-	default:
-		return 0;
-	case ONEBYTE:
-		// dec = &ONEBYTE_SYM.opcodeDecisions[insnContext].modRMDecisions[opcode];
-		index = index_x86DisassemblerOneByteOpcodes[insnContext];
-		if (index)
-			dec = &ONEBYTE_SYM[index - 1].modRMDecisions[opcode];
-		else
-			dec = &emptyDecision.modRMDecisions[opcode];
-		break;
-	case TWOBYTE:
-		//dec = &TWOBYTE_SYM.opcodeDecisions[insnContext].modRMDecisions[opcode];
-		index = index_x86DisassemblerTwoByteOpcodes[insnContext];
-		if (index)
-			dec = &TWOBYTE_SYM[index - 1].modRMDecisions[opcode];
-		else
-			dec = &emptyDecision.modRMDecisions[opcode];
-		break;
-	case THREEBYTE_38:
-		// dec = &THREEBYTE38_SYM.opcodeDecisions[insnContext].modRMDecisions[opcode];
-		index = index_x86DisassemblerThreeByte38Opcodes[insnContext];
-		if (index)
-			dec = &THREEBYTE38_SYM[index - 1].modRMDecisions[opcode];
-		else
-			dec = &emptyDecision.modRMDecisions[opcode];
-		break;
-	case THREEBYTE_3A:
-		//dec = &THREEBYTE3A_SYM.opcodeDecisions[insnContext].modRMDecisions[opcode];
-		index = index_x86DisassemblerThreeByte3AOpcodes[insnContext];
-		if (index)
-			dec = &THREEBYTE3A_SYM[index - 1].modRMDecisions[opcode];
-		else
-			dec = &emptyDecision.modRMDecisions[opcode];
-		break;
-#ifndef CAPSTONE_X86_REDUCE
-	case XOP8_MAP:
-		// dec = &XOP8_MAP_SYM.opcodeDecisions[insnContext].modRMDecisions[opcode];
-		index = index_x86DisassemblerXOP8Opcodes[insnContext];
-		if (index)
-			dec = &XOP8_MAP_SYM[index - 1].modRMDecisions[opcode];
-		else
-			dec = &emptyDecision.modRMDecisions[opcode];
-		break;
-	case XOP9_MAP:
-		// dec = &XOP9_MAP_SYM.opcodeDecisions[insnContext].modRMDecisions[opcode];
-		index = index_x86DisassemblerXOP9Opcodes[insnContext];
-		if (index)
-			dec = &XOP9_MAP_SYM[index - 1].modRMDecisions[opcode];
-		else
-			dec = &emptyDecision.modRMDecisions[opcode];
-		break;
-	case XOPA_MAP:
-		// dec = &XOPA_MAP_SYM.opcodeDecisions[insnContext].modRMDecisions[opcode];
-		index = index_x86DisassemblerXOPAOpcodes[insnContext];
-		if (index)
-			dec = &XOPA_MAP_SYM[index - 1].modRMDecisions[opcode];
-		else
-			dec = &emptyDecision.modRMDecisions[opcode];
-		break;
-	case THREEDNOW_MAP:
-		// dec = &THREEDNOW_MAP_SYM.opcodeDecisions[insnContext].modRMDecisions[opcode];
-		index = index_x86Disassembler3DNowOpcodes[insnContext];
-		if (index)
-			dec = &THREEDNOW_MAP_SYM[index - 1]
-				       .modRMDecisions[opcode];
-		else
-			dec = &emptyDecision.modRMDecisions[opcode];
-		break;
-#endif
-	}
-
 	switch (dec->modrm_type) {
 	default:
 		// debug("Corrupt table!  Unknown modrm_type");
@@ -272,10 +174,9 @@ static const struct InstructionSpecifier *specifierForUID(InstrUID uid)
 }
 
 /*
- * consumeByte - Uses the reader function provided by the user to consume one
- *   byte from the instruction's memory and advance the cursor.
+ * consumeByte - Read one byte from the input and advance the cursor.
  *
- * @param insn  - The instruction with the reader function to use.  The cursor
+ * @param insn  - The instruction with the input buffer to use.  The cursor
  *                for this instruction is advanced.
  * @param byte  - A pointer to a pre-allocated memory buffer to be populated
  *                with the data read.
@@ -283,12 +184,12 @@ static const struct InstructionSpecifier *specifierForUID(InstrUID uid)
  */
 static int consumeByte(struct InternalInstruction *insn, uint8_t *byte)
 {
-	int ret = insn->reader(insn->readerArg, byte, insn->readerCursor);
-
-	if (!ret)
-		++(insn->readerCursor);
-
-	return ret;
+	uint64_t offset = insn->readerCursor - insn->startLocation;
+	if (offset >= insn->codeSize)
+		return -1;
+	*byte = insn->code[offset];
+	++insn->readerCursor;
+	return 0;
 }
 
 /*
@@ -300,7 +201,11 @@ static int consumeByte(struct InternalInstruction *insn, uint8_t *byte)
  */
 static int lookAtByte(struct InternalInstruction *insn, uint8_t *byte)
 {
-	return insn->reader(insn->readerArg, byte, insn->readerCursor);
+	uint64_t offset = insn->readerCursor - insn->startLocation;
+	if (offset >= insn->codeSize)
+		return -1;
+	*byte = insn->code[offset];
+	return 0;
 }
 
 static void unconsumeByte(struct InternalInstruction *insn)
@@ -311,26 +216,24 @@ static void unconsumeByte(struct InternalInstruction *insn)
 #define CONSUME_FUNC(name, type) \
 	static int name(struct InternalInstruction *insn, type *ptr) \
 	{ \
-		type combined = 0; \
+		uint64_t combined = 0; \
+		uint64_t cursor = insn->readerCursor - insn->startLocation; \
 		unsigned offset; \
+		if (cursor > insn->codeSize || \
+		    sizeof(type) > insn->codeSize - cursor) \
+			return -1; \
 		for (offset = 0; offset < sizeof(type); ++offset) { \
-			uint8_t byte; \
-			int ret = insn->reader(insn->readerArg, &byte, \
-					       insn->readerCursor + offset); \
-			if (ret) \
-				return ret; \
-			combined = combined | \
-				   ((uint64_t)byte << (offset * 8)); \
+			combined |= (uint64_t)insn->code[cursor + offset] \
+				    << (offset * 8); \
 		} \
-		*ptr = combined; \
+		*ptr = (type)combined; \
 		insn->readerCursor += sizeof(type); \
 		return 0; \
 	}
 
 /*
- * consume* - Use the reader function provided by the user to consume data
- *   values of various sizes from the instruction's memory and advance the
- *   cursor appropriately.  These readers perform endian conversion.
+ * consume* - Read little-endian values with one bounds check per value.
+ *   Byte assembly permits unaligned inputs and either host byte order.
  *
  * @param insn    - See consumeByte().
  * @param ptr     - A pointer to a pre-allocated memory of appropriate size to
@@ -995,23 +898,22 @@ static int getIDWithAttrMask(uint16_t *instructionID,
 			     struct InternalInstruction *insn,
 			     uint16_t attrMask)
 {
+	const struct ModRMDecision *decision = getModRMDecision(
+		insn->opcodeType, contextForAttrs(attrMask), insn->opcode);
 	bool hasModRMExtension;
 
-	InstructionContext instructionClass = contextForAttrs(attrMask);
-
-	hasModRMExtension =
-		modRMRequired(insn->opcodeType, instructionClass, insn->opcode);
-
-	if (hasModRMExtension) {
-		if (readModRM(insn))
-			return -1;
-
-		*instructionID = decode(insn->opcodeType, instructionClass,
-					insn->opcode, insn->modRM);
-	} else {
-		*instructionID = decode(insn->opcodeType, instructionClass,
-					insn->opcode, 0);
+	if (!decision) {
+		*instructionID = 0;
+		return 0;
 	}
+	hasModRMExtension = decision->modrm_type != MODRM_ONEENTRY;
+#ifndef CAPSTONE_X86_REDUCE
+	/* The trailing 3DNow opcode always follows a ModR/M byte. */
+	hasModRMExtension |= insn->opcodeType == THREEDNOW_MAP;
+#endif
+	if (hasModRMExtension && readModRM(insn))
+		return -1;
+	*instructionID = decode(decision, hasModRMExtension ? insn->modRM : 0);
 
 	return 0;
 }
@@ -2469,6 +2371,11 @@ static int checkGatherRegisters(const struct InternalInstruction *insn)
 	bool reg = false, vsib = false;
 	int i;
 
+	index = vectorIndexNumber(insn->sibIndex);
+	destination = vectorRegisterNumber(insn->reg);
+	if (destination < 0 || index < 0)
+		return 0;
+
 	/* A gather lists its ModRM.reg destination before its VSIB source; a
 	 * scatter lists its VSIB destination first. */
 	for (i = 0; i < X86_MAX_OPERANDS; ++i) {
@@ -2489,10 +2396,6 @@ CASE_ENCODING_VSIB:
 		}
 	}
 	if (!vsib)
-		return 0;
-	destination = vectorRegisterNumber(insn->reg);
-	index = vectorIndexNumber(insn->sibIndex);
-	if (destination < 0 || index < 0)
 		return 0;
 	if (destination == index ||
 	    (mask >= 0 && (mask == destination || mask == index)))
@@ -2728,19 +2631,18 @@ static bool checkPrefix(struct InternalInstruction *insn)
  *
  * @param insn      - A pointer to the instruction to be populated.  Must be
  *                    pre-allocated.
- * @param reader    - The function to be used to read the instruction's bytes.
- * @param readerArg - A generic argument to be passed to the reader to store
- *                    any internal state.
+ * @param code      - The instruction bytes.
+ * @param codeSize  - The number of readable bytes.
  * @param startLoc  - The address (in the reader's address space) of the first
  *                    byte in the instruction.
  * @param mode      - Capstone mode flags.
  * @return          - 0 if instruction is valid; nonzero if not.
  */
-int decodeInstruction(struct InternalInstruction *insn, byteReader_t reader,
-		      const void *readerArg, uint64_t startLoc, cs_mode mode)
+int decodeInstruction(struct InternalInstruction *insn, const uint8_t *code,
+		      size_t codeSize, uint64_t startLoc, cs_mode mode)
 {
-	insn->reader = reader;
-	insn->readerArg = readerArg;
+	insn->code = code;
+	insn->codeSize = codeSize;
 	insn->startLocation = startLoc;
 	insn->readerCursor = startLoc;
 	if (x86_has_feature(mode, CS_MODE_16))

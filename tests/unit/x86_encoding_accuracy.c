@@ -5,6 +5,7 @@
 
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 static bool decode(csh handle, const uint8_t *bytes, size_t size, unsigned id,
@@ -43,6 +44,166 @@ static bool decode(csh handle, const uint8_t *bytes, size_t size, unsigned id,
 	}
 	cs_free(batch, count);
 	cs_free(iter, iter ? 1 : 0);
+	return ok;
+}
+
+struct reader_case {
+	cs_mode mode;
+	uint8_t bytes[10];
+	size_t size;
+	unsigned id;
+	bool memory;
+	int64_t value;
+};
+
+static bool check_reader_input(csh handle, cs_insn *iter,
+			       const struct reader_case *test,
+			       const uint8_t *bytes, size_t available,
+			       uint64_t start, bool detail)
+{
+	const uint8_t *cursor = bytes;
+	size_t remaining = available;
+	uint64_t address = start;
+	bool expected = available == test->size;
+	bool decoded =
+		cs_disasm_iter(handle, &cursor, &remaining, &address, iter);
+	bool match = decoded == expected;
+
+	if (decoded) {
+		match &= iter->id == test->id && iter->size == available &&
+			 iter->address == start &&
+			 cursor == bytes + available && remaining == 0 &&
+			 address == start + available &&
+			 memcmp(iter->bytes, bytes, available) == 0;
+	} else {
+		match &= cursor == bytes && remaining == available &&
+			 address == start;
+	}
+	if (decoded && detail) {
+		const cs_x86 *x86 = &iter->detail->x86;
+		bool found = false;
+		for (unsigned op = 0; op < x86->op_count; ++op) {
+			const cs_x86_op *operand = &x86->operands[op];
+			if (test->memory)
+				found |= operand->type == X86_OP_MEM &&
+					 operand->mem.disp == test->value;
+			else
+				found |= operand->type == X86_OP_IMM &&
+					 operand->imm == test->value;
+		}
+		match &= found;
+	}
+	cs_insn *batch = NULL;
+	size_t count = cs_disasm(handle, bytes, available, start, 1, &batch);
+	match &= count == (expected ? 1 : 0);
+	if (count)
+		match &= batch[0].id == test->id &&
+			 batch[0].size == available &&
+			 batch[0].address == start &&
+			 memcmp(batch[0].bytes, bytes, available) == 0;
+	cs_free(batch, count);
+	return match;
+}
+
+/* Exact-size allocations also make these checks sensitive to overreads in
+ * sanitizer builds. Exercise every truncation and several input alignments. */
+static bool check_reader_bounds(csh handle, cs_mode mode, bool detail)
+{
+	static const struct reader_case cases[] = {
+		{ CS_MODE_16,
+		  { 0xb8, 0x34, 0x12 },
+		  3,
+		  X86_INS_MOV,
+		  false,
+		  0x1234 },
+		{ CS_MODE_16,
+		  { 0x8b, 0x86, 0x98, 0xfe },
+		  4,
+		  X86_INS_MOV,
+		  true,
+		  -360 },
+		{ CS_MODE_32,
+		  { 0xb8, 0x78, 0x56, 0x34, 0x12 },
+		  5,
+		  X86_INS_MOV,
+		  false,
+		  0x12345678 },
+		{ CS_MODE_32,
+		  { 0x8b, 0x83, 0x98, 0xba, 0xdc, 0xfe },
+		  6,
+		  X86_INS_MOV,
+		  true,
+		  -19088744 },
+		{ CS_MODE_64,
+		  { 0x48, 0xb8, 0xef, 0xcd, 0xab, 0x89, 0x67, 0x45, 0x23,
+		    0x01 },
+		  10,
+		  X86_INS_MOVABS,
+		  false,
+		  INT64_C(0x0123456789abcdef) },
+		{ CS_MODE_64,
+		  { 0x48, 0xa1, 0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02,
+		    0x01 },
+		  10,
+		  X86_INS_MOVABS,
+		  true,
+		  INT64_C(0x0102030405060708) },
+		{ CS_MODE_64,
+		  { 0x48, 0x8b, 0x84, 0x8b, 0x98, 0xba, 0xdc, 0xfe },
+		  8,
+		  X86_INS_MOV,
+		  true,
+		  -19088744 },
+		{ CS_MODE_64,
+		  { 0x48, 0x83, 0xc0, 0x81 },
+		  4,
+		  X86_INS_ADD,
+		  false,
+		  -127 },
+	};
+	static const uint64_t addresses[] = { 0, 0x1000, UINT64_MAX - 4,
+					      UINT64_MAX };
+	cs_insn *iter = cs_malloc(handle);
+	bool ok = iter != NULL;
+	if (!iter)
+		return false;
+
+	for (size_t c = 0; c < sizeof(cases) / sizeof(cases[0]); ++c) {
+		if (cases[c].mode != mode)
+			continue;
+		for (size_t available = 0; available <= cases[c].size;
+		     ++available) {
+			for (size_t alignment = 0; alignment != 8;
+			     ++alignment) {
+				size_t allocation_size = available + alignment;
+				uint8_t *allocation = malloc(
+					allocation_size ? allocation_size : 1);
+				if (!allocation) {
+					cs_free(iter, 1);
+					return false;
+				}
+				uint8_t *bytes = allocation + alignment;
+				memcpy(bytes, cases[c].bytes, available);
+				for (size_t a = 0;
+				     a <
+				     sizeof(addresses) / sizeof(addresses[0]);
+				     ++a) {
+					bool match = check_reader_input(
+						handle, iter, &cases[c], bytes,
+						available, addresses[a],
+						detail);
+					if (!match)
+						fprintf(stderr,
+							"reader bounds: case=%zu size=%zu alignment=%zu address=%zu\n",
+							c, available, alignment,
+							a);
+					ok &= match;
+				}
+				free(allocation);
+			}
+		}
+	}
+	cs_free(iter, 1);
 	return ok;
 }
 
@@ -505,6 +666,9 @@ int main(void)
 							detail) == CS_ERR_OK;
 					ok &= cs_option(handle, CS_OPT_TEXT,
 							text) == CS_ERR_OK;
+					ok &= check_reader_bounds(
+						handle, modes[m],
+						detail && text);
 					ok &= check_lock(handle, modes[m]);
 					ok &= check_segments(handle, modes[m]);
 					const uint8_t ud0[] = { 0x0f, 0xff };
