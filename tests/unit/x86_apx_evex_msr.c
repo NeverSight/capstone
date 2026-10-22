@@ -260,6 +260,36 @@ static bool check_implicit_msr(void)
 	return ok;
 }
 
+static bool check_unmodeled_system_refinements(void)
+{
+	const cs_mode modes[] = { CS_MODE_32, CS_MODE_64 };
+	const uint8_t codes[][4] = {
+		{ 0xf2, 0x0f, 0x01, 0xca }, /* ERETS, not CLAC. */
+		{ 0xf3, 0x0f, 0x01, 0xca }, /* ERETU, not CLAC. */
+		{ 0xf3, 0x0f, 0x01, 0xee }, /* CLUI, not RDPKRU. */
+		{ 0xf3, 0x0f, 0x01, 0xef }, /* STUI, not WRPKRU. */
+	};
+	const unsigned int legacy[] = { X86_INS_CLAC, X86_INS_CLAC,
+					X86_INS_RDPKRU, X86_INS_WRPKRU };
+	unsigned int mode, i;
+	bool ok = true;
+	for (mode = 0; mode < sizeof(modes) / sizeof(modes[0]); ++mode) {
+		csh handle;
+		if (cs_open(CS_ARCH_X86, modes[mode], &handle) != CS_ERR_OK)
+			return false;
+		for (i = 0; i < sizeof(codes) / sizeof(codes[0]); ++i) {
+			ok &= rejects(handle, codes[i], sizeof(codes[i]));
+			ok &= decodes_as(handle, codes[i] + 1,
+					 sizeof(codes[i]) - 1, legacy[i], 3);
+		}
+		cs_close(&handle);
+	}
+	if (!ok)
+		fprintf(stderr,
+			"unsupported system refining prefixes alias legacy instructions\n");
+	return ok;
+}
+
 int main(void)
 {
 	static const uint8_t rd_imm[] = {
@@ -428,5 +458,6 @@ int main(void)
 	}
 	cs_close(&handle);
 	ok &= check_implicit_msr();
+	ok &= check_unmodeled_system_refinements();
 	return ok ? 0 : 1;
 }

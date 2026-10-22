@@ -2976,8 +2976,8 @@ static x86_feature_decode_result decode_apx_invalidate(csh handle,const uint8_t*
 }
 
 static x86_feature_decode_result
-decode_msr_legacy_vex(csh handle, const uint8_t *code, size_t code_len,
-		      MCInst *instr, uint16_t *size)
+decode_system_legacy_vex(csh handle, const uint8_t *code, size_t code_len,
+			 MCInst *instr, uint16_t *size)
 {
 	const cs_struct *arch = (const cs_struct *)(uintptr_t)handle;
 	size_t encoding_offset = 0, instruction_size;
@@ -3022,6 +3022,16 @@ decode_msr_legacy_vex(csh handle, const uint8_t *code, size_t code_len,
 	}
 	if (encoding_offset == code_len)
 		return X86_FEATURE_NOT_HANDLED;
+
+	/* FRED and UINTR use refining prefixes on older system opcodes. Until
+	 * their own contracts are decoded, never let the generated legacy tables
+	 * discard those prefixes and report CLAC, RDPKRU or WRPKRU instead. */
+	if (code_len - encoding_offset >= 3 && code[encoding_offset] == 0x0f &&
+	    code[encoding_offset + 1] == 0x01 &&
+	    ((mandatory_prefix && code[encoding_offset + 2] == 0xca) ||
+	     (mandatory_prefix == 0xf3 && (code[encoding_offset + 2] == 0xee ||
+					   code[encoding_offset + 2] == 0xef))))
+		return X86_FEATURE_INVALID;
 
 	if (code_len - encoding_offset >= 3 && code[encoding_offset] == 0x0f &&
 	    code[encoding_offset + 1] == 0x01 &&
@@ -4357,7 +4367,8 @@ static bool may_be_feature_extension(const uint8_t *code, size_t code_len,
 	case 0x0f:
 		return (code_len - offset >= 2 && code[offset + 1] == 0x38) ||
 		       (code_len - offset >= 3 && code[offset + 1] == 0x01 &&
-			code[offset + 2] == 0xc6);
+			(code[offset + 2] == 0xc6 || code[offset + 2] == 0xca ||
+			 code[offset + 2] == 0xee || code[offset + 2] == 0xef));
 	case 0x62:
 	case 0xc4:
 	case 0xd5:
@@ -4600,7 +4611,7 @@ decode_feature_extension(csh handle, const uint8_t *code, size_t code_len,
 	result = decode_legacy_enqueue(handle, code, code_len, instr, size);
 	if (result != X86_FEATURE_NOT_HANDLED)
 		return result;
-	result = decode_msr_legacy_vex(handle, code, code_len, instr, size);
+	result = decode_system_legacy_vex(handle, code, code_len, instr, size);
 	if (result != X86_FEATURE_NOT_HANDLED)
 		return result;
 	result = decode_sha512_vex(handle, code, code_len, instr, size);

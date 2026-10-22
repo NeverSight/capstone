@@ -54,6 +54,11 @@ instruction values and public structure layouts are unchanged. The Python,
 Java and OCaml x86 constants are regenerated from the current public header,
 including the earlier APX/AMX extensions that were absent from those bindings.
 
+The unmodeled `ERETS`, `ERETU`, `CLUI` and `STUI` refining-prefix forms now
+fail decoding instead of being mislabeled as `CLAC`, `RDPKRU` or `WRPKRU`.
+The unprefixed legacy instructions remain supported. This rejection does not
+implement FRED or user-interrupt semantics.
+
 ## Overview
 
 For `v6` we _updated_ the following architectures: `ARM`, `AArch64`, `Mips` (adding `NanoMips`!), `RISC-V`, `SystemZ`, `PPC`.
