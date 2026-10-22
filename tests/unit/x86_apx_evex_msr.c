@@ -117,6 +117,149 @@ static bool decodes_as(csh handle, const uint8_t *bytes, size_t size,
 	return ok;
 }
 
+static bool check_implicit_msr(void)
+{
+	bool ok = true;
+	const cs_mode modes[] = { CS_MODE_16, CS_MODE_32, CS_MODE_64 };
+	unsigned int mode, form, syntax;
+
+	for (mode = 0; mode < sizeof(modes) / sizeof(modes[0]); ++mode) {
+		csh handle;
+		if (cs_open(CS_ARCH_X86, modes[mode], &handle) != CS_ERR_OK)
+			return false;
+		cs_option(handle, CS_OPT_DETAIL, CS_OPT_ON);
+		for (syntax = 0; syntax < 2; ++syntax) {
+			cs_option(handle, CS_OPT_SYNTAX,
+				  syntax ? CS_OPT_SYNTAX_ATT :
+					   CS_OPT_SYNTAX_INTEL);
+			for (form = 0; form < 3; ++form) {
+				uint8_t code[] = { 0xf1 + form, 0x0f, 0x01,
+						   0xc6 };
+				const uint8_t *bytes = code + (form == 0);
+				size_t size = sizeof(code) - (form == 0);
+				const char *name = form == 0 ? "wrmsrns" :
+						   form == 1 ? "rdmsrlist" :
+							       "wrmsrlist";
+				cs_insn *insn = NULL;
+				size_t count = cs_disasm(handle, bytes, size, 0,
+							 1, &insn);
+				if (form && modes[mode] != CS_MODE_64) {
+					ok &= count == 0;
+				} else if (count != 1) {
+					fprintf(stderr,
+						"missing %s in mode %u\n", name,
+						modes[mode]);
+					ok = false;
+				} else {
+					cs_regs reads, writes;
+					uint8_t read_count = 0, write_count = 0;
+					const cs_x86 *x = &insn->detail->x86;
+					ok &= insn->size == size &&
+					      !strcmp(insn->mnemonic, name) &&
+					      !strcmp(cs_insn_name(handle,
+								   insn->id),
+						      name) &&
+					      !insn->op_str[0] &&
+					      x->op_count == 0 &&
+					      x->eflags == 0 &&
+					      x->opcode[0] == 0x0f &&
+					      x->opcode[1] == 0x01 &&
+					      x->modrm == 0xc6 &&
+					      x->encoding.modrm_offset ==
+						      size - 1 &&
+					      x->encoding.imm_size == 0 &&
+					      x->encoding.disp_size == 0 &&
+					      insn->detail->groups_count == 1 &&
+					      insn->detail->groups[0] ==
+						      X86_GRP_PRIVILEGE;
+					ok &= cs_regs_access(handle, insn,
+							     reads, &read_count,
+							     writes,
+							     &write_count) ==
+					      CS_ERR_OK;
+					ok &= read_count == 3 &&
+					      write_count == (form ? 1 : 0);
+					if (read_count == 3)
+						ok &= reads[0] ==
+							      (form ? X86_REG_RSI :
+								      X86_REG_EAX) &&
+						      reads[1] ==
+							      (form ? X86_REG_RDI :
+								      X86_REG_EDX) &&
+						      reads[2] ==
+							      (form ? X86_REG_RCX :
+								      X86_REG_ECX);
+					if (write_count == 1)
+						ok &= writes[0] == X86_REG_RCX;
+				}
+				cs_free(insn, count);
+				ok &= rejects(handle, bytes, size - 1);
+				if (!form || modes[mode] == CS_MODE_64) {
+					const unsigned int id =
+						!form	  ? X86_INS_WRMSRNS :
+						form == 1 ? X86_INS_RDMSRLIST :
+							    X86_INS_WRMSRLIST;
+					const uint8_t prefixes[] = {
+						0x26, 0x2e, 0x36, 0x3e, 0x64,
+						0x65, 0x67, 0x48, 0x4f
+					};
+					unsigned int p;
+					uint8_t extended[16];
+					memcpy(extended + 1, bytes, size);
+					for (p = 0; p < sizeof(prefixes); ++p) {
+						if (prefixes[p] >= 0x40 &&
+						    prefixes[p] <= 0x4f &&
+						    modes[mode] != CS_MODE_64)
+							continue;
+						extended[0] = prefixes[p];
+						ok &= decodes_as(handle,
+								 extended,
+								 size + 1, id,
+								 size + 1);
+					}
+					extended[0] = 0x66;
+					ok &= form ? decodes_as(handle,
+								extended,
+								size + 1, id,
+								size + 1) :
+						     rejects(handle, extended,
+							     size + 1);
+					extended[0] = 0xf0;
+					ok &= rejects(handle, extended,
+						      size + 1);
+					memset(extended, 0x67,
+					       sizeof(extended));
+					memcpy(extended + 15 - size, bytes,
+					       size);
+					ok &= decodes_as(handle, extended, 15,
+							 id, 15);
+					memmove(extended + 16 - size, bytes,
+						size);
+					extended[15 - size] = 0x67;
+					ok &= rejects(handle, extended, 16);
+				}
+			}
+		}
+		if (modes[mode] == CS_MODE_64) {
+			const uint8_t read[] = { 0xf3, 0x66, 0xf2,
+						 0x0f, 0x01, 0xc6 };
+			const uint8_t write[] = { 0xf2, 0xf3, 0x66,
+						  0x0f, 0x01, 0xc6 };
+			ok &= decodes_as(handle, read, sizeof(read),
+					 X86_INS_RDMSRLIST, sizeof(read));
+			ok &= decodes_as(handle, write, sizeof(write),
+					 X86_INS_WRMSRLIST, sizeof(write));
+			cs_option(handle, CS_OPT_DETAIL, CS_OPT_OFF);
+			ok &= decodes_as(handle, read, sizeof(read),
+					 X86_INS_RDMSRLIST, sizeof(read));
+			ok &= decodes_as(handle, write, sizeof(write),
+					 X86_INS_WRMSRLIST, sizeof(write));
+		}
+		cs_close(&handle);
+	}
+	return ok;
+}
+
 int main(void)
 {
 	static const uint8_t rd_imm[] = {
@@ -284,5 +427,6 @@ int main(void)
 					 2);
 	}
 	cs_close(&handle);
+	ok &= check_implicit_msr();
 	return ok ? 0 : 1;
 }

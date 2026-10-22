@@ -134,6 +134,9 @@
 #define X86_FEATURE_APX_SUB 0x100e8U
 #define X86_FEATURE_APX_XOR 0x100e9U
 #define X86_FEATURE_APX_IMULZU_IMMEDIATE 0x100eaU
+#define X86_FEATURE_WRMSRNS 0x100ebU
+#define X86_FEATURE_RDMSRLIST 0x100ecU
+#define X86_FEATURE_WRMSRLIST 0x100edU
 
 // Generated x86 register identifiers stop at R15.  These private MC register
 // identifiers let the generated EVEX printer carry APX R16-R31 operands while

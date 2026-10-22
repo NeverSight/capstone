@@ -2976,8 +2976,8 @@ static x86_feature_decode_result decode_apx_invalidate(csh handle,const uint8_t*
 }
 
 static x86_feature_decode_result
-decode_user_msr_legacy_vex(csh handle, const uint8_t *code, size_t code_len,
-			   MCInst *instr, uint16_t *size)
+decode_msr_legacy_vex(csh handle, const uint8_t *code, size_t code_len,
+		      MCInst *instr, uint16_t *size)
 {
 	const cs_struct *arch = (const cs_struct *)(uintptr_t)handle;
 	size_t encoding_offset = 0, instruction_size;
@@ -3022,6 +3022,44 @@ decode_user_msr_legacy_vex(csh handle, const uint8_t *code, size_t code_len,
 	}
 	if (encoding_offset == code_len)
 		return X86_FEATURE_NOT_HANDLED;
+
+	if (code_len - encoding_offset >= 3 && code[encoding_offset] == 0x0f &&
+	    code[encoding_offset + 1] == 0x01 &&
+	    code[encoding_offset + 2] == 0xc6) {
+		cs_x86 *x86;
+		bool list = mandatory_prefix != 0;
+		instruction_size = encoding_offset + 3;
+		/* 66 alone is a different refining prefix; F2/F3 select MSRLIST.
+		 * Address size, segments and REX do not change implicit operands. */
+		if (lock_prefix || (!list && operand_size) ||
+		    (list && !(arch->mode & CS_MODE_64)) ||
+		    instruction_size > 15)
+			return X86_FEATURE_INVALID;
+		MCInst_clear(instr);
+		MCInst_setOpcode(instr, !list ? X86_FEATURE_WRMSRNS :
+					mandatory_prefix == 0xf2 ?
+						X86_FEATURE_RDMSRLIST :
+						X86_FEATURE_WRMSRLIST);
+		*size = (uint16_t)instruction_size;
+		if (!instr->flat_insn->detail)
+			return X86_FEATURE_DECODED;
+		x86 = &instr->flat_insn->detail->x86;
+		x86->prefix[0] = mandatory_prefix;
+		x86->prefix[1] = segment_prefix;
+		x86->prefix[2] = operand_size ? 0x66 : 0;
+		x86->prefix[3] = address32 ? 0x67 : 0;
+		memcpy(instr->x86_prefix, x86->prefix, sizeof(x86->prefix));
+		x86->rex = rex;
+		x86->opcode[0] = 0x0f;
+		x86->opcode[1] = 0x01;
+		x86->addr_size =
+			(arch->mode & CS_MODE_64) ? (address32 ? 4 : 8) :
+			(arch->mode & CS_MODE_32) ? (address32 ? 2 : 4) :
+						    (address32 ? 4 : 2);
+		x86->modrm = 0xc6;
+		x86->encoding.modrm_offset = (uint8_t)(encoding_offset + 2);
+		return X86_FEATURE_DECODED;
+	}
 
 	if (code[encoding_offset] == 0xc4) {
 		uint8_t p0, p1, pp, opcode;
@@ -4317,7 +4355,9 @@ static bool may_be_feature_extension(const uint8_t *code, size_t code_len,
 	default:
 		return false;
 	case 0x0f:
-		return code_len - offset >= 2 && code[offset + 1] == 0x38;
+		return (code_len - offset >= 2 && code[offset + 1] == 0x38) ||
+		       (code_len - offset >= 3 && code[offset + 1] == 0x01 &&
+			code[offset + 2] == 0xc6);
 	case 0x62:
 	case 0xc4:
 	case 0xd5:
@@ -4560,7 +4600,7 @@ decode_feature_extension(csh handle, const uint8_t *code, size_t code_len,
 	result = decode_legacy_enqueue(handle, code, code_len, instr, size);
 	if (result != X86_FEATURE_NOT_HANDLED)
 		return result;
-	result = decode_user_msr_legacy_vex(handle, code, code_len, instr, size);
+	result = decode_msr_legacy_vex(handle, code, code_len, instr, size);
 	if (result != X86_FEATURE_NOT_HANDLED)
 		return result;
 	result = decode_sha512_vex(handle, code, code_len, instr, size);
@@ -7760,6 +7800,28 @@ static bool print_apx_evex_vector_gpr(MCInst *instr, SStream *stream,
 	return true;
 }
 
+static bool print_implicit_msr(MCInst *instr, SStream *stream)
+{
+	const char *mnemonic;
+	switch (MCInst_getOpcode(instr)) {
+	case X86_FEATURE_WRMSRNS:
+		mnemonic = "wrmsrns";
+		break;
+	case X86_FEATURE_RDMSRLIST:
+		mnemonic = "rdmsrlist";
+		break;
+	case X86_FEATURE_WRMSRLIST:
+		mnemonic = "wrmsrlist";
+		break;
+	default:
+		return false;
+	}
+	if (MCInst_getNumOperands(instr))
+		return false;
+	SStream_concat0(stream, mnemonic);
+	return true;
+}
+
 static bool print_apx_msr(MCInst *instr, SStream *stream, bool att_syntax)
 {
 	const unsigned int opcode = MCInst_getOpcode(instr);
@@ -7966,6 +8028,7 @@ bool X86_printFeatureExtension(MCInst *instr, SStream *stream, bool att_syntax)
 	if (MCInst_getOpcode(instr) < X86_FEATURE_OPCODE_BASE)
 		return false;
 	return print_sha512_vex(instr, stream, att_syntax) ||
+	       print_implicit_msr(instr, stream) ||
 	       print_apx_msr(instr, stream, att_syntax) ||
 	       print_apx_evex_vector_gpr(instr, stream, att_syntax) ||
 	       print_tile_control(instr, stream, att_syntax) ||
@@ -8404,6 +8467,28 @@ bool X86_mapFeatureExtension(cs_insn *insn, unsigned int opcode)
 			insn->detail->groups_count = 1;
 		}
 		return true;
+	case X86_FEATURE_WRMSRNS:
+	case X86_FEATURE_RDMSRLIST:
+	case X86_FEATURE_WRMSRLIST: {
+		bool list = opcode != X86_FEATURE_WRMSRNS;
+		insn->id = !list			   ? X86_INS_WRMSRNS :
+			   opcode == X86_FEATURE_RDMSRLIST ? X86_INS_RDMSRLIST :
+							     X86_INS_WRMSRLIST;
+		if (insn->detail) {
+			cs_detail *detail = insn->detail;
+			detail->groups[0] = X86_GRP_PRIVILEGE;
+			detail->groups_count = 1;
+			detail->regs_read[0] = list ? X86_REG_RSI : X86_REG_EAX;
+			detail->regs_read[1] = list ? X86_REG_RDI : X86_REG_EDX;
+			detail->regs_read[2] = list ? X86_REG_RCX : X86_REG_ECX;
+			detail->regs_read_count = 3;
+			if (list) {
+				detail->regs_write[0] = X86_REG_RCX;
+				detail->regs_write_count = 1;
+			}
+		}
+		return true;
+	}
 	case X86_FEATURE_APX_URDMSR:
 		insn->id = X86_INS_URDMSR;
 		return true;
@@ -8624,6 +8709,10 @@ const char *X86_featureExtensionInstructionName(unsigned int id)
 		return "uwrmsr";
 	case X86_INS_WRMSRNS:
 		return "wrmsrns";
+	case X86_INS_RDMSRLIST:
+		return "rdmsrlist";
+	case X86_INS_WRMSRLIST:
+		return "wrmsrlist";
 	case X86_INS_VSHA512MSG1:
 		return "vsha512msg1";
 	case X86_INS_VSHA512MSG2:

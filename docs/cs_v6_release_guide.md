@@ -39,6 +39,21 @@ The legacy/VEX USER_MSR and EVEX forms retain their existing identities.
 Reserved VEX fields, register-only ModRM violations and truncated immediates
 are rejected. No public enum or structure layout changes are required.
 
+## x86 implicit MSR decoding
+
+Operand-free `WRMSRNS` (`0F 01 C6`) now decodes with implicit EAX, EDX and
+ECX reads. `RDMSRLIST` (`F2 0F 01 C6`) and `WRMSRLIST` (`F3 0F 01 C6`)
+are recognized only in 64-bit mode, with RSI/RDI reads and RCX read/write
+access. All three retain the privilege group and leave arithmetic flags alone.
+LOCK, truncation, excessive instruction length and the unassigned `66`-only
+form are rejected; segment/address-size prefixes do not change these implicit
+register widths.
+
+The two list instruction IDs are appended before `X86_INS_ENDING`; existing
+instruction values and public structure layouts are unchanged. The Python,
+Java and OCaml x86 constants are regenerated from the current public header,
+including the earlier APX/AMX extensions that were absent from those bindings.
+
 ## Overview
 
 For `v6` we _updated_ the following architectures: `ARM`, `AArch64`, `Mips` (adding `NanoMips`!), `RISC-V`, `SystemZ`, `PPC`.
