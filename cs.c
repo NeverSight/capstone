@@ -942,7 +942,26 @@ static void fill_insn_without_text(cs_insn *insn, MCInst *mci,
 {
 	uint16_t copy_size = MIN(sizeof(insn->bytes), insn->size);
 
-	memcpy(insn->bytes, code + insn->size - copy_size, copy_size);
+	code += insn->size - copy_size;
+	/* Constant-size chunks let short copies inline. The head and tail may
+	 * overlap, but both stay within the instruction. */
+	if (copy_size >= 8) {
+		if (copy_size > 16) {
+			memcpy(insn->bytes, code, copy_size);
+		} else {
+			memcpy(insn->bytes, code, 8);
+			memcpy(insn->bytes + copy_size - 8,
+			       code + copy_size - 8, 8);
+		}
+	} else if (copy_size >= 4) {
+		memcpy(insn->bytes, code, 4);
+		memcpy(insn->bytes + copy_size - 4, code + copy_size - 4, 4);
+	} else if (copy_size >= 2) {
+		memcpy(insn->bytes, code, 2);
+		memcpy(insn->bytes + copy_size - 2, code + copy_size - 2, 2);
+	} else if (copy_size) {
+		insn->bytes[0] = code[0];
+	}
 	insn->size = copy_size;
 	insn->mnemonic[0] = '\0';
 	insn->op_str[0] = '\0';

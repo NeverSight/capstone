@@ -133,7 +133,15 @@ getModRMDecision(OpcodeType type, InstructionContext insnContext,
 		       &emptyDecision;
 }
 
-static InstrUID decode(const struct ModRMDecision *dec, uint8_t modRM)
+#if defined(_MSC_VER)
+static __forceinline InstrUID
+#else
+#if defined(__GNUC__)
+__attribute__((always_inline))
+#endif
+static inline InstrUID
+#endif
+decode(const struct ModRMDecision *dec, uint8_t modRM)
 {
 	switch (dec->modrm_type) {
 	default:
@@ -893,9 +901,16 @@ static int readOpcode(struct InternalInstruction *insn)
  * @return              - 0 if the ModR/M could be read when needed or was not
  *                        needed; nonzero otherwise.
  */
-static int getIDWithAttrMask(uint16_t *instructionID,
-			     struct InternalInstruction *insn,
-			     uint16_t attrMask)
+#if defined(_MSC_VER)
+static __forceinline int
+#else
+#if defined(__GNUC__)
+__attribute__((always_inline))
+#endif
+static inline int
+#endif
+getIDWithAttrMask(uint16_t *instructionID, struct InternalInstruction *insn,
+		  uint16_t attrMask)
 {
 	const struct ModRMDecision *decision = getModRMDecision(
 		insn->opcodeType, contextForAttrs(attrMask), insn->opcode);

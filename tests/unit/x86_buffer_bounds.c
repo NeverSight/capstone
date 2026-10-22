@@ -19,6 +19,79 @@ static bool check(bool condition, const char *message)
 	return condition;
 }
 
+static bool check_short_copy(csh handle, cs_insn *iter, uint8_t *end,
+			     size_t length)
+{
+	uint8_t *start = end - length;
+	const uint8_t *cursor = start;
+	size_t left = length;
+	uint64_t address = UINT64_MAX - 7;
+	cs_insn *batch = NULL;
+
+	memset(start, 0x2e, length);
+	start[length - 1] = 0x90;
+	memset(iter->bytes, 0xa5, sizeof(iter->bytes));
+	bool decoded = cs_disasm_iter(handle, &cursor, &left, &address, iter);
+	size_t count =
+		cs_disasm(handle, start, length, UINT64_MAX - 7, 1, &batch);
+	bool ok = decoded && count == 1;
+	if (ok) {
+		ok = iter->id == X86_INS_NOP && batch->id == X86_INS_NOP &&
+		     iter->size == length && batch->size == length &&
+		     memcmp(iter->bytes, start, length) == 0 &&
+		     memcmp(batch->bytes, start, length) == 0 &&
+		     cursor == end && left == 0 &&
+		     address == UINT64_MAX - 7 + length;
+		for (size_t i = length; i < sizeof(iter->bytes); ++i)
+			ok &= iter->bytes[i] == 0xa5;
+	}
+	cs_free(batch, count);
+	/* Removing the opcode leaves only prefixes at the guard page. */
+	start[length - 1] = 0x2e;
+	cursor = start;
+	left = length;
+	address = 0x1000;
+	ok &= !cs_disasm_iter(handle, &cursor, &left, &address, iter) &&
+	      cursor == start && left == length && address == 0x1000;
+	if (!ok)
+		fprintf(stderr, "x86 short-copy bounds: length=%zu\n", length);
+	return ok;
+}
+
+static bool check_short_copies(uint8_t *end)
+{
+	static const cs_mode modes[] = { CS_MODE_16, CS_MODE_32, CS_MODE_64 };
+	bool success = true;
+
+	for (size_t mode = 0; mode < sizeof(modes) / sizeof(modes[0]); ++mode) {
+		csh handle;
+		if (!check(cs_open(CS_ARCH_X86, modes[mode], &handle) ==
+				   CS_ERR_OK,
+			   "open short-copy decoder"))
+			return false;
+		for (unsigned text = 0; text != 2; ++text) {
+			cs_option(handle, CS_OPT_TEXT,
+				  text ? CS_OPT_ON : CS_OPT_OFF);
+			for (unsigned detail = 0; detail != 2; ++detail) {
+				cs_option(handle, CS_OPT_DETAIL,
+					  detail ? CS_OPT_ON : CS_OPT_OFF);
+				cs_insn *iter = cs_malloc(handle);
+				if (!check(iter != NULL,
+					   "allocate short-copy instruction")) {
+					cs_close(&handle);
+					return false;
+				}
+				for (size_t length = 1; length <= 15; ++length)
+					success &= check_short_copy(
+						handle, iter, end, length);
+				cs_free(iter, 1);
+			}
+		}
+		cs_close(&handle);
+	}
+	return success;
+}
+
 int main(void)
 {
 	static const struct {
@@ -88,6 +161,7 @@ int main(void)
 		return 1;
 	}
 #endif
+	success &= check_short_copies(pages + page_size);
 	for (i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
 		csh handle;
 		cs_insn *insn;
