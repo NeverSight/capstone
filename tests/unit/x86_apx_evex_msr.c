@@ -30,8 +30,11 @@ static bool check_case(csh handle, const msr_case *test, bool att)
 	unsigned int register_write_count = 0;
 	unsigned int i;
 
-	if (!ok)
+	if (!ok) {
+		fprintf(stderr, "cannot decode %s %s\n", test->mnemonic,
+			test->intel);
 		return false;
+	}
 	ok = instruction->id == test->id &&
 	     strcmp(instruction->mnemonic, test->mnemonic) == 0 &&
 	     strcmp(instruction->op_str, att ? test->att : test->intel) == 0 &&
@@ -40,6 +43,8 @@ static bool check_case(csh handle, const msr_case *test, bool att)
 	     instruction->detail && instruction->detail->x86.op_count == 2;
 	if (ok) {
 		const cs_x86 *x86 = &instruction->detail->x86;
+		cs_regs reads, writes;
+		uint8_t reads_count, writes_count;
 		for (i = 0; i < x86->op_count; ++i) {
 			immediate_count += x86->operands[i].type == X86_OP_IMM;
 			register_read_count +=
@@ -51,17 +56,38 @@ static bool check_case(csh handle, const msr_case *test, bool att)
 			ok &= x86->operands[i].size ==
 			      (x86->operands[i].type == X86_OP_IMM ? 4 : 8);
 		}
-		ok = immediate_count == (unsigned int)test->immediate &&
-		     register_read_count == test->register_reads &&
-		     register_write_count ==
-			     (unsigned int)test->register_write &&
-		     x86->encoding.modrm_offset == test->modrm_offset &&
-		     x86->encoding.imm_offset == test->immediate_offset &&
-		     x86->encoding.imm_size == (test->immediate ? 4 : 0) &&
-		     (instruction->detail->groups_count == 1) ==
-			     test->privileged &&
-		     (!test->privileged ||
-		      instruction->detail->groups[0] == X86_GRP_PRIVILEGE);
+		ok &= immediate_count == (unsigned int)test->immediate &&
+		      register_read_count == test->register_reads &&
+		      register_write_count ==
+			      (unsigned int)test->register_write &&
+		      x86->encoding.modrm_offset == test->modrm_offset &&
+		      x86->encoding.imm_offset == test->immediate_offset &&
+		      x86->encoding.imm_size == (test->immediate ? 4 : 0) &&
+		      (instruction->detail->groups_count == 1) ==
+			      test->privileged &&
+		      (!test->privileged ||
+		       instruction->detail->groups[0] == X86_GRP_PRIVILEGE);
+		ok &= x86->eflags == 0 &&
+		      cs_regs_access(handle, instruction, reads, &reads_count,
+				     writes, &writes_count) == CS_ERR_OK;
+		if (ok) {
+			ok &= reads_count == test->register_reads &&
+			      writes_count ==
+				      (unsigned int)test->register_write;
+			for (i = 0; i < x86->op_count; ++i) {
+				const cs_x86_op *op = &x86->operands[i];
+				if (op->type != X86_OP_REG)
+					continue;
+				if (op->access & CS_AC_READ)
+					ok &= (reads_count > 0 &&
+					       reads[0] == op->reg) ||
+					      (reads_count > 1 &&
+					       reads[1] == op->reg);
+				if (op->access & CS_AC_WRITE)
+					ok &= writes_count == 1 &&
+					      writes[0] == op->reg;
+			}
+		}
 	}
 	if (!ok)
 		fprintf(stderr, "%s %s\n", instruction->mnemonic,
@@ -88,6 +114,186 @@ static bool decodes_as(csh handle, const uint8_t *bytes, size_t size,
 		  instruction->size == length;
 
 	cs_free(instruction, count);
+	return ok;
+}
+
+static bool check_implicit_msr(void)
+{
+	bool ok = true;
+	const cs_mode modes[] = { CS_MODE_16, CS_MODE_32, CS_MODE_64 };
+	unsigned int mode, form, syntax;
+
+	for (mode = 0; mode < sizeof(modes) / sizeof(modes[0]); ++mode) {
+		csh handle;
+		if (cs_open(CS_ARCH_X86, modes[mode], &handle) != CS_ERR_OK)
+			return false;
+		cs_option(handle, CS_OPT_DETAIL, CS_OPT_ON);
+		for (syntax = 0; syntax < 2; ++syntax) {
+			cs_option(handle, CS_OPT_SYNTAX,
+				  syntax ? CS_OPT_SYNTAX_ATT :
+					   CS_OPT_SYNTAX_INTEL);
+			for (form = 0; form < 3; ++form) {
+				uint8_t code[] = { 0xf1 + form, 0x0f, 0x01,
+						   0xc6 };
+				const uint8_t *bytes = code + (form == 0);
+				size_t size = sizeof(code) - (form == 0);
+				const char *name = form == 0 ? "wrmsrns" :
+						   form == 1 ? "rdmsrlist" :
+							       "wrmsrlist";
+				cs_insn *insn = NULL;
+				size_t count = cs_disasm(handle, bytes, size, 0,
+							 1, &insn);
+				if (form && modes[mode] != CS_MODE_64) {
+					ok &= count == 0;
+				} else if (count != 1) {
+					fprintf(stderr,
+						"missing %s in mode %u\n", name,
+						modes[mode]);
+					ok = false;
+				} else {
+					cs_regs reads, writes;
+					uint8_t read_count = 0, write_count = 0;
+					const cs_x86 *x = &insn->detail->x86;
+					ok &= insn->size == size &&
+					      !strcmp(insn->mnemonic, name) &&
+					      !strcmp(cs_insn_name(handle,
+								   insn->id),
+						      name) &&
+					      !insn->op_str[0] &&
+					      x->op_count == 0 &&
+					      x->eflags == 0 &&
+					      x->opcode[0] == 0x0f &&
+					      x->opcode[1] == 0x01 &&
+					      x->modrm == 0xc6 &&
+					      x->encoding.modrm_offset ==
+						      size - 1 &&
+					      x->encoding.imm_size == 0 &&
+					      x->encoding.disp_size == 0 &&
+					      insn->detail->groups_count == 1 &&
+					      insn->detail->groups[0] ==
+						      X86_GRP_PRIVILEGE;
+					ok &= cs_regs_access(handle, insn,
+							     reads, &read_count,
+							     writes,
+							     &write_count) ==
+					      CS_ERR_OK;
+					ok &= read_count == 3 &&
+					      write_count == (form ? 1 : 0);
+					if (read_count == 3)
+						ok &= reads[0] ==
+							      (form ? X86_REG_RSI :
+								      X86_REG_EAX) &&
+						      reads[1] ==
+							      (form ? X86_REG_RDI :
+								      X86_REG_EDX) &&
+						      reads[2] ==
+							      (form ? X86_REG_RCX :
+								      X86_REG_ECX);
+					if (write_count == 1)
+						ok &= writes[0] == X86_REG_RCX;
+				}
+				cs_free(insn, count);
+				ok &= rejects(handle, bytes, size - 1);
+				if (!form || modes[mode] == CS_MODE_64) {
+					const unsigned int id =
+						!form	  ? X86_INS_WRMSRNS :
+						form == 1 ? X86_INS_RDMSRLIST :
+							    X86_INS_WRMSRLIST;
+					const uint8_t prefixes[] = {
+						0x26, 0x2e, 0x36, 0x3e, 0x64,
+						0x65, 0x67, 0x48, 0x4f
+					};
+					unsigned int p;
+					uint8_t extended[16];
+					memcpy(extended + 1, bytes, size);
+					for (p = 0; p < sizeof(prefixes); ++p) {
+						if (prefixes[p] >= 0x40 &&
+						    prefixes[p] <= 0x4f &&
+						    modes[mode] != CS_MODE_64)
+							continue;
+						extended[0] = prefixes[p];
+						ok &= decodes_as(handle,
+								 extended,
+								 size + 1, id,
+								 size + 1);
+					}
+					extended[0] = 0x66;
+					ok &= form ? decodes_as(handle,
+								extended,
+								size + 1, id,
+								size + 1) :
+						     rejects(handle, extended,
+							     size + 1);
+					extended[0] = 0xf0;
+					ok &= rejects(handle, extended,
+						      size + 1);
+					memset(extended, 0x67,
+					       sizeof(extended));
+					memcpy(extended + 15 - size, bytes,
+					       size);
+					ok &= decodes_as(handle, extended, 15,
+							 id, 15);
+					memmove(extended + 16 - size, bytes,
+						size);
+					extended[15 - size] = 0x67;
+					ok &= rejects(handle, extended, 16);
+				}
+			}
+		}
+		if (modes[mode] == CS_MODE_64) {
+			const uint8_t read[] = { 0xf3, 0x66, 0xf2,
+						 0x0f, 0x01, 0xc6 };
+			const uint8_t write[] = { 0xf2, 0xf3, 0x66,
+						  0x0f, 0x01, 0xc6 };
+			ok &= decodes_as(handle, read, sizeof(read),
+					 X86_INS_RDMSRLIST, sizeof(read));
+			ok &= decodes_as(handle, write, sizeof(write),
+					 X86_INS_WRMSRLIST, sizeof(write));
+			cs_option(handle, CS_OPT_DETAIL, CS_OPT_OFF);
+			ok &= decodes_as(handle, read, sizeof(read),
+					 X86_INS_RDMSRLIST, sizeof(read));
+			ok &= decodes_as(handle, write, sizeof(write),
+					 X86_INS_WRMSRLIST, sizeof(write));
+		}
+		cs_close(&handle);
+	}
+	return ok;
+}
+
+static bool check_unmodeled_system_refinements(void)
+{
+	const cs_mode modes[] = { CS_MODE_32, CS_MODE_64 };
+	const uint8_t codes[][4] = {
+		{ 0xf2, 0x0f, 0x01, 0xca }, /* ERETS, not CLAC. */
+		{ 0xf3, 0x0f, 0x01, 0xca }, /* ERETU, not CLAC. */
+		{ 0xf3, 0x0f, 0x01, 0xee }, /* CLUI, not RDPKRU. */
+		{ 0xf3, 0x0f, 0x01, 0xef }, /* STUI, not WRPKRU. */
+	};
+	const unsigned int legacy[] = { X86_INS_CLAC, X86_INS_CLAC,
+					X86_INS_RDPKRU, X86_INS_WRPKRU };
+	unsigned int mode, i;
+	bool ok = true;
+	for (mode = 0; mode < sizeof(modes) / sizeof(modes[0]); ++mode) {
+		csh handle;
+		if (cs_open(CS_ARCH_X86, modes[mode], &handle) != CS_ERR_OK)
+			return false;
+		for (i = 0; i < sizeof(codes) / sizeof(codes[0]); ++i) {
+			if (i >= 2 && modes[mode] == CS_MODE_64)
+				ok &= decodes_as(
+					handle, codes[i], sizeof(codes[i]),
+					i == 2 ? X86_INS_CLUI : X86_INS_STUI,
+					4);
+			else
+				ok &= rejects(handle, codes[i],
+					      sizeof(codes[i]));
+			ok &= decodes_as(handle, codes[i] + 1,
+					 sizeof(codes[i]) - 1, legacy[i], 3);
+		}
+		cs_close(&handle);
+	}
+	if (!ok)
+		fprintf(stderr,
+			"unsupported system refining prefixes alias legacy instructions\n");
 	return ok;
 }
 
@@ -123,34 +329,40 @@ int main(void)
 	static const uint8_t vex_uwr_imm[] = {
 		0xc4, 0x07, 0x7a, 0xf8, 0xc7, 0x01, 0x1b, 0x00, 0x00
 	};
+	static const uint8_t vex_rd_imm[] = { 0xc4, 0x07, 0x7b, 0xf6, 0xc7,
+					      0x78, 0x56, 0x34, 0x92 };
+	static const uint8_t vex_wr_imm[] = { 0xc4, 0x07, 0x7a, 0xf6, 0xc7,
+					      0x78, 0x56, 0x34, 0x92 };
 	static const msr_case tests[] = {
 		{ rd_imm, sizeof(rd_imm), X86_INS_RDMSR, "rdmsr",
-		  "r17, 0x12345678", "$0x12345678, %r17", true, true, 0,
-		  true, 5, 6 },
-		{ wr_imm, sizeof(wr_imm), X86_INS_WRMSRNS, "wrmsrns",
-		  "0x12345678, r18", "%r18, $0x12345678", true, false, 1,
-		  true, 5, 6 },
-		{ urd_imm, sizeof(urd_imm), X86_INS_URDMSR, "urdmsr",
-		  "r19, 0x1b00", "$0x1b00, %r19", false, true, 0, true, 5,
-		  6 },
-		{ uwr_imm, sizeof(uwr_imm), X86_INS_UWRMSR, "uwrmsr",
-		  "0x1b01, r20", "%r20, $0x1b01", false, false, 1, true,
+		  "r17, 0x12345678", "$0x12345678, %r17", true, true, 0, true,
 		  5, 6 },
+		{ wr_imm, sizeof(wr_imm), X86_INS_WRMSRNS, "wrmsrns",
+		  "0x12345678, r18", "%r18, $0x12345678", true, false, 1, true,
+		  5, 6 },
+		{ urd_imm, sizeof(urd_imm), X86_INS_URDMSR, "urdmsr",
+		  "r19, 0x1b00", "$0x1b00, %r19", false, true, 0, true, 5, 6 },
+		{ uwr_imm, sizeof(uwr_imm), X86_INS_UWRMSR, "uwrmsr",
+		  "0x1b01, r20", "%r20, $0x1b01", false, false, 1, true, 5, 6 },
 		{ urd_reg, sizeof(urd_reg), X86_INS_URDMSR, "urdmsr",
 		  "r21, r22", "%r22, %r21", false, true, 1, false, 5, 0 },
 		{ uwr_reg, sizeof(uwr_reg), X86_INS_UWRMSR, "uwrmsr",
 		  "r23, r24", "%r24, %r23", false, false, 2, false, 5, 0 },
 		{ legacy_urd_reg, sizeof(legacy_urd_reg), X86_INS_URDMSR,
-		  "urdmsr", "r15, r8", "%r8, %r15", false, true, 1, false,
-		  5, 0 },
+		  "urdmsr", "r15, r8", "%r8, %r15", false, true, 1, false, 5,
+		  0 },
 		{ legacy_uwr_reg, sizeof(legacy_uwr_reg), X86_INS_UWRMSR,
-		  "uwrmsr", "r8, r15", "%r15, %r8", false, false, 2, false,
-		  5, 0 },
+		  "uwrmsr", "r8, r15", "%r15, %r8", false, false, 2, false, 5,
+		  0 },
 		{ vex_urd_imm, sizeof(vex_urd_imm), X86_INS_URDMSR, "urdmsr",
-		  "r15, 0x1b00", "$0x1b00, %r15", false, true, 0, true, 4,
-		  5 },
+		  "r15, 0x1b00", "$0x1b00, %r15", false, true, 0, true, 4, 5 },
 		{ vex_uwr_imm, sizeof(vex_uwr_imm), X86_INS_UWRMSR, "uwrmsr",
-		  "0x1b01, r15", "%r15, $0x1b01", false, false, 1, true,
+		  "0x1b01, r15", "%r15, $0x1b01", false, false, 1, true, 4, 5 },
+		{ vex_rd_imm, sizeof(vex_rd_imm), X86_INS_RDMSR, "rdmsr",
+		  "r15, 0x92345678", "$0x92345678, %r15", true, true, 0, true,
+		  4, 5 },
+		{ vex_wr_imm, sizeof(vex_wr_imm), X86_INS_WRMSRNS, "wrmsrns",
+		  "0x92345678, r15", "%r15, $0x92345678", true, false, 1, true,
 		  4, 5 },
 	};
 	csh handle;
@@ -211,21 +423,24 @@ int main(void)
 		invalid[3] |= 0x10; /* ND is reserved. */
 		ok &= rejects(handle, invalid, sizeof(invalid));
 	}
-	{
+	for (i = 8; i < sizeof(tests) / sizeof(tests[0]); ++i) {
 		uint8_t invalid[sizeof(vex_urd_imm)];
-		memcpy(invalid, vex_urd_imm, sizeof(invalid));
+		memcpy(invalid, tests[i].bytes, sizeof(invalid));
 		invalid[2] |= 0x80; /* VEX.W must be zero. */
 		ok &= rejects(handle, invalid, sizeof(invalid));
-		memcpy(invalid, vex_urd_imm, sizeof(invalid));
+		memcpy(invalid, tests[i].bytes, sizeof(invalid));
 		invalid[2] |= 0x04; /* VEX.L must be zero. */
 		ok &= rejects(handle, invalid, sizeof(invalid));
-		memcpy(invalid, vex_urd_imm, sizeof(invalid));
+		memcpy(invalid, tests[i].bytes, sizeof(invalid));
 		invalid[2] &= (uint8_t)~0x08; /* VEX.vvvv is reserved. */
 		ok &= rejects(handle, invalid, sizeof(invalid));
-		memcpy(invalid, vex_urd_imm, sizeof(invalid));
+		memcpy(invalid, tests[i].bytes, sizeof(invalid));
 		invalid[4] = 0xc8; /* VEX MAP7 requires ModRM.reg=/0. */
 		ok &= rejects(handle, invalid, sizeof(invalid));
-		ok &= rejects(handle, vex_urd_imm, sizeof(vex_urd_imm) - 1);
+		memcpy(invalid, tests[i].bytes, sizeof(invalid));
+		invalid[4] = 0x00; /* Memory operands are not encodable. */
+		ok &= rejects(handle, invalid, sizeof(invalid));
+		ok &= rejects(handle, tests[i].bytes, tests[i].size - 1);
 	}
 	{
 		uint8_t prefixed[sizeof(rd_imm) + 1];
@@ -249,5 +464,7 @@ int main(void)
 					 2);
 	}
 	cs_close(&handle);
+	ok &= check_implicit_msr();
+	ok &= check_unmodeled_system_refinements();
 	return ok ? 0 : 1;
 }

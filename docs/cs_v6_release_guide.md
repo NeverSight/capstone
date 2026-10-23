@@ -30,6 +30,55 @@ For a full list of all the developers, please see the release page.
 
 With all that said, we hope you enjoy the new release!
 
+## x86 explicit MSR decoding
+
+VEX MAP7 immediate `RDMSR` and `WRMSRNS` are decoded in 64-bit mode using
+the existing public instruction IDs. Their 32-bit immediate selectors and
+64-bit register operands carry exact access metadata and the privilege group.
+The legacy/VEX USER_MSR and EVEX forms retain their existing identities.
+Reserved VEX fields, register-only ModRM violations and truncated immediates
+are rejected. No public enum or structure layout changes are required.
+
+## x86 implicit MSR decoding
+
+Operand-free `WRMSRNS` (`0F 01 C6`) now decodes with implicit EAX, EDX and
+ECX reads. `RDMSRLIST` (`F2 0F 01 C6`) and `WRMSRLIST` (`F3 0F 01 C6`)
+are recognized only in 64-bit mode, with RSI/RDI reads and RCX read/write
+access. All three retain the privilege group and leave arithmetic flags alone.
+LOCK, truncation, excessive instruction length and the unassigned `66`-only
+form are rejected; segment/address-size prefixes do not change these implicit
+register widths.
+
+The two list instruction IDs are appended before `X86_INS_ENDING`; existing
+instruction values and public structure layouts are unchanged. The Python,
+Java and OCaml x86 constants are regenerated from the current public header,
+including the earlier APX/AMX extensions that were absent from those bindings.
+
+The unmodeled `ERETS` and `ERETU` refining-prefix forms fail decoding
+instead of being mislabeled as `CLAC`. Bare CLAC remains supported.
+
+## x86 bounded system extensions
+
+Append public instruction IDs for CLUI, STUI, TESTUI, SENDUIPI, LKGS, HRESET,
+INVLPGB and TLBSYNC. Existing IDs and structure layouts are unchanged; Python,
+Java and OCaml constants are regenerated. CLUI/STUI now decode with their own
+identities instead of being rejected or aliased to RDPKRU/WRPKRU.
+
+UINTR and LKGS are long-mode only. SENDUIPI always reads a 64-bit register;
+LKGS reads a 16-bit register or memory selector and reports an implicit GS
+write. TESTUI writes CF and clears the other five arithmetic flags; CLUI/STUI
+modify the hidden UIF, not EFLAGS. HRESET reports its imm8 and implicit EAX
+read. INVLPGB reports address-width EAX/RAX plus EDX/ECX reads and rejects
+16-bit effective addressing. TLBSYNC has no GPR operands. LKGS/HRESET and
+both TLB instructions carry the privilege group. Hidden MSRs, UIF, descriptor
+caches and interrupt-target memory are not additional public registers.
+
+Details preserve ignored operand-size prefixes on mandatory-prefix forms,
+REX selection, segments, SIB/displacements and immediate offsets. LOCK,
+truncation, excessive length, invalid modes and reserved prefix forms fail.
+Decoder recognition does not assert that the runtime CPU or OS enables the
+instruction; FRED/UIRET returns are still outside this addition.
+
 ## Overview
 
 For `v6` we _updated_ the following architectures: `ARM`, `AArch64`, `Mips` (adding `NanoMips`!), `RISC-V`, `SystemZ`, `PPC`.
