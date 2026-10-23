@@ -2297,7 +2297,7 @@ CASE_ENCODING_RM:
  *   vector length L'L = 11 outside a register-form rounding control, and
  *   EVEX.V' outside 64-bit mode.
  *
- * @param insn  - The instruction whose operands have been read.
+ * @param insn  - The EVEX instruction whose operands have been read.
  * @return      - 0 if the EVEX prefix is legal; nonzero otherwise.
  */
 static int checkEVEX(const struct InternalInstruction *insn)
@@ -2305,8 +2305,6 @@ static int checkEVEX(const struct InternalInstruction *insn)
 	uint8_t p2;
 	bool registerForm;
 
-	if (insn->vectorExtensionType != TYPE_EVEX)
-		return 0;
 	p2 = insn->vectorExtensionPrefix[3];
 	registerForm = insn->consumedModRM && modFromModRM(insn->modRM) == 3;
 	if (zFromEVEX4of4(p2) && !aaaFromEVEX4of4(p2))
@@ -2348,19 +2346,16 @@ static int vectorIndexNumber(SIBIndex index)
  *   either; the SDM makes both #UD, and XED rejects them.
  *
  * @param insn  - The instruction whose operands have been read.
+ * @param index - The decoded vector index register number.
  * @return      - 0 if the registers are distinct; nonzero otherwise.
  */
-static int checkGatherRegisters(const struct InternalInstruction *insn)
+static int checkGatherRegisters(const struct InternalInstruction *insn,
+				int index)
 {
 	const OperandSpecifier *operands = insn->operands;
 	int destination, mask = -1;
-	const int index = vectorIndexNumber(insn->sibIndex);
 	bool reg = false, vsib = false;
 	int i;
-
-	/* Only a decoded VSIB index can participate in a gather conflict. */
-	if (index < 0)
-		return 0;
 
 	/* A gather lists its ModRM.reg destination before its VSIB source; a
 	 * scatter lists its VSIB destination first. */
@@ -2640,9 +2635,15 @@ int decodeInstruction(struct InternalInstruction *insn, const uint8_t *code,
 	insn->numImmediatesConsumed = 0;
 
 	if (readPrefixes(insn) || readOpcode(insn) || getID(insn, mode) ||
-	    insn->instructionID == 0 || checkPrefix(insn) ||
-	    readOperands(insn) || checkEVEX(insn) ||
-	    checkGatherRegisters(insn))
+	    insn->instructionID == 0 || checkPrefix(insn) || readOperands(insn))
+		return -1;
+
+	if (insn->vectorExtensionType == TYPE_EVEX && checkEVEX(insn))
+		return -1;
+
+	/* Only a decoded VSIB index can participate in a gather conflict. */
+	const int index = vectorIndexNumber(insn->sibIndex);
+	if (index >= 0 && checkGatherRegisters(insn, index))
 		return -1;
 
 	/* MOV can read CS (8C /1), but loading CS (8E /1) always raises #UD.

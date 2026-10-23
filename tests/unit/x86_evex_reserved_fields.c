@@ -37,6 +37,47 @@ static bool check_case(const evex_case *test)
 		fprintf(stderr, "%s: decoded as \"%s\", expected %s\n",
 			test->name, actual, test->text ? test->text : "#UD");
 	cs_free(insn, count);
+	for (unsigned options = 0; options < 4; ++options) {
+		const bool text = (options & 1) != 0;
+		const bool detail = (options & 2) != 0;
+		const uint8_t *cursor = test->code;
+		size_t remaining = test->size;
+		uint64_t address = 0x1000;
+		cs_option(handle, CS_OPT_TEXT, text ? CS_OPT_ON : CS_OPT_OFF);
+		cs_option(handle, CS_OPT_DETAIL,
+			  detail ? CS_OPT_ON : CS_OPT_OFF);
+		insn = cs_malloc(handle);
+		if (!insn) {
+			ok = false;
+			break;
+		}
+		const bool decoded = cs_disasm_iter(handle, &cursor, &remaining,
+						    &address, insn);
+		bool iter_ok = decoded == (test->text != NULL);
+		if (decoded) {
+			iter_ok &= insn->size == test->size && remaining == 0 &&
+				   cursor == test->code + test->size &&
+				   address == 0x1000 + test->size;
+			if (text) {
+				snprintf(actual, sizeof(actual), "%s %s",
+					 insn->mnemonic, insn->op_str);
+				iter_ok &= test->text &&
+					   strcmp(actual, test->text) == 0;
+			} else {
+				iter_ok &= !insn->mnemonic[0] &&
+					   !insn->op_str[0];
+			}
+		} else {
+			iter_ok &= cursor == test->code &&
+				   remaining == test->size && address == 0x1000;
+		}
+		if (!iter_ok)
+			fprintf(stderr,
+				"%s: iterator failed (text=%d detail=%d)\n",
+				test->name, text, detail);
+		ok &= iter_ok;
+		cs_free(insn, 1);
+	}
 	cs_close(&handle);
 	return ok;
 }
@@ -157,6 +198,16 @@ int main(void)
 		  6,
 		  NULL },
 		{ CS_MODE_64,
+		  "VEX YMM gather",
+		  { 0xc4, 0xe2, 0x6d, 0x92, 0x04, 0x88 },
+		  6,
+		  "vgatherdps ymm0, ymmword ptr [rax + ymm1*4], ymm2" },
+		{ CS_MODE_64,
+		  "VEX YMM gather destination is index",
+		  { 0xc4, 0xe2, 0x6d, 0x92, 0x04, 0x80 },
+		  6,
+		  NULL },
+		{ CS_MODE_64,
 		  "VEX gather mask is index",
 		  { 0xc4, 0xe2, 0x71, 0x92, 0x04, 0x88 },
 		  6,
@@ -174,6 +225,16 @@ int main(void)
 		{ CS_MODE_64,
 		  "EVEX gather destination is index",
 		  { 0x62, 0xf2, 0x7d, 0x49, 0x92, 0x04, 0x80 },
+		  7,
+		  NULL },
+		{ CS_MODE_64,
+		  "EVEX XMM gather destination is index",
+		  { 0x62, 0xf2, 0x7d, 0x09, 0x92, 0x04, 0x80 },
+		  7,
+		  NULL },
+		{ CS_MODE_64,
+		  "EVEX YMM gather destination is index",
+		  { 0x62, 0xf2, 0x7d, 0x29, 0x92, 0x04, 0x80 },
 		  7,
 		  NULL },
 		{ CS_MODE_64,

@@ -233,10 +233,10 @@ static bool translateRegRegister(MCInst *mcInst,
 				 InternalInstruction *insn)
 {
 	const OperandType type = (OperandType)operand->type;
-	const uint8_t width = gprOperandWidth(insn, type);
 	unsigned int number;
 
 	if (insn->hasRex2) {
+		const uint8_t width = gprOperandWidth(insn, type);
 		/* Segment-register selectors remain three bits wide.  Both R4 and
 		 * R3 are architecturally ignored for this operand class.  The
 		 * generated fixup has already normalized insn->reg to those three
@@ -265,6 +265,11 @@ static bool translateOpcodeRegister(MCInst *mcInst,
 				    const OperandSpecifier *operand,
 				    InternalInstruction *insn)
 {
+	if (!insn->hasRex2 || !b4FromREX2(insn->rex2Prefix)) {
+		translateRegister(mcInst, insn->opcodeRegister);
+		return false;
+	}
+
 	uint8_t width = gprOperandWidth(insn, (OperandType)operand->type);
 
 	if (width == 0) {
@@ -288,8 +293,7 @@ static bool translateOpcodeRegister(MCInst *mcInst,
 			break;
 		}
 	}
-	if (insn->hasRex2 && width != 0 &&
-	    b4FromREX2(insn->rex2Prefix)) {
+	if (width != 0) {
 		const unsigned int number =
 			16 | (b3FromREX2(insn->rex2Prefix) << 3) |
 			(insn->opcode & 7);
@@ -1035,38 +1039,43 @@ static void translateImmediate(MCInst *mcInst, uint64_t immediate,
 static bool translateRMRegister(MCInst *mcInst, InternalInstruction *insn,
 				OperandType type)
 {
-	const uint8_t width = gprOperandWidth(insn, type);
-
 	if (insn->eaBase == EA_BASE_sib || insn->eaBase == EA_BASE_sib64) {
 		//debug("A R/M register operand may not have a SIB byte");
 		return true;
 	}
 
-	if (insn->hasRex2) {
-		const unsigned int number =
-			(b4FromREX2(insn->rex2Prefix) << 4) |
-			(b3FromREX2(insn->rex2Prefix) << 3) |
-			rmFromModRM(insn->orgModRM);
+	if (insn->hasRex2 || insn->apxEvexB4) {
+		const uint8_t width = gprOperandWidth(insn, type);
 
-		if (type == TYPE_CONTROLREG &&
-		    !rex2ControlRegisterIsValid(number))
-			return true;
-		if (type == TYPE_DEBUGREG && !rex2DebugRegisterIsValid(number))
-			return true;
-		if (width != 0 && b4FromREX2(insn->rex2Prefix))
-			return appendFeatureGpr(mcInst, number, width);
-	}
-	if (insn->apxEvexB4 && width != 0) {
-		const unsigned int number =
-			16 | (bFromEVEX2of4(insn->vectorExtensionPrefix[1]) << 3) |
-			(insn->orgModRM & 7);
-		const unsigned int reg =
-			X86_featureExtensionMCGPR(number, width);
+		if (insn->hasRex2) {
+			const unsigned int number =
+				(b4FromREX2(insn->rex2Prefix) << 4) |
+				(b3FromREX2(insn->rex2Prefix) << 3) |
+				rmFromModRM(insn->orgModRM);
 
-		if (reg == 0)
-			return true;
-		MCOperand_CreateReg0(mcInst, reg);
-		return false;
+			if (type == TYPE_CONTROLREG &&
+			    !rex2ControlRegisterIsValid(number))
+				return true;
+			if (type == TYPE_DEBUGREG &&
+			    !rex2DebugRegisterIsValid(number))
+				return true;
+			if (width != 0 && b4FromREX2(insn->rex2Prefix))
+				return appendFeatureGpr(mcInst, number, width);
+		}
+		if (insn->apxEvexB4 && width != 0) {
+			const unsigned int number =
+				16 |
+				(bFromEVEX2of4(insn->vectorExtensionPrefix[1])
+				 << 3) |
+				(insn->orgModRM & 7);
+			const unsigned int reg =
+				X86_featureExtensionMCGPR(number, width);
+
+			if (reg == 0)
+				return true;
+			MCOperand_CreateReg0(mcInst, reg);
+			return false;
+		}
 	}
 
 	/* EABase and Reg enumerate their register ranges with ALL_REGS. */
@@ -1615,7 +1624,6 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 			void *_info)
 {
 	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
-	InternalInstruction insn = { 0 };
 	const uint8_t *decode_code = code;
 	size_t decode_size = code_len;
 	uint8_t normalized_code[15];
@@ -1661,6 +1669,7 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 	if (extension_result == X86_FEATURE_INVALID)
 		return false;
 
+	InternalInstruction insn = { 0 };
 	evex_normalization_limit = code_len < sizeof(normalized_code) ?
 					   code_len :
 					   sizeof(normalized_code);
