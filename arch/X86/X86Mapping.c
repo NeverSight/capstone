@@ -9929,14 +9929,8 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
 	if (id >= X86_FEATURE_OPCODE_BASE && X86_mapFeatureExtension(insn, id))
 		return;
 
-	/* Scans need only the public ID, not the larger detail-mapping entry. */
-	if (h && !h->detail_opt && h->x86_insn_lut &&
-	    id <= h->x86_insn_lut_max) {
-		uint16_t mapid = (uint16_t)(h->x86_insn_lut[id] >> 16);
-		if (mapid != UINT16_MAX)
-			insn->id = mapid;
+	if (X86_get_insn_id_no_detail(h, insn, id))
 		return;
-	}
 
 	i = find_insn_h(h, id);
 	if (i != -1) {

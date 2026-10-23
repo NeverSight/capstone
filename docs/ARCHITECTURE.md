@@ -57,6 +57,14 @@ intermediate operand slots in this mode. Text or detail output retains full
 operand construction. Memory validation and construction share one implementation
 specialized for the two constant store policies.
 
+Without detail, the x86 mapping layer exposes its existing checked public-ID
+lookup as a private inline helper shared by the mapper and both core decode
+APIs. Cached holes preserve the current ID. Out-of-range IDs, unavailable
+caches and detailed output retain the original mapping callback. The range
+check precedes cache access, so source-owned extension IDs return promptly to
+their existing mapper. Printer aliases and pseudo-opcode adjustments still
+follow mapping at their original core locations.
+
 The x86 extension selector is inlined at the decoder entry. It retains the
 mode-dependent prefix and opcode filters in `X86FeatureExtension.h`, and only
 calls the extension decoders for a possible match. EVEX normalization and its

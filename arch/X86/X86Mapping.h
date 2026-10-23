@@ -39,6 +39,21 @@ const char *X86_reg_name(csh handle, unsigned int reg);
 // given internal insn id, return public instruction info
 void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id);
 
+/* Cached holes are handled without changing the caller's instruction ID. */
+static inline bool X86_get_insn_id_no_detail(const cs_struct *h, cs_insn *insn,
+					     unsigned int id)
+{
+	uint16_t mapid;
+
+	if (!h || id > h->x86_insn_lut_max || h->detail_opt || !h->x86_insn_lut)
+		return false;
+
+	mapid = (uint16_t)(h->x86_insn_lut[id] >> 16);
+	if (mapid != UINT16_MAX)
+		insn->id = mapid;
+	return true;
+}
+
 // return insn name, given insn id
 const char *X86_insn_name(csh handle, unsigned int id);
 

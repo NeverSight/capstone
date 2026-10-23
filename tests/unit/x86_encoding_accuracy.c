@@ -4,6 +4,7 @@
 #include <capstone/capstone.h>
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -92,8 +93,22 @@ static bool check_instruction_names(void)
 	return ok;
 }
 
-static bool decode(csh handle, const uint8_t *bytes, size_t size, unsigned id,
-		   size_t length)
+static bool same_mapping_result(const cs_insn *a, const cs_insn *b)
+{
+	if (a->id != b->id || a->address != b->address || a->size != b->size ||
+	    memcmp(a->bytes, b->bytes, a->size) ||
+	    strcmp(a->mnemonic, b->mnemonic) || strcmp(a->op_str, b->op_str) ||
+	    (a->detail != NULL) != (b->detail != NULL))
+		return false;
+	/* The x86 decoder clears this complete region before populating detail. */
+	return !a->detail ||
+	       memcmp(a->detail, b->detail,
+		      offsetof(cs_detail, x86) + sizeof(cs_x86)) == 0;
+}
+
+static bool decode_reference(csh handle, const uint8_t *bytes, size_t size,
+			     unsigned id, size_t length,
+			     const cs_insn *reference)
 {
 	cs_insn *batch = NULL, *iter = cs_malloc(handle);
 	const uint8_t *cursor = bytes;
@@ -113,12 +128,16 @@ static bool decode(csh handle, const uint8_t *bytes, size_t size, unsigned id,
 		else
 			ok &= cursor == bytes && remaining == size &&
 			      address == 0x1000;
+		if (decoded && reference)
+			ok &= same_mapping_result(iter, reference);
 	}
 	if (length)
 		ok &= count == 1 && batch->id == id && batch->size == length &&
 		      memcmp(batch->bytes, bytes, length) == 0;
 	else
 		ok &= count == 0;
+	if (count == 1 && reference)
+		ok &= same_mapping_result(batch, reference);
 	if (!ok) {
 		fprintf(stderr, "decode: expected id=%u size=%zu for", id,
 			length);
@@ -128,6 +147,68 @@ static bool decode(csh handle, const uint8_t *bytes, size_t size, unsigned id,
 	}
 	cs_free(batch, count);
 	cs_free(iter, iter ? 1 : 0);
+	return ok;
+}
+
+static bool decode(csh handle, const uint8_t *bytes, size_t size, unsigned id,
+		   size_t length)
+{
+	return decode_reference(handle, bytes, size, id, length, NULL);
+}
+
+/* Public APIs must retain mapping, printer aliases and detail when the
+ * optional ID cache is unavailable. The caller supplies each output mode. */
+static bool check_public_id_cache(csh handle, cs_mode mode)
+{
+	static const struct {
+		uint8_t bytes[6];
+		size_t size;
+		unsigned id;
+		bool full_only;
+	} cases[] = {
+		{ { 0x48, 0x8b, 0xc1 }, 3, X86_INS_MOV, false },
+		{ { 0x90 }, 1, X86_INS_NOP, false },
+		{ { 0x41, 0x90 }, 2, X86_INS_XCHG, false },
+		/* AT&T printing overrides the public opcode for CALLpcrel32. */
+		{ { 0xe8, 0, 0, 0, 0 }, 5, X86_INS_CALL, false },
+		{ { 0xf3, 0x0f, 0x01, 0xee }, 4, X86_INS_CLUI, false },
+		{ { 0xf3, 0x0f, 0x01, 0xed }, 4, X86_INS_TESTUI, false },
+		/* Predicate aliases vary with text output; use fallback as oracle. */
+		{ { 0xf3, 0x0f, 0xc2, 0xc1, 0 }, 5, X86_INS_INVALID, true },
+		{ { 0xf3, 0x0f, 0xc2, 0xc1, 0xff }, 5, X86_INS_INVALID, true },
+	};
+	if (mode != CS_MODE_64)
+		return true;
+	cs_struct *arch = (cs_struct *)(uintptr_t)handle;
+	uint32_t *cache = arch->x86_insn_lut;
+	bool ok = cache != NULL;
+	for (size_t c = 0; c < sizeof(cases) / sizeof(cases[0]); ++c) {
+		if (cases[c].full_only && cs_support(CS_SUPPORT_X86_REDUCE))
+			continue;
+		cs_insn *reference = NULL;
+		arch->x86_insn_lut = NULL;
+		size_t count = cs_disasm(handle, cases[c].bytes, cases[c].size,
+					 0x1000, 1, &reference);
+		arch->x86_insn_lut = cache;
+		if (count != 1) {
+			fprintf(stderr, "public ID-cache fixture %zu failed\n",
+				c);
+			ok = false;
+		} else {
+			if (cases[c].id != X86_INS_INVALID)
+				ok &= reference->id == cases[c].id;
+			for (unsigned cached = 0; cached != 2; ++cached) {
+				arch->x86_insn_lut = cached ? cache : NULL;
+				ok &= decode_reference(handle, cases[c].bytes,
+						       cases[c].size,
+						       reference->id,
+						       cases[c].size,
+						       reference);
+			}
+		}
+		arch->x86_insn_lut = cache;
+		cs_free(reference, count);
+	}
 	return ok;
 }
 
@@ -816,6 +897,8 @@ int main(void)
 							detail) == CS_ERR_OK;
 					ok &= cs_option(handle, CS_OPT_TEXT,
 							text) == CS_ERR_OK;
+					ok &= check_public_id_cache(handle,
+								    modes[m]);
 					ok &= check_reader_bounds(
 						handle, modes[m],
 						detail && text);

@@ -76,6 +76,9 @@
 #include "arch/TMS320C64x/TMS320C64xModule.h"
 #include "arch/TriCore/TriCoreModule.h"
 #include "arch/WASM/WASMModule.h"
+#ifdef CAPSTONE_HAS_X86
+#include "arch/X86/X86Mapping.h"
+#endif
 #include "arch/X86/X86Module.h"
 #include "arch/XCore/XCoreModule.h"
 #include "arch/Xtensa/XtensaModule.h"
@@ -919,6 +922,19 @@ static int str_replace(char *result, char *target, const char *str1, char *str2)
 }
 #endif
 
+static inline void map_insn_id(cs_struct *handle, cs_insn *insn,
+			       unsigned int id)
+{
+#ifdef CAPSTONE_HAS_X86
+	/* The LUT contains only generated 16-bit opcodes; source-owned
+	 * feature opcodes exceed its bound and keep the normal mapper. */
+	if (handle->arch == CS_ARCH_X86 &&
+	    X86_get_insn_id_no_detail(handle, insn, id))
+		return;
+#endif
+	handle->insn_id(handle, insn, id);
+}
+
 static void init_disasm_mcinst(MCInst *mci, const cs_struct *handle)
 {
 	if (handle->arch == CS_ARCH_X86 && handle->no_text &&
@@ -1399,7 +1415,7 @@ size_t CAPSTONE_API cs_disasm(csh ud, const uint8_t *buffer, size_t size,
 
 			// map internal instruction opcode to public insn ID
 
-			handle->insn_id(handle, insn_cache, mci.Opcode);
+			map_insn_id(handle, insn_cache, mci.Opcode);
 
 			if (handle->no_text) {
 				fill_insn_without_text(insn_cache, &mci,
@@ -1620,7 +1636,7 @@ static bool disasm_iter(struct cs_struct *handle, csh ud, const uint8_t **code,
 		mci.flat_insn->size = insn_size;
 
 		// map internal instruction opcode to public insn ID
-		handle->insn_id(handle, insn, mci.Opcode);
+		map_insn_id(handle, insn, mci.Opcode);
 
 		if (handle->no_text) {
 			fill_insn_without_text(insn, &mci, *code);
