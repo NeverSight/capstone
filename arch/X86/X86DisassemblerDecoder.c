@@ -1792,9 +1792,20 @@ static int readModRM(struct InternalInstruction *insn)
 	return 0;
 }
 
+/* Specializations below pass constant operand classes to the same readers
+ * and validators as the generic operand interpreter. */
+#if defined(_MSC_VER)
+#define X86_OPERAND_INLINE static __forceinline
+#elif defined(__GNUC__)
+#define X86_OPERAND_INLINE static inline __attribute__((always_inline))
+#else
+#define X86_OPERAND_INLINE static inline
+#endif
+
 #define GENERIC_FIXUP_FUNC(name, base, prefix, mask, rm_field) \
-	static uint16_t name(struct InternalInstruction *insn, \
-			     OperandType type, uint8_t index, uint8_t *valid) \
+	X86_OPERAND_INLINE uint16_t name(struct InternalInstruction *insn, \
+					 OperandType type, uint8_t index, \
+					 uint8_t *valid) \
 	{ \
 		*valid = 1; \
 		switch (type) { \
@@ -1889,7 +1900,8 @@ GENERIC_FIXUP_FUNC(fixupRMValue, insn->eaRegBase, EA_REG, 0xf, true)
  *                RAX.
  * @return      - 0 on success; nonzero otherwise.
  */
-static int readOpcodeRegister(struct InternalInstruction *insn, uint8_t size)
+X86_OPERAND_INLINE int readOpcodeRegister(struct InternalInstruction *insn,
+					  uint8_t size)
 {
 	if (size == 0)
 		size = insn->registerSize;
@@ -2036,6 +2048,36 @@ static int readMaskRegister(struct InternalInstruction *insn)
 	return 0;
 }
 
+/* The caller has already consumed ModR/M and any addressing bytes. */
+X86_OPERAND_INLINE int fixupRegisterOperand(struct InternalInstruction *insn,
+					    OperandType type)
+{
+	uint8_t valid;
+	insn->reg = (Reg)fixupRegValue(insn, type, insn->reg - insn->regBase,
+				       &valid);
+	if (!valid)
+		return -1;
+	return 0;
+}
+
+X86_OPERAND_INLINE int fixupRMOperand(struct InternalInstruction *insn,
+				      OperandType type,
+				      OperandEncoding encoding)
+{
+	uint8_t valid;
+	if (insn->eaBase >= insn->eaRegBase) {
+		insn->eaBase = (EABase)fixupRMValue(
+			insn, type, insn->eaBase - insn->eaRegBase, &valid);
+		if (!valid)
+			return -1;
+	}
+
+	// Apply the AVX512 compressed displacement scaling factor.
+	if (insn->eaDisplacement == EA_DISP_8)
+		insn->displacement *= 1 << (encoding - ENCODING_RM);
+	return 0;
+}
+
 /*
  * readOperands - Consults the specifier for an instruction and consumes all
  *   operands for that instruction, interpreting them as it goes.
@@ -2070,6 +2112,12 @@ static int readOperands(struct InternalInstruction *insn)
 	   uses it. */
 	hasVVVV = !readVVVV(insn);
 	needVVVV = hasVVVV && (insn->vvvv != 0);
+
+	/* UD1 overrides its generated operands above. The generated scalar
+	 * readers otherwise use exactly the selected operand set. */
+	if (insn->instructionID != X86_UD1) {
+#include "X86GenScalarOperandRead.inc"
+	}
 
 	for (i = 0; i < X86_MAX_OPERANDS &&
 		    insn->operands[i].encoding != ENCODING_NONE;
@@ -2138,30 +2186,16 @@ CASE_ENCODING_VSIB:
 			break;
 
 		case ENCODING_REG:
-			if (readModRM(insn))
-				return -1;
-			insn->reg = (Reg)fixupRegValue(
-				insn, (OperandType)op->type,
-				insn->reg - insn->regBase, &valid);
-			if (!valid)
+			if (readModRM(insn) ||
+			    fixupRegisterOperand(insn, (OperandType)op->type))
 				return -1;
 			break;
 
 CASE_ENCODING_RM:
-			if (readModRM(insn))
+			if (readModRM(insn) ||
+			    fixupRMOperand(insn, (OperandType)op->type,
+					   (OperandEncoding)op->encoding))
 				return -1;
-			if (insn->eaBase >= insn->eaRegBase) {
-				insn->eaBase = (EABase)fixupRMValue(
-					insn, (OperandType)op->type,
-					insn->eaBase - insn->eaRegBase, &valid);
-				if (!valid)
-					return -1;
-			}
-
-			// Apply the AVX512 compressed displacement scaling factor.
-			if (insn->eaDisplacement == EA_DISP_8)
-				insn->displacement *=
-					1 << (op->encoding - ENCODING_RM);
 			break;
 
 		case ENCODING_IB:
@@ -2290,6 +2324,8 @@ CASE_ENCODING_RM:
 
 	return 0;
 }
+
+#undef X86_OPERAND_INLINE
 
 /*
  * checkEVEX - Rejects the EVEX encodings that the decode tables accept but

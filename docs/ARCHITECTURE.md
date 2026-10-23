@@ -63,6 +63,17 @@ scratch buffer live in a separate helper; ordinary instructions enter the
 generated decoder directly. Both routes retain operand validation and
 translation, including immediate-dependent opcode selection.
 
+The x86 operand reader specializes sets with at most two scalar operands after
+ignoring duplicates. `X86GenScalarOperandRead.inc` is derived from the full and
+reduced `X86GenDisassemblerTables*.inc` operand descriptors by
+`python3 suite/synctools/x86_scalar_readers.py`. Regenerate it whenever those
+descriptors change; `--check` verifies it without writing files, and runs in
+the unit suite when Python is available. The specialized cases consume ModR/M
+once when needed and call the same register, memory, immediate, and
+opcode-register helpers as the generic loop.
+They retain reserved VVVV checks and leave translation unchanged. UD1's
+runtime operand override and other operand shapes use the generic loop.
+
 ### Disassembling process
 
 There are two steps in disassembling an instruction.
