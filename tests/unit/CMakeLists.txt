@@ -5,8 +5,8 @@ set(UNIT_TEST_SOURCES sstream.c utils.c api.c mcinst.c mapping.c)
 if(CAPSTONE_X86_SUPPORT)
     find_package(Python3 3.8 COMPONENTS Interpreter QUIET)
     if(Python3_Interpreter_FOUND)
-        add_test(NAME unit_x86_scalar_readers
-            COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/suite/synctools/x86_scalar_readers.py" --check)
+        add_test(NAME unit_x86_operand_specializations
+            COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/suite/synctools/x86_operand_specializations.py" --check)
     endif()
     list(APPEND UNIT_TEST_SOURCES x86_far_immediate_encoding.c)
     list(APPEND UNIT_TEST_SOURCES x86_buffer_bounds.c)

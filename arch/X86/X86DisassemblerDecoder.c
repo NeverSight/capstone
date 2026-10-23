@@ -1133,21 +1133,44 @@ static uint16_t resolveMandatoryPrefixConflict(struct InternalInstruction *insn,
  * @return      - 0 if the ModR/M could be read when needed or was not needed;
  *                nonzero otherwise.
  */
-static int getID(struct InternalInstruction *insn, cs_mode mode)
+#if defined(_MSC_VER)
+static __forceinline int
+#elif defined(__GNUC__)
+static inline __attribute__((always_inline)) int
+#else
+static inline int
+#endif
+getIDForMode(struct InternalInstruction *insn, cs_mode mode,
+	     DisassemblerMode decoderMode)
 {
 	uint16_t attrMask;
 	uint16_t instructionID;
 	bool rexWOverridesOpSize;
 
+	/* Common legacy instructions need no prefix-conflict or size repair. */
+	if (decoderMode != MODE_16BIT &&
+	    insn->vectorExtensionType == TYPE_NO_VEX_XOP &&
+	    !(insn->hasOpSize | insn->hasAdSize | insn->repeatPrefix) &&
+	    insn->opcode != 0x90) {
+		attrMask = decoderMode == MODE_64BIT ? ATTR_64BIT : ATTR_NONE;
+		if (insn->rexPrefix & 0x08)
+			attrMask |= ATTR_REXW;
+		if (getIDWithAttrMask(&instructionID, insn, attrMask))
+			return -1;
+		insn->instructionID = instructionID;
+		insn->spec = specifierForUID(instructionID);
+		return 0;
+	}
+
 	/* REX.W overrides the operand-sized prefix for near RET in 64-bit mode */
-	rexWOverridesOpSize = insn->mode == MODE_64BIT && insn->hasOpSize &&
+	rexWOverridesOpSize = decoderMode == MODE_64BIT && insn->hasOpSize &&
 			      insn->opcodeType == ONEBYTE &&
 			      (insn->opcode == 0xC2 || insn->opcode == 0xC3) &&
 			      (insn->rexPrefix & 0x08);
 
 	attrMask = ATTR_NONE;
 
-	if (insn->mode == MODE_64BIT)
+	if (decoderMode == MODE_64BIT)
 		attrMask |= ATTR_64BIT;
 
 	if (insn->vectorExtensionType != TYPE_NO_VEX_XOP) {
@@ -1228,7 +1251,7 @@ static int getID(struct InternalInstruction *insn, cs_mode mode)
 			return -1;
 		}
 	} else {
-		if (insn->hasOpSize && insn->mode != MODE_16BIT &&
+		if (insn->hasOpSize && decoderMode != MODE_16BIT &&
 		    !rexWOverridesOpSize) {
 			attrMask |= ATTR_OPSIZE;
 		}
@@ -1267,7 +1290,7 @@ static int getID(struct InternalInstruction *insn, cs_mode mode)
 	 * JCXZ/JECXZ need special handling for 16-bit mode because the meaning
 	 * of the AdSize prefix is inverted w.r.t. 32-bit mode.
 	 */
-	if (insn->mode == MODE_16BIT && insn->opcodeType == ONEBYTE &&
+	if (decoderMode == MODE_16BIT && insn->opcodeType == ONEBYTE &&
 	    insn->opcode == 0xE3)
 		attrMask ^= ATTR_ADSIZE;
 
@@ -1275,7 +1298,7 @@ static int getID(struct InternalInstruction *insn, cs_mode mode)
 	 * Preserve legacy decoding unless an explicit CPU mode selects its
 	 * operand-size rules for relative branches.
 	 */
-	if ((insn->mode == MODE_64BIT) && insn->hasOpSize) {
+	if ((decoderMode == MODE_64BIT) && insn->hasOpSize) {
 		switch (insn->opcode) {
 		case 0xE9:
 			if (insn->opcodeType == ONEBYTE &&
@@ -1338,7 +1361,7 @@ static int getID(struct InternalInstruction *insn, cs_mode mode)
 	}
 
 	/* The following clauses compensate for limitations of the tables. */
-	if (insn->mode != MODE_64BIT &&
+	if (decoderMode != MODE_64BIT &&
 	    insn->vectorExtensionType != TYPE_NO_VEX_XOP) {
 		if (getIDWithAttrMask(&instructionID, insn, attrMask)) {
 			return -1;
@@ -1392,7 +1415,7 @@ static int getID(struct InternalInstruction *insn, cs_mode mode)
 			attrMask |= ATTR_OPSIZE;
 
 		/* In 16-bit, invert the attributes. */
-		if (insn->mode == MODE_16BIT) {
+		if (decoderMode == MODE_16BIT) {
 			attrMask ^= ATTR_ADSIZE;
 
 			/* The OpSize attribute is only valid with the absolute moves. */
@@ -1414,7 +1437,7 @@ static int getID(struct InternalInstruction *insn, cs_mode mode)
 		return -1;
 	}
 
-	if ((insn->mode == MODE_16BIT ||
+	if ((decoderMode == MODE_16BIT ||
 	     (insn->hasOpSize && !rexWOverridesOpSize)) &&
 	    !(attrMask & ATTR_OPSIZE)) {
 		/*
@@ -1442,7 +1465,7 @@ static int getID(struct InternalInstruction *insn, cs_mode mode)
 		}
 
 		if (is16BitEquivalent(instructionID, instructionIDWithOpsize) &&
-		    (insn->mode == MODE_16BIT) ^ insn->hasOpSize) {
+		    (decoderMode == MODE_16BIT) ^ insn->hasOpSize) {
 			insn->instructionID = instructionIDWithOpsize;
 			insn->spec = specifierForUID(instructionIDWithOpsize);
 		} else {
@@ -1494,6 +1517,18 @@ static int getID(struct InternalInstruction *insn, cs_mode mode)
 	insn->spec = specifierForUID(insn->instructionID);
 
 	return 0;
+}
+
+static int getID(struct InternalInstruction *insn, cs_mode mode)
+{
+	switch (insn->mode) {
+	case MODE_16BIT:
+		return getIDForMode(insn, mode, MODE_16BIT);
+	case MODE_32BIT:
+		return getIDForMode(insn, mode, MODE_32BIT);
+	default:
+		return getIDForMode(insn, mode, MODE_64BIT);
+	}
 }
 
 /*
@@ -2078,6 +2113,83 @@ X86_OPERAND_INLINE int fixupRMOperand(struct InternalInstruction *insn,
 	return 0;
 }
 
+X86_OPERAND_INLINE int readVSIBOperand(struct InternalInstruction *insn,
+				       OperandType type,
+				       OperandEncoding encoding, int hasVVVV,
+				       int *needVVVV)
+{
+	// VSIB can use the V2 bit so check only the other bits.
+	if (*needVVVV)
+		*needVVVV = hasVVVV & ((insn->vvvv & 0xf) != 0);
+
+	if (readModRM(insn))
+		return -1;
+
+	// Reject if SIB wasn't used.
+	if (insn->eaBase != EA_BASE_sib && insn->eaBase != EA_BASE_sib64)
+		return -1;
+
+	// If sibIndex was set to SIB_INDEX_NONE, index offset is 4.
+	if (insn->sibIndex == SIB_INDEX_NONE)
+		insn->sibIndex = (SIBIndex)(insn->sibIndexBase + 4);
+
+	// If EVEX.v2 is set this is one of the 16-31 registers.
+	if (insn->vectorExtensionType == TYPE_EVEX &&
+	    insn->mode == MODE_64BIT &&
+	    v2FromEVEX4of4(insn->vectorExtensionPrefix[3]))
+		insn->sibIndex = (SIBIndex)(insn->sibIndex + 16);
+
+	// Adjust the index register to the correct size.
+	switch (type) {
+	default:
+		// debug("Unhandled VSIB index type");
+		return -1;
+	case TYPE_MVSIBX:
+		insn->sibIndex =
+			(SIBIndex)(SIB_INDEX_XMM0 +
+				   (insn->sibIndex - insn->sibIndexBase));
+		break;
+	case TYPE_MVSIBY:
+		insn->sibIndex =
+			(SIBIndex)(SIB_INDEX_YMM0 +
+				   (insn->sibIndex - insn->sibIndexBase));
+		break;
+	case TYPE_MVSIBZ:
+		insn->sibIndex =
+			(SIBIndex)(SIB_INDEX_ZMM0 +
+				   (insn->sibIndex - insn->sibIndexBase));
+		break;
+	}
+
+	// Apply the AVX512 compressed displacement scaling factor.
+	if (encoding != ENCODING_REG && insn->eaDisplacement == EA_DISP_8)
+		insn->displacement *= 1 << (encoding - ENCODING_VSIB);
+
+	return 0;
+}
+
+X86_OPERAND_INLINE int readVVVVOperand(struct InternalInstruction *insn,
+				       OperandType type, int hasVVVV,
+				       int *needVVVV)
+{
+	uint8_t valid;
+
+	if (!hasVVVV)
+		return -1;
+
+	*needVVVV = 0; /* Mark that we have found a VVVV operand. */
+
+	if (insn->mode != MODE_64BIT)
+		insn->vvvv = (Reg)(insn->vvvv & 0x7);
+
+	insn->vvvv =
+		(Reg)fixupRegValue(insn, (OperandType)type, insn->vvvv, &valid);
+	if (!valid)
+		return -1;
+
+	return 0;
+}
+
 /*
  * readOperands - Consults the specifier for an instruction and consumes all
  *   operands for that instruction, interpreting them as it goes.
@@ -2093,7 +2205,6 @@ static int readOperands(struct InternalInstruction *insn)
 	};
 	int hasVVVV, needVVVV;
 	int sawRegImm = 0;
-	uint8_t valid;
 	int i;
 
 	insn->operands = &x86OperandSets[insn->spec->operands][0];
@@ -2113,10 +2224,10 @@ static int readOperands(struct InternalInstruction *insn)
 	hasVVVV = !readVVVV(insn);
 	needVVVV = hasVVVV && (insn->vvvv != 0);
 
-	/* UD1 overrides its generated operands above. The generated scalar
+	/* UD1 overrides its generated operands above. The generated
 	 * readers otherwise use exactly the selected operand set. */
 	if (insn->instructionID != X86_UD1) {
-#include "X86GenScalarOperandRead.inc"
+#include "X86GenOperandRead.inc"
 	}
 
 	for (i = 0; i < X86_MAX_OPERANDS &&
@@ -2129,60 +2240,10 @@ static int readOperands(struct InternalInstruction *insn)
 			break;
 
 CASE_ENCODING_VSIB:
-			// VSIB can use the V2 bit so check only the other bits.
-			if (needVVVV)
-				needVVVV = hasVVVV & ((insn->vvvv & 0xf) != 0);
-
-			if (readModRM(insn))
+			if (readVSIBOperand(insn, (OperandType)op->type,
+					    (OperandEncoding)op->encoding,
+					    hasVVVV, &needVVVV))
 				return -1;
-
-			// Reject if SIB wasn't used.
-			if (insn->eaBase != EA_BASE_sib &&
-			    insn->eaBase != EA_BASE_sib64)
-				return -1;
-
-			// If sibIndex was set to SIB_INDEX_NONE, index offset is 4.
-			if (insn->sibIndex == SIB_INDEX_NONE)
-				insn->sibIndex =
-					(SIBIndex)(insn->sibIndexBase + 4);
-
-			// If EVEX.v2 is set this is one of the 16-31 registers.
-			if (insn->vectorExtensionType == TYPE_EVEX &&
-			    insn->mode == MODE_64BIT &&
-			    v2FromEVEX4of4(insn->vectorExtensionPrefix[3]))
-				insn->sibIndex =
-					(SIBIndex)(insn->sibIndex + 16);
-
-			// Adjust the index register to the correct size.
-			switch (op->type) {
-			default:
-				// debug("Unhandled VSIB index type");
-				return -1;
-			case TYPE_MVSIBX:
-				insn->sibIndex =
-					(SIBIndex)(SIB_INDEX_XMM0 +
-						   (insn->sibIndex -
-						    insn->sibIndexBase));
-				break;
-			case TYPE_MVSIBY:
-				insn->sibIndex =
-					(SIBIndex)(SIB_INDEX_YMM0 +
-						   (insn->sibIndex -
-						    insn->sibIndexBase));
-				break;
-			case TYPE_MVSIBZ:
-				insn->sibIndex =
-					(SIBIndex)(SIB_INDEX_ZMM0 +
-						   (insn->sibIndex -
-						    insn->sibIndexBase));
-				break;
-			}
-
-			// Apply the AVX512 compressed displacement scaling factor.
-			if (op->encoding != ENCODING_REG &&
-			    insn->eaDisplacement == EA_DISP_8)
-				insn->displacement *=
-					1 << (op->encoding - ENCODING_VSIB);
 			break;
 
 		case ENCODING_REG:
@@ -2288,19 +2349,8 @@ CASE_ENCODING_RM:
 			break;
 
 		case ENCODING_VVVV:
-			if (!hasVVVV)
-				return -1;
-
-			needVVVV =
-				0; /* Mark that we have found a VVVV operand. */
-
-			if (insn->mode != MODE_64BIT)
-				insn->vvvv = (Reg)(insn->vvvv & 0x7);
-
-			insn->vvvv = (Reg)fixupRegValue(insn,
-							(OperandType)op->type,
-							insn->vvvv, &valid);
-			if (!valid)
+			if (readVVVVOperand(insn, (OperandType)op->type,
+					    hasVVVV, &needVVVV))
 				return -1;
 			break;
 

@@ -923,9 +923,9 @@ static void init_disasm_mcinst(MCInst *mci, const cs_struct *handle)
 {
 	if (handle->arch == CS_ARCH_X86 && handle->no_text &&
 	    !handle->detail_opt) {
-		/* The x86 decoder constructs each operand before use. With no
-		 * printer or detail consumer, only the opcode state needs a reset;
-		 * the caller sets the handle, address and public instruction. */
+		/* The x86 scan path validates operands without storing them. Only
+		 * opcode state needs a reset; the caller sets the handle, address
+		 * and public instruction. */
 		mci->Opcode = 0;
 		mci->OpcodePub = 0;
 		mci->size = 0;

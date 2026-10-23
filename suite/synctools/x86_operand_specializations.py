@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Specialize scalar operand reading and translation from x86 descriptors."""
+"""Specialize operand reading and translation from x86 descriptors."""
 
 import argparse
 from collections import defaultdict
@@ -11,11 +11,11 @@ import re
 
 ROOT = Path(__file__).resolve().parents[2]
 X86 = ROOT / "arch" / "X86"
-OUTPUT = X86 / "X86GenScalarOperandRead.inc"
-TRANSLATE_OUTPUT = X86 / "X86GenScalarOperandTranslate.inc"
+OUTPUT = X86 / "X86GenOperandRead.inc"
+TRANSLATE_OUTPUT = X86 / "X86GenOperandTranslate.inc"
 
-# Register-immediates, scaled displacements, VSIB, and implicit operands stay
-# with the generic reader. These types cannot split an immediate into operands.
+# These scalar immediate types cannot split an immediate into registers.
+# Register-immediates and opcode-changing predicates stay with the generic reader.
 TYPES = {
     "TYPE_R8",
     "TYPE_R16",
@@ -75,14 +75,32 @@ def read_sets(path, *, include_duplicates=False):
     return result
 
 
+RM_ENCODINGS = {"ENCODING_RM"} | {f"ENCODING_RM_CD{n}" for n in (2, 4, 8, 16, 32, 64)}
+VSIB_ENCODINGS = {"ENCODING_VSIB"} | {
+    f"ENCODING_VSIB_CD{n}" for n in (2, 4, 8, 16, 32, 64)
+}
+VECTOR_ENCODINGS = (
+    RM_ENCODINGS - {"ENCODING_RM"}
+    | VSIB_ENCODINGS
+    | {"ENCODING_VVVV", "ENCODING_WRITEMASK"}
+)
+
+
 def emit_switch(suffix):
     groups = defaultdict(list)
     for index, operands in enumerate(
         read_sets(X86 / f"X86GenDisassemblerTables{suffix}.inc")
     ):
-        if len(operands) <= 2 and all(
-            encoding in ENCODINGS and operand_type in TYPES
-            for encoding, operand_type in operands
+        vector = any(t in VECTOR_TYPES or e in VECTOR_ENCODINGS for e, t in operands)
+        if (
+            len(operands) <= (4 if vector else 2)
+            and sum(e in IMMEDIATES for e, _ in operands) <= 2
+            and all(
+                encoding in (ENCODINGS | VECTOR_ENCODINGS)
+                and operand_type in (TYPES | VECTOR_TYPES)
+                and (encoding not in IMMEDIATES or operand_type in TYPES)
+                for encoding, operand_type in operands
+            )
         ):
             groups[operands].append(index)
 
@@ -92,13 +110,24 @@ def emit_switch(suffix):
         calls = []
         has_modrm = False
         for encoding, operand_type in operands:
-            if encoding in {"ENCODING_REG", "ENCODING_RM"} and not has_modrm:
+            if encoding in ({"ENCODING_REG"} | RM_ENCODINGS) and not has_modrm:
                 calls.append("(!insn->consumedModRM && readModRM(insn))")
                 has_modrm = True
             if encoding == "ENCODING_REG":
                 calls.append(f"fixupRegisterOperand(insn, {operand_type})")
-            elif encoding == "ENCODING_RM":
-                calls.append(f"fixupRMOperand(insn, {operand_type}, ENCODING_RM)")
+            elif encoding in RM_ENCODINGS:
+                calls.append(f"fixupRMOperand(insn, {operand_type}, {encoding})")
+            elif encoding in VSIB_ENCODINGS:
+                calls.append(
+                    f"readVSIBOperand(insn, {operand_type}, {encoding}, hasVVVV, &needVVVV)"
+                )
+                has_modrm = True
+            elif encoding == "ENCODING_VVVV":
+                calls.append(
+                    f"readVVVVOperand(insn, {operand_type}, hasVVVV, &needVVVV)"
+                )
+            elif encoding == "ENCODING_WRITEMASK":
+                calls.append("readMaskRegister(insn)")
             elif encoding in IMMEDIATES:
                 calls.append(f"readImmediate(insn, {IMMEDIATES[encoding]})")
             else:
@@ -125,6 +154,25 @@ def resolve_duplicates(operands):
     return tuple(resolve(index) for index in range(len(operands)))
 
 
+VECTOR_TYPES = {
+    "TYPE_XMM",
+    "TYPE_YMM",
+    "TYPE_ZMM",
+    "TYPE_MM64",
+    "TYPE_VK",
+    "TYPE_MVSIBX",
+    "TYPE_MVSIBY",
+    "TYPE_MVSIBZ",
+}
+
+
+def translation_operand(operand):
+    encoding, operand_type = operand
+    if encoding in (RM_ENCODINGS - {"ENCODING_RM"}) | VSIB_ENCODINGS:
+        encoding = "ENCODING_RM"
+    return encoding, operand_type
+
+
 def emit_translation(suffix):
     groups = defaultdict(list)
     for index, operands in enumerate(
@@ -133,13 +181,19 @@ def emit_translation(suffix):
         )
     ):
         # Translation emits duplicates in their original positions, including
-        # forward references. Scalar immediate types cannot change the opcode.
-        operands = resolve_duplicates(operands)
+        # forward references. Selected immediate types cannot change the opcode.
+        operands = tuple(translation_operand(op) for op in resolve_duplicates(operands))
+        vector = any(
+            t in VECTOR_TYPES or e in {"ENCODING_VVVV", "ENCODING_WRITEMASK"}
+            for e, t in operands
+        )
         if (
-            len(operands) <= 3
+            len(operands) <= (5 if vector else 3)
             and sum(encoding in IMMEDIATES for encoding, _ in operands) <= 2
             and all(
-                encoding in ENCODINGS and operand_type in TYPES
+                encoding in (ENCODINGS | {"ENCODING_VVVV", "ENCODING_WRITEMASK"})
+                and operand_type in (TYPES | VECTOR_TYPES)
+                and (encoding not in IMMEDIATES or operand_type in TYPES)
                 for encoding, operand_type in operands
             )
         ):
@@ -150,17 +204,30 @@ def emit_translation(suffix):
         lines.extend(f"case {index}:" for index in indices)
         lines.append("{")
         for index, (encoding, operand_type) in enumerate(operands):
+            if encoding in {"ENCODING_VVVV", "ENCODING_WRITEMASK"}:
+                continue
             lines.append(
                 f"\tstatic const OperandSpecifier op{index} = "
                 f"{{ {encoding}, {operand_type} }};"
             )
         for index, (encoding, _) in enumerate(operands):
+            if encoding == "ENCODING_VVVV":
+                lines.append("\ttranslateRegister(mcInst, insn->vvvv, emitOperands);")
+                continue
+            if encoding == "ENCODING_WRITEMASK":
+                lines.extend(
+                    [
+                        "\tif (translateMaskRegister(mcInst, insn->writemask, emitOperands))",
+                        "\t\treturn true;",
+                    ]
+                )
+                continue
             if encoding in IMMEDIATES:
                 lines.extend(
                     [
                         "\ttranslateImmediate(",
                         "\t\tmcInst, insn->immediates[insn->numImmediatesTranslated++],",
-                        f"\t\t&op{index}, insn);",
+                        f"\t\t&op{index}, insn, emitOperands);",
                     ]
                 )
                 continue
@@ -175,7 +242,7 @@ def emit_translation(suffix):
             )
             lines.extend(
                 [
-                    f"\tif ({function}(mcInst, &op{index}, insn))",
+                    f"\tif ({function}(mcInst, &op{index}, insn, emitOperands))",
                     "\t\treturn true;",
                 ]
             )
@@ -188,7 +255,7 @@ def generated_output(emit):
     return (
         "/* Capstone Disassembly Engine */\n"
         "/* SPDX-License-Identifier: BSD-3-Clause */\n"
-        "/* Generated by suite/synctools/x86_scalar_readers.py; do not edit. */\n\n"
+        "/* Generated by suite/synctools/x86_operand_specializations.py; do not edit. */\n\n"
         "#ifdef CAPSTONE_X86_REDUCE\n"
         + emit("_reduce")
         + "\n#else\n"

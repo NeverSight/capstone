@@ -103,6 +103,132 @@ static bool test_x86(void)
 	return success;
 }
 
+static bool same_scan(const cs_insn *a, const cs_insn *b)
+{
+	return a->id == b->id && a->size == b->size &&
+	       a->address == b->address &&
+	       memcmp(a->bytes, b->bytes, a->size) == 0 &&
+	       a->mnemonic[0] == '\0' && b->mnemonic[0] == '\0' &&
+	       a->op_str[0] == '\0' && b->op_str[0] == '\0';
+}
+
+/* Detail forces intermediate operand construction even with text disabled. */
+static bool check_scan_pair(csh scan, csh detail, const uint8_t *bytes,
+			    size_t length, bool valid)
+{
+	const csh handles[] = { scan, detail };
+	cs_insn *batch[2] = { NULL, NULL };
+	cs_insn *iter[2] = { NULL, NULL };
+	size_t counts[2];
+	bool success = true;
+
+	for (unsigned i = 0; i < 2; ++i) {
+		const uint8_t *code = bytes;
+		size_t remaining = length;
+		uint64_t address = 0x1000;
+		bool decoded;
+
+		counts[i] = cs_disasm(handles[i], bytes, length, address, 1,
+				      &batch[i]);
+		success &= check(counts[i] == (valid ? 1 : 0),
+				 "scan batch acceptance");
+		iter[i] = cs_malloc(handles[i]);
+		if (!check(iter[i] != NULL, "allocate scan instruction")) {
+			success = false;
+			continue;
+		}
+		decoded = cs_disasm_iter(handles[i], &code, &remaining,
+					 &address, iter[i]);
+		success &= check(decoded == valid, "scan iterator acceptance");
+		if (decoded && counts[i] == 1) {
+			success &=
+				check(same_scan(iter[i], batch[i]) &&
+					      iter[i]->size == length &&
+					      code == bytes + length &&
+					      remaining == 0 &&
+					      address == 0x1000 + length,
+				      "scan batch/iterator fields and cursor");
+		} else if (!decoded) {
+			success &=
+				check(code == bytes && remaining == length &&
+					      address == 0x1000,
+				      "rejected scan leaves cursor unchanged");
+		}
+	}
+	if (valid && counts[0] == 1 && counts[1] == 1)
+		success &= check(same_scan(batch[0], batch[1]),
+				 "operand validation preserves scan fields");
+	for (unsigned i = 0; i < 2; ++i) {
+		cs_free(batch[i], counts[i]);
+		cs_free(iter[i], 1);
+	}
+	return success;
+}
+
+static bool test_x86_scan_validation(void)
+{
+	static const struct {
+		uint8_t bytes[8];
+		size_t length;
+		bool valid;
+		bool vector;
+	} cases[] = {
+		{ { 0x48, 0x8b, 0xc1 }, 3, true, false },
+		{ { 0x48, 0x8b, 0x44, 0x88, 0x08 }, 5, true, false },
+		{ { 0xd5, 0x7f, 0x8b, 0x44, 0xb7, 0xe0 }, 6, true, false },
+		{ { 0x48, 0x8d, 0xc0 }, 3, false, false },
+		{ { 0xd5, 0xc0, 0x20, 0xc0 }, 4, false, false },
+		{ { 0xd5, 0xc0, 0x21, 0xc0 }, 4, false, false },
+		{ { 0xc4, 0xe2, 0x69, 0x92, 0x04, 0x88 }, 6, true, true },
+		{ { 0xc4, 0xe2, 0x6d, 0x92, 0x04, 0x88 }, 6, true, true },
+		{ { 0x62, 0xf2, 0x7d, 0x49, 0x92, 0x04, 0x88 }, 7, true, true },
+		{ { 0x62, 0xf2, 0x7d, 0x49, 0xa0, 0x04, 0x80 }, 7, true, true },
+		{ { 0xc4, 0xe2, 0x69, 0x92, 0x00 }, 5, false, true },
+		{ { 0xc4, 0xe2, 0x79, 0x92, 0x04, 0x88 }, 6, false, true },
+		{ { 0x62, 0xf1, 0x7c, 0x88, 0x58, 0xc1 }, 6, false, true },
+	};
+	csh scan = 0, detail = 0;
+	bool success = true;
+	const bool reduced = cs_support(CS_SUPPORT_X86_REDUCE);
+
+	if (!check(cs_open(CS_ARCH_X86, CS_MODE_64, &scan) == CS_ERR_OK &&
+			   cs_open(CS_ARCH_X86, CS_MODE_64, &detail) ==
+				   CS_ERR_OK,
+		   "open scan validation handles"))
+		return false;
+	cs_option(scan, CS_OPT_TEXT, CS_OPT_OFF);
+	cs_option(detail, CS_OPT_TEXT, CS_OPT_OFF);
+	cs_option(detail, CS_OPT_DETAIL, CS_OPT_ON);
+	for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+		if (reduced && cases[i].vector)
+			continue;
+		success &= check_scan_pair(scan, detail, cases[i].bytes,
+					   cases[i].length, cases[i].valid);
+		if (cases[i].valid)
+			for (size_t length = 0; length < cases[i].length;
+			     ++length)
+				success &= check_scan_pair(scan, detail,
+							   cases[i].bytes,
+							   length, false);
+	}
+	if (!reduced) {
+		/* Predicates can change the internal opcode during translation. */
+		uint8_t sse[] = { 0xf3, 0x0f, 0xc2, 0xc1, 0 };
+		uint8_t vex[] = { 0xc5, 0xf2, 0xc2, 0xc2, 0 };
+		for (unsigned immediate = 0; immediate <= UINT8_MAX;
+		     ++immediate) {
+			sse[sizeof(sse) - 1] = vex[sizeof(vex) - 1] = immediate;
+			success &= check_scan_pair(scan, detail, sse,
+						   sizeof(sse), true);
+			success &= check_scan_pair(scan, detail, vex,
+						   sizeof(vex), true);
+		}
+	}
+	cs_close(&scan);
+	cs_close(&detail);
+	return success;
+}
+
 static bool test_aarch64(void)
 {
 	// mov w0, #1; bl 0x1004
@@ -142,8 +268,12 @@ static bool test_aarch64(void)
 
 int main(void)
 {
-	bool success = test_x86();
+	bool success = true;
 
+	/* The original text fixture includes SSE, absent from reduced tables. */
+	if (!cs_support(CS_SUPPORT_X86_REDUCE))
+		success &= test_x86();
+	success &= test_x86_scan_validation();
 	success &= test_aarch64();
 	return success ? 0 : 1;
 }

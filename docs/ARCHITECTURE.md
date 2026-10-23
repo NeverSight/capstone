@@ -51,10 +51,11 @@ and holds more details about an instruction.
 
 For x86 with both text and detail disabled, the core initializes only the
 `MCInst` opcode fields and operand count, then sets its handle, address and
-public instruction pointer. The decoder still validates and constructs its
-operands before using them. Printer state and unused operand slots are not
-initialized in this mode and must not be read by a decoder. Other option
-combinations use the complete initializer.
+public instruction pointer. Translation runs the same operand validation and
+opcode corrections with operand stores disabled. No consumer reads those
+intermediate operand slots in this mode. Text or detail output retains full
+operand construction. Memory validation and construction share one implementation
+specialized for the two constant store policies.
 
 The x86 extension selector is inlined at the decoder entry. It retains the
 mode-dependent prefix and opcode filters in `X86FeatureExtension.h`, and only
@@ -63,24 +64,27 @@ scratch buffer live in a separate helper; ordinary instructions enter the
 generated decoder directly. Both routes retain operand validation and
 translation, including immediate-dependent opcode selection.
 
-The x86 operand reader specializes sets with at most two scalar operands after
-ignoring duplicates. `X86GenScalarOperandRead.inc` is derived from the full and
-reduced `X86GenDisassemblerTables*.inc` operand descriptors by
-`python3 suite/synctools/x86_scalar_readers.py`. Regenerate it whenever those
-descriptors change; `--check` verifies it without writing files, and runs in
-the unit suite when Python is available. The specialized cases consume ModR/M
-once when needed and call the same register, memory, immediate, and
-opcode-register helpers as the generic loop.
-They retain reserved VVVV checks and leave translation unchanged. UD1's
-runtime operand override and other operand shapes use the generic loop.
+The x86 operand reader and translator specialize common scalar and vector
+operand sets from the full and reduced `X86GenDisassemblerTables*.inc`
+descriptors. Run `python3 suite/synctools/x86_operand_specializations.py` whenever
+those descriptors change; `--check` verifies both `X86GenOperandRead.inc` and
+`X86GenOperandTranslate.inc` without writing, and runs in the unit suite when
+Python is available.
 
-The same generator emits `X86GenScalarOperandTranslate.inc` for sets of at
-most three scalar operands. It resolves duplicate descriptors, including
-forward references, and calls the original translators with constant operand
-classes. All operands are still validated and written to `MCInst` in order.
-UD1 and other operand shapes retain generic translation, including comparison
-immediates that select a different opcode. The generator's `--check` verifies
-both generated files.
+The reader selects up to two scalar or four vector operands after ignoring
+duplicates. It calls the same register, memory, immediate, VVVV, writemask and
+VSIB helpers as the generic loop. Reserved VVVV checks, register restrictions
+and compressed displacement scaling remain active. Translation selects up to
+three scalar or five vector operands, resolving duplicates in original order,
+including forward references. Scaled R/M and VSIB encodings share translation
+sequences after the reader has applied their addressing rules. Register-encoded
+immediates, opcode-changing comparison predicates, UD1's runtime override and
+other operand shapes retain their generic paths.
+
+Instruction ID selection specializes the existing rules for each bitness. In
+32- and 64-bit legacy encodings without operand/address-size or repeat prefixes,
+ordinary opcodes take the direct attribute lookup. Opcode 90 and other prefix
+combinations retain the size, mandatory-prefix and XCHG repair rules.
 
 ### Disassembling process
 

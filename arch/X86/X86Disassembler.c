@@ -179,19 +179,35 @@ static bool gfniAffineBroadcastNeedsDisp8Scale(
 #define X86_TRANSLATE_INLINE static inline
 #endif
 
+/* Suppress stores only: validation and opcode selection run in both modes. */
+X86_TRANSLATE_INLINE void createRegisterOperand(MCInst *mcInst, unsigned reg,
+						bool emitOperands)
+{
+	if (emitOperands)
+		MCOperand_CreateReg0(mcInst, reg);
+}
+
+X86_TRANSLATE_INLINE void createImmediateOperand(MCInst *mcInst, int64_t value,
+						 bool emitOperands)
+{
+	if (emitOperands)
+		MCOperand_CreateImm0(mcInst, value);
+}
+
 /// translateRegister - Translates an internal register to the appropriate LLVM
 ///   register, and appends it as an operand to an MCInst.
 ///
 /// @param mcInst     - The MCInst to append to.
 /// @param reg        - The Reg to append.
-X86_TRANSLATE_INLINE void translateRegister(MCInst *mcInst, Reg reg)
+X86_TRANSLATE_INLINE void translateRegister(MCInst *mcInst, Reg reg,
+					    bool emitOperands)
 {
 #define ENTRY(x) X86_##x,
 	static const uint16_t llvmRegnums[] = { ALL_REGS 0 };
 #undef ENTRY
 
 	uint16_t llvmRegnum = llvmRegnums[reg];
-	MCOperand_CreateReg0(mcInst, llvmRegnum);
+	createRegisterOperand(mcInst, llvmRegnum, emitOperands);
 }
 
 X86_TRANSLATE_INLINE uint8_t gprOperandWidth(const InternalInstruction *insn,
@@ -214,13 +230,13 @@ X86_TRANSLATE_INLINE uint8_t gprOperandWidth(const InternalInstruction *insn,
 }
 
 X86_TRANSLATE_INLINE bool appendFeatureGpr(MCInst *mcInst, unsigned int number,
-					   uint8_t width)
+					   uint8_t width, bool emitOperands)
 {
 	const unsigned int reg = X86_featureExtensionMCGPR(number, width);
 
 	if (reg == 0)
 		return true;
-	MCOperand_CreateReg0(mcInst, reg);
+	createRegisterOperand(mcInst, reg, emitOperands);
 	return false;
 }
 
@@ -238,7 +254,8 @@ static bool rex2DebugRegisterIsValid(unsigned int number)
 
 X86_TRANSLATE_INLINE bool translateRegRegister(MCInst *mcInst,
 					       const OperandSpecifier *operand,
-					       InternalInstruction *insn)
+					       InternalInstruction *insn,
+					       bool emitOperands)
 {
 	const OperandType type = (OperandType)operand->type;
 	unsigned int number;
@@ -250,7 +267,7 @@ X86_TRANSLATE_INLINE bool translateRegRegister(MCInst *mcInst,
 		 * generated fixup has already normalized insn->reg to those three
 		 * raw ModR/M bits. */
 		if (type == TYPE_SEGMENTREG) {
-			translateRegister(mcInst, insn->reg);
+			translateRegister(mcInst, insn->reg, emitOperands);
 			return false;
 		}
 		number = (r4FromREX2(insn->rex2Prefix) << 4) |
@@ -263,18 +280,19 @@ X86_TRANSLATE_INLINE bool translateRegRegister(MCInst *mcInst,
 		if (type == TYPE_DEBUGREG && !rex2DebugRegisterIsValid(number))
 			return true;
 		if (width != 0 && r4FromREX2(insn->rex2Prefix))
-			return appendFeatureGpr(mcInst, number, width);
+			return appendFeatureGpr(mcInst, number, width,
+						emitOperands);
 	}
-	translateRegister(mcInst, insn->reg);
+	translateRegister(mcInst, insn->reg, emitOperands);
 	return false;
 }
 
 X86_TRANSLATE_INLINE bool
 translateOpcodeRegister(MCInst *mcInst, const OperandSpecifier *operand,
-			InternalInstruction *insn)
+			InternalInstruction *insn, bool emitOperands)
 {
 	if (!insn->hasRex2 || !b4FromREX2(insn->rex2Prefix)) {
-		translateRegister(mcInst, insn->opcodeRegister);
+		translateRegister(mcInst, insn->opcodeRegister, emitOperands);
 		return false;
 	}
 
@@ -306,9 +324,9 @@ translateOpcodeRegister(MCInst *mcInst, const OperandSpecifier *operand,
 			16 | (b3FromREX2(insn->rex2Prefix) << 3) |
 			(insn->opcode & 7);
 
-		return appendFeatureGpr(mcInst, number, width);
+		return appendFeatureGpr(mcInst, number, width, emitOperands);
 	}
-	translateRegister(mcInst, insn->opcodeRegister);
+	translateRegister(mcInst, insn->opcodeRegister, emitOperands);
 	return false;
 }
 
@@ -321,7 +339,8 @@ static const uint8_t segmentRegnums[SEG_OVERRIDE_max] = {
 ///
 /// @param mcInst       - The MCInst to append to.
 /// @param insn         - The internal instruction.
-static bool translateSrcIndex(MCInst *mcInst, InternalInstruction *insn)
+static bool translateSrcIndex(MCInst *mcInst, InternalInstruction *insn,
+			      bool emitOperands)
 {
 	unsigned baseRegNo;
 
@@ -334,9 +353,10 @@ static bool translateSrcIndex(MCInst *mcInst, InternalInstruction *insn)
 		baseRegNo = insn->hasAdSize ? X86_ESI : X86_SI;
 	}
 
-	MCOperand_CreateReg0(mcInst, baseRegNo);
+	createRegisterOperand(mcInst, baseRegNo, emitOperands);
 
-	MCOperand_CreateReg0(mcInst, segmentRegnums[insn->segmentOverride]);
+	createRegisterOperand(mcInst, segmentRegnums[insn->segmentOverride],
+			      emitOperands);
 
 	return false;
 }
@@ -345,7 +365,8 @@ static bool translateSrcIndex(MCInst *mcInst, InternalInstruction *insn)
 ///
 /// @param mcInst       - The MCInst to append to.
 /// @param insn         - The internal instruction.
-static bool translateDstIndex(MCInst *mcInst, InternalInstruction *insn)
+static bool translateDstIndex(MCInst *mcInst, InternalInstruction *insn,
+			      bool emitOperands)
 {
 	unsigned baseRegNo;
 
@@ -358,7 +379,7 @@ static bool translateDstIndex(MCInst *mcInst, InternalInstruction *insn)
 		baseRegNo = insn->hasAdSize ? X86_EDI : X86_DI;
 	}
 
-	MCOperand_CreateReg0(mcInst, baseRegNo);
+	createRegisterOperand(mcInst, baseRegNo, emitOperands);
 
 	return false;
 }
@@ -371,7 +392,8 @@ static bool translateDstIndex(MCInst *mcInst, InternalInstruction *insn)
 /// @param insn         - The internal instruction.
 X86_TRANSLATE_INLINE void translateImmediate(MCInst *mcInst, uint64_t immediate,
 					     const OperandSpecifier *operand,
-					     InternalInstruction *insn)
+					     InternalInstruction *insn,
+					     bool emitOperands)
 {
 	OperandType type;
 
@@ -1014,27 +1036,31 @@ X86_TRANSLATE_INLINE void translateImmediate(MCInst *mcInst, uint64_t immediate,
 
 	switch (type) {
 	case TYPE_XMM:
-		MCOperand_CreateReg0(mcInst,
-				     X86_XMM0 + ((uint32_t)immediate >> 4));
+		createRegisterOperand(mcInst,
+				      X86_XMM0 + ((uint32_t)immediate >> 4),
+				      emitOperands);
 		return;
 	case TYPE_YMM:
-		MCOperand_CreateReg0(mcInst,
-				     X86_YMM0 + ((uint32_t)immediate >> 4));
+		createRegisterOperand(mcInst,
+				      X86_YMM0 + ((uint32_t)immediate >> 4),
+				      emitOperands);
 		return;
 	case TYPE_ZMM:
-		MCOperand_CreateReg0(mcInst,
-				     X86_ZMM0 + ((uint32_t)immediate >> 4));
+		createRegisterOperand(mcInst,
+				      X86_ZMM0 + ((uint32_t)immediate >> 4),
+				      emitOperands);
 		return;
 	default:
 		// operand is 64 bits wide.  Do nothing.
 		break;
 	}
 
-	MCOperand_CreateImm0(mcInst, immediate);
+	createImmediateOperand(mcInst, immediate, emitOperands);
 
 	if (type == TYPE_MOFFS) {
-		MCOperand_CreateReg0(mcInst,
-				     segmentRegnums[insn->segmentOverride]);
+		createRegisterOperand(mcInst,
+				      segmentRegnums[insn->segmentOverride],
+				      emitOperands);
 	}
 }
 
@@ -1044,8 +1070,10 @@ X86_TRANSLATE_INLINE void translateImmediate(MCInst *mcInst, uint64_t immediate,
 /// @param insn         - The internal instruction to extract the R/M field
 ///                       from.
 /// @return             - 0 on success; -1 otherwise
-X86_TRANSLATE_INLINE bool
-translateRMRegister(MCInst *mcInst, InternalInstruction *insn, OperandType type)
+X86_TRANSLATE_INLINE bool translateRMRegister(MCInst *mcInst,
+					      InternalInstruction *insn,
+					      OperandType type,
+					      bool emitOperands)
 {
 	if (insn->eaBase == EA_BASE_sib || insn->eaBase == EA_BASE_sib64) {
 		//debug("A R/M register operand may not have a SIB byte");
@@ -1068,7 +1096,8 @@ translateRMRegister(MCInst *mcInst, InternalInstruction *insn, OperandType type)
 			    !rex2DebugRegisterIsValid(number))
 				return true;
 			if (width != 0 && b4FromREX2(insn->rex2Prefix))
-				return appendFeatureGpr(mcInst, number, width);
+				return appendFeatureGpr(mcInst, number, width,
+							emitOperands);
 		}
 		if (insn->apxEvexB4 && width != 0) {
 			const unsigned int number =
@@ -1081,7 +1110,7 @@ translateRMRegister(MCInst *mcInst, InternalInstruction *insn, OperandType type)
 
 			if (reg == 0)
 				return true;
-			MCOperand_CreateReg0(mcInst, reg);
+			createRegisterOperand(mcInst, reg, emitOperands);
 			return false;
 		}
 	}
@@ -1090,7 +1119,7 @@ translateRMRegister(MCInst *mcInst, InternalInstruction *insn, OperandType type)
 	const unsigned int reg = (unsigned int)insn->eaBase - EA_REG_AL;
 	if (reg >= MODRM_REG_max)
 		return true;
-	translateRegister(mcInst, (Reg)reg);
+	translateRegister(mcInst, (Reg)reg, emitOperands);
 	return false;
 }
 
@@ -1102,8 +1131,10 @@ translateRMRegister(MCInst *mcInst, InternalInstruction *insn, OperandType type)
 /// @param insn         - The instruction to extract Mod, R/M, and SIB fields
 ///                       from.
 /// @return             - 0 on success; nonzero otherwise
-static bool translateRMMemory(MCInst *mcInst, InternalInstruction *insn,
-			      OperandType type)
+X86_TRANSLATE_INLINE bool translateRMMemoryImpl(MCInst *mcInst,
+						InternalInstruction *insn,
+						OperandType type,
+						bool emitOperands)
 {
 	// Addresses in an MCInst are represented as five operands:
 	//   1. basereg       (register)  The R/M base, or (if there is a SIB) the
@@ -1132,13 +1163,14 @@ static bool translateRMMemory(MCInst *mcInst, InternalInstruction *insn,
 					(insn->sib & 7);
 
 				if (appendFeatureGpr(mcInst, number,
-						     insn->addressSize))
+						     insn->addressSize,
+						     emitOperands))
 					return true;
 			} else {
 				switch (insn->sibBase) {
 #define ENTRY(x) \
 	case SIB_BASE_##x: \
-		MCOperand_CreateReg0(mcInst, X86_##x); \
+		createRegisterOperand(mcInst, X86_##x, emitOperands); \
 		break;
 					ALL_SIB_BASES
 #undef ENTRY
@@ -1148,7 +1180,7 @@ static bool translateRMMemory(MCInst *mcInst, InternalInstruction *insn,
 				}
 			}
 		} else {
-			MCOperand_CreateReg0(mcInst, 0);
+			createRegisterOperand(mcInst, 0, emitOperands);
 		}
 
 		if (type == TYPE_M &&
@@ -1217,8 +1249,8 @@ static bool translateRMMemory(MCInst *mcInst, InternalInstruction *insn,
 				16 | (extension << 3) |
 				(insn->orgModRM & 7);
 
-			if (appendFeatureGpr(mcInst, number,
-					     insn->addressSize))
+			if (appendFeatureGpr(mcInst, number, insn->addressSize,
+					     emitOperands))
 				return true;
 			indexReg = 0;
 		} else {
@@ -1231,33 +1263,36 @@ static bool translateRMMemory(MCInst *mcInst, InternalInstruction *insn,
 			if (insn->mode == MODE_64BIT) {
 				if (insn->prefix3 ==
 				    0x67) // address-size prefix overrides RIP relative addressing
-					MCOperand_CreateReg0(mcInst, X86_EIP);
+					createRegisterOperand(mcInst, X86_EIP,
+							      emitOperands);
 				else
 					// Section 2.2.1.6
-					MCOperand_CreateReg0(
-						mcInst, insn->addressSize == 4 ?
-								X86_EIP :
-								X86_RIP);
+					createRegisterOperand(
+						mcInst,
+						insn->addressSize == 4 ?
+							X86_EIP :
+							X86_RIP,
+						emitOperands);
 			} else {
-				MCOperand_CreateReg0(mcInst, 0);
+				createRegisterOperand(mcInst, 0, emitOperands);
 			}
 
 			indexReg = 0;
 			break;
 		case EA_BASE_BX_SI:
-			MCOperand_CreateReg0(mcInst, X86_BX);
+			createRegisterOperand(mcInst, X86_BX, emitOperands);
 			indexReg = X86_SI;
 			break;
 		case EA_BASE_BX_DI:
-			MCOperand_CreateReg0(mcInst, X86_BX);
+			createRegisterOperand(mcInst, X86_BX, emitOperands);
 			indexReg = X86_DI;
 			break;
 		case EA_BASE_BP_SI:
-			MCOperand_CreateReg0(mcInst, X86_BP);
+			createRegisterOperand(mcInst, X86_BP, emitOperands);
 			indexReg = X86_SI;
 			break;
 		case EA_BASE_BP_DI:
-			MCOperand_CreateReg0(mcInst, X86_BP);
+			createRegisterOperand(mcInst, X86_BP, emitOperands);
 			indexReg = X86_DI;
 			break;
 		default:
@@ -1272,7 +1307,7 @@ static bool translateRMMemory(MCInst *mcInst, InternalInstruction *insn,
 				//   placeholders to keep the compiler happy.
 #define ENTRY(x) \
 	case EA_BASE_##x: \
-		MCOperand_CreateReg0(mcInst, X86_##x); \
+		createRegisterOperand(mcInst, X86_##x, emitOperands); \
 		break;
 				ALL_EA_BASES
 #undef ENTRY
@@ -1289,13 +1324,35 @@ static bool translateRMMemory(MCInst *mcInst, InternalInstruction *insn,
 		scaleAmount = 1;
 	}
 
-	MCOperand_CreateImm0(mcInst, scaleAmount);
-	MCOperand_CreateReg0(mcInst, indexReg);
-	MCOperand_CreateImm0(mcInst, insn->displacement);
+	createImmediateOperand(mcInst, scaleAmount, emitOperands);
+	createRegisterOperand(mcInst, indexReg, emitOperands);
+	createImmediateOperand(mcInst, insn->displacement, emitOperands);
 
-	MCOperand_CreateReg0(mcInst, segmentRegnums[insn->segmentOverride]);
+	createRegisterOperand(mcInst, segmentRegnums[insn->segmentOverride],
+			      emitOperands);
 
 	return false;
+}
+
+static bool translateRMMemoryFull(MCInst *mcInst, InternalInstruction *insn,
+				  OperandType type)
+{
+	return translateRMMemoryImpl(mcInst, insn, type, true);
+}
+
+static bool validateRMMemory(MCInst *mcInst, InternalInstruction *insn,
+			     OperandType type)
+{
+	return translateRMMemoryImpl(mcInst, insn, type, false);
+}
+
+X86_TRANSLATE_INLINE bool translateRMMemory(MCInst *mcInst,
+					    InternalInstruction *insn,
+					    OperandType type, bool emitOperands)
+{
+	if (emitOperands)
+		return translateRMMemoryFull(mcInst, insn, type);
+	return validateRMMemory(mcInst, insn, type);
 }
 
 /// translateRM - Translates an operand stored in the R/M (and possibly SIB)
@@ -1308,7 +1365,8 @@ static bool translateRMMemory(MCInst *mcInst, InternalInstruction *insn,
 /// @return             - 0 on success; nonzero otherwise
 X86_TRANSLATE_INLINE bool translateRM(MCInst *mcInst,
 				      const OperandSpecifier *operand,
-				      InternalInstruction *insn)
+				      InternalInstruction *insn,
+				      bool emitOperands)
 {
 	switch (operand->type) {
 	default:
@@ -1327,14 +1385,14 @@ X86_TRANSLATE_INLINE bool translateRM(MCInst *mcInst,
 	case TYPE_DEBUGREG:
 	case TYPE_CONTROLREG:
 	case TYPE_BNDR:
-		return translateRMRegister(mcInst, insn,
-					   (OperandType)operand->type);
+		return translateRMRegister(
+			mcInst, insn, (OperandType)operand->type, emitOperands);
 	case TYPE_M:
 	case TYPE_MVSIBX:
 	case TYPE_MVSIBY:
 	case TYPE_MVSIBZ:
-		return translateRMMemory(mcInst, insn,
-					 (OperandType)operand->type);
+		return translateRMMemory(
+			mcInst, insn, (OperandType)operand->type, emitOperands);
 	}
 }
 
@@ -1343,9 +1401,10 @@ X86_TRANSLATE_INLINE bool translateRM(MCInst *mcInst,
 ///
 /// @param mcInst       - The MCInst to append to.
 /// @param stackPos     - The stack position to translate.
-static void translateFPRegister(MCInst *mcInst, uint8_t stackPos)
+static void translateFPRegister(MCInst *mcInst, uint8_t stackPos,
+				bool emitOperands)
 {
-	MCOperand_CreateReg0(mcInst, X86_ST0 + stackPos);
+	createRegisterOperand(mcInst, X86_ST0 + stackPos, emitOperands);
 }
 
 /// translateMaskRegister - Translates a 3-bit mask register number to
@@ -1354,14 +1413,15 @@ static void translateFPRegister(MCInst *mcInst, uint8_t stackPos)
 /// @param mcInst       - The MCInst to append to.
 /// @param maskRegNum   - Number of mask register from 0 to 7.
 /// @return             - false on success; true otherwise.
-static bool translateMaskRegister(MCInst *mcInst, uint8_t maskRegNum)
+X86_TRANSLATE_INLINE bool
+translateMaskRegister(MCInst *mcInst, uint8_t maskRegNum, bool emitOperands)
 {
 	if (maskRegNum >= 8) {
 		// debug("Invalid mask register number");
 		return true;
 	}
 
-	MCOperand_CreateReg0(mcInst, X86_K0 + maskRegNum);
+	createRegisterOperand(mcInst, X86_K0 + maskRegNum, emitOperands);
 
 	return false;
 }
@@ -1374,16 +1434,18 @@ static bool translateMaskRegister(MCInst *mcInst, uint8_t maskRegNum)
 /// @param insn         - The internal instruction.
 /// @return             - false on success; true otherwise.
 static bool translateOperand(MCInst *mcInst, const OperandSpecifier *operand,
-			     InternalInstruction *insn)
+			     InternalInstruction *insn, bool emitOperands)
 {
 	switch (operand->encoding) {
 	case ENCODING_REG:
-		return translateRegRegister(mcInst, operand, insn);
+		return translateRegRegister(mcInst, operand, insn,
+					    emitOperands);
 	case ENCODING_WRITEMASK:
-		return translateMaskRegister(mcInst, insn->writemask);
+		return translateMaskRegister(mcInst, insn->writemask,
+					     emitOperands);
 CASE_ENCODING_RM:
 CASE_ENCODING_VSIB:
-		return translateRM(mcInst, operand, insn);
+		return translateRM(mcInst, operand, insn, emitOperands);
 	case ENCODING_IB:
 	case ENCODING_IW:
 	case ENCODING_ID:
@@ -1393,31 +1455,32 @@ CASE_ENCODING_VSIB:
 		translateImmediate(
 			mcInst,
 			insn->immediates[insn->numImmediatesTranslated++],
-			operand, insn);
+			operand, insn, emitOperands);
 		return false;
 	case ENCODING_IRC:
-		MCOperand_CreateImm0(mcInst, insn->RC);
+		createImmediateOperand(mcInst, insn->RC, emitOperands);
 		return false;
 	case ENCODING_SI:
-		return translateSrcIndex(mcInst, insn);
+		return translateSrcIndex(mcInst, insn, emitOperands);
 	case ENCODING_DI:
-		return translateDstIndex(mcInst, insn);
+		return translateDstIndex(mcInst, insn, emitOperands);
 	case ENCODING_RB:
 	case ENCODING_RW:
 	case ENCODING_RD:
 	case ENCODING_RO:
 	case ENCODING_Rv:
-		return translateOpcodeRegister(mcInst, operand, insn);
+		return translateOpcodeRegister(mcInst, operand, insn,
+					       emitOperands);
 	case ENCODING_FP:
-		translateFPRegister(mcInst, insn->modRM & 7);
+		translateFPRegister(mcInst, insn->modRM & 7, emitOperands);
 		return false;
 	case ENCODING_VVVV:
-		translateRegister(mcInst, insn->vvvv);
+		translateRegister(mcInst, insn->vvvv, emitOperands);
 		return false;
 	case ENCODING_DUP:
 		return translateOperand(
 			mcInst, &insn->operands[operand->type - TYPE_DUP0],
-			insn);
+			insn, emitOperands);
 	default:
 		//debug("Unhandled operand encoding during translation");
 		return true;
@@ -1425,7 +1488,8 @@ CASE_ENCODING_VSIB:
 }
 
 X86_TRANSLATE_INLINE bool translateInstruction(MCInst *mcInst,
-					       InternalInstruction *insn)
+					       InternalInstruction *insn,
+					       bool emitOperands)
 {
 	int index;
 
@@ -1451,16 +1515,17 @@ X86_TRANSLATE_INLINE bool translateInstruction(MCInst *mcInst,
 
 	insn->numImmediatesTranslated = 0;
 
-	/* UD1 has a runtime operand override; other selected scalar sets use
+	/* UD1 has a runtime operand override; other selected sets use
 	 * the same translators with constant descriptors, including duplicates. */
 	if (insn->instructionID != X86_UD1) {
-#include "X86GenScalarOperandTranslate.inc"
+#include "X86GenOperandTranslate.inc"
 	}
 
 	for (index = 0; index < X86_MAX_OPERANDS &&
 			insn->operands[index].encoding != ENCODING_NONE;
 	     ++index) {
-		if (translateOperand(mcInst, &insn->operands[index], insn))
+		if (translateOperand(mcInst, &insn->operands[index], insn,
+				     emitOperands))
 			return true;
 	}
 
@@ -1975,12 +2040,10 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 			insn.displacement *= 8;
 #endif
 
-		result = (!translateInstruction(instr, &insn)) ? true : false;
+		if (handle->no_text && !handle->detail_opt)
+			return !translateInstruction(instr, &insn, false);
+		result = !translateInstruction(instr, &insn, true);
 		if (result) {
-			/* Translation still validates operands and selects the opcode;
-			 * a scan does not consume printer metadata or public detail. */
-			if (handle->no_text && !handle->detail_opt)
-				return true;
 			unsigned Flags = X86_IP_NO_PREFIX;
 			if (scalar_compare_p2_normalized)
 				insn.vectorExtensionPrefix[3] =
