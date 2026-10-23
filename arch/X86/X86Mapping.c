@@ -4274,50 +4274,60 @@ static x86_feature_decode_result decode_apx_map4_reserved(const uint8_t *code,
 	return X86_FEATURE_INVALID;
 }
 
+enum {
+	FEATURE_LEGACY_PREFIX = 1,
+	FEATURE_REX_PREFIX = 2,
+	FEATURE_ESCAPE = 4,
+	FEATURE_MAP2_ESCAPE = 8,
+};
+
+static const uint8_t feature_prefix_flags[256] = {
+	/* 0x00 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8,
+	/* 0x10 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 0x20 */ 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0,
+	/* 0x30 */ 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0,
+	/* 0x40 */ 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+	/* 0x50 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 0x60 */ 0, 0, 4, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 0x70 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 0x80 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 0x90 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 0xa0 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 0xb0 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 0xc0 */ 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 0xd0 */ 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 0xe0 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 0xf0 */ 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+};
+
 static bool is_rex2_leading_prefix(uint8_t byte)
 {
-	switch (byte) {
-	default:
-		return byte >= 0x40 && byte <= 0x4f;
-	case 0x26:
-	case 0x2e:
-	case 0x36:
-	case 0x3e:
-	case 0x64:
-	case 0x65:
-	case 0x66:
-	case 0x67:
-	case 0xf0:
-	case 0xf2:
-	case 0xf3:
-		return true;
-	}
+	return (feature_prefix_flags[byte] &
+		(FEATURE_LEGACY_PREFIX | FEATURE_REX_PREFIX)) != 0;
 }
 
-/* Every feature decoder starts at the first byte after the legacy and REX
- * prefixes, which is an EVEX, VEX or REX2 escape or the 0F 38 of a legacy
- * map-2 opcode.  Most instructions start with none of them and need not run
- * the decoders at all. */
+/* Classify prefixes and escapes in one lookup. In 16/32-bit modes the
+ * 40..4f opcodes end the scan; subsequent instructions cannot be extensions
+ * of the current INC/DEC. */
 static bool may_be_feature_extension(const uint8_t *code, size_t code_len,
-				     uint8_t *opcode)
+				     bool is_64_bit, uint8_t *opcode)
 {
+	const uint8_t prefix_mask = FEATURE_LEGACY_PREFIX |
+				    (is_64_bit ? FEATURE_REX_PREFIX : 0);
 	size_t offset = 0;
 
-	while (offset < code_len && is_rex2_leading_prefix(code[offset]))
+	while (offset < code_len) {
+		uint8_t byte = code[offset];
+		uint8_t flags = feature_prefix_flags[byte];
 		++offset;
-	if (offset == code_len)
-		return false;
-	*opcode = code[offset];
-	switch (*opcode) {
-	default:
-		return false;
-	case 0x0f:
-		return code_len - offset >= 2 && code[offset + 1] == 0x38;
-	case 0x62:
-	case 0xc4:
-	case 0xd5:
-		return true;
+		if (flags & prefix_mask)
+			continue;
+		*opcode = byte;
+		if (flags == FEATURE_MAP2_ESCAPE)
+			return offset < code_len && code[offset] == 0x38;
+		return flags == FEATURE_ESCAPE;
 	}
+	return false;
 }
 
 static bool starts_with_legacy_inc_dec(csh handle, const uint8_t *code,
@@ -4679,7 +4689,10 @@ X86_decodeFeatureExtension(csh handle, const uint8_t *code, size_t code_len,
 {
 	// Keep the common rejection path outside the extension decoders' stack frame.
 	*opcode = 0;
-	if (!may_be_feature_extension(code, code_len, opcode))
+	if (!may_be_feature_extension(code, code_len,
+				      (((cs_struct *)(uintptr_t)handle)->mode &
+				       CS_MODE_64) != 0,
+				      opcode))
 		return X86_FEATURE_NOT_HANDLED;
 	return decode_feature_extension(handle, code, code_len, instr, size,
 					*opcode);
@@ -9582,7 +9595,7 @@ unsigned int find_insn(unsigned int id)
 static inline unsigned int find_insn_h(cs_struct *h, unsigned int id)
 {
 	if (h && h->x86_insn_lut && id <= h->x86_insn_lut_max)
-		return (unsigned int)(int16_t)h->x86_insn_lut[id];
+		return (unsigned int)(int16_t)(uint16_t)h->x86_insn_lut[id];
 
 	return find_insn(id);
 }
@@ -9592,8 +9605,17 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
 {
 	unsigned int i;
 
-	if (X86_mapFeatureExtension(insn, id))
+	if (id >= X86_FEATURE_OPCODE_BASE && X86_mapFeatureExtension(insn, id))
 		return;
+
+	/* Scans need only the public ID, not the larger detail-mapping entry. */
+	if (h && !h->detail_opt && h->x86_insn_lut &&
+	    id <= h->x86_insn_lut_max) {
+		uint16_t mapid = (uint16_t)(h->x86_insn_lut[id] >> 16);
+		if (mapid != UINT16_MAX)
+			insn->id = mapid;
+		return;
+	}
 
 	i = find_insn_h(h, id);
 	if (i != -1) {
@@ -10493,16 +10515,18 @@ void X86_build_lookup_tables(cs_struct *h)
 	unsigned int id_max;
 
 	CS_ASSERT_RET(h && !h->x86_insn_lut);
+	CS_ASSERT_RET(max <= INT16_MAX && X86_INS_ENDING < UINT16_MAX);
 
 	id_max = insns[max - 1].id;
 	h->x86_insn_lut_max = id_max;
 	h->x86_insn_lut =
-		(uint16_t *)cs_mem_malloc((id_max + 1) * sizeof(uint16_t));
+		(uint32_t *)cs_mem_malloc((id_max + 1) * sizeof(uint32_t));
 	CS_ASSERT_RET(h->x86_insn_lut);
 
-	memset(h->x86_insn_lut, 0xff, (id_max + 1) * sizeof(uint16_t));
+	memset(h->x86_insn_lut, 0xff, (id_max + 1) * sizeof(uint32_t));
 	for (i = 0; i < max; i++)
-		h->x86_insn_lut[insns[i].id] = (uint16_t)i;
+		h->x86_insn_lut[insns[i].id] =
+			((uint32_t)insns[i].mapid << 16) | i;
 
 	h->x86_insn_reg_lut =
 		(uint32_t *)cs_mem_calloc(id_max + 1, sizeof(uint32_t));

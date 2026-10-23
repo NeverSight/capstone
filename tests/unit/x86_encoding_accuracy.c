@@ -9,6 +9,7 @@
 #include <string.h>
 
 #include "../../arch/X86/X86DisassemblerDecoder.h"
+#include "../../arch/X86/X86Mapping.h"
 #ifdef CAPSTONE_X86_REDUCE
 #include "../../arch/X86/X86GenDisassemblerTables_reduce.inc"
 #else
@@ -34,6 +35,34 @@ static bool check_operand_sets(void)
 		}
 	}
 	return true;
+}
+
+/* Cache allocation is optional: every ID and hole must agree with the
+ * original binary-search mapping when the cache is unavailable. */
+static bool check_id_cache(void)
+{
+	csh handle;
+	if (cs_open(CS_ARCH_X86, CS_MODE_64, &handle) != CS_ERR_OK)
+		return false;
+	cs_struct *arch = (cs_struct *)(uintptr_t)handle;
+	uint32_t *cache = arch->x86_insn_lut;
+	bool ok = cache != NULL;
+	for (unsigned id = 0; id <= arch->x86_insn_lut_max + 1; ++id) {
+		cs_insn cached = { 0 }, fallback = { 0 };
+		cached.id = fallback.id = UINT32_MAX;
+		X86_get_insn_id(arch, &cached, id);
+		arch->x86_insn_lut = NULL;
+		X86_get_insn_id(arch, &fallback, id);
+		arch->x86_insn_lut = cache;
+		if (cached.id != fallback.id) {
+			fprintf(stderr,
+				"ID cache differs from fallback at %u\n", id);
+			ok = false;
+			break;
+		}
+	}
+	cs_close(&handle);
+	return ok;
 }
 
 static bool decode(csh handle, const uint8_t *bytes, size_t size, unsigned id,
@@ -735,7 +764,7 @@ int main(void)
 	};
 	const cs_mode modes[] = { CS_MODE_16, CS_MODE_32, CS_MODE_64 };
 	const unsigned syntaxes[] = { CS_OPT_SYNTAX_INTEL, CS_OPT_SYNTAX_ATT };
-	bool ok = check_operand_sets();
+	bool ok = check_operand_sets() && check_id_cache();
 	for (size_t m = 0; m < sizeof(modes) / sizeof(modes[0]); ++m)
 		for (size_t s = 0; s < sizeof(syntaxes) / sizeof(syntaxes[0]);
 		     ++s)

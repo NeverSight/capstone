@@ -92,6 +92,131 @@ static bool check_short_copies(uint8_t *end)
 	return success;
 }
 
+static bool check_escape(csh handle, cs_insn *iter, uint8_t *end,
+			 const uint8_t *code, size_t size, unsigned id,
+			 size_t instruction_size)
+{
+	bool ok = true;
+	for (size_t n = 0; n <= size; ++n) {
+		uint8_t *start = end - n;
+		const uint8_t *cursor = start;
+		size_t left = n;
+		uint64_t address = UINT64_MAX - 2;
+		cs_insn *batch = NULL;
+		bool expected = instruction_size != 0 && n >= instruction_size;
+		memcpy(start, code, n);
+		bool decoded =
+			cs_disasm_iter(handle, &cursor, &left, &address, iter);
+		size_t count =
+			cs_disasm(handle, start, n, UINT64_MAX - 2, 1, &batch);
+		ok &= decoded == expected && count == (expected ? 1 : 0);
+		if (decoded && count == 1) {
+			ok &= iter->id == id && batch->id == id &&
+			      iter->size == instruction_size &&
+			      batch->size == instruction_size &&
+			      memcmp(iter->bytes, code, instruction_size) ==
+				      0 &&
+			      memcmp(batch->bytes, code, instruction_size) ==
+				      0 &&
+			      cursor == start + instruction_size &&
+			      left == n - instruction_size &&
+			      address == UINT64_MAX - 2 + instruction_size;
+		} else if (!decoded) {
+			ok &= cursor == start && left == n &&
+			      address == UINT64_MAX - 2;
+		}
+		cs_free(batch, count);
+	}
+	if (!ok)
+		fprintf(stderr, "x86 escape bounds: id=%u size=%zu\n", id,
+			size);
+	return ok;
+}
+
+static bool check_escape_boundaries(uint8_t *end)
+{
+	static const struct {
+		cs_mode mode;
+		uint8_t code[8];
+		size_t size;
+		unsigned id;
+		size_t instruction_size;
+	} cases[] = {
+		{ CS_MODE_64, { 0x0f, 0xa2 }, 2, X86_INS_CPUID, 2 },
+		{ CS_MODE_64,
+		  { 0x64, 0x0f, 0x38, 0xf6, 0x00 },
+		  5,
+		  X86_INS_WRSSD,
+		  5 },
+		{ CS_MODE_64, { 0xd5, 0x00, 0x90 }, 3, X86_INS_NOP, 3 },
+		{ CS_MODE_64,
+		  { 0x62, 0xf4, 0x7c, 0x08, 0x01, 0xc1 },
+		  6,
+		  X86_INS_ADD,
+		  6 },
+		{ CS_MODE_64,
+		  { 0xc4, 0xe2, 0x7b, 0x49, 0xf0 },
+		  5,
+		  X86_INS_TILEZERO,
+		  5 },
+		{ CS_MODE_32, { 0xc4, 0x07 }, 2, X86_INS_LES, 2 },
+		{ CS_MODE_16, { 0x62, 0x07 }, 2, X86_INS_BOUND, 2 },
+		/* Trailing escapes must not absorb an earlier legacy INC/DEC. */
+		{ CS_MODE_32,
+		  { 0x40, 0x62, 0xf4, 0x7c, 0x08, 0x01, 0xc1 },
+		  7,
+		  X86_INS_INC,
+		  1 },
+		{ CS_MODE_16, { 0x48, 0xd5, 0x00, 0x90 }, 4, X86_INS_DEC, 1 },
+#ifndef CAPSTONE_X86_REDUCE
+		{ CS_MODE_64, { 0xc5, 0xf8, 0x77 }, 3, X86_INS_VZEROUPPER, 3 },
+		{ CS_MODE_64,
+		  { 0xc4, 0xe1, 0x74, 0x58, 0xc2 },
+		  5,
+		  X86_INS_VADDPS,
+		  5 },
+		{ CS_MODE_64,
+		  { 0x62, 0xf1, 0x7c, 0x08, 0x58, 0xc2 },
+		  6,
+		  X86_INS_VADDPS,
+		  6 },
+#endif
+		{ CS_MODE_64,
+		  { 0x66, 0xc4, 0xe1, 0x74, 0x58, 0xc2 },
+		  6,
+		  X86_INS_INVALID,
+		  0 },
+		{ CS_MODE_64,
+		  { 0xf3, 0xc5, 0xf8, 0x77 },
+		  4,
+		  X86_INS_INVALID,
+		  0 },
+	};
+	bool ok = true;
+	for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+		csh handle;
+		if (cs_open(CS_ARCH_X86, cases[i].mode, &handle) != CS_ERR_OK)
+			return false;
+		for (unsigned options = 0; options != 4; ++options) {
+			cs_option(handle, CS_OPT_TEXT,
+				  options & 1 ? CS_OPT_ON : CS_OPT_OFF);
+			cs_option(handle, CS_OPT_DETAIL,
+				  options & 2 ? CS_OPT_ON : CS_OPT_OFF);
+			cs_insn *iter = cs_malloc(handle);
+			if (!iter) {
+				cs_close(&handle);
+				return false;
+			}
+			ok &= check_escape(handle, iter, end, cases[i].code,
+					   cases[i].size, cases[i].id,
+					   cases[i].instruction_size);
+			cs_free(iter, 1);
+		}
+		cs_close(&handle);
+	}
+	return ok;
+}
+
 int main(void)
 {
 	static const struct {
@@ -162,6 +287,7 @@ int main(void)
 	}
 #endif
 	success &= check_short_copies(pages + page_size);
+	success &= check_escape_boundaries(pages + page_size);
 	for (i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
 		csh handle;
 		cs_insn *insn;
