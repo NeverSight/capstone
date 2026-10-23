@@ -171,12 +171,20 @@ static bool gfniAffineBroadcastNeedsDisp8Scale(
 // Private code that translates from struct InternalInstructions to MCInsts.
 //
 
+#if defined(_MSC_VER)
+#define X86_TRANSLATE_INLINE static __forceinline
+#elif defined(__GNUC__)
+#define X86_TRANSLATE_INLINE static inline __attribute__((always_inline))
+#else
+#define X86_TRANSLATE_INLINE static inline
+#endif
+
 /// translateRegister - Translates an internal register to the appropriate LLVM
 ///   register, and appends it as an operand to an MCInst.
 ///
 /// @param mcInst     - The MCInst to append to.
 /// @param reg        - The Reg to append.
-static void translateRegister(MCInst *mcInst, Reg reg)
+X86_TRANSLATE_INLINE void translateRegister(MCInst *mcInst, Reg reg)
 {
 #define ENTRY(x) X86_##x,
 	static const uint16_t llvmRegnums[] = { ALL_REGS 0 };
@@ -186,8 +194,8 @@ static void translateRegister(MCInst *mcInst, Reg reg)
 	MCOperand_CreateReg0(mcInst, llvmRegnum);
 }
 
-static uint8_t gprOperandWidth(const InternalInstruction *insn,
-			       OperandType type)
+X86_TRANSLATE_INLINE uint8_t gprOperandWidth(const InternalInstruction *insn,
+					     OperandType type)
 {
 	switch (type) {
 	default:
@@ -205,8 +213,8 @@ static uint8_t gprOperandWidth(const InternalInstruction *insn,
 	}
 }
 
-static bool appendFeatureGpr(MCInst *mcInst, unsigned int number,
-			     uint8_t width)
+X86_TRANSLATE_INLINE bool appendFeatureGpr(MCInst *mcInst, unsigned int number,
+					   uint8_t width)
 {
 	const unsigned int reg = X86_featureExtensionMCGPR(number, width);
 
@@ -228,9 +236,9 @@ static bool rex2DebugRegisterIsValid(unsigned int number)
 	return number <= 7;
 }
 
-static bool translateRegRegister(MCInst *mcInst,
-				 const OperandSpecifier *operand,
-				 InternalInstruction *insn)
+X86_TRANSLATE_INLINE bool translateRegRegister(MCInst *mcInst,
+					       const OperandSpecifier *operand,
+					       InternalInstruction *insn)
 {
 	const OperandType type = (OperandType)operand->type;
 	unsigned int number;
@@ -261,9 +269,9 @@ static bool translateRegRegister(MCInst *mcInst,
 	return false;
 }
 
-static bool translateOpcodeRegister(MCInst *mcInst,
-				    const OperandSpecifier *operand,
-				    InternalInstruction *insn)
+X86_TRANSLATE_INLINE bool
+translateOpcodeRegister(MCInst *mcInst, const OperandSpecifier *operand,
+			InternalInstruction *insn)
 {
 	if (!insn->hasRex2 || !b4FromREX2(insn->rex2Prefix)) {
 		translateRegister(mcInst, insn->opcodeRegister);
@@ -361,9 +369,9 @@ static bool translateDstIndex(MCInst *mcInst, InternalInstruction *insn)
 /// @param immediate    - The immediate value to append.
 /// @param operand      - The operand, as stored in the descriptor table.
 /// @param insn         - The internal instruction.
-static void translateImmediate(MCInst *mcInst, uint64_t immediate,
-			       const OperandSpecifier *operand,
-			       InternalInstruction *insn)
+X86_TRANSLATE_INLINE void translateImmediate(MCInst *mcInst, uint64_t immediate,
+					     const OperandSpecifier *operand,
+					     InternalInstruction *insn)
 {
 	OperandType type;
 
@@ -1036,8 +1044,8 @@ static void translateImmediate(MCInst *mcInst, uint64_t immediate,
 /// @param insn         - The internal instruction to extract the R/M field
 ///                       from.
 /// @return             - 0 on success; -1 otherwise
-static bool translateRMRegister(MCInst *mcInst, InternalInstruction *insn,
-				OperandType type)
+X86_TRANSLATE_INLINE bool
+translateRMRegister(MCInst *mcInst, InternalInstruction *insn, OperandType type)
 {
 	if (insn->eaBase == EA_BASE_sib || insn->eaBase == EA_BASE_sib64) {
 		//debug("A R/M register operand may not have a SIB byte");
@@ -1298,8 +1306,9 @@ static bool translateRMMemory(MCInst *mcInst, InternalInstruction *insn,
 /// @param insn         - The instruction to extract Mod, R/M, and SIB fields
 ///                       from.
 /// @return             - 0 on success; nonzero otherwise
-static bool translateRM(MCInst *mcInst, const OperandSpecifier *operand,
-			InternalInstruction *insn)
+X86_TRANSLATE_INLINE bool translateRM(MCInst *mcInst,
+				      const OperandSpecifier *operand,
+				      InternalInstruction *insn)
 {
 	switch (operand->type) {
 	default:
@@ -1415,7 +1424,8 @@ CASE_ENCODING_VSIB:
 	}
 }
 
-static bool translateInstruction(MCInst *mcInst, InternalInstruction *insn)
+X86_TRANSLATE_INLINE bool translateInstruction(MCInst *mcInst,
+					       InternalInstruction *insn)
 {
 	int index;
 
@@ -1441,6 +1451,12 @@ static bool translateInstruction(MCInst *mcInst, InternalInstruction *insn)
 
 	insn->numImmediatesTranslated = 0;
 
+	/* UD1 has a runtime operand override; other selected scalar sets use
+	 * the same translators with constant descriptors, including duplicates. */
+	if (insn->instructionID != X86_UD1) {
+#include "X86GenScalarOperandTranslate.inc"
+	}
+
 	for (index = 0; index < X86_MAX_OPERANDS &&
 			insn->operands[index].encoding != ENCODING_NONE;
 	     ++index) {
@@ -1450,6 +1466,8 @@ static bool translateInstruction(MCInst *mcInst, InternalInstruction *insn)
 
 	return false;
 }
+
+#undef X86_TRANSLATE_INLINE
 
 // copy x86 detail information from internal structure to public structure
 static void update_pub_insn(cs_insn *pub, InternalInstruction *inter)

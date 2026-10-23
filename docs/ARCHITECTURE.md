@@ -74,6 +74,14 @@ opcode-register helpers as the generic loop.
 They retain reserved VVVV checks and leave translation unchanged. UD1's
 runtime operand override and other operand shapes use the generic loop.
 
+The same generator emits `X86GenScalarOperandTranslate.inc` for sets of at
+most three scalar operands. It resolves duplicate descriptors, including
+forward references, and calls the original translators with constant operand
+classes. All operands are still validated and written to `MCInst` in order.
+UD1 and other operand shapes retain generic translation, including comparison
+immediates that select a different opcode. The generator's `--check` verifies
+both generated files.
+
 ### Disassembling process
 
 There are two steps in disassembling an instruction.
