@@ -4516,7 +4516,11 @@ static bool may_be_feature_extension(const uint8_t *code, size_t code_len,
 		if (flags == FEATURE_0F_ESCAPE)
 			return may_be_0f_feature_extension(code + offset,
 							   code_len - offset);
-		return flags == FEATURE_ESCAPE;
+		if (flags != FEATURE_ESCAPE)
+			return false;
+		/* VEX map 1 is entirely handled by the generated decoder. */
+		return byte != 0xc4 || offset == code_len ||
+		       (code[offset] & 0x1f) != 1;
 	}
 	return false;
 }

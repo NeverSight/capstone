@@ -173,6 +173,8 @@ static bool check_escape_boundaries(uint8_t *end)
 		  X86_INS_TILEZERO,
 		  5 },
 		{ CS_MODE_32, { 0xc4, 0x07 }, 2, X86_INS_LES, 2 },
+		{ CS_MODE_32, { 0xc4, 0x21 }, 2, X86_INS_LES, 2 },
+		{ CS_MODE_16, { 0xc4, 0x21 }, 2, X86_INS_LES, 2 },
 		{ CS_MODE_16, { 0x62, 0x07 }, 2, X86_INS_BOUND, 2 },
 		/* Trailing escapes must not absorb an earlier legacy INC/DEC. */
 		{ CS_MODE_32,
