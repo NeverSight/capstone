@@ -64,6 +64,18 @@ scratch buffer live in a separate helper; ordinary instructions enter the
 generated decoder directly. Both routes retain operand validation and
 translation, including immediate-dependent opcode selection.
 
+Extension dispatch groups handlers by the selected legacy/VEX escape and EVEX
+map, retaining handler precedence within each map. A new source-owned encoding
+must be routed to its handler here as well as validated by that handler. The
+legacy pointer-load ambiguity, duplicate-prefix policy and reserved-map-4
+rejection remain ahead of fallback to the generated decoder.
+
+The prefix reader shares the selector's byte classification. A first ordinary
+opcode, optionally after one REX in 64-bit mode, skips the legacy prefix loop;
+vector escapes reuse the existing payload parser. Other prefix sequences keep
+the full ordering and conflict checks. Both paths use the same size defaults,
+checked opcode reader and full instruction-state initialization.
+
 The x86 operand reader and translator specialize common scalar and vector
 operand sets from the full and reduced `X86GenDisassemblerTables*.inc`
 descriptors. Run `python3 suite/synctools/x86_operand_specializations.py` whenever

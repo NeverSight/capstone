@@ -32,6 +32,7 @@
 
 #include "X86DisassemblerDecoder.h"
 #include "X86Mapping.h"
+#include "X86FeatureExtension.h"
 
 /// Specifies whether a ModR/M byte is needed and (if so) which
 /// instruction each possible value of the ModR/M byte corresponds to.  Once
@@ -340,6 +341,34 @@ static int readPrefixes(struct InternalInstruction *insn)
 	unsigned int addressSizePrefixCount = 0;
 	uint8_t byte = 0;
 	uint8_t nextByte;
+	size_t offset = 0;
+	const uint8_t prefixMask =
+		FEATURE_LEGACY_PREFIX |
+		(insn->mode == MODE_64BIT ? FEATURE_REX_PREFIX : 0);
+
+	/* Start ordinary opcodes and single-REX encodings without the legacy
+	 * prefix loop. Escapes reuse the same payload parser; repeated REX or
+	 * legacy prefixes retain their ordering and conflict checks below. */
+	if (insn->codeSize == 0)
+		return -1;
+	byte = insn->code[0];
+	if (isREX(insn, byte)) {
+		offset = 1;
+		if (insn->codeSize == offset)
+			return -1;
+		byte = insn->code[offset];
+	}
+	if (!(feature_prefix_flags[byte] & prefixMask)) {
+		if (offset)
+			insn->rexPrefix = insn->code[0];
+		insn->readerCursor = offset + 1;
+		if ((feature_prefix_flags[byte] & FEATURE_ESCAPE) ||
+		    byte == 0xc5 || byte == 0x8f)
+			goto legacyPrefixesRead;
+		insn->readerCursor = offset;
+		insn->vectorExtensionType = TYPE_NO_VEX_XOP;
+		goto sizes;
+	}
 
 	while (isPrefix) {
 		/* If we fail reading prefixes, just stop here and let the opcode reader deal with it */
@@ -433,6 +462,7 @@ static int readPrefixes(struct InternalInstruction *insn)
 		}
 	}
 
+legacyPrefixesRead:
 	insn->vectorExtensionType = TYPE_NO_VEX_XOP;
 	/* A 66, F2, F3 or LOCK prefix anywhere before a VEX, EVEX or XOP prefix,
 	 * or a REX prefix right before it, makes the instruction #UD, as in
@@ -675,6 +705,7 @@ static int readPrefixes(struct InternalInstruction *insn)
 		}
 	}
 
+sizes:
 	if (insn->mode == MODE_16BIT) {
 		insn->registerSize = (insn->hasOpSize ? 4 : 2);
 		insn->addressSize = (insn->hasAdSize ? 4 : 2);

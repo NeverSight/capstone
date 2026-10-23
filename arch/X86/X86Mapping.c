@@ -4676,30 +4676,48 @@ x86_feature_decode_result
 X86_decodeFeatureExtension(csh handle, const uint8_t *code, size_t code_len,
 			   MCInst *instr, uint16_t *size, uint8_t opcode)
 {
-	/* In 16/32-bit modes 0x40..0x4f are INC/DEC opcodes, not REX
-	 * prefixes.  Do not let a later EVEX-looking byte sequence make a
-	 * feature decoder reinterpret the current legacy instruction. */
+	x86_feature_decode_result result;
+
+	/* The selector already found the first non-prefix byte. Dispatch
+	 * legacy and VEX families before trying unrelated EVEX decoders. */
+	if (opcode == 0x0f) {
+		size_t offset = 0;
+
+		while (offset < code_len && code[offset] != 0x0f)
+			++offset;
+		if (code_len - offset < 2)
+			return X86_FEATURE_NOT_HANDLED;
+		if (code[offset + 1] == 0x38) {
+			result = decode_legacy_cet_store(handle, code, code_len,
+							 instr, size);
+			if (result != X86_FEATURE_NOT_HANDLED)
+				return result;
+			result = decode_legacy_enqueue(handle, code, code_len,
+						       instr, size);
+			if (result != X86_FEATURE_NOT_HANDLED)
+				return result;
+		}
+		return decode_system_legacy_vex(handle, code, code_len, instr,
+						size);
+	}
+
+	/* Outside 64-bit mode C4/62 can still be LES/BOUND. */
 	if (starts_with_legacy_inc_dec(handle, code, code_len) ||
 	    starts_with_legacy_pointer_load(handle, code, code_len))
 		return X86_FEATURE_NOT_HANDLED;
 	if (has_duplicate_feature_evex_prefixes(code, code_len))
 		return X86_FEATURE_INVALID;
 
-	x86_feature_decode_result result =
-		decode_legacy_cet_store(handle, code, code_len, instr, size);
-	if (result != X86_FEATURE_NOT_HANDLED)
-		return result;
-	result = decode_legacy_enqueue(handle, code, code_len, instr, size);
-	if (result != X86_FEATURE_NOT_HANDLED)
-		return result;
-	result = decode_system_legacy_vex(handle, code, code_len, instr, size);
-	if (result != X86_FEATURE_NOT_HANDLED)
-		return result;
-	result = decode_sha512_vex(handle, code, code_len, instr, size);
-	if (result != X86_FEATURE_NOT_HANDLED)
-		return result;
-	if (opcode == 0xc4)
+	if (opcode == 0xc4) {
+		result = decode_system_legacy_vex(handle, code, code_len, instr,
+						  size);
+		if (result != X86_FEATURE_NOT_HANDLED)
+			return result;
+		result = decode_sha512_vex(handle, code, code_len, instr, size);
+		if (result != X86_FEATURE_NOT_HANDLED)
+			return result;
 		return decode_amx(handle, code, code_len, instr, size);
+	}
 	if (opcode == 0xd5) {
 		result = decode_rex2_push_pop(handle, code, code_len, instr,
 					      size);
@@ -4710,104 +4728,126 @@ X86_decodeFeatureExtension(csh handle, const uint8_t *code, size_t code_len,
 	/* Legacy and VEX encodings cannot match the EVEX decoders below. */
 	if (opcode != 0x62)
 		return X86_FEATURE_NOT_HANDLED;
-	result = decode_apx_evex_vector_gpr(handle, code, code_len, instr, size);
-	if (result != X86_FEATURE_NOT_HANDLED)
-		return result;
-	result = decode_apx_direct_store(handle, code, code_len, instr, size);
-	if (result != X86_FEATURE_NOT_HANDLED)
-		return result;
-	result = decode_apx_msr(handle, code, code_len, instr, size);
-	if (result != X86_FEATURE_NOT_HANDLED)
-		return result;
-	result = decode_apx_enqueue(handle, code, code_len, instr, size);
-	if (result != X86_FEATURE_NOT_HANDLED)
-		return result;
-	result = decode_apx_rao(handle, code, code_len, instr, size);
-	if (result != X86_FEATURE_NOT_HANDLED)
-		return result;
-	result = decode_apx_cmpccxadd(handle, code, code_len, instr, size);
-	if (result != X86_FEATURE_NOT_HANDLED)
-		return result;
-	result = decode_apx_ccmp(handle, code, code_len, instr, size);
-	if (result != X86_FEATURE_NOT_HANDLED)
-		return result;
-	result = decode_apx_ctest(handle, code, code_len, instr, size);
-	if (result != X86_FEATURE_NOT_HANDLED)
-		return result;
-	result = decode_apx_kmov(handle, code, code_len, instr, size);
-	if (result != X86_FEATURE_NOT_HANDLED)
-		return result;
-	result = decode_apx_movrs(handle, code, code_len, instr, size);
-	if (result != X86_FEATURE_NOT_HANDLED)
-		return result;
-	result = decode_apx_invalidate(handle, code, code_len, instr, size);
-	if (result != X86_FEATURE_NOT_HANDLED)
-		return result;
-	result = decode_amx(handle, code, code_len, instr, size);
 
-	if (result != X86_FEATURE_NOT_HANDLED)
-		return result;
-	result = decode_rex2_push_pop(handle, code, code_len, instr, size);
-	if (result != X86_FEATURE_NOT_HANDLED)
-		return result;
-	result = decode_apx_push2_pop2(handle, code, code_len, instr, size);
-	if (result != X86_FEATURE_NOT_HANDLED)
-		return result;
-	result = decode_apx_cmov(handle, code, code_len, instr, size);
-	if (result != X86_FEATURE_NOT_HANDLED)
-		return result;
-	result = decode_apx_setcc(handle, code, code_len, instr, size);
-	if (result != X86_FEATURE_NOT_HANDLED)
-		return result;
-	result = decode_apx_shift_rotate(handle, code, code_len, instr, size);
-	if (result != X86_FEATURE_NOT_HANDLED)
-		return result;
-	result = decode_apx_imul_immediate(handle, code, code_len, instr, size);
-	if (result != X86_FEATURE_NOT_HANDLED)
-		return result;
-	result = decode_apx_imul(handle, code, code_len, instr, size);
-	if (result != X86_FEATURE_NOT_HANDLED)
-		return result;
-	result = decode_apx_adx(handle, code, code_len, instr, size);
-	if (result != X86_FEATURE_NOT_HANDLED)
-		return result;
-	result = decode_apx_unary(handle, code, code_len, instr, size);
-	if (result != X86_FEATURE_NOT_HANDLED)
-		return result;
-	result = decode_apx_pdep_pext(handle, code, code_len, instr, size);
-	if (result != X86_FEATURE_NOT_HANDLED)
-		return result;
-	result = decode_apx_double_shift(handle, code, code_len, instr, size);
-	if (result != X86_FEATURE_NOT_HANDLED)
-		return result;
-	result = decode_apx_bmi_ternary(handle, code, code_len, instr, size);
-	if (result != X86_FEATURE_NOT_HANDLED)
-		return result;
-	result = decode_apx_bls(handle, code, code_len, instr, size);
-	if (result != X86_FEATURE_NOT_HANDLED)
-		return result;
-	result = decode_apx_bextr(handle, code, code_len, instr, size);
-	if (result != X86_FEATURE_NOT_HANDLED)
-		return result;
-	result = decode_apx_count(handle, code, code_len, instr, size);
-	if (result != X86_FEATURE_NOT_HANDLED)
-		return result;
-	result = decode_apx_rorx(handle, code, code_len, instr, size);
-	if (result != X86_FEATURE_NOT_HANDLED)
-		return result;
-	result = decode_apx_mulx(handle, code, code_len, instr, size);
-	if (result != X86_FEATURE_NOT_HANDLED)
-		return result;
-	result = decode_apx_convert(handle, code, code_len, instr, size);
-	if (result != X86_FEATURE_NOT_HANDLED)
-		return result;
-	result = decode_apx_arithmetic(handle, code, code_len, instr, size);
-	if (result != X86_FEATURE_NOT_HANDLED)
-		return result;
-	result = decode_apx_map4_reserved(code, code_len);
-	if (result != X86_FEATURE_NOT_HANDLED)
-		return result;
-	return X86_FEATURE_NOT_HANDLED;
+	size_t offset = 0;
+	while (offset < code_len && code[offset] != 0x62)
+		++offset;
+	if (code_len - offset < 2)
+		return X86_FEATURE_NOT_HANDLED;
+
+	/* Preserve handler precedence within each EVEX map. Other maps cannot
+     * match these source-owned encodings and use the generated decoder. */
+	switch (code[offset + 1] & 7) {
+	default:
+		return X86_FEATURE_NOT_HANDLED;
+	case 1:
+		return decode_apx_kmov(handle, code, code_len, instr, size);
+	case 2:
+		result = decode_apx_evex_vector_gpr(handle, code, code_len,
+						    instr, size);
+		if (result != X86_FEATURE_NOT_HANDLED)
+			return result;
+		result = decode_apx_cmpccxadd(handle, code, code_len, instr,
+					      size);
+		if (result != X86_FEATURE_NOT_HANDLED)
+			return result;
+		result = decode_amx(handle, code, code_len, instr, size);
+		if (result != X86_FEATURE_NOT_HANDLED)
+			return result;
+		result = decode_apx_pdep_pext(handle, code, code_len, instr,
+					      size);
+		if (result != X86_FEATURE_NOT_HANDLED)
+			return result;
+		result = decode_apx_bmi_ternary(handle, code, code_len, instr,
+						size);
+		if (result != X86_FEATURE_NOT_HANDLED)
+			return result;
+		result = decode_apx_bls(handle, code, code_len, instr, size);
+		if (result != X86_FEATURE_NOT_HANDLED)
+			return result;
+		result = decode_apx_bextr(handle, code, code_len, instr, size);
+		if (result != X86_FEATURE_NOT_HANDLED)
+			return result;
+		return decode_apx_mulx(handle, code, code_len, instr, size);
+	case 3:
+		result = decode_amx(handle, code, code_len, instr, size);
+		if (result != X86_FEATURE_NOT_HANDLED)
+			return result;
+		return decode_apx_rorx(handle, code, code_len, instr, size);
+	case 4:
+		result = decode_apx_direct_store(handle, code, code_len, instr,
+						 size);
+		if (result != X86_FEATURE_NOT_HANDLED)
+			return result;
+		result = decode_apx_msr(handle, code, code_len, instr, size);
+		if (result != X86_FEATURE_NOT_HANDLED)
+			return result;
+		result =
+			decode_apx_enqueue(handle, code, code_len, instr, size);
+		if (result != X86_FEATURE_NOT_HANDLED)
+			return result;
+		result = decode_apx_rao(handle, code, code_len, instr, size);
+		if (result != X86_FEATURE_NOT_HANDLED)
+			return result;
+		result = decode_apx_ccmp(handle, code, code_len, instr, size);
+		if (result != X86_FEATURE_NOT_HANDLED)
+			return result;
+		result = decode_apx_ctest(handle, code, code_len, instr, size);
+		if (result != X86_FEATURE_NOT_HANDLED)
+			return result;
+		result = decode_apx_movrs(handle, code, code_len, instr, size);
+		if (result != X86_FEATURE_NOT_HANDLED)
+			return result;
+		result = decode_apx_invalidate(handle, code, code_len, instr,
+					       size);
+		if (result != X86_FEATURE_NOT_HANDLED)
+			return result;
+		result = decode_apx_push2_pop2(handle, code, code_len, instr,
+					       size);
+		if (result != X86_FEATURE_NOT_HANDLED)
+			return result;
+		result = decode_apx_cmov(handle, code, code_len, instr, size);
+		if (result != X86_FEATURE_NOT_HANDLED)
+			return result;
+		result = decode_apx_setcc(handle, code, code_len, instr, size);
+		if (result != X86_FEATURE_NOT_HANDLED)
+			return result;
+		result = decode_apx_shift_rotate(handle, code, code_len, instr,
+						 size);
+		if (result != X86_FEATURE_NOT_HANDLED)
+			return result;
+		result = decode_apx_imul_immediate(handle, code, code_len,
+						   instr, size);
+		if (result != X86_FEATURE_NOT_HANDLED)
+			return result;
+		result = decode_apx_imul(handle, code, code_len, instr, size);
+		if (result != X86_FEATURE_NOT_HANDLED)
+			return result;
+		result = decode_apx_adx(handle, code, code_len, instr, size);
+		if (result != X86_FEATURE_NOT_HANDLED)
+			return result;
+		result = decode_apx_unary(handle, code, code_len, instr, size);
+		if (result != X86_FEATURE_NOT_HANDLED)
+			return result;
+		result = decode_apx_double_shift(handle, code, code_len, instr,
+						 size);
+		if (result != X86_FEATURE_NOT_HANDLED)
+			return result;
+		result = decode_apx_count(handle, code, code_len, instr, size);
+		if (result != X86_FEATURE_NOT_HANDLED)
+			return result;
+		result =
+			decode_apx_convert(handle, code, code_len, instr, size);
+		if (result != X86_FEATURE_NOT_HANDLED)
+			return result;
+		result = decode_apx_arithmetic(handle, code, code_len, instr,
+					       size);
+		if (result != X86_FEATURE_NOT_HANDLED)
+			return result;
+		return decode_apx_map4_reserved(code, code_len);
+	case 7:
+		return decode_apx_msr(handle, code, code_len, instr, size);
+	}
 }
 
 static bool print_tilezero(MCInst *instr, SStream *stream, bool att_syntax)
