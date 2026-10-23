@@ -9797,11 +9797,8 @@ const char *X86_reg_name(csh handle, unsigned int reg)
 #ifndef CAPSTONE_DIET
 static const char *const insn_name_maps[] = {
 	NULL, // X86_INS_INVALID
-#ifndef CAPSTONE_X86_REDUCE
+	/* Reduced decoding retains the full public instruction ID numbering. */
 #include "X86MappingInsnName.inc"
-#else
-#include "X86MappingInsnName_reduce.inc"
-#endif
 };
 #endif
 

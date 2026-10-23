@@ -65,6 +65,33 @@ static bool check_id_cache(void)
 	return ok;
 }
 
+static bool check_instruction_names(void)
+{
+	static const struct {
+		unsigned id;
+		const char *name;
+	} cases[] = {
+		{ X86_INS_ADD, "add" },	  { X86_INS_INC, "inc" },
+		{ X86_INS_MOV, "mov" },	  { X86_INS_RDMSR, "rdmsr" },
+		{ X86_INS_CLAC, "clac" }, { X86_INS_RDPKRU, "rdpkru" },
+	};
+	csh handle;
+	if (cs_open(CS_ARCH_X86, CS_MODE_64, &handle) != CS_ERR_OK)
+		return false;
+	bool ok = true;
+	for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+		const char *name = cs_insn_name(handle, cases[i].id);
+		if (!name || strcmp(name, cases[i].name)) {
+			fprintf(stderr, "instruction %u: expected %s, got %s\n",
+				cases[i].id, cases[i].name,
+				name ? name : "NULL");
+			ok = false;
+		}
+	}
+	cs_close(&handle);
+	return ok;
+}
+
 static bool decode(csh handle, const uint8_t *bytes, size_t size, unsigned id,
 		   size_t length)
 {
@@ -764,7 +791,8 @@ int main(void)
 	};
 	const cs_mode modes[] = { CS_MODE_16, CS_MODE_32, CS_MODE_64 };
 	const unsigned syntaxes[] = { CS_OPT_SYNTAX_INTEL, CS_OPT_SYNTAX_ATT };
-	bool ok = check_operand_sets() && check_id_cache();
+	bool ok = check_operand_sets() && check_id_cache() &&
+		  check_instruction_names();
 	for (size_t m = 0; m < sizeof(modes) / sizeof(modes[0]); ++m)
 		for (size_t s = 0; s < sizeof(syntaxes) / sizeof(syntaxes[0]);
 		     ++s)

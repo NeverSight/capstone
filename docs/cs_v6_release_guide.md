@@ -331,6 +331,9 @@ Nonetheless, we hope this additional information is useful to you.
 
 **x86-64**
 
+- `cs_insn_name()` in `CAPSTONE_X86_REDUCE` builds now uses the public
+  instruction ID numbering, fixing incorrect names and missing names for
+  decoded instructions such as `MOV` and `RDMSR`.
 - Invalid LOCK forms, including arithmetic register/memory forms with a
   register destination and multi-byte NOPs, and MOV-to-CS encodings are now
   rejected during decoding, independently of syntax, text, and detail options.

@@ -35,12 +35,13 @@ static bool check_case(csh handle, const msr_case *test, bool att)
 			test->intel);
 		return false;
 	}
+	const char *name = cs_insn_name(handle, instruction->id);
 	ok = instruction->id == test->id &&
 	     strcmp(instruction->mnemonic, test->mnemonic) == 0 &&
 	     strcmp(instruction->op_str, att ? test->att : test->intel) == 0 &&
-	     strcmp(cs_insn_name(handle, instruction->id), test->mnemonic) == 0 &&
-	     instruction->size == test->size &&
-	     instruction->detail && instruction->detail->x86.op_count == 2;
+	     name && strcmp(name, test->mnemonic) == 0 &&
+	     instruction->size == test->size && instruction->detail &&
+	     instruction->detail->x86.op_count == 2;
 	if (ok) {
 		const cs_x86 *x86 = &instruction->detail->x86;
 		cs_regs reads, writes;
