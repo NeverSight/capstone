@@ -121,6 +121,11 @@ static bool check_escape(csh handle, cs_insn *iter, uint8_t *end,
 			      cursor == start + instruction_size &&
 			      left == n - instruction_size &&
 			      address == UINT64_MAX - 2 + instruction_size;
+			if (iter->detail && id == X86_INS_VCMPSS)
+				ok &= memcmp(iter->detail->x86.opcode, code,
+					     4) == 0 &&
+				      memcmp(batch->detail->x86.opcode, code,
+					     4) == 0;
 		} else if (!decoded) {
 			ok &= cursor == start && left == n &&
 			      address == UINT64_MAX - 2;
@@ -176,6 +181,11 @@ static bool check_escape_boundaries(uint8_t *end)
 		{ CS_MODE_32, { 0xc4, 0x21 }, 2, X86_INS_LES, 2 },
 		{ CS_MODE_16, { 0xc4, 0x21 }, 2, X86_INS_LES, 2 },
 		{ CS_MODE_16, { 0x62, 0x07 }, 2, X86_INS_BOUND, 2 },
+		{ CS_MODE_32,
+		  { 0x62, 0x02, 0x05, 0x60, 0xcb, 0xc0, 0x90, 0x90 },
+		  8,
+		  X86_INS_BOUND,
+		  2 },
 		/* Trailing escapes must not absorb an earlier legacy INC/DEC. */
 		{ CS_MODE_32,
 		  { 0x40, 0x62, 0xf4, 0x7c, 0x08, 0x01, 0xc1 },
@@ -184,6 +194,23 @@ static bool check_escape_boundaries(uint8_t *end)
 		  1 },
 		{ CS_MODE_16, { 0x48, 0xd5, 0x00, 0x90 }, 4, X86_INS_DEC, 1 },
 #ifndef CAPSTONE_X86_REDUCE
+		/* Scalar LLIG and APX addressing normalize different EVEX bytes.
+		 * Their raw prefix must survive both batch and iterator decoding. */
+		{ CS_MODE_64,
+		  { 0x62, 0xf1, 0x6e, 0x28, 0xc2, 0xcb, 0x20 },
+		  7,
+		  X86_INS_VCMPSS,
+		  7 },
+		{ CS_MODE_64,
+		  { 0x62, 0xf9, 0x6e, 0x28, 0xc2, 0x0b, 0x20 },
+		  7,
+		  X86_INS_VCMPSS,
+		  7 },
+		{ CS_MODE_64,
+		  { 0x62, 0xf1, 0x6e, 0x68, 0xc2, 0xcb, 0x00 },
+		  7,
+		  X86_INS_INVALID,
+		  0 },
 		{ CS_MODE_64, { 0xc5, 0xf8, 0x77 }, 3, X86_INS_VZEROUPPER, 3 },
 		{ CS_MODE_64,
 		  { 0xc4, 0xe1, 0x74, 0x58, 0xc2 },

@@ -1618,12 +1618,18 @@ static bool scan_x86_evex_prefix(const uint8_t *code, size_t code_len,
 	return false;
 }
 
-// Public interface for the disassembler
-bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
-			MCInst *instr, uint16_t *size, uint64_t address,
-			void *_info)
+/* Keep EVEX normalization state off the ordinary decoding path. */
+#if defined(_MSC_VER)
+__declspec(noinline)
+#elif defined(__GNUC__)
+__attribute__((noinline))
+#endif
+static int
+decodeEVEXInstruction(InternalInstruction *insn, const uint8_t *code,
+		      size_t code_len, cs_mode mode,
+		      bool *scalar_compare_p2_normalized,
+		      uint8_t *original_scalar_compare_p2)
 {
-	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
 	const uint8_t *decode_code = code;
 	size_t decode_size = code_len;
 	uint8_t normalized_code[15];
@@ -1633,52 +1639,16 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 	unsigned int evex_address_size_count = 0;
 	bool evex_invalid_prefix = false;
 	bool has_evex_normalization_prefix = false;
-	bool scalar_compare_p2_normalized = false;
 	uint8_t apx_evex_p0 = 0, apx_evex_p1 = 0;
 	bool apx_evex_normalized = false;
 	bool apx_evex_b4 = false, apx_evex_x4 = false;
-	uint8_t extension_opcode;
-	x86_feature_decode_result extension_result;
-	int ret;
-	bool result;
-
-	if (instr->flat_insn->detail) {
-		// instr->flat_insn->detail initialization: 3 alternatives
-
-		// 1. The whole structure, this is how it's done in other arch disassemblers
-		// Probably overkill since cs_detail is huge because of the 36 operands of ARM
-
-		//memset(instr->flat_insn->detail, 0, sizeof(cs_detail));
-
-		// 2. Only the part relevant to x86
-		memset(instr->flat_insn->detail, 0,
-		       offsetof(cs_detail, x86) + sizeof(cs_x86));
-
-		// 3. The relevant part except for x86.operands
-		// sizeof(cs_x86) is 0x1c0, sizeof(x86.operands) is 0x180
-		// marginally faster, should be okay since x86.op_count is set to 0
-
-		//memset(instr->flat_insn->detail, 0, offsetof(cs_detail, x86)+offsetof(cs_x86, operands));
-	}
-
-	extension_result = X86_decodeFeatureExtension(ud, code, code_len, instr,
-						      size, &extension_opcode);
-	if (extension_result == X86_FEATURE_DECODED) {
-		return true;
-	}
-	if (extension_result == X86_FEATURE_INVALID)
-		return false;
-
-	InternalInstruction insn = { 0 };
 	evex_normalization_limit = code_len < sizeof(normalized_code) ?
 					   code_len :
 					   sizeof(normalized_code);
-	if (extension_opcode == 0x62)
-		has_evex_normalization_prefix = scan_x86_evex_prefix(
-			code, evex_normalization_limit,
-			(handle->mode & CS_MODE_64) != 0,
-			&evex_normalization_offset, &evex_segment_count,
-			&evex_address_size_count, &evex_invalid_prefix);
+	has_evex_normalization_prefix = scan_x86_evex_prefix(
+		code, evex_normalization_limit, (mode & CS_MODE_64) != 0,
+		&evex_normalization_offset, &evex_segment_count,
+		&evex_address_size_count, &evex_invalid_prefix);
 
 	/* Packed VCMPPS/PD uses EVEX.L'L as its vector length unless EVEX.b
 	 * selects SAE and a fixed 512-bit length for a register source.  The
@@ -1697,9 +1667,8 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 			(code[evex_normalization_offset + 5] & 0xc0) != 0xc0;
 
 		if (evex_invalid_prefix || evex_segment_count > 1 ||
-		    evex_address_size_count > 1 ||
-		    (ll == 3 && !(b && !memory)))
-			return false;
+		    evex_address_size_count > 1 || (ll == 3 && !(b && !memory)))
+			return -1;
 	}
 
 	/* Scalar VCMPSS/SD treats EVEX.L'L as LLIG when EVEX.b is clear.
@@ -1721,14 +1690,14 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 		if (evex_invalid_prefix || evex_segment_count > 1 ||
 		    evex_address_size_count > 1 || (memory && b) ||
 		    (!b && ll == 3))
-			return false;
+			return -1;
 		if (!b && ll != 0) {
 			memcpy(normalized_code, decode_code,
 			       evex_normalization_limit);
 			normalized_code[evex_normalization_offset + 3] &= ~0x60;
 			decode_code = normalized_code;
 			decode_size = evex_normalization_limit;
-			scalar_compare_p2_normalized = true;
+			*scalar_compare_p2_normalized = true;
 		}
 	}
 
@@ -1744,22 +1713,23 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 	    (code[evex_normalization_offset + 4] == 0xc8 ||
 	     (code[evex_normalization_offset + 4] >= 0xca &&
 	      code[evex_normalization_offset + 4] <= 0xcd))) {
-		const uint8_t ll =
-			(code[evex_normalization_offset + 3] >> 5) & 3;
-		const bool b =
-			(code[evex_normalization_offset + 3] & 0x10) != 0;
+		const uint8_t ll = (code[evex_normalization_offset + 3] >> 5) &
+				   3;
+		const bool b = (code[evex_normalization_offset + 3] & 0x10) !=
+			       0;
 		const bool memory =
 			(code[evex_normalization_offset + 5] & 0xc0) != 0xc0;
-		const bool scalar = code[evex_normalization_offset + 4] == 0xcb ||
+		const bool scalar = code[evex_normalization_offset + 4] ==
+					    0xcb ||
 				    code[evex_normalization_offset + 4] == 0xcd;
 
 		if (evex_invalid_prefix || evex_segment_count > 1 ||
 		    evex_address_size_count > 1)
-			return false;
+			return -1;
 
 		if (scalar) {
 			if ((memory && b) || (!b && ll == 3))
-				return false;
+				return -1;
 			if (!b && ll != 0) {
 				memcpy(normalized_code, decode_code,
 				       evex_normalization_limit);
@@ -1769,7 +1739,7 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 				decode_size = evex_normalization_limit;
 			}
 		} else if (!(b && !memory) && ll != 2) {
-			return false;
+			return -1;
 		}
 	}
 	/* VRCP14/VRSQRT14 scalar forms are LLIG when EVEX.b is clear;
@@ -1782,21 +1752,21 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 	    (code[evex_normalization_offset + 2] & 3) == 1 &&
 	    code[evex_normalization_offset + 4] >= 0x4c &&
 	    code[evex_normalization_offset + 4] <= 0x4f) {
-		const uint8_t ll =
-			(code[evex_normalization_offset + 3] >> 5) & 3;
-		const bool b =
-			(code[evex_normalization_offset + 3] & 0x10) != 0;
+		const uint8_t ll = (code[evex_normalization_offset + 3] >> 5) &
+				   3;
+		const bool b = (code[evex_normalization_offset + 3] & 0x10) !=
+			       0;
 		const bool memory =
 			(code[evex_normalization_offset + 5] & 0xc0) != 0xc0;
-		const bool scalar =
-			(code[evex_normalization_offset + 4] & 1) != 0;
+		const bool scalar = (code[evex_normalization_offset + 4] & 1) !=
+				    0;
 
 		if (evex_invalid_prefix || evex_segment_count > 1 ||
 		    evex_address_size_count > 1)
-			return false;
+			return -1;
 
 		if (ll == 3 || (b && (!memory || scalar)))
-			return false;
+			return -1;
 		if (scalar && ll != 0) {
 			memcpy(normalized_code, decode_code,
 			       evex_normalization_limit);
@@ -1812,17 +1782,17 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 	    (code[evex_normalization_offset + 1] & 7) == 3 &&
 	    (code[evex_normalization_offset + 2] & 3) == 1 &&
 	    code[evex_normalization_offset + 4] == 0x67) {
-		const uint8_t ll =
-			(code[evex_normalization_offset + 3] >> 5) & 3;
-		const bool b =
-			(code[evex_normalization_offset + 3] & 0x10) != 0;
+		const uint8_t ll = (code[evex_normalization_offset + 3] >> 5) &
+				   3;
+		const bool b = (code[evex_normalization_offset + 3] & 0x10) !=
+			       0;
 
 		if (evex_invalid_prefix || evex_segment_count > 1 ||
 		    evex_address_size_count > 1)
-			return false;
+			return -1;
 
 		if (ll == 3 || b)
-			return false;
+			return -1;
 		if (ll != 0) {
 			memcpy(normalized_code, decode_code,
 			       evex_normalization_limit);
@@ -1843,8 +1813,7 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 		    (code[evex_normalization_offset + 2] & 3) == 3 &&
 		    (code[evex_normalization_offset + 4] == 0x9b ||
 		     code[evex_normalization_offset + 4] == 0xab)) {
-			const uint8_t p2 =
-				code[evex_normalization_offset + 3];
+			const uint8_t p2 = code[evex_normalization_offset + 3];
 			const uint8_t ll = (p2 >> 5) & 3;
 			const uint8_t mask = p2 & 7;
 			const bool broadcast = (p2 & 0x10) != 0;
@@ -1853,7 +1822,7 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 			if (evex_invalid_prefix || evex_segment_count > 1 ||
 			    evex_address_size_count > 1 || broadcast ||
 			    (zeroing && mask == 0) || ll == 3)
-				return false;
+				return -1;
 			if (ll != 0) {
 				memcpy(normalized_code, decode_code,
 				       evex_normalization_limit);
@@ -1883,12 +1852,12 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 			const uint8_t modrm =
 				code[evex_normalization_offset + 5];
 
-			if (!(handle->mode & CS_MODE_64) ||
-			    evex_invalid_prefix || evex_segment_count > 1 ||
+			if (!(mode & CS_MODE_64) || evex_invalid_prefix ||
+			    evex_segment_count > 1 ||
 			    evex_address_size_count > 1 ||
 			    ((modrm & 0xc0) == 0xc0 &&
 			     (code[evex_normalization_offset + 2] & 0x04) == 0))
-				return false;
+				return -1;
 			apx_evex_p0 = code[evex_normalization_offset + 1];
 			apx_evex_p1 = code[evex_normalization_offset + 2];
 			apx_evex_b4 = (apx_evex_p0 & 0x08) != 0;
@@ -1905,18 +1874,82 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 		}
 	}
 
-	ret = decodeInstruction(&insn, decode_code, decode_size, handle->mode);
+	const int ret = decodeInstruction(insn, decode_code, decode_size, mode);
+
+	/* No further byte reads follow decoding; keep the input pointer valid
+	 * when the local normalization buffer goes out of scope. */
+	insn->code = code;
+	insn->codeSize = code_len;
+	if (ret)
+		return ret;
+	if (apx_evex_normalized) {
+		insn->apxEvexB4 = apx_evex_b4;
+		insn->apxEvexX4 = apx_evex_x4;
+		insn->vectorExtensionPrefix[1] = apx_evex_p0;
+		insn->vectorExtensionPrefix[2] = apx_evex_p1;
+	}
+	if (*scalar_compare_p2_normalized)
+		*original_scalar_compare_p2 =
+			code[evex_normalization_offset + 3];
+	return 0;
+}
+
+// Public interface for the disassembler
+bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
+			MCInst *instr, uint16_t *size, uint64_t address,
+			void *_info)
+{
+	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
+	bool scalar_compare_p2_normalized = false;
+	uint8_t original_scalar_compare_p2 = 0;
+	uint8_t extension_opcode;
+	x86_feature_decode_result extension_result;
+	int ret;
+	bool result;
+
+	if (instr->flat_insn->detail) {
+		// instr->flat_insn->detail initialization: 3 alternatives
+
+		// 1. The whole structure, this is how it's done in other arch disassemblers
+		// Probably overkill since cs_detail is huge because of the 36 operands of ARM
+
+		//memset(instr->flat_insn->detail, 0, sizeof(cs_detail));
+
+		// 2. Only the part relevant to x86
+		memset(instr->flat_insn->detail, 0,
+		       offsetof(cs_detail, x86) + sizeof(cs_x86));
+
+		// 3. The relevant part except for x86.operands
+		// sizeof(cs_x86) is 0x1c0, sizeof(x86.operands) is 0x180
+		// marginally faster, should be okay since x86.op_count is set to 0
+
+		//memset(instr->flat_insn->detail, 0, offsetof(cs_detail, x86)+offsetof(cs_x86, operands));
+	}
+
+	extension_result = X86_FEATURE_NOT_HANDLED;
+	if (X86_mayDecodeFeatureExtension(code, code_len,
+					  (handle->mode & CS_MODE_64) != 0,
+					  &extension_opcode))
+		extension_result = X86_decodeFeatureExtension(
+			ud, code, code_len, instr, size, extension_opcode);
+	if (extension_result == X86_FEATURE_DECODED) {
+		return true;
+	}
+	if (extension_result == X86_FEATURE_INVALID)
+		return false;
+
+	InternalInstruction insn = { 0 };
+	if (extension_opcode == 0x62)
+		ret = decodeEVEXInstruction(&insn, code, code_len, handle->mode,
+					    &scalar_compare_p2_normalized,
+					    &original_scalar_compare_p2);
+	else
+		ret = decodeInstruction(&insn, code, code_len, handle->mode);
 
 	if (ret) {
 		return false;
 	} else {
 		*size = (uint16_t)insn.length;
-		if (apx_evex_normalized) {
-			insn.apxEvexB4 = apx_evex_b4;
-			insn.apxEvexX4 = apx_evex_x4;
-			insn.vectorExtensionPrefix[1] = apx_evex_p0;
-			insn.vectorExtensionPrefix[2] = apx_evex_p1;
-		}
 
 #ifndef CAPSTONE_X86_REDUCE
 		if (insn.displacementSize == 1 &&
@@ -1933,7 +1966,7 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 			unsigned Flags = X86_IP_NO_PREFIX;
 			if (scalar_compare_p2_normalized)
 				insn.vectorExtensionPrefix[3] =
-					code[evex_normalization_offset + 3];
+					original_scalar_compare_p2;
 			instr->imm_size = insn.immSize;
 
 			// copy all prefixes

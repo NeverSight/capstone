@@ -159,13 +159,84 @@ typedef enum x86_feature_decode_result {
 	X86_FEATURE_INVALID,
 } x86_feature_decode_result;
 
-/* opcode receives the first byte after the mode's legacy/REX prefixes, or
- * zero if absent, including when no feature decoder handles the instruction. */
-x86_feature_decode_result X86_decodeFeatureExtension(
-	csh handle, const uint8_t *code, size_t code_len, MCInst *instr,
-	uint16_t *size, uint8_t *opcode);
-bool X86_printFeatureExtension(MCInst *instr, SStream *stream,
-			       bool att_syntax);
+enum {
+	FEATURE_LEGACY_PREFIX = 1,
+	FEATURE_REX_PREFIX = 2,
+	FEATURE_ESCAPE = 4,
+	FEATURE_0F_ESCAPE = 8,
+};
+
+static const uint8_t feature_prefix_flags[256] = {
+	/* 0x00 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8,
+	/* 0x10 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 0x20 */ 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0,
+	/* 0x30 */ 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0,
+	/* 0x40 */ 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+	/* 0x50 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 0x60 */ 0, 0, 4, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 0x70 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 0x80 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 0x90 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 0xa0 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 0xb0 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 0xc0 */ 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 0xd0 */ 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 0xe0 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 0xf0 */ 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+};
+
+static inline bool may_be_0f_feature_extension(const uint8_t *suffix,
+					       size_t size)
+{
+	return (size >= 1 && suffix[0] == 0x38) ||
+	       (size >= 2 &&
+		((suffix[0] == 0x00 && (suffix[1] & 0x38) == 0x30) ||
+		 (suffix[0] == 0xc7 && (suffix[1] & 0xf8) == 0xf0) ||
+		 (suffix[0] == 0x3a && suffix[1] == 0xf0))) ||
+	       (size >= 2 && suffix[0] == 0x01 &&
+		(suffix[1] == 0xc6 || suffix[1] == 0xca || suffix[1] == 0xed ||
+		 suffix[1] == 0xee || suffix[1] == 0xef || suffix[1] == 0xfe ||
+		 suffix[1] == 0xff));
+}
+
+/* Classify prefixes and escapes in one lookup. In 16/32-bit modes the
+ * 40..4f opcodes end the scan; subsequent instructions cannot be extensions
+ * of the current INC/DEC. opcode receives the first non-prefix byte, or zero
+ * if the input is empty or contains only prefixes. */
+static inline bool X86_mayDecodeFeatureExtension(const uint8_t *code,
+						 size_t code_len,
+						 bool is_64_bit,
+						 uint8_t *opcode)
+{
+	const uint8_t prefix_mask = FEATURE_LEGACY_PREFIX |
+				    (is_64_bit ? FEATURE_REX_PREFIX : 0);
+	size_t offset = 0;
+
+	*opcode = 0;
+	while (offset < code_len) {
+		uint8_t byte = code[offset];
+		uint8_t flags = feature_prefix_flags[byte];
+		++offset;
+		if (flags & prefix_mask)
+			continue;
+		*opcode = byte;
+		if (flags == FEATURE_0F_ESCAPE)
+			return may_be_0f_feature_extension(code + offset,
+							   code_len - offset);
+		if (flags != FEATURE_ESCAPE)
+			return false;
+		/* VEX map 1 is entirely handled by the generated decoder. */
+		return byte != 0xc4 || offset == code_len ||
+		       (code[offset] & 0x1f) != 1;
+	}
+	return false;
+}
+
+/* Called only after X86_mayDecodeFeatureExtension selects an escape. */
+x86_feature_decode_result
+X86_decodeFeatureExtension(csh handle, const uint8_t *code, size_t code_len,
+			   MCInst *instr, uint16_t *size, uint8_t opcode);
+bool X86_printFeatureExtension(MCInst *instr, SStream *stream, bool att_syntax);
 bool X86_mapFeatureExtension(cs_insn *insn, unsigned int opcode);
 const char *X86_featureExtensionRegisterName(unsigned int reg);
 const char *X86_featureExtensionInstructionName(unsigned int id);

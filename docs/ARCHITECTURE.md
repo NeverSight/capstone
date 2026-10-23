@@ -56,6 +56,13 @@ operands before using them. Printer state and unused operand slots are not
 initialized in this mode and must not be read by a decoder. Other option
 combinations use the complete initializer.
 
+The x86 extension selector is inlined at the decoder entry. It retains the
+mode-dependent prefix and opcode filters in `X86FeatureExtension.h`, and only
+calls the extension decoders for a possible match. EVEX normalization and its
+scratch buffer live in a separate helper; ordinary instructions enter the
+generated decoder directly. Both routes retain operand validation and
+translation, including immediate-dependent opcode selection.
+
 ### Disassembling process
 
 There are two steps in disassembling an instruction.
