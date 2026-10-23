@@ -98,6 +98,20 @@ Instruction ID selection specializes the existing rules for each bitness. In
 ordinary opcodes take the direct attribute lookup. Opcode 90 and other prefix
 combinations retain the size, mandatory-prefix and XCHG repair rules.
 
+The decoder's packed decision tables derive from the original full/reduced
+`X86GenDisassemblerTables*.inc` inputs. Direct decisions embed one or two
+instruction IDs in the existing four-byte entry; other decisions retain their
+ModR/M-table offsets. The read-required flag is independent of those IDs, so
+invalid split entries still consume ModR/M. The trailing 3DNow opcode keeps its
+explicit ModR/M requirement. Identical complete opcode rows share storage.
+Run `python3 suite/synctools/x86_disassembler_tables.py` after changing the
+inputs or decoder context definitions. Its `--check` mode verifies generated
+output and every context/opcode/ModR/M result against the original tables,
+including read requirements, and rejects values outside the packed format.
+This check runs in the unit suite when Python is available. Edit the original
+tables, then regenerate; the packed tables are not a separate instruction
+definition.
+
 ### Disassembling process
 
 There are two steps in disassembling an instruction.

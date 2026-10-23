@@ -38,8 +38,7 @@
 /// instruction each possible value of the ModR/M byte corresponds to.  Once
 /// this information is known, we have narrowed down to a single instruction.
 struct ModRMDecision {
-	uint8_t modrm_type;
-	uint16_t instructionIDs;
+	uint32_t packed;
 };
 
 /// Specifies which set of ModR/M->instruction tables to look at
@@ -59,11 +58,11 @@ struct ContextDecision {
 
 #ifdef CAPSTONE_X86_REDUCE
 #include "X86GenDisassemblerTables_reduce.inc"
-#include "X86GenDisassemblerTables_reduce2.inc"
+#include "X86GenDisassemblerTablesPacked_reduce.inc"
 #include "X86Lookup16_reduce.inc"
 #else
 #include "X86GenDisassemblerTables.inc"
-#include "X86GenDisassemblerTables2.inc"
+#include "X86GenDisassemblerTablesPacked.inc"
 #include "X86Lookup16.inc"
 #endif
 
@@ -142,30 +141,30 @@ __attribute__((always_inline))
 #endif
 static inline InstrUID
 #endif
-decode(const struct ModRMDecision *dec, uint8_t modRM)
+decode(uint32_t packed, uint8_t modRM)
 {
-	switch (dec->modrm_type) {
+	unsigned int offset;
+
+	if (!(packed & X86_DECISION_INDEXED)) {
+		unsigned int shift = modFromModRM(modRM) == 0x3 ?
+					     X86_DECISION_REGISTER_SHIFT :
+					     0;
+		return (packed >> shift) & X86_DECISION_UID_MASK;
+	}
+	offset = packed & X86_DECISION_OFFSET_MASK;
+	switch ((packed >> X86_DECISION_TYPE_SHIFT) & X86_DECISION_TYPE_MASK) {
 	default:
-		// debug("Corrupt table!  Unknown modrm_type");
 		return 0;
-	case MODRM_ONEENTRY:
-		return modRMTable[dec->instructionIDs];
-	case MODRM_SPLITRM:
-		if (modFromModRM(modRM) == 0x3)
-			return modRMTable[dec->instructionIDs + 1];
-		return modRMTable[dec->instructionIDs];
 	case MODRM_SPLITREG:
 		if (modFromModRM(modRM) == 0x3)
-			return modRMTable[dec->instructionIDs +
-					  ((modRM & 0x38) >> 3) + 8];
-		return modRMTable[dec->instructionIDs + ((modRM & 0x38) >> 3)];
+			return modRMTable[offset + ((modRM & 0x38) >> 3) + 8];
+		return modRMTable[offset + ((modRM & 0x38) >> 3)];
 	case MODRM_SPLITMISC:
 		if (modFromModRM(modRM) == 0x3)
-			return modRMTable[dec->instructionIDs + (modRM & 0x3f) +
-					  8];
-		return modRMTable[dec->instructionIDs + ((modRM & 0x38) >> 3)];
+			return modRMTable[offset + (modRM & 0x3f) + 8];
+		return modRMTable[offset + ((modRM & 0x38) >> 3)];
 	case MODRM_FULL:
-		return modRMTable[dec->instructionIDs + modRM];
+		return modRMTable[offset + modRM];
 	}
 }
 
@@ -945,20 +944,23 @@ getIDWithAttrMask(uint16_t *instructionID, struct InternalInstruction *insn,
 {
 	const struct ModRMDecision *decision = getModRMDecision(
 		insn->opcodeType, contextForAttrs(attrMask), insn->opcode);
+	uint32_t packed;
 	bool hasModRMExtension;
 
 	if (!decision) {
 		*instructionID = 0;
 		return 0;
 	}
-	hasModRMExtension = decision->modrm_type != MODRM_ONEENTRY;
+	packed = decision->packed;
+	hasModRMExtension =
+		(packed & (X86_DECISION_INDEXED | X86_DECISION_SPLIT)) != 0;
 #ifndef CAPSTONE_X86_REDUCE
 	/* The trailing 3DNow opcode always follows a ModR/M byte. */
 	hasModRMExtension |= insn->opcodeType == THREEDNOW_MAP;
 #endif
 	if (hasModRMExtension && readModRM(insn))
 		return -1;
-	*instructionID = decode(decision, hasModRMExtension ? insn->modRM : 0);
+	*instructionID = decode(packed, hasModRMExtension ? insn->modRM : 0);
 
 	return 0;
 }
@@ -1177,21 +1179,6 @@ getIDForMode(struct InternalInstruction *insn, cs_mode mode,
 	uint16_t attrMask;
 	uint16_t instructionID;
 	bool rexWOverridesOpSize;
-
-	/* Common legacy instructions need no prefix-conflict or size repair. */
-	if (decoderMode != MODE_16BIT &&
-	    insn->vectorExtensionType == TYPE_NO_VEX_XOP &&
-	    !(insn->hasOpSize | insn->hasAdSize | insn->repeatPrefix) &&
-	    insn->opcode != 0x90) {
-		attrMask = decoderMode == MODE_64BIT ? ATTR_64BIT : ATTR_NONE;
-		if (insn->rexPrefix & 0x08)
-			attrMask |= ATTR_REXW;
-		if (getIDWithAttrMask(&instructionID, insn, attrMask))
-			return -1;
-		insn->instructionID = instructionID;
-		insn->spec = specifierForUID(instructionID);
-		return 0;
-	}
 
 	/* REX.W overrides the operand-sized prefix for near RET in 64-bit mode */
 	rexWOverridesOpSize = decoderMode == MODE_64BIT && insn->hasOpSize &&
@@ -1550,7 +1537,7 @@ getIDForMode(struct InternalInstruction *insn, cs_mode mode,
 	return 0;
 }
 
-static int getID(struct InternalInstruction *insn, cs_mode mode)
+static int getIDSlow(struct InternalInstruction *insn, cs_mode mode)
 {
 	switch (insn->mode) {
 	case MODE_16BIT:
@@ -1560,6 +1547,29 @@ static int getID(struct InternalInstruction *insn, cs_mode mode)
 	default:
 		return getIDForMode(insn, mode, MODE_64BIT);
 	}
+}
+
+static int getID(struct InternalInstruction *insn, cs_mode mode)
+{
+	uint16_t attrMask;
+	uint16_t instructionID;
+
+	/* Common legacy instructions need no prefix-conflict or size repair. */
+	if (insn->mode != MODE_16BIT &&
+	    insn->vectorExtensionType == TYPE_NO_VEX_XOP &&
+	    !(insn->hasOpSize | insn->hasAdSize | insn->repeatPrefix) &&
+	    insn->opcode != 0x90) {
+		attrMask = insn->mode == MODE_64BIT ? ATTR_64BIT : ATTR_NONE;
+		if (insn->rexPrefix & 0x08)
+			attrMask |= ATTR_REXW;
+		if (getIDWithAttrMask(&instructionID, insn, attrMask))
+			return -1;
+		insn->instructionID = instructionID;
+		insn->spec = specifierForUID(instructionID);
+		return 0;
+	}
+
+	return getIDSlow(insn, mode);
 }
 
 /*
