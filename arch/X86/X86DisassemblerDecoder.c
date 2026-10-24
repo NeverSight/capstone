@@ -324,16 +324,62 @@ static void setSegmentOverride(struct InternalInstruction *insn,
 	insn->prefix1 = byte;
 }
 
+#if defined(_MSC_VER)
+static __forceinline void
+#elif defined(__GNUC__)
+static inline __attribute__((always_inline)) void
+#else
+static inline void
+#endif
+setInstructionSizes(struct InternalInstruction *insn, bool hasOpSize,
+		    bool hasAdSize)
+{
+	if (insn->mode == MODE_16BIT) {
+		insn->registerSize = (hasOpSize ? 4 : 2);
+		insn->addressSize = (hasAdSize ? 4 : 2);
+		insn->displacementSize = (hasAdSize ? 4 : 2);
+		insn->immediateSize = (hasOpSize ? 4 : 2);
+		insn->immSize = (hasOpSize ? 4 : 2);
+	} else if (insn->mode == MODE_32BIT) {
+		insn->registerSize = (hasOpSize ? 2 : 4);
+		insn->addressSize = (hasAdSize ? 2 : 4);
+		insn->displacementSize = (hasAdSize ? 2 : 4);
+		insn->immediateSize = (hasOpSize ? 2 : 4);
+		insn->immSize = (hasOpSize ? 2 : 4);
+	} else if (insn->mode == MODE_64BIT) {
+		if (insn->rexPrefix && wFromREX(insn->rexPrefix)) {
+			insn->registerSize = 8;
+			insn->addressSize = (hasAdSize ? 4 : 8);
+			insn->displacementSize = 4;
+			insn->immediateSize = 4;
+			insn->immSize = 4;
+		} else {
+			insn->registerSize = (hasOpSize ? 2 : 4);
+			insn->addressSize = (hasAdSize ? 4 : 8);
+			insn->displacementSize = (hasOpSize ? 2 : 4);
+			insn->immediateSize = (hasOpSize ? 2 : 4);
+			insn->immSize = (hasOpSize ? 4 : 8);
+		}
+	}
+}
+
+typedef enum {
+	PREFIX_READ_INVALID = -1,
+	PREFIX_READ_GENERIC,
+	PREFIX_READ_SIMPLE_LEGACY,
+} PrefixReadStatus;
+
 /*
  * readPrefixes - Consumes all of an instruction's prefix bytes, and marks the
  *   instruction as having them.  Also sets the instruction's default operand,
  *   address, and other relevant data sizes to report operands correctly.
  *
  * @param insn  - The instruction whose prefixes are to be read.
- * @return      - 0 if the instruction could be read until the end of the prefix
- *                bytes, and no prefixes conflicted; nonzero otherwise.
+ * @return      - Invalid on a read/conflict failure. Simple legacy identifies
+ *                an ordinary opcode after no prefix or one REX; other successful
+ *                prefix sequences return generic.
  */
-static int readPrefixes(struct InternalInstruction *insn)
+static PrefixReadStatus readPrefixes(struct InternalInstruction *insn)
 {
 	bool isPrefix = true;
 	bool vexForbiddenPrefix;
@@ -350,12 +396,12 @@ static int readPrefixes(struct InternalInstruction *insn)
 	 * prefix loop. Escapes reuse the same payload parser; repeated REX or
 	 * legacy prefixes retain their ordering and conflict checks below. */
 	if (insn->codeSize == 0)
-		return -1;
+		return PREFIX_READ_INVALID;
 	byte = insn->code[0];
 	if (isREX(insn, byte)) {
 		offset = 1;
 		if (insn->codeSize == offset)
-			return -1;
+			return PREFIX_READ_INVALID;
 		byte = insn->code[offset];
 	}
 	if (!(feature_prefix_flags[byte] & prefixMask)) {
@@ -367,29 +413,31 @@ static int readPrefixes(struct InternalInstruction *insn)
 			goto legacyPrefixesRead;
 		insn->readerCursor = offset;
 		insn->vectorExtensionType = TYPE_NO_VEX_XOP;
-		goto sizes;
+		/* The initialized state has no overrides on this prefix-free path. */
+		setInstructionSizes(insn, false, false);
+		return PREFIX_READ_SIMPLE_LEGACY;
 	}
 
 	while (isPrefix) {
 		/* If we fail reading prefixes, just stop here and let the opcode reader deal with it */
 		if (consumeByte(insn, &byte))
-			return -1;
+			return PREFIX_READ_INVALID;
 
 		if (insn->readerCursor == 1 && (byte == 0xf2 || byte == 0xf3)) {
 			// prefix requires next byte
 			if (lookAtByte(insn, &nextByte))
-				return -1;
+				return PREFIX_READ_INVALID;
 
 			if (isREX(insn, nextByte)) {
 				uint8_t nnextByte;
 
 				// Go to REX prefix after the current one
 				if (consumeByte(insn, &nnextByte))
-					return -1;
+					return PREFIX_READ_INVALID;
 
 				// We should be able to read next byte after REX prefix
 				if (lookAtByte(insn, &nnextByte))
-					return -1;
+					return PREFIX_READ_INVALID;
 
 				unconsumeByte(insn);
 			}
@@ -433,7 +481,7 @@ static int readPrefixes(struct InternalInstruction *insn)
 				break;
 			default:
 				// debug("Unhandled override");
-				return -1;
+				return PREFIX_READ_INVALID;
 			}
 			insn->rexPrefix = 0;
 			break;
@@ -479,7 +527,7 @@ legacyPrefixesRead:
 		 * so accept only the canonical single-prefix spelling. */
 		if (insn->rexPrefix || segmentPrefixCount > 1 ||
 		    addressSizePrefixCount > 1 || consumeByte(insn, &payload))
-			return -1;
+			return PREFIX_READ_INVALID;
 		insn->hasRex2 = true;
 		insn->rex2Prefix = payload;
 		/* Reuse the generated legacy tables for W/R3/X3/B3.  R4/X4/B4
@@ -491,7 +539,7 @@ legacyPrefixesRead:
 
 		if (consumeByte(insn, &byte1)) {
 			// dbgprintf(insn, "Couldn't read second byte of EVEX prefix");
-			return -1;
+			return PREFIX_READ_INVALID;
 		}
 
 		if (lookAtByte(insn, &byte2)) {
@@ -515,13 +563,13 @@ legacyPrefixesRead:
 			if (consumeByte(insn,
 					&insn->vectorExtensionPrefix[2])) {
 				// dbgprintf(insn, "Couldn't read third byte of EVEX prefix");
-				return -1;
+				return PREFIX_READ_INVALID;
 			}
 
 			if (consumeByte(insn,
 					&insn->vectorExtensionPrefix[3])) {
 				// dbgprintf(insn, "Couldn't read fourth byte of EVEX prefix");
-				return -1;
+				return PREFIX_READ_INVALID;
 			}
 
 			/* We simulate the REX prefix for simplicity's sake */
@@ -551,7 +599,7 @@ legacyPrefixesRead:
 
 		if (lookAtByte(insn, &byte1)) {
 			// dbgprintf(insn, "Couldn't read second byte of VEX");
-			return -1;
+			return PREFIX_READ_INVALID;
 		}
 
 		if (insn->mode == MODE_64BIT || (byte1 & 0xc0) == 0xc0)
@@ -590,7 +638,7 @@ legacyPrefixesRead:
 
 		if (lookAtByte(insn, &byte1)) {
 			// dbgprintf(insn, "Couldn't read second byte of VEX");
-			return -1;
+			return PREFIX_READ_INVALID;
 		}
 
 		if (insn->mode == MODE_64BIT || (byte1 & 0xc0) == 0xc0)
@@ -626,7 +674,7 @@ legacyPrefixesRead:
 
 		if (lookAtByte(insn, &byte1)) {
 			// dbgprintf(insn, "Couldn't read second byte of XOP");
-			return -1;
+			return PREFIX_READ_INVALID;
 		}
 
 		if ((byte1 & 0x38) !=
@@ -673,11 +721,11 @@ legacyPrefixesRead:
 		unconsumeByte(insn);
 
 	if (insn->vectorExtensionType != TYPE_NO_VEX_XOP && vexForbiddenPrefix)
-		return -1;
+		return PREFIX_READ_INVALID;
 
 	if (insn->repeatPrefix != 0) {
 		if (lookAtByte(insn, &nextByte))
-			return -1;
+			return PREFIX_READ_INVALID;
 
 		/*
 		* REP prefix is present, and any of the following conditions are
@@ -705,36 +753,9 @@ legacyPrefixesRead:
 		}
 	}
 
-sizes:
-	if (insn->mode == MODE_16BIT) {
-		insn->registerSize = (insn->hasOpSize ? 4 : 2);
-		insn->addressSize = (insn->hasAdSize ? 4 : 2);
-		insn->displacementSize = (insn->hasAdSize ? 4 : 2);
-		insn->immediateSize = (insn->hasOpSize ? 4 : 2);
-		insn->immSize = (insn->hasOpSize ? 4 : 2);
-	} else if (insn->mode == MODE_32BIT) {
-		insn->registerSize = (insn->hasOpSize ? 2 : 4);
-		insn->addressSize = (insn->hasAdSize ? 2 : 4);
-		insn->displacementSize = (insn->hasAdSize ? 2 : 4);
-		insn->immediateSize = (insn->hasOpSize ? 2 : 4);
-		insn->immSize = (insn->hasOpSize ? 2 : 4);
-	} else if (insn->mode == MODE_64BIT) {
-		if (insn->rexPrefix && wFromREX(insn->rexPrefix)) {
-			insn->registerSize = 8;
-			insn->addressSize = (insn->hasAdSize ? 4 : 8);
-			insn->displacementSize = 4;
-			insn->immediateSize = 4;
-			insn->immSize = 4;
-		} else {
-			insn->registerSize = (insn->hasOpSize ? 2 : 4);
-			insn->addressSize = (insn->hasAdSize ? 4 : 8);
-			insn->displacementSize = (insn->hasOpSize ? 2 : 4);
-			insn->immediateSize = (insn->hasOpSize ? 2 : 4);
-			insn->immSize = (insn->hasOpSize ? 4 : 8);
-		}
-	}
+	setInstructionSizes(insn, insn->hasOpSize, insn->hasAdSize);
 
-	return 0;
+	return PREFIX_READ_GENERIC;
 }
 
 static int readModRM(struct InternalInstruction *insn);
@@ -769,13 +790,15 @@ static bool isRex2Map0PrefixByte(uint8_t byte)
  * @param insn  - The instruction whose opcode is to be read.
  * @return      - 0 if the opcode could be read successfully; nonzero otherwise.
  */
-static int readOpcode(struct InternalInstruction *insn)
+static int readOpcode(struct InternalInstruction *insn, bool simpleLegacy)
 {
 	uint8_t current;
 
 	// dbgprintf(insn, "readOpcode()");
 
 	insn->opcodeType = ONEBYTE;
+	if (simpleLegacy)
+		goto legacyOpcode;
 	if (insn->hasRex2) {
 		if (consumeByte(insn, &current))
 			return -1;
@@ -861,6 +884,7 @@ static int readOpcode(struct InternalInstruction *insn)
 		}
 	}
 
+legacyOpcode:
 	if (consumeByte(insn, &current))
 		return -1;
 
@@ -2753,7 +2777,11 @@ X86_DECODE_INLINE int beginDecodedInstruction(struct InternalInstruction *insn,
 		insn->mode = MODE_64BIT;
 	insn->numImmediatesConsumed = 0;
 
-	if (readPrefixes(insn) || readOpcode(insn) || getID(insn, mode) ||
+	const PrefixReadStatus prefixResult = readPrefixes(insn);
+	if (prefixResult == PREFIX_READ_INVALID)
+		return -1;
+	const bool simpleLegacy = prefixResult == PREFIX_READ_SIMPLE_LEGACY;
+	if (readOpcode(insn, simpleLegacy) || getID(insn, mode) ||
 	    insn->instructionID == 0 || checkPrefix(insn))
 		return -1;
 

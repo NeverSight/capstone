@@ -81,8 +81,11 @@ rejection remain ahead of fallback to the generated decoder.
 The prefix reader shares the selector's byte classification. A first ordinary
 opcode, optionally after one REX in 64-bit mode, skips the legacy prefix loop;
 vector escapes reuse the existing payload parser. Other prefix sequences keep
-the full ordering and conflict checks. Both paths use the same size defaults,
-checked opcode reader and full instruction-state initialization.
+the full ordering and conflict checks. The reader reports when it has consumed
+no legacy prefix and at most one REX. This path supplies the known absent size
+overrides to the shared size policy and enters the existing legacy opcode
+reader directly. ID selection and prefix validation keep their existing rules.
+Both paths retain checked reads and full instruction-state initialization.
 
 The x86 operand reader and translator specialize common scalar and vector
 operand sets from the full and reduced `X86GenDisassemblerTables*.inc`
