@@ -823,6 +823,107 @@ def emit_terminal(suffix):
     return "\n".join(handlers + lines)
 
 
+def vex_scan_form(operands, register_form):
+    registers = {
+        "TYPE_R8",
+        "TYPE_R16",
+        "TYPE_R32",
+        "TYPE_R64",
+        "TYPE_Rv",
+        "TYPE_XMM",
+        "TYPE_YMM",
+    }
+    immediates = {"TYPE_REL", "TYPE_RELv", "TYPE_IMM", "TYPE_UIMM8"}
+    for encoding, operand_type in operands:
+        if encoding == "ENCODING_RM":
+            if operand_type not in registers | {"TYPE_M"}:
+                return False
+            if (operand_type == "TYPE_M") == register_form:
+                return False
+        elif encoding in {"ENCODING_REG", "ENCODING_VVVV"}:
+            if operand_type not in registers:
+                return False
+        elif encoding in REGISTERS:
+            if operand_type not in registers - {"TYPE_XMM", "TYPE_YMM"}:
+                return False
+        elif encoding in IMMEDIATES:
+            if operand_type not in immediates:
+                return False
+        else:
+            return False
+    return True
+
+
+def emit_vex_scan(suffix):
+    # MODE_64BIT ordinary VEX registers are at most 15. Admitted classes have
+    # no gather, mask, register-limit or predicate-dependent opcode checks.
+    reads = dict(read_specializations(suffix))
+    translations = dict(translation_specializations(suffix))
+    source = (X86 / f"X86GenDisassemblerTables{suffix}.inc").read_text()
+    specifiers = instruction_specifiers(source)
+    patterns = {(): 0}
+    flags = []
+    for operands in specifiers:
+        if operands not in reads or operands not in translations:
+            flags.append(0)
+            continue
+        read_ops, translate_ops = reads[operands], translations[operands]
+        forms = int(vex_scan_form(read_ops + translate_ops, False)) | (
+            int(vex_scan_form(read_ops + translate_ops, True)) << 1
+        )
+        if not forms:
+            flags.append(0)
+            continue
+        immediates = tuple(IMMEDIATES[e] for e, _ in read_ops if e in IMMEDIATES)
+        if immediates not in patterns:
+            patterns[immediates] = len(patterns)
+        tables.require(len(patterns) <= 16, "VEX scan read patterns exceed storage")
+        has_modrm = any(e in {"ENCODING_RM", "ENCODING_REG"} for e, _ in read_ops)
+        has_vvvv = any(e == "ENCODING_VVVV" for e, _ in read_ops)
+        flags.append(
+            forms
+            | (int(has_modrm) << 2)
+            | (int(has_vvvv) << 3)
+            | (patterns[immediates] << 4)
+        )
+    ud1 = int(
+        re.search(
+            r"X86_UD1\s*=\s*(\d+)", (X86 / f"X86GenInstrInfo{suffix}.inc").read_text()
+        )[1]
+    )
+    flags[ud1] = 0
+    tables.require(all(0 <= f <= 255 for f in flags), "VEX scan flags exceed a byte")
+    lines = [
+        f"/* {sum(bool(f) for f in flags)} admitted UIDs, {len(patterns)} immediate patterns. */",
+        "enum { X86_VEX_SCAN_MEMORY = 1, X86_VEX_SCAN_REGISTER = 2,",
+        "       X86_VEX_SCAN_MODRM = 4, X86_VEX_SCAN_VVVV = 8,",
+        "       X86_VEX_SCAN_PATTERN_SHIFT = 4 };",
+        "static const uint8_t x86VexScanFlags[] = {",
+    ]
+    lines += [
+        "\t" + ", ".join(f"0x{f:02x}" for f in flags[i : i + 16]) + ","
+        for i in range(0, len(flags), 16)
+    ]
+    lines += [
+        "};",
+        "",
+        "X86_DECODE_INLINE int readVexScanImmediates(struct InternalInstruction *insn, unsigned pattern)",
+        "{",
+        "\tswitch (pattern) {",
+    ]
+    for immediates, pattern in patterns.items():
+        lines.append(f"\tcase {pattern}:")
+        if immediates:
+            calls = [f"readImmediateImpl(insn, {size}, false)" for size in immediates]
+            lines += [
+                "\t\tif (" + " ||\n\t\t    ".join(calls) + ")",
+                "\t\t\treturn X86_SCAN_INVALID;",
+            ]
+        lines.append("\t\treturn X86_SCAN_COMPLETE;")
+    lines += ["\tdefault:", "\t\treturn X86_SCAN_INVALID;", "\t}", "}"]
+    return "\n".join(lines)
+
+
 def generated_output(emit):
     return (
         "/* Capstone Disassembly Engine */\n"
@@ -845,6 +946,7 @@ def main():
         (TRANSLATE_OUTPUT, emit_translation),
         (SCAN_OUTPUT, emit_scan),
         (TERMINAL_OUTPUT, emit_terminal),
+        (X86 / "X86GenVexScan.inc", emit_vex_scan),
     ]
     generated = [(path, generated_output(emit)) for path, emit in outputs]
     for path, output in generated:

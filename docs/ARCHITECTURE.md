@@ -102,9 +102,9 @@ The x86 operand reader and translator specialize common scalar and vector
 operand sets from the full and reduced `X86GenDisassemblerTables*.inc`
 descriptors. Run `python3 suite/synctools/x86_operand_specializations.py` whenever
 those descriptors, opcode tables or `X86Lookup16*.inc` change; `--check` verifies
-`X86GenOperandRead.inc`, `X86GenOperandTranslate.inc`, `X86GenOperandScan.inc` and
-`X86GenLegacyTerminal.inc` without writing, and runs in the unit suite when Python
-is available.
+`X86GenOperandRead.inc`, `X86GenOperandTranslate.inc`, `X86GenOperandScan.inc`,
+`X86GenLegacyTerminal.inc` and `X86GenVexScan.inc` without writing, and runs in the
+unit suite when Python is available.
 
 The reader selects up to two scalar or four vector operands after ignoring
 duplicates. It calls the same register, memory, immediate, VVVV, writemask and
@@ -156,6 +156,22 @@ Any incompatible descriptor keeps the generic path. Under this admission rule,
 REX produces only valid GPR indices, and a successful legacy address read
 produces valid base/index registers. These facts discharge the operand fixup
 and translation checks for scan terminals before code generation.
+
+The compact scan result also admits unprefixed 64-bit C4/C5 instructions with
+ordinary GPR, XMM/YMM, memory and plain immediate operands. Generated UID flags
+derive register/memory legality, VVVV use and immediate-read patterns from both
+operand sequences. Prefix parsing, attribute selection and opcode decisions
+reuse the generic decoder's policy; checked address and immediate readers
+consume the same bytes. An unused VVVV field must still be zero after inversion.
+Within these admitted forms, the VEX register indices and ordinary addresses
+already satisfy the operand fixup and translation checks.
+
+Source-owned extensions retain precedence. Legacy prefixes, other bitness,
+VSIB, masks, register-encoded immediates, opcode-changing predicates and special
+size repairs keep generic decoding. An admission miss restarts that path from
+the original bytes. The raw and operand-producing interfaces retain their
+existing state and failure contracts. VEX admission runs after successful
+legacy terminals, without retaining prefix-loop state across those readers.
 
 The same ModR/M, SIB, displacement and immediate readers serve both outputs,
 with a constant materialization policy. Raw decoding retains all fields and

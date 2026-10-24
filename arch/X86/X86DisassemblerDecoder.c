@@ -404,6 +404,88 @@ readSimpleLegacyPrefix(struct InternalInstruction *insn, size_t offset)
 	return PREFIX_READ_SIMPLE_LEGACY;
 }
 
+X86_DECODE_INLINE bool readVexPrefix(struct InternalInstruction *insn,
+				     uint8_t byte)
+{
+	if (byte == 0xc4) {
+		uint8_t byte1;
+
+		if (lookAtByte(insn, &byte1)) {
+			// dbgprintf(insn, "Couldn't read second byte of VEX");
+			return true;
+		}
+
+		if (insn->mode == MODE_64BIT || (byte1 & 0xc0) == 0xc0)
+			insn->vectorExtensionType = TYPE_VEX_3B;
+		else
+			unconsumeByte(insn);
+
+		if (insn->vectorExtensionType == TYPE_VEX_3B) {
+			insn->vectorExtensionPrefix[0] = byte;
+			consumeByte(insn, &insn->vectorExtensionPrefix[1]);
+			consumeByte(insn, &insn->vectorExtensionPrefix[2]);
+
+			/* We simulate the REX prefix for simplicity's sake */
+			if (insn->mode == MODE_64BIT)
+				insn->rexPrefix =
+					0x40 |
+					(wFromVEX3of3(
+						 insn->vectorExtensionPrefix[2])
+					 << 3) |
+					(rFromVEX2of3(
+						 insn->vectorExtensionPrefix[1])
+					 << 2) |
+					(xFromVEX2of3(
+						 insn->vectorExtensionPrefix[1])
+					 << 1) |
+					(bFromVEX2of3(
+						 insn->vectorExtensionPrefix[1])
+					 << 0);
+
+			// dbgprintf(insn, "Found VEX prefix 0x%hhx 0x%hhx 0x%hhx",
+			// 		insn->vectorExtensionPrefix[0], insn->vectorExtensionPrefix[1],
+			// 		insn->vectorExtensionPrefix[2]);
+		}
+	} else {
+		uint8_t byte1;
+
+		if (lookAtByte(insn, &byte1)) {
+			// dbgprintf(insn, "Couldn't read second byte of VEX");
+			return true;
+		}
+
+		if (insn->mode == MODE_64BIT || (byte1 & 0xc0) == 0xc0)
+			insn->vectorExtensionType = TYPE_VEX_2B;
+		else
+			unconsumeByte(insn);
+
+		if (insn->vectorExtensionType == TYPE_VEX_2B) {
+			insn->vectorExtensionPrefix[0] = byte;
+			consumeByte(insn, &insn->vectorExtensionPrefix[1]);
+
+			if (insn->mode == MODE_64BIT)
+				insn->rexPrefix =
+					0x40 |
+					(rFromVEX2of2(
+						 insn->vectorExtensionPrefix[1])
+					 << 2);
+
+			switch (ppFromVEX2of2(insn->vectorExtensionPrefix[1])) {
+			default:
+				break;
+			case VEX_PREFIX_66:
+				insn->hasOpSize = true;
+				break;
+			}
+
+			// dbgprintf(insn, "Found VEX prefix 0x%hhx 0x%hhx",
+			// 		insn->vectorExtensionPrefix[0],
+			// 		insn->vectorExtensionPrefix[1]);
+		}
+	}
+	return false;
+}
+
 /*
  * readPrefixes - Consumes all of an instruction's prefix bytes, and marks the
  *   instruction as having them.  Also sets the instruction's default operand,
@@ -621,81 +703,9 @@ legacyPrefixesRead:
 			// 		insn->vectorExtensionPrefix[0], insn->vectorExtensionPrefix[1],
 			// 		insn->vectorExtensionPrefix[2], insn->vectorExtensionPrefix[3]);
 		}
-	} else if (byte == 0xc4) {
-		uint8_t byte1;
-
-		if (lookAtByte(insn, &byte1)) {
-			// dbgprintf(insn, "Couldn't read second byte of VEX");
+	} else if (byte == 0xc4 || byte == 0xc5) {
+		if (readVexPrefix(insn, byte))
 			return PREFIX_READ_INVALID;
-		}
-
-		if (insn->mode == MODE_64BIT || (byte1 & 0xc0) == 0xc0)
-			insn->vectorExtensionType = TYPE_VEX_3B;
-		else
-			unconsumeByte(insn);
-
-		if (insn->vectorExtensionType == TYPE_VEX_3B) {
-			insn->vectorExtensionPrefix[0] = byte;
-			consumeByte(insn, &insn->vectorExtensionPrefix[1]);
-			consumeByte(insn, &insn->vectorExtensionPrefix[2]);
-
-			/* We simulate the REX prefix for simplicity's sake */
-			if (insn->mode == MODE_64BIT)
-				insn->rexPrefix =
-					0x40 |
-					(wFromVEX3of3(
-						 insn->vectorExtensionPrefix[2])
-					 << 3) |
-					(rFromVEX2of3(
-						 insn->vectorExtensionPrefix[1])
-					 << 2) |
-					(xFromVEX2of3(
-						 insn->vectorExtensionPrefix[1])
-					 << 1) |
-					(bFromVEX2of3(
-						 insn->vectorExtensionPrefix[1])
-					 << 0);
-
-			// dbgprintf(insn, "Found VEX prefix 0x%hhx 0x%hhx 0x%hhx",
-			// 		insn->vectorExtensionPrefix[0], insn->vectorExtensionPrefix[1],
-			// 		insn->vectorExtensionPrefix[2]);
-		}
-	} else if (byte == 0xc5) {
-		uint8_t byte1;
-
-		if (lookAtByte(insn, &byte1)) {
-			// dbgprintf(insn, "Couldn't read second byte of VEX");
-			return PREFIX_READ_INVALID;
-		}
-
-		if (insn->mode == MODE_64BIT || (byte1 & 0xc0) == 0xc0)
-			insn->vectorExtensionType = TYPE_VEX_2B;
-		else
-			unconsumeByte(insn);
-
-		if (insn->vectorExtensionType == TYPE_VEX_2B) {
-			insn->vectorExtensionPrefix[0] = byte;
-			consumeByte(insn, &insn->vectorExtensionPrefix[1]);
-
-			if (insn->mode == MODE_64BIT)
-				insn->rexPrefix =
-					0x40 |
-					(rFromVEX2of2(
-						 insn->vectorExtensionPrefix[1])
-					 << 2);
-
-			switch (ppFromVEX2of2(insn->vectorExtensionPrefix[1])) {
-			default:
-				break;
-			case VEX_PREFIX_66:
-				insn->hasOpSize = true;
-				break;
-			}
-
-			// dbgprintf(insn, "Found VEX prefix 0x%hhx 0x%hhx",
-			// 		insn->vectorExtensionPrefix[0],
-			// 		insn->vectorExtensionPrefix[1]);
-		}
 	} else if (byte == 0x8f) {
 		uint8_t byte1;
 
@@ -1211,6 +1221,20 @@ static uint16_t resolveMandatoryPrefixConflict(struct InternalInstruction *insn,
 	}
 }
 
+X86_DECODE_INLINE uint16_t mandatoryPrefixAttributes(uint8_t pp)
+{
+	switch (pp) {
+	case VEX_PREFIX_66:
+		return ATTR_OPSIZE;
+	case VEX_PREFIX_F3:
+		return ATTR_XS;
+	case VEX_PREFIX_F2:
+		return ATTR_XD;
+	default:
+		return ATTR_NONE;
+	}
+}
+
 /*
  * getID - Determines the ID of an instruction, consuming the ModR/M byte as
  *   appropriate for extended and escape opcodes.  Determines the attributes and
@@ -1251,18 +1275,8 @@ getIDForMode(struct InternalInstruction *insn, cs_mode mode,
 				    ATTR_VEX;
 
 		if (insn->vectorExtensionType == TYPE_EVEX) {
-			switch (ppFromEVEX3of4(
-				insn->vectorExtensionPrefix[2])) {
-			case VEX_PREFIX_66:
-				attrMask |= ATTR_OPSIZE;
-				break;
-			case VEX_PREFIX_F3:
-				attrMask |= ATTR_XS;
-				break;
-			case VEX_PREFIX_F2:
-				attrMask |= ATTR_XD;
-				break;
-			}
+			attrMask |= mandatoryPrefixAttributes(
+				ppFromEVEX3of4(insn->vectorExtensionPrefix[2]));
 
 			if (zFromEVEX4of4(insn->vectorExtensionPrefix[3]))
 				attrMask |= ATTR_EVEXKZ;
@@ -1275,47 +1289,20 @@ getIDForMode(struct InternalInstruction *insn, cs_mode mode,
 			if (l2FromEVEX4of4(insn->vectorExtensionPrefix[3]))
 				attrMask |= ATTR_EVEXL2;
 		} else if (insn->vectorExtensionType == TYPE_VEX_3B) {
-			switch (ppFromVEX3of3(insn->vectorExtensionPrefix[2])) {
-			case VEX_PREFIX_66:
-				attrMask |= ATTR_OPSIZE;
-				break;
-			case VEX_PREFIX_F3:
-				attrMask |= ATTR_XS;
-				break;
-			case VEX_PREFIX_F2:
-				attrMask |= ATTR_XD;
-				break;
-			}
+			attrMask |= mandatoryPrefixAttributes(
+				ppFromVEX3of3(insn->vectorExtensionPrefix[2]));
 
 			if (lFromVEX3of3(insn->vectorExtensionPrefix[2]))
 				attrMask |= ATTR_VEXL;
 		} else if (insn->vectorExtensionType == TYPE_VEX_2B) {
-			switch (ppFromVEX2of2(insn->vectorExtensionPrefix[1])) {
-			case VEX_PREFIX_66:
-				attrMask |= ATTR_OPSIZE;
-				break;
-			case VEX_PREFIX_F3:
-				attrMask |= ATTR_XS;
-				break;
-			case VEX_PREFIX_F2:
-				attrMask |= ATTR_XD;
-				break;
-			}
+			attrMask |= mandatoryPrefixAttributes(
+				ppFromVEX2of2(insn->vectorExtensionPrefix[1]));
 
 			if (lFromVEX2of2(insn->vectorExtensionPrefix[1]))
 				attrMask |= ATTR_VEXL;
 		} else if (insn->vectorExtensionType == TYPE_XOP) {
-			switch (ppFromXOP3of3(insn->vectorExtensionPrefix[2])) {
-			case VEX_PREFIX_66:
-				attrMask |= ATTR_OPSIZE;
-				break;
-			case VEX_PREFIX_F3:
-				attrMask |= ATTR_XS;
-				break;
-			case VEX_PREFIX_F2:
-				attrMask |= ATTR_XD;
-				break;
-			}
+			attrMask |= mandatoryPrefixAttributes(
+				ppFromXOP3of3(insn->vectorExtensionPrefix[2]));
 
 			if (lFromXOP3of3(insn->vectorExtensionPrefix[2]))
 				attrMask |= ATTR_VEXL;
@@ -2927,7 +2914,7 @@ X86_DECODE_INLINE int finishDecodedInstruction(struct InternalInstruction *insn,
 }
 
 #include "X86GenLegacyTerminal.inc"
-
+#include "X86GenVexScan.inc"
 
 int decodeInstruction(struct InternalInstruction *insn, const uint8_t *code,
 		      size_t codeSize, cs_mode mode)
@@ -3240,6 +3227,94 @@ static bool decode16BitSizePrefixedResult(csh ud, const uint8_t *code,
 	return completeTerminalScanResult(result, instructionID, status);
 }
 
+X86_DECODE_INLINE int tryVexTerminalScan(const uint8_t *code, size_t code_len,
+					 uint8_t prefix,
+					 unsigned *instructionID,
+					 uint16_t *size)
+{
+	InternalInstruction insn = { 0 };
+	initializeInstructionHeader(&insn, code, code_len, CS_MODE_64);
+	insn.readerCursor = 1;
+	if (readVexPrefix(&insn, prefix))
+		return X86_SCAN_INVALID;
+	setInstructionSizes(&insn, insn.hasOpSize, insn.hasAdSize);
+	int opcodeResult = readOpcode(&insn, false, true);
+	if (opcodeResult)
+		return opcodeResult == OPCODE_READ_GENERIC ?
+			       X86_SCAN_NOT_HANDLED :
+			       X86_SCAN_INVALID;
+	/* Keep the generic opcode/size repairs outside this admission. */
+	if ((insn.opcodeType == TWOBYTE &&
+	     (insn.opcode == 0xae ||
+	      (insn.opcode >= 0x82 && insn.opcode <= 0x8f))) ||
+	    (insn.opcodeType == THREEBYTE_38 && insn.opcode == 0xf8))
+		return X86_SCAN_NOT_HANDLED;
+	const uint8_t payload =
+		insn.vectorExtensionPrefix[prefix == 0xc4 ? 2 : 1];
+	uint16_t attributes = ATTR_64BIT | ATTR_VEX |
+			      mandatoryPrefixAttributes(
+				      prefix == 0xc4 ? ppFromVEX3of3(payload) :
+						       ppFromVEX2of2(payload));
+	if (prefix == 0xc4 ? lFromVEX3of3(payload) : lFromVEX2of2(payload))
+		attributes |= ATTR_VEXL;
+	if (wFromREX(insn.rexPrefix))
+		attributes |= ATTR_REXW;
+	const struct ModRMDecision *decision = getModRMDecision(
+		insn.opcodeType, contextForAttrs(attributes), insn.opcode);
+	if (!decision)
+		return X86_SCAN_INVALID;
+	const uint32_t packed = decision->packed;
+	const bool decisionModRM =
+		(packed & (X86_DECISION_INDEXED | X86_DECISION_SPLIT)) != 0;
+	uint8_t modrm = 0;
+	if (decisionModRM && lookAtByte(&insn, &modrm))
+		return X86_SCAN_INVALID;
+	insn.instructionID = decode(packed, modrm);
+	if (!insn.instructionID)
+		return X86_SCAN_INVALID;
+	if (insn.instructionID >= ARR_SIZE(x86VexScanFlags))
+		return X86_SCAN_NOT_HANDLED;
+	const uint8_t flags = x86VexScanFlags[insn.instructionID];
+	if (!flags)
+		return X86_SCAN_NOT_HANDLED;
+	if (decisionModRM || (flags & X86_VEX_SCAN_MODRM)) {
+		if (readModRMScan(&insn))
+			return X86_SCAN_INVALID;
+		if (!(flags & (insn.modRM >= 0xc0 ? X86_VEX_SCAN_REGISTER :
+						    X86_VEX_SCAN_MEMORY)))
+			return X86_SCAN_INVALID;
+	}
+	if (!(flags & X86_VEX_SCAN_VVVV) &&
+	    (prefix == 0xc4 ? vvvvFromVEX3of3(payload) :
+			      vvvvFromVEX2of2(payload)))
+		return X86_SCAN_INVALID;
+	if (readVexScanImmediates(&insn, flags >> X86_VEX_SCAN_PATTERN_SHIFT) !=
+		    X86_SCAN_COMPLETE ||
+	    finishDecodedInstruction(&insn, false))
+		return X86_SCAN_INVALID;
+	*instructionID = insn.instructionID;
+	*size = (uint16_t)insn.length;
+	return X86_SCAN_COMPLETE;
+}
+
+#if defined(_MSC_VER)
+__declspec(noinline)
+#elif defined(__GNUC__)
+__attribute__((noinline))
+#endif
+static bool decodeVexTerminalResult(csh ud, const uint8_t *code,
+				    size_t code_len, cs_insn *insn,
+				    X86ScanResult *result, uint8_t prefix)
+{
+	unsigned instructionID = 0;
+	int status = tryVexTerminalScan(code, code_len, prefix, &instructionID,
+					&result->length);
+	if (status == X86_SCAN_NOT_HANDLED)
+		return decodeScanResultFallback(ud, code, code_len, insn,
+						result, prefix, false);
+	return completeTerminalScanResult(result, instructionID, status);
+}
+
 bool X86_getInstructionScanResult(csh ud, const uint8_t *code, size_t code_len,
 				  cs_insn *insn, X86ScanResult *result)
 {
@@ -3263,6 +3338,10 @@ bool X86_getInstructionScanResult(csh ud, const uint8_t *code, size_t code_len,
 	    (code[0] == 0x66 || code[0] == 0x67))
 		return decode16BitSizePrefixedResult(ud, code, code_len, insn,
 						     result);
+	if (code_len && (code[0] == 0xc4 || code[0] == 0xc5) &&
+	    !(handle->mode & (CS_MODE_16 | CS_MODE_32)))
+		return decodeVexTerminalResult(ud, code, code_len, insn, result,
+					       opcode);
 	return decodeScanResultFallback(ud, code, code_len, insn, result,
 					opcode, false);
 }
