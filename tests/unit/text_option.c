@@ -362,56 +362,125 @@ static bool test_x86_scan_mode_priority(void)
 		{ CS_MODE_32 | CS_MODE_64, X86_INS_DEC, 1 },
 		{ CS_MODE_16 | CS_MODE_32 | CS_MODE_64, X86_INS_DEC, 1 },
 	};
-	static const uint8_t bytes[] = { 0x48, 0x8b, 0xc1 };
+	static const uint8_t opcode[] = { 0x48, 0x8b, 0xc1 };
+	static const uint8_t prefixes[] = { 0x66, 0x67 };
 	bool success = true;
 	for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
-		for (unsigned detail = 0; detail != 2; ++detail) {
-			csh handle;
-			if (!check(cs_open(CS_ARCH_X86, CS_MODE_64, &handle) ==
-					   CS_ERR_OK,
-				   "open mode-priority decoder"))
-				return false;
-			success &= check(cs_option(handle, CS_OPT_MODE,
-						   cases[i].mode) == CS_ERR_OK,
-					 "select existing mode combination");
-			cs_option(handle, CS_OPT_TEXT, CS_OPT_OFF);
-			cs_option(handle, CS_OPT_DETAIL,
-				  detail ? CS_OPT_ON : CS_OPT_OFF);
-			cs_insn *iter = cs_malloc(handle);
-			if (!check(iter != NULL,
-				   "allocate mode-priority result")) {
+		for (unsigned prefix_length = 0; prefix_length != 3;
+		     ++prefix_length) {
+			uint8_t bytes[sizeof(prefixes) + sizeof(opcode)];
+			memcpy(bytes, prefixes, prefix_length);
+			memcpy(bytes + prefix_length, opcode, sizeof(opcode));
+			const size_t length = prefix_length + sizeof(opcode);
+			const uint16_t expected_length =
+				cases[i].length + prefix_length;
+			for (unsigned detail = 0; detail != 2; ++detail) {
+				csh handle;
+				if (!check(cs_open(CS_ARCH_X86, CS_MODE_64,
+						   &handle) == CS_ERR_OK,
+					   "open mode-priority decoder"))
+					return false;
+				success &= check(
+					cs_option(handle, CS_OPT_MODE,
+						  cases[i].mode) == CS_ERR_OK,
+					"select existing mode combination");
+				cs_option(handle, CS_OPT_TEXT, CS_OPT_OFF);
+				cs_option(handle, CS_OPT_DETAIL,
+					  detail ? CS_OPT_ON : CS_OPT_OFF);
+				cs_insn *iter = cs_malloc(handle);
+				if (!check(iter != NULL,
+					   "allocate mode-priority result")) {
+					cs_close(&handle);
+					return false;
+				}
+				cs_insn *batch = NULL;
+				size_t count = cs_disasm(handle, bytes, length,
+							 0x1000, 1, &batch);
+				success &= check(
+					count == 1 &&
+						batch[0].id == cases[i].id &&
+						batch[0].size ==
+							expected_length,
+					"batch preserves bitness priority");
+				const uint8_t *cursor = bytes;
+				size_t remaining = length;
+				uint64_t address = 0x1000;
+				bool decoded = cs_disasm_iter(handle, &cursor,
+							      &remaining,
+							      &address, iter);
+				success &= check(
+					decoded && iter->id == cases[i].id &&
+						iter->size == expected_length &&
+						cursor ==
+							bytes + expected_length &&
+						remaining ==
+							length -
+								expected_length &&
+						address ==
+							0x1000 +
+								expected_length,
+					"iterator preserves bitness priority and cursor");
+				if (decoded && count == 1)
+					success &= check(
+						same_scan(iter, batch),
+						"mode-priority output matches");
+				cs_free(batch, count);
+				cs_free(iter, 1);
 				cs_close(&handle);
-				return false;
 			}
-			cs_insn *batch = NULL;
-			size_t count = cs_disasm(handle, bytes, sizeof(bytes),
-						 0x1000, 1, &batch);
-			success &= check(
-				count == 1 && batch[0].id == cases[i].id &&
-					batch[0].size == cases[i].length,
-				"batch preserves bitness priority");
-			const uint8_t *cursor = bytes;
-			size_t remaining = sizeof(bytes);
-			uint64_t address = 0x1000;
-			bool decoded = cs_disasm_iter(
-				handle, &cursor, &remaining, &address, iter);
-			success &= check(
-				decoded && iter->id == cases[i].id &&
-					iter->size == cases[i].length &&
-					cursor == bytes + cases[i].length &&
-					remaining == sizeof(bytes) -
-							     cases[i].length &&
-					address == 0x1000 + cases[i].length,
-				"iterator preserves bitness priority and cursor");
-			if (decoded && count == 1)
-				success &=
-					check(same_scan(iter, batch),
-					      "mode-priority output matches");
-			cs_free(batch, count);
-			cs_free(iter, 1);
-			cs_close(&handle);
 		}
 	}
+	return success;
+}
+
+static bool test_x86_scan_size_prefixes(void)
+{
+	static const struct {
+		uint8_t bytes[8];
+		size_t length;
+		bool valid;
+	} cases[] = {
+		{ { 0x66, 0x55 }, 2, true },
+		{ { 0x67, 0x66, 0x8b, 0x5c, 0x24, 0x18 }, 6, true },
+		{ { 0x66, 0x67, 0x8b, 0x5c, 0x24, 0x18 }, 6, true },
+		{ { 0x67, 0x8b, 0x5c, 0x24, 0x18 }, 5, true },
+		{ { 0x66, 0x66, 0xb8, 0x78, 0x56, 0x34, 0x12 }, 7, true },
+		{ { 0x67, 0x67, 0x66, 0x8b, 0x5c, 0x24, 0x18 }, 7, true },
+		{ { 0x66, 0x0f, 0xb6, 0xc1 }, 4, true },
+		/* Address-dependent IDs keep their existing generic repair. */
+		{ { 0x67, 0xe3, 0xfe }, 3, true },
+		{ { 0x66, 0xa1, 0x34, 0x12 }, 4, true },
+		{ { 0x67, 0x66, 0xa1, 0x78, 0x56, 0x34, 0x12 }, 7, true },
+		{ { 0x66 }, 1, false },
+		{ { 0x67, 0x66, 0x8b, 0x5c, 0x24 }, 5, false },
+		{ { 0x66, 0xb8, 0x78, 0x56, 0x34 }, 5, false },
+	};
+	csh scan = 0, detail = 0;
+	if (!check(cs_open(CS_ARCH_X86, CS_MODE_16, &scan) == CS_ERR_OK &&
+			   cs_open(CS_ARCH_X86, CS_MODE_16, &detail) ==
+				   CS_ERR_OK,
+		   "open size-prefix decoders")) {
+		if (scan)
+			cs_close(&scan);
+		return false;
+	}
+	cs_option(scan, CS_OPT_TEXT, CS_OPT_OFF);
+	cs_option(detail, CS_OPT_TEXT, CS_OPT_OFF);
+	cs_option(detail, CS_OPT_DETAIL, CS_OPT_ON);
+	bool success = true;
+	for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i)
+		success &= check_scan_pair(scan, detail, cases[i].bytes,
+					   cases[i].length, cases[i].valid);
+	uint8_t boundary[16];
+	memset(boundary, 0x66, sizeof(boundary));
+	boundary[14] = 0xc3;
+	success &= check_scan_pair(scan, detail, boundary, 15, true);
+	boundary[14] = 0x66;
+	boundary[15] = 0xc3;
+	success &= check_scan_pair(scan, detail, boundary, sizeof(boundary),
+				   false);
+	cs_close(&scan);
+	cs_close(&detail);
 	return success;
 }
 
@@ -462,6 +531,7 @@ int main(void)
 	success &= test_x86_scan_validation();
 	success &= test_x86_scan_option_transition();
 	success &= test_x86_scan_mode_priority();
+	success &= test_x86_scan_size_prefixes();
 	success &= test_aarch64();
 	return success ? 0 : 1;
 }

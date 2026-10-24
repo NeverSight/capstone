@@ -334,6 +334,20 @@ static void setSegmentOverride(struct InternalInstruction *insn,
 	insn->prefix1 = byte;
 }
 
+X86_DECODE_INLINE void setOperandSizePrefix(struct InternalInstruction *insn)
+{
+	insn->hasOpSize = true;
+	insn->prefix2 = 0x66;
+	insn->rexPrefix = 0;
+}
+
+X86_DECODE_INLINE void setAddressSizePrefix(struct InternalInstruction *insn)
+{
+	insn->hasAdSize = true;
+	insn->prefix3 = 0x67;
+	insn->rexPrefix = 0;
+}
+
 #if defined(_MSC_VER)
 static __forceinline void
 #elif defined(__GNUC__)
@@ -504,16 +518,12 @@ X86_DECODE_INLINE PrefixReadStatus readPrefixes(struct InternalInstruction *insn
 			break;
 
 		case 0x66: /* Operand-size override */
-			insn->hasOpSize = true;
-			insn->prefix2 = byte;
-			insn->rexPrefix = 0;
+			setOperandSizePrefix(insn);
 			break;
 
 		case 0x67: /* Address-size override */
 			++addressSizePrefixCount;
-			insn->hasAdSize = true;
-			insn->prefix3 = byte;
-			insn->rexPrefix = 0;
+			setAddressSizePrefix(insn);
 			break;
 		default:
 			if (isREX(insn, byte)) {
@@ -2939,14 +2949,19 @@ static int readOperandsScan(struct InternalInstruction *insn, MCInst *mcInst,
 }
 
 X86_DECODE_INLINE uint64_t
-legacyTerminalDecision(const struct InternalInstruction *insn)
+legacyTerminalDecision(const struct InternalInstruction *insn, bool sizePrefixes)
 {
 	if (insn->opcodeType != ONEBYTE && insn->opcodeType != TWOBYTE)
 		return 0;
-	const unsigned int row = insn->mode == MODE_64BIT ?
-					 1 + wFromREX(insn->rexPrefix) :
-				 insn->mode == MODE_16BIT ? 3 :
-							    0;
+	unsigned int row;
+	if (insn->mode == MODE_64BIT)
+		row = X86_TERMINAL_64 + wFromREX(insn->rexPrefix);
+	else if (insn->mode == MODE_16BIT)
+		row = (sizePrefixes && insn->hasAdSize ? X86_TERMINAL_16_ADSIZE :
+					 X86_TERMINAL_16) +
+		      (sizePrefixes && insn->hasOpSize);
+	else
+		row = X86_TERMINAL_32;
 	return x86LegacyDecisions[row][insn->opcodeType == TWOBYTE]
 				 [insn->opcode];
 }
@@ -2968,7 +2983,7 @@ decodeInstructionScanImpl(struct InternalInstruction *insn, const uint8_t *code,
 		return X86_SCAN_INVALID;
 	if (prefixResult == PREFIX_READ_SIMPLE_LEGACY &&
 	    (insn->opcodeType == ONEBYTE || insn->opcodeType == TWOBYTE)) {
-		const uint64_t decision = legacyTerminalDecision(insn);
+		const uint64_t decision = legacyTerminalDecision(insn, false);
 		if (decision) {
 			int result = decodeLegacyTerminal(
 				insn, directTerminal ? NULL : mcInst, size,
@@ -3001,7 +3016,8 @@ enum { X86_SCAN_NOT_HANDLED = 3 };
  * own state if the generated table has no terminal for this header. */
 X86_DECODE_INLINE int trySimpleLegacyScan(const uint8_t *code, size_t codeSize,
 					  cs_mode mode, uint8_t opcode,
-					  size_t opcodeOffset, MCInst *mcInst,
+					  size_t opcodeOffset,
+					  unsigned *instructionID,
 					  uint16_t *size)
 {
 	if (opcodeOffset >= 2)
@@ -3020,14 +3036,12 @@ X86_DECODE_INLINE int trySimpleLegacyScan(const uint8_t *code, size_t codeSize,
 		return opcodeResult == OPCODE_READ_GENERIC ?
 			       X86_SCAN_NOT_HANDLED :
 			       X86_SCAN_INVALID;
-	const uint64_t decision = legacyTerminalDecision(&insn);
+	const uint64_t decision = legacyTerminalDecision(&insn, false);
 	if (!decision)
 		return X86_SCAN_NOT_HANDLED;
 	int result = decodeLegacyTerminal(&insn, NULL, size, decision, true);
-	if (result == X86_SCAN_COMPLETE) {
-		MCInst_clear(mcInst);
-		MCInst_setOpcode(mcInst, insn.instructionID);
-	}
+	if (result == X86_SCAN_COMPLETE)
+		*instructionID = insn.instructionID;
 	return result;
 }
 
@@ -3052,6 +3066,69 @@ static bool decodeGenericScan(const uint8_t *code, size_t code_len,
 	return X86_completeScan(instr, &insn, size);
 }
 
+X86_DECODE_INLINE int try16BitSizePrefixedScan(const uint8_t *code,
+					       size_t code_len,
+					       unsigned *instructionID,
+					       uint16_t *size)
+{
+	InternalInstruction insn = { 0 };
+	/* The caller has selected the decoder's 16-bit mode priority. */
+	initializeInstructionHeader(&insn, code, code_len, CS_MODE_16);
+	size_t offset = 0;
+	while (offset < code_len) {
+		if (code[offset] == 0x66)
+			setOperandSizePrefix(&insn);
+		else if (code[offset] == 0x67)
+			setAddressSizePrefix(&insn);
+		else
+			break;
+		++offset;
+	}
+	if (!offset || offset == code_len)
+		return X86_SCAN_NOT_HANDLED;
+	const uint8_t opcode = code[offset];
+	if ((feature_prefix_flags[opcode] &
+	     (FEATURE_LEGACY_PREFIX | FEATURE_ESCAPE)) ||
+	    opcode == 0xc5 || opcode == 0x8f)
+		return X86_SCAN_NOT_HANDLED;
+	insn.readerCursor = offset;
+	insn.vectorExtensionType = TYPE_NO_VEX_XOP;
+	setInstructionSizes(&insn, insn.hasOpSize, insn.hasAdSize);
+	int opcodeResult = readOpcode(&insn, true, true);
+	if (opcodeResult == OPCODE_READ_GENERIC)
+		return X86_SCAN_NOT_HANDLED;
+	if (opcodeResult)
+		return X86_SCAN_INVALID;
+	const uint64_t decision = legacyTerminalDecision(&insn, true);
+	if (!decision)
+		return X86_SCAN_NOT_HANDLED;
+	int result = decodeLegacyTerminal(&insn, NULL, size, decision, true);
+	if (result == X86_SCAN_COMPLETE)
+		*instructionID = insn.instructionID;
+	return result;
+}
+
+#if defined(_MSC_VER)
+__declspec(noinline)
+#elif defined(__GNUC__)
+__attribute__((noinline))
+#endif
+static bool decode16BitSizePrefixedScan(const uint8_t *code, size_t code_len,
+					cs_mode mode, MCInst *instr,
+					uint16_t *size)
+{
+	unsigned instructionID;
+	int result =
+		try16BitSizePrefixedScan(code, code_len, &instructionID, size);
+	if (result == X86_SCAN_NOT_HANDLED)
+		return decodeGenericScan(code, code_len, mode, instr, size);
+	if (result != X86_SCAN_COMPLETE)
+		return false;
+	MCInst_clear(instr);
+	MCInst_setOpcode(instr, instructionID);
+	return true;
+}
+
 bool X86_getInstructionScan(csh ud, const uint8_t *code, size_t code_len,
 			    MCInst *instr, uint16_t *size)
 {
@@ -3071,11 +3148,123 @@ bool X86_getInstructionScan(csh ud, const uint8_t *code, size_t code_len,
 	if (opcode == 0x62)
 		return X86_getInstructionAfterExtensions(ud, code, code_len,
 							 instr, size, opcode);
+	unsigned instructionID;
 	int terminal = trySimpleLegacyScan(code, code_len, handle->mode, opcode,
-					   opcodeOffset, instr, size);
-	if (terminal != X86_SCAN_NOT_HANDLED)
-		return terminal == X86_SCAN_COMPLETE;
+					   opcodeOffset, &instructionID, size);
+	if (terminal != X86_SCAN_NOT_HANDLED) {
+		if (terminal != X86_SCAN_COMPLETE)
+			return false;
+		MCInst_clear(instr);
+		MCInst_setOpcode(instr, instructionID);
+		return true;
+	}
+	if ((handle->mode & CS_MODE_16) && code_len &&
+	    (code[0] == 0x66 || code[0] == 0x67))
+		return decode16BitSizePrefixedScan(code, code_len, handle->mode,
+						   instr, size);
 	return decodeGenericScan(code, code_len, handle->mode, instr, size);
+}
+
+/* Only generic and extension decoding need an MCInst in the core scan path. */
+#if defined(_MSC_VER)
+__declspec(noinline)
+#elif defined(__GNUC__)
+__attribute__((noinline))
+#endif
+static bool decodeScanResultFallback(csh ud, const uint8_t *code,
+				     size_t code_len, cs_insn *insn,
+				     X86ScanResult *result, uint8_t opcode,
+				     bool tryExtension)
+{
+	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
+	MCInst instr;
+	instr.Opcode = 0;
+	instr.OpcodePub = 0;
+	instr.size = 0;
+	instr.popcode_adjust = 0;
+	instr.csh = handle;
+	instr.address = insn->address;
+	instr.flat_insn = insn;
+	uint16_t size;
+	x86_feature_decode_result extension = X86_FEATURE_NOT_HANDLED;
+	if (tryExtension)
+		extension = X86_decodeFeatureExtension(ud, code, code_len,
+						       &instr, &size, opcode);
+	if (extension == X86_FEATURE_INVALID)
+		return false;
+	if (extension != X86_FEATURE_DECODED) {
+		bool decoded = opcode == 0x62 ?
+				       X86_getInstructionAfterExtensions(
+					       ud, code, code_len, &instr,
+					       &size, opcode) :
+				       decodeGenericScan(code, code_len,
+							 handle->mode, &instr,
+							 &size);
+		if (!decoded)
+			return false;
+	}
+	result->opcode = instr.Opcode;
+	result->opcode_pub = instr.OpcodePub;
+	result->length = size;
+	result->popcode_adjust = instr.popcode_adjust;
+	return true;
+}
+
+X86_DECODE_INLINE bool completeTerminalScanResult(X86ScanResult *result,
+						  unsigned instructionID,
+						  int status)
+{
+	if (status != X86_SCAN_COMPLETE)
+		return false;
+	result->opcode = instructionID;
+	result->opcode_pub = 0;
+	result->popcode_adjust = 0;
+	return true;
+}
+
+#if defined(_MSC_VER)
+__declspec(noinline)
+#elif defined(__GNUC__)
+__attribute__((noinline))
+#endif
+static bool decode16BitSizePrefixedResult(csh ud, const uint8_t *code,
+					  size_t code_len, cs_insn *insn,
+					  X86ScanResult *result)
+{
+	unsigned instructionID = 0;
+	int status = try16BitSizePrefixedScan(code, code_len, &instructionID,
+					      &result->length);
+	if (status == X86_SCAN_NOT_HANDLED)
+		return decodeScanResultFallback(ud, code, code_len, insn,
+						result, 0, false);
+	return completeTerminalScanResult(result, instructionID, status);
+}
+
+bool X86_getInstructionScanResult(csh ud, const uint8_t *code, size_t code_len,
+				  cs_insn *insn, X86ScanResult *result)
+{
+	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
+	uint8_t opcode;
+	size_t opcodeOffset;
+	bool extension = X86_mayDecodeFeatureExtensionImpl(
+		code, code_len, (handle->mode & CS_MODE_64) != 0, &opcode,
+		&opcodeOffset);
+	if (extension || opcode == 0x62)
+		return decodeScanResultFallback(ud, code, code_len, insn,
+						result, opcode, extension);
+	unsigned instructionID = 0;
+	int status = trySimpleLegacyScan(code, code_len, handle->mode, opcode,
+					 opcodeOffset, &instructionID,
+					 &result->length);
+	if (status != X86_SCAN_NOT_HANDLED)
+		return completeTerminalScanResult(result, instructionID,
+						  status);
+	if ((handle->mode & CS_MODE_16) && code_len &&
+	    (code[0] == 0x66 || code[0] == 0x67))
+		return decode16BitSizePrefixedResult(ud, code, code_len, insn,
+						     result);
+	return decodeScanResultFallback(ud, code, code_len, insn, result,
+					opcode, false);
 }
 
 #undef X86_DECODE_INLINE

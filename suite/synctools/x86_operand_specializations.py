@@ -22,6 +22,16 @@ TERMINAL_HANDLER_SHIFT = TERMINAL_UID_BITS + TERMINAL_OPERAND_BITS
 TERMINAL_BITS = 31
 TERMINAL_SPLIT = 1 << 62
 TERMINAL_INDEXED = 1 << 63
+# Row name, primary attributes, 16-bit mode, operand-size override.
+TERMINAL_ROWS = (
+    ("X86_TERMINAL_32", 0, False, False),
+    ("X86_TERMINAL_64", 1, False, False),
+    ("X86_TERMINAL_64_REXW", 9, False, False),
+    ("X86_TERMINAL_16", 0, True, False),
+    ("X86_TERMINAL_16_OPSIZE", 0, True, True),
+    ("X86_TERMINAL_16_ADSIZE", 32, True, False),
+    ("X86_TERMINAL_16_OPSIZE_ADSIZE", 32, True, True),
+)
 
 # These scalar immediate types cannot split an immediate into registers.
 # Register-immediates and opcode-changing predicates stay with the generic reader.
@@ -485,7 +495,7 @@ def legacy_terminal_model(suffix):
     sequences = {}
     rows = []
     selected_counts = []
-    # These are the exact contexts used by the existing unprefixed getID path.
+    # Match the primary and secondary contexts of getIDForMode.
     context_body = (
         source.split("static const uint8_t x86DisassemblerContexts[", 1)[1]
         .split("\n};", 1)[0]
@@ -500,21 +510,32 @@ def legacy_terminal_model(suffix):
     tables.require(
         [
             attributes.get(name)
-            for name in ("ATTR_NONE", "ATTR_64BIT", "ATTR_REXW", "ATTR_OPSIZE")
+            for name in (
+                "ATTR_NONE",
+                "ATTR_64BIT",
+                "ATTR_REXW",
+                "ATTR_OPSIZE",
+                "ATTR_ADSIZE",
+            )
         ]
-        == ["0x00", "(0x1 << 0", "(0x1 << 3", "(0x1 << 4"],
-        "Unprefixed attribute values changed",
+        == ["0x00", "(0x1 << 0", "(0x1 << 3", "(0x1 << 4", "(0x1 << 5"],
+        "Terminal attribute values changed",
     )
     tables.require(
-        [context_values[i] for i in (0, 1, 9, 16)]
-        == ["IC", "IC_64BIT", "IC_64BIT_REXW", "IC_OPSIZE"],
-        "Unprefixed attribute contexts changed",
+        [context_values[i] for i in (0, 1, 9, 16, 32, 48)]
+        == [
+            "IC",
+            "IC_64BIT",
+            "IC_64BIT_REXW",
+            "IC_OPSIZE",
+            "IC_ADSIZE",
+            "IC_OPSIZE_ADSIZE",
+        ],
+        "Terminal attribute contexts changed",
     )
     equivalent = equivalents16(suffix)
-    for context_name in ("IC", "IC_64BIT", "IC_64BIT_REXW", "MODE16"):
-        mode16 = context_name == "MODE16"
-        if mode16:
-            context_name = "IC"
+    for _, attr_mask, mode16, has_op_size in TERMINAL_ROWS:
+        context_name = context_values[attr_mask]
         row_maps = []
         for name, indices, source_rows in maps[:2]:
             number = indices[contexts.index(context_name)]
@@ -522,7 +543,7 @@ def legacy_terminal_model(suffix):
                 source_rows[number - 1] if number else (("MODRM_ONEENTRY", 0),) * 256
             )
             if mode16:
-                second_number = indices[contexts.index("IC_OPSIZE")]
+                second_number = indices[contexts.index(context_values[attr_mask | 16])]
                 second_row = (
                     source_rows[second_number - 1]
                     if second_number
@@ -561,7 +582,7 @@ def legacy_terminal_model(suffix):
                         "Incomplete secondary terminal sequence",
                     )
                     uids = tuple(
-                        b if (a, b) in equivalent else a
+                        b if not has_op_size and (a, b) in equivalent else a
                         for a, b in zip(uids, other_uids)
                     )
                 if (
@@ -606,7 +627,7 @@ def legacy_terminal_model(suffix):
                         second = tables.source_id(
                             ids, second_kind, second_offset, modrm
                         )
-                        if (expected, second) in equivalent:
+                        if not has_op_size and (expected, second) in equivalent:
                             expected = second
                     tables.require(
                         terminals[first + delta][0] == expected,
@@ -678,7 +699,12 @@ def emit_terminal(suffix):
         "\t" + ", ".join(f"0x{word:08x}u" for word in words[start : start + 8]) + ","
         for start in range(0, len(words), 8)
     ]
-    lines += ["};", "static const uint64_t x86LegacyDecisions[4][2][256] = {"]
+    lines += ["};", "enum {"]
+    lines += [f"\t{name}," for name, _, _, _ in TERMINAL_ROWS]
+    lines += ["\tX86_TERMINAL_ROW_COUNT,", "};"]
+    lines += [
+        "static const uint64_t x86LegacyDecisions[X86_TERMINAL_ROW_COUNT][2][256] = {"
+    ]
     for row_maps in rows:
         lines.append("{")
         for row in row_maps:

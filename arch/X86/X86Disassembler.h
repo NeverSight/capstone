@@ -27,6 +27,18 @@ bool X86_getInstruction(csh handle, const uint8_t *code, size_t code_len,
 /* The caller selects this entry only with text and detail disabled. */
 bool X86_getInstructionScan(csh handle, const uint8_t *code, size_t code_len,
 			    MCInst *instr, uint16_t *size);
+/* Private result for text-free, detail-free core decoding. */
+typedef struct X86ScanResult {
+	unsigned opcode;
+	unsigned opcode_pub;
+	uint16_t length;
+	uint8_t popcode_adjust;
+} X86ScanResult;
+
+bool X86_getInstructionScanResult(csh handle, const uint8_t *code,
+				  size_t code_len, cs_insn *insn,
+				  X86ScanResult *result);
+
 /* Scan-only entry after source extension dispatch. */
 bool X86_getInstructionAfterExtensions(csh ud, const uint8_t *code,
 				       size_t code_len, MCInst *instr,

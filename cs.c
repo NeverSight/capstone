@@ -936,41 +936,16 @@ static inline void map_insn_id(cs_struct *handle, cs_insn *insn,
 	handle->insn_id(handle, insn, id);
 }
 
-static bool init_disasm_mcinst(MCInst *mci, const cs_struct *handle)
+static inline bool use_x86_scan(const cs_struct *handle)
 {
-	if (handle->arch == CS_ARCH_X86 && handle->no_text &&
-	    !handle->detail_opt) {
-		/* The x86 scan path validates operands without storing them. Only
-		 * opcode state needs a reset; the caller sets the handle, address
-		 * and public instruction. */
-		mci->Opcode = 0;
-		mci->OpcodePub = 0;
-		mci->size = 0;
-		mci->popcode_adjust = 0;
-		return true;
-	} else {
-		MCInst_Init(mci, handle->arch);
-		return false;
-	}
-}
-
-static bool decode_insn(cs_struct *handle, const uint8_t *code, size_t size,
-			MCInst *mci, uint16_t *insn_size, uint64_t address,
-			bool scan)
-{
-#ifdef CAPSTONE_HAS_X86
-	if (scan)
-		return X86_getInstructionScan((csh)(uintptr_t)handle, code,
-					      size, mci, insn_size);
-#endif
-	return handle->disasm((csh)(uintptr_t)handle, code, size, mci,
-			      insn_size, address, handle->getinsn_info);
+	return handle->arch == CS_ARCH_X86 && handle->no_text &&
+	       !handle->detail_opt;
 }
 
 // fill the parts of insn that do not come from printing it, for a handle
 // with CS_OPT_TEXT off
-static void fill_insn_without_text(cs_insn *insn, MCInst *mci,
-				   const uint8_t *code)
+static inline void fill_insn_without_text(cs_insn *insn, unsigned opcode_pub,
+					  const uint8_t *code)
 {
 	uint16_t copy_size = MIN(sizeof(insn->bytes), insn->size);
 
@@ -999,8 +974,8 @@ static void fill_insn_without_text(cs_insn *insn, MCInst *mci,
 	insn->op_str[0] = '\0';
 
 	// alias instruction might have ID saved in OpcodePub
-	if (MCInst_getOpcodePub(mci))
-		insn->id = MCInst_getOpcodePub(mci);
+	if (opcode_pub)
+		insn->id = opcode_pub;
 }
 
 static void fill_insn(struct cs_struct *handle, cs_insn *insn, SStream *OS,
@@ -1063,6 +1038,61 @@ static void fill_insn(struct cs_struct *handle, cs_insn *insn, SStream *OS,
 		}
 	}
 #endif
+}
+
+#if defined(_MSC_VER)
+__declspec(noinline)
+#elif defined(__GNUC__)
+__attribute__((noinline))
+#endif
+static bool decode_full_insn(cs_struct *handle, const uint8_t *code,
+			     size_t size, cs_insn *insn, uint16_t *insn_size,
+			     bool batch)
+{
+	MCInst mci;
+	MCInst_Init(&mci, handle->arch);
+	mci.csh = handle;
+	mci.address = insn->address;
+	mci.flat_insn = insn;
+	if (!handle->disasm((csh)(uintptr_t)handle, code, size, &mci, insn_size,
+			    insn->address, handle->getinsn_info))
+		return false;
+	insn->size = *insn_size;
+	map_insn_id(handle, insn, mci.Opcode);
+	if (handle->no_text) {
+		fill_insn_without_text(insn, MCInst_getOpcodePub(&mci), code);
+	} else {
+		SStream ss;
+		SStream_Init(&ss);
+		SStream_opt_unum(&ss, handle->imm_unsigned);
+		handle->printer(&mci, &ss, handle->printer_info);
+		fill_insn(handle, insn, &ss, &mci, handle->post_printer, code);
+	}
+	if (handle->arch == CS_ARCH_X86 && (!batch || insn->id != X86_INS_VCMP))
+		insn->id += mci.popcode_adjust;
+	return true;
+}
+
+static inline bool decode_insn(cs_struct *handle, const uint8_t *code,
+			       size_t size, cs_insn *insn, uint16_t *insn_size,
+			       bool scan, bool batch)
+{
+#ifdef CAPSTONE_HAS_X86
+	if (scan) {
+		X86ScanResult result;
+		if (!X86_getInstructionScanResult((csh)(uintptr_t)handle, code,
+						  size, insn, &result))
+			return false;
+		*insn_size = result.length;
+		insn->size = result.length;
+		map_insn_id(handle, insn, result.opcode);
+		fill_insn_without_text(insn, result.opcode_pub, code);
+		if (!batch || insn->id != X86_INS_VCMP)
+			insn->id += result.popcode_adjust;
+		return true;
+	}
+#endif
+	return decode_full_insn(handle, code, size, insn, insn_size, batch);
 }
 
 // how many bytes will we skip when encountering data (CS_OPT_SKIPDATA)?
@@ -1343,7 +1373,6 @@ size_t CAPSTONE_API cs_disasm(csh ud, const uint8_t *buffer, size_t size,
 			      uint64_t offset, size_t count, cs_insn **insn)
 {
 	struct cs_struct *handle;
-	MCInst mci;
 	uint16_t insn_size;
 	size_t c = 0, i;
 	unsigned int f = 0; // index of the next instruction in the cache
@@ -1390,11 +1419,8 @@ size_t CAPSTONE_API cs_disasm(csh ud, const uint8_t *buffer, size_t size,
 	insn_cache = total;
 
 	while (size > 0) {
-		const bool scan = init_disasm_mcinst(&mci, handle);
-		mci.csh = handle;
-
-		// relative branches need to know the address & size of current insn
-		mci.address = offset;
+		/* Preserve this selection across detail-allocation callbacks. */
+		const bool scan = use_x86_scan(handle);
 
 		if (handle->detail_opt) {
 			// allocate memory for @detail pointer
@@ -1416,41 +1442,16 @@ size_t CAPSTONE_API cs_disasm(csh ud, const uint8_t *buffer, size_t size,
 		}
 
 		// save all the information for non-detailed mode
-		mci.flat_insn = insn_cache;
-		mci.flat_insn->address = offset;
+		insn_cache->address = offset;
 #ifdef CAPSTONE_DIET
 		// zero out mnemonic & op_str
-		mci.flat_insn->mnemonic[0] = '\0';
-		mci.flat_insn->op_str[0] = '\0';
+		insn_cache->mnemonic[0] = '\0';
+		insn_cache->op_str[0] = '\0';
 #endif
 
-		r = decode_insn(handle, buffer, size, &mci, &insn_size, offset,
-				scan);
+		r = decode_insn(handle, buffer, size, insn_cache, &insn_size,
+				scan, true);
 		if (r) {
-			mci.flat_insn->size = insn_size;
-
-			// map internal instruction opcode to public insn ID
-
-			map_insn_id(handle, insn_cache, mci.Opcode);
-
-			if (handle->no_text) {
-				fill_insn_without_text(insn_cache, &mci,
-						       buffer);
-			} else {
-				SStream ss;
-				SStream_Init(&ss);
-				SStream_opt_unum(&ss, handle->imm_unsigned);
-				handle->printer(&mci, &ss,
-						handle->printer_info);
-				fill_insn(handle, insn_cache, &ss, &mci,
-					  handle->post_printer, buffer);
-			}
-
-			// adjust for pseudo opcode (X86)
-			if (handle->arch == CS_ARCH_X86 &&
-			    insn_cache->id != X86_INS_VCMP)
-				insn_cache->id += mci.popcode_adjust;
-
 			next_offset = insn_size;
 		} else {
 			// encounter a broken instruction
@@ -1626,48 +1627,20 @@ static bool disasm_iter(struct cs_struct *handle, const uint8_t **code,
 			size_t *size, uint64_t *address, cs_insn *insn)
 {
 	uint16_t insn_size;
-	MCInst mci;
 	bool r;
 
 	handle->errnum = CS_ERR_OK;
 
-	const bool scan = init_disasm_mcinst(&mci, handle);
-	mci.csh = handle;
-
-	// relative branches need to know the address & size of current insn
-	mci.address = *address;
-
-	// save all the information for non-detailed mode
-	mci.flat_insn = insn;
-	mci.flat_insn->address = *address;
+	const bool scan = use_x86_scan(handle);
+	insn->address = *address;
 #ifdef CAPSTONE_DIET
 	// zero out mnemonic & op_str
-	mci.flat_insn->mnemonic[0] = '\0';
-	mci.flat_insn->op_str[0] = '\0';
+	insn->mnemonic[0] = '\0';
+	insn->op_str[0] = '\0';
 #endif
 
-	r = decode_insn(handle, *code, *size, &mci, &insn_size, *address, scan);
+	r = decode_insn(handle, *code, *size, insn, &insn_size, scan, false);
 	if (r) {
-		mci.flat_insn->size = insn_size;
-
-		// map internal instruction opcode to public insn ID
-		map_insn_id(handle, insn, mci.Opcode);
-
-		if (handle->no_text) {
-			fill_insn_without_text(insn, &mci, *code);
-		} else {
-			SStream ss;
-			SStream_Init(&ss);
-			SStream_opt_unum(&ss, handle->imm_unsigned);
-			handle->printer(&mci, &ss, handle->printer_info);
-			fill_insn(handle, insn, &ss, &mci, handle->post_printer,
-				  *code);
-		}
-
-		// adjust for pseudo opcode (X86)
-		if (handle->arch == CS_ARCH_X86)
-			insn->id += mci.popcode_adjust;
-
 		*code += insn_size;
 		*size -= insn_size;
 		*address += insn_size;

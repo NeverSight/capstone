@@ -49,19 +49,24 @@ The `cs_insn` is meant to be used by the Capstone core.
 It is distinct from the `MCInst`. It uses different instruction identifiers, other operand representation
 and holds more details about an instruction.
 
-For x86 with both text and detail disabled, the core initializes only the
-`MCInst` opcode fields and operand count, then sets its handle, address and
-public instruction pointer. Translation runs the same operand validation and
-opcode corrections with operand stores disabled. No consumer reads those
-intermediate operand slots in this mode. Text or detail output retains full
-operand construction. Memory validation and construction share one implementation
-specialized for the two constant store policies.
+For x86 with both text and detail disabled, the core uses a compact result
+containing the validated internal opcode, optional public opcode, length and
+pseudo-opcode adjustment. Proven scalar terminals fill this result directly.
+The generic and source-extension fallback owns its own `MCInst`, initializes
+only opcode/count state and context, and validates operands without storing
+them. Existing decoder entries retain their raw and `MCInst` contracts. Text
+or detail output retains full operand construction. Memory validation and
+construction share one implementation specialized for the two store policies.
 
-The core reuses that initialization policy to select the x86 scan entry for
-each instruction. No allocation or callback intervenes after a scan selection;
-other selections call the normal backend with its live options. Skip-data
-callbacks can change options for the next instruction, and iterator detail
-pointer hiding/restoration remains outside the selected decoder.
+The core selects the scan policy for each instruction before any detail
+allocation. No allocation or callback intervenes after a scan selection; other
+selections call the normal backend with its live options and a fully initialized
+`MCInst`, even if an allocation callback changes those options. Full decoding
+and printing own their temporary objects in a separate function. Public ID
+mapping, byte copying, aliases, pseudo-opcode adjustments and cursor updates
+remain in the core. Skip-data callbacks can change options for the next
+instruction; iterator detail-pointer hiding and restoration remain outside
+the selected decoder.
 
 Without detail, the x86 mapping layer exposes its existing checked public-ID
 lookup as a private inline helper shared by the mapper and both core decode
@@ -133,10 +138,13 @@ they do not define another instruction set. Direct decisions embed terminals;
 indexed decisions retain their ModR/M read and branch selection, including
 invalid IDs. Generation checks every selected ModR/M value and packed result.
 
-The 16-bit row composes the existing primary and operand-size lookups only when
+The 16-bit rows compose the existing primary and operand-size lookups only when
 their decision kinds match. Both then require the same read, and the second
 lookup either reads nothing or reuses an already successful ModR/M read.
-Equivalence comes from the existing lookup ranges. Different read requirements,
+Equivalence comes from the existing lookup ranges. Rows for operand/address-size
+prefix combinations keep the primary ID with an operand-size override and use
+the equivalent secondary ID without one; both still preserve the secondary
+lookup's read requirement. Different read requirements,
 address-size repairs, opcode 90 and UD1's runtime operand override retain generic
 selection. No failed secondary read or cursor update is removed from that path.
 
@@ -174,23 +182,32 @@ scalar-compare P2 restoration stays in the successful public-output path. The
 GFNI displacement correction remains before backend translation. Public output
 modes and instruction state remain caller-local.
 
-The dedicated scan entry shares the parser with raw decoding. Its scalar
-terminals return only their validated internal ID and length before completing
-the `MCInst` opcode fields; they need no intermediate opcode translation because
-terminal admission excludes acquire/release prefixes and opcode-changing
-operands. This ID-only result is private to the scan entry. Existing decoder
-entries retain their raw/`MCInst` contracts. Prefix, opcode, ID selection, prefix
-validation, terminal, checked scalar reads and compact ModR/M helpers stay inline
-so the compiler can remove unused local state.
+The dedicated scan entries share the parser with raw decoding. Their scalar
+terminals return only the validated internal ID and length before constructing
+the requested compact or `MCInst` result. They need no intermediate opcode
+translation because terminal admission excludes acquire/release prefixes and
+opcode-changing operands. Prefix, opcode, ID selection, prefix validation,
+terminal, checked scalar reads and compact ModR/M helpers stay inline so the
+compiler can remove unused local state.
 
-The extension selector also supplies the bounded first non-prefix offset. The
-scan entry uses that offset only for no-prefix and single-REX terminal admission,
-with the decoder's existing bitness priority. Compact terminal state stays local
-to its shared readers: the opcode reader returns to generic decoding before
-three-byte maps and operand-bearing 3DNow headers, which are outside the terminal
-tables. The outlined generic fallback owns a separate state. No terminal copies
-register/address values merely to discard them, and byte consumption, bounds and
-legality still come from the shared readers.
+The extension selector also supplies the bounded first non-prefix offset.
+Ordinary terminal admission uses that offset for no-prefix and single-REX
+headers with the decoder's existing bitness priority. A separate compact
+reader admits only operand/address-size prefix sequences in 16-bit mode,
+including repeats and either order. It checks each byte itself under the
+selected 16-bit mode: the extension selector's 64-bit flag can have a different
+priority for mixed mode flags. Prefix field updates and size calculation are
+shared with the full parser. The generated size-prefix rows are selected only
+after this admission; raw decoding retains its original row selection even
+when incoming raw state contains size-prefix flags. Other prefixes and
+address-dependent repairs retain generic decoding.
+
+Compact terminal state stays local to its shared readers. The opcode reader
+returns to generic decoding before three-byte maps and operand-bearing 3DNow
+headers, which are outside the terminal tables. The outlined generic fallback
+owns a separate state. No terminal copies register/address values merely to
+discard them; byte consumption, bounds and legality still come from the shared
+readers.
 
 The scan entry consumes the existing extension selector once. Source-owned
 extensions keep their handlers and precedence; EVEX enters the same backend
