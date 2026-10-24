@@ -784,17 +784,17 @@ def emit_terminal(suffix):
             scan_groups[scan_calls] = len(scan_groups) + 1
         scan_handlers.append(scan_groups[scan_calls])
     handlers += [
-        "static const uint8_t x86LegacyScanPatterns[] = {",
-        "\t0, " + ", ".join(str(handler) for handler in scan_handlers),
-        "};",
-        "",
         "X86_DECODE_INLINE int scanLegacyOperands(struct InternalInstruction *insn,",
         "\t\tMCInst *mcInst, uint16_t *size, unsigned int handler)",
         "{",
-        "\tswitch (x86LegacyScanPatterns[handler]) {",
+        "\tswitch (handler) {",
     ]
     for calls, handler in scan_groups.items():
-        handlers.append(f"\tcase {handler}:")
+        handlers += [
+            f"\tcase {raw_handler}:"
+            for raw_handler, pattern in enumerate(scan_handlers, 1)
+            if pattern == handler
+        ]
         if calls:
             handlers += [
                 "\t\tif (" + " ||\n\t\t    ".join(calls) + ")",

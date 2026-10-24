@@ -3328,9 +3328,21 @@ bool X86_getInstructionScanResult(csh ud, const uint8_t *code, size_t code_len,
 		return decodeScanResultFallback(ud, code, code_len, insn,
 						result, opcode, extension);
 	unsigned instructionID = 0;
-	int status = trySimpleLegacyScan(code, code_len, handle->mode, opcode,
-					 opcodeOffset, &instructionID,
-					 &result->length);
+	/* Constant bitness folds the terminal readers' mode and size tests.
+	 * Feature routing above still observes the original mode bits. */
+	int status;
+	if (!(handle->mode & (CS_MODE_16 | CS_MODE_32)))
+		status = trySimpleLegacyScan(code, code_len, CS_MODE_64, opcode,
+					     opcodeOffset, &instructionID,
+					     &result->length);
+	else if (handle->mode & CS_MODE_16)
+		status = trySimpleLegacyScan(code, code_len, CS_MODE_16, opcode,
+					     opcodeOffset, &instructionID,
+					     &result->length);
+	else
+		status = trySimpleLegacyScan(code, code_len, CS_MODE_32, opcode,
+					     opcodeOffset, &instructionID,
+					     &result->length);
 	if (status != X86_SCAN_NOT_HANDLED)
 		return completeTerminalScanResult(result, instructionID,
 						  status);

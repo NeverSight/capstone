@@ -729,66 +729,126 @@ static int readLegacyShape77(struct InternalInstruction *insn)
 		return X86_SCAN_INVALID;
 	return X86_SCAN_RAW_READY;
 }
-static const uint8_t x86LegacyScanPatterns[] = {
-	0, 1, 1, 1, 1, 1, 1, 1, 1, 2, 3, 4, 1, 1, 1, 1, 1, 1, 4, 4, 1, 1, 2, 5, 5, 5, 6, 6, 6, 5, 5, 1, 1, 7, 2, 3, 5, 5, 5, 8, 9, 2, 1, 1, 10, 3, 1, 1, 1, 1, 1, 1, 1, 1, 4, 10, 1, 1, 1, 1, 1, 1, 1, 1, 1, 11, 11, 11, 5, 5, 4, 12, 5, 1, 1, 1, 13, 8
-};
-
 X86_DECODE_INLINE int scanLegacyOperands(struct InternalInstruction *insn,
 		MCInst *mcInst, uint16_t *size, unsigned int handler)
 {
-	switch (x86LegacyScanPatterns[handler]) {
+	switch (handler) {
 	case 1:
+	case 2:
+	case 3:
+	case 4:
+	case 5:
+	case 6:
+	case 7:
+	case 8:
+	case 12:
+	case 13:
+	case 14:
+	case 15:
+	case 16:
+	case 17:
+	case 20:
+	case 21:
+	case 31:
+	case 32:
+	case 42:
+	case 43:
+	case 46:
+	case 47:
+	case 48:
+	case 49:
+	case 50:
+	case 51:
+	case 52:
+	case 53:
+	case 56:
+	case 57:
+	case 58:
+	case 59:
+	case 60:
+	case 61:
+	case 62:
+	case 63:
+	case 64:
+	case 73:
+	case 74:
+	case 75:
 		if ((!insn->consumedModRM && readModRMScan(insn)))
 			return X86_SCAN_INVALID;
 		break;
-	case 2:
+	case 9:
+	case 22:
+	case 34:
+	case 41:
 		if (readImmediateImpl(insn, 1, false))
 			return X86_SCAN_INVALID;
 		break;
-	case 3:
+	case 10:
+	case 35:
+	case 45:
 		if (readImmediateImpl(insn, insn->immediateSize, false))
 			return X86_SCAN_INVALID;
 		break;
-	case 4:
+	case 11:
+	case 18:
+	case 19:
+	case 54:
+	case 70:
 		break;
-	case 5:
+	case 23:
+	case 24:
+	case 25:
+	case 29:
+	case 30:
+	case 36:
+	case 37:
+	case 38:
+	case 68:
+	case 69:
+	case 72:
 		if ((!insn->consumedModRM && readModRMScan(insn)) ||
 		    readImmediateImpl(insn, 1, false))
 			return X86_SCAN_INVALID;
 		break;
-	case 6:
+	case 26:
+	case 27:
+	case 28:
 		if ((!insn->consumedModRM && readModRMScan(insn)) ||
 		    readImmediateImpl(insn, insn->immediateSize, false))
 			return X86_SCAN_INVALID;
 		break;
-	case 7:
+	case 33:
 		if (readImmediateImpl(insn, insn->immediateSize, false) ||
 		    readImmediateImpl(insn, 2, false))
 			return X86_SCAN_INVALID;
 		break;
-	case 8:
+	case 39:
+	case 77:
 		if (readImmediateImpl(insn, 2, false))
 			return X86_SCAN_INVALID;
 		break;
-	case 9:
+	case 40:
 		if (readImmediateImpl(insn, 2, false) ||
 		    readImmediateImpl(insn, 1, false))
 			return X86_SCAN_INVALID;
 		break;
-	case 10:
+	case 44:
+	case 55:
 		if (readImmediateImpl(insn, 4, false))
 			return X86_SCAN_INVALID;
 		break;
-	case 11:
+	case 65:
+	case 66:
+	case 67:
 		if ((!insn->consumedModRM && readModRMScan(insn)) ||
 		    readImmediateImpl(insn, 4, false))
 			return X86_SCAN_INVALID;
 		break;
-	case 12:
+	case 71:
 		if (readImmediateImpl(insn, 8, false))
 			return X86_SCAN_INVALID;
 		break;
-	case 13:
+	case 76:
 		if (readImmediateImpl(insn, insn->immediateSize, false) ||
 		    readImmediateImpl(insn, insn->immediateSize, false))
 			return X86_SCAN_INVALID;
@@ -2855,66 +2915,126 @@ static int readLegacyShape77(struct InternalInstruction *insn)
 		return X86_SCAN_INVALID;
 	return X86_SCAN_RAW_READY;
 }
-static const uint8_t x86LegacyScanPatterns[] = {
-	0, 1, 1, 1, 1, 1, 1, 1, 1, 2, 3, 4, 1, 1, 1, 1, 1, 1, 4, 4, 1, 1, 2, 5, 5, 5, 6, 6, 6, 5, 5, 1, 1, 7, 2, 3, 5, 5, 5, 8, 3, 9, 2, 1, 1, 10, 1, 1, 1, 1, 1, 1, 1, 1, 4, 10, 1, 1, 1, 1, 1, 1, 1, 1, 1, 11, 11, 11, 5, 5, 4, 12, 5, 1, 1, 1, 13, 8
-};
-
 X86_DECODE_INLINE int scanLegacyOperands(struct InternalInstruction *insn,
 		MCInst *mcInst, uint16_t *size, unsigned int handler)
 {
-	switch (x86LegacyScanPatterns[handler]) {
+	switch (handler) {
 	case 1:
+	case 2:
+	case 3:
+	case 4:
+	case 5:
+	case 6:
+	case 7:
+	case 8:
+	case 12:
+	case 13:
+	case 14:
+	case 15:
+	case 16:
+	case 17:
+	case 20:
+	case 21:
+	case 31:
+	case 32:
+	case 43:
+	case 44:
+	case 46:
+	case 47:
+	case 48:
+	case 49:
+	case 50:
+	case 51:
+	case 52:
+	case 53:
+	case 56:
+	case 57:
+	case 58:
+	case 59:
+	case 60:
+	case 61:
+	case 62:
+	case 63:
+	case 64:
+	case 73:
+	case 74:
+	case 75:
 		if ((!insn->consumedModRM && readModRMScan(insn)))
 			return X86_SCAN_INVALID;
 		break;
-	case 2:
+	case 9:
+	case 22:
+	case 34:
+	case 42:
 		if (readImmediateImpl(insn, 1, false))
 			return X86_SCAN_INVALID;
 		break;
-	case 3:
+	case 10:
+	case 35:
+	case 40:
 		if (readImmediateImpl(insn, insn->immediateSize, false))
 			return X86_SCAN_INVALID;
 		break;
-	case 4:
+	case 11:
+	case 18:
+	case 19:
+	case 54:
+	case 70:
 		break;
-	case 5:
+	case 23:
+	case 24:
+	case 25:
+	case 29:
+	case 30:
+	case 36:
+	case 37:
+	case 38:
+	case 68:
+	case 69:
+	case 72:
 		if ((!insn->consumedModRM && readModRMScan(insn)) ||
 		    readImmediateImpl(insn, 1, false))
 			return X86_SCAN_INVALID;
 		break;
-	case 6:
+	case 26:
+	case 27:
+	case 28:
 		if ((!insn->consumedModRM && readModRMScan(insn)) ||
 		    readImmediateImpl(insn, insn->immediateSize, false))
 			return X86_SCAN_INVALID;
 		break;
-	case 7:
+	case 33:
 		if (readImmediateImpl(insn, insn->immediateSize, false) ||
 		    readImmediateImpl(insn, 2, false))
 			return X86_SCAN_INVALID;
 		break;
-	case 8:
+	case 39:
+	case 77:
 		if (readImmediateImpl(insn, 2, false))
 			return X86_SCAN_INVALID;
 		break;
-	case 9:
+	case 41:
 		if (readImmediateImpl(insn, 2, false) ||
 		    readImmediateImpl(insn, 1, false))
 			return X86_SCAN_INVALID;
 		break;
-	case 10:
+	case 45:
+	case 55:
 		if (readImmediateImpl(insn, 4, false))
 			return X86_SCAN_INVALID;
 		break;
-	case 11:
+	case 65:
+	case 66:
+	case 67:
 		if ((!insn->consumedModRM && readModRMScan(insn)) ||
 		    readImmediateImpl(insn, 4, false))
 			return X86_SCAN_INVALID;
 		break;
-	case 12:
+	case 71:
 		if (readImmediateImpl(insn, 8, false))
 			return X86_SCAN_INVALID;
 		break;
-	case 13:
+	case 76:
 		if (readImmediateImpl(insn, insn->immediateSize, false) ||
 		    readImmediateImpl(insn, insn->immediateSize, false))
 			return X86_SCAN_INVALID;
