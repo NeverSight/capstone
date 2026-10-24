@@ -432,6 +432,7 @@ static DecodeStatus decodeUImmLog2XLenNonZeroOperand(MCInst *Inst, uint32_t Imm,
 }
 
 #include "RISCVGenDisassemblerTables.inc"
+#include "RISCVGenDirectDecoder.inc"
 
 static DecodeStatus decodeRVCInstrRdRs1ImmZero(MCInst *Inst, uint32_t Insn,
 					       uint64_t Address,

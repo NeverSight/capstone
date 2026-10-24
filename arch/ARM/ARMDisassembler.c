@@ -603,6 +603,7 @@ static DecodeStatus DecodeT2AddSubSPImm(MCInst *Inst, unsigned Insn,
 					uint64_t Address, const void *Decoder);
 
 #include "ARMGenDisassemblerTables.inc"
+#include "ARMGenDirectDecoder.inc"
 
 // Post-decoding checks
 

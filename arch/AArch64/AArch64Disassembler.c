@@ -326,6 +326,7 @@ static DecodeStatus DecodePRFMRegInstruction(MCInst *Inst, uint32_t insn,
 					     const void *Decoder);
 
 #include "AArch64GenDisassemblerTables.inc"
+#include "AArch64GenDirectDecoder.inc"
 
 #define Success MCDisassembler_Success
 #define Fail MCDisassembler_Fail

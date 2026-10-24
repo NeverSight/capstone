@@ -378,6 +378,20 @@ public:
             filename=Path("filename"),
         )
 
+    def test_direct_decoder_includes(self):
+        for arch in ("ARM", "AArch64", "RISCV", "PPC"):
+            with self.subTest(arch=arch):
+                syntax = f'#include "{arch}GenDisassemblerTables.inc"\n'.encode()
+                expected = syntax
+                if arch != "PPC":
+                    expected += f'#include "{arch}GenDirectDecoder.inc"\n'.encode()
+                self.check_patching_result(
+                    Includes(0, arch),
+                    syntax,
+                    expected + b"\n",
+                    filename=Path(f"{arch}Disassembler.cpp"),
+                )
+
     def test_inlinetostaticinline(self):
         patch = InlineToStaticInline(0)
         syntax = b"inline void FUNCTION() {}"

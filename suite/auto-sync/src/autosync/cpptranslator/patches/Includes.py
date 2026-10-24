@@ -37,11 +37,18 @@ class Includes(Patch):
         include_text = get_text(src, captures[0][0].start_byte, captures[0][0].end_byte)
         # Special cases, which appear somewhere in the code.
         if b"GenDisassemblerTables.inc" in include_text:
-            return (
+            result = (
                 b'#include "'
                 + bytes(self.arch, "utf8")
-                + b'GenDisassemblerTables.inc"\n\n'
+                + b'GenDisassemblerTables.inc"\n'
             )
+            if self.arch in ("ARM", "AArch64", "RISCV"):
+                result += (
+                    b'#include "'
+                    + bytes(self.arch, "utf8")
+                    + b'GenDirectDecoder.inc"\n'
+                )
+            return result + b"\n"
         elif b"GenAsmWriter.inc" in include_text:
             return b'#include "' + bytes(self.arch, "utf8") + b'GenAsmWriter.inc"\n\n'
         elif b"GenSystemOperands.inc" in include_text:
