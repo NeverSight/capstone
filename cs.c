@@ -78,6 +78,7 @@
 #include "arch/WASM/WASMModule.h"
 #ifdef CAPSTONE_HAS_X86
 #include "arch/X86/X86Mapping.h"
+#include "arch/X86/X86Disassembler.h"
 #endif
 #include "arch/X86/X86Module.h"
 #include "arch/XCore/XCoreModule.h"
@@ -935,7 +936,7 @@ static inline void map_insn_id(cs_struct *handle, cs_insn *insn,
 	handle->insn_id(handle, insn, id);
 }
 
-static void init_disasm_mcinst(MCInst *mci, const cs_struct *handle)
+static bool init_disasm_mcinst(MCInst *mci, const cs_struct *handle)
 {
 	if (handle->arch == CS_ARCH_X86 && handle->no_text &&
 	    !handle->detail_opt) {
@@ -946,9 +947,24 @@ static void init_disasm_mcinst(MCInst *mci, const cs_struct *handle)
 		mci->OpcodePub = 0;
 		mci->size = 0;
 		mci->popcode_adjust = 0;
+		return true;
 	} else {
 		MCInst_Init(mci, handle->arch);
+		return false;
 	}
+}
+
+static bool decode_insn(cs_struct *handle, const uint8_t *code, size_t size,
+			MCInst *mci, uint16_t *insn_size, uint64_t address,
+			bool scan)
+{
+#ifdef CAPSTONE_HAS_X86
+	if (scan)
+		return X86_getInstructionScan((csh)(uintptr_t)handle, code,
+					      size, mci, insn_size);
+#endif
+	return handle->disasm((csh)(uintptr_t)handle, code, size, mci,
+			      insn_size, address, handle->getinsn_info);
 }
 
 // fill the parts of insn that do not come from printing it, for a handle
@@ -1374,7 +1390,7 @@ size_t CAPSTONE_API cs_disasm(csh ud, const uint8_t *buffer, size_t size,
 	insn_cache = total;
 
 	while (size > 0) {
-		init_disasm_mcinst(&mci, handle);
+		const bool scan = init_disasm_mcinst(&mci, handle);
 		mci.csh = handle;
 
 		// relative branches need to know the address & size of current insn
@@ -1408,8 +1424,8 @@ size_t CAPSTONE_API cs_disasm(csh ud, const uint8_t *buffer, size_t size,
 		mci.flat_insn->op_str[0] = '\0';
 #endif
 
-		r = handle->disasm(ud, buffer, size, &mci, &insn_size, offset,
-				   handle->getinsn_info);
+		r = decode_insn(handle, buffer, size, &mci, &insn_size, offset,
+				scan);
 		if (r) {
 			mci.flat_insn->size = insn_size;
 
@@ -1606,7 +1622,7 @@ cs_insn *CAPSTONE_API cs_malloc(csh ud)
 	return insn;
 }
 
-static bool disasm_iter(struct cs_struct *handle, csh ud, const uint8_t **code,
+static bool disasm_iter(struct cs_struct *handle, const uint8_t **code,
 			size_t *size, uint64_t *address, cs_insn *insn)
 {
 	uint16_t insn_size;
@@ -1615,7 +1631,7 @@ static bool disasm_iter(struct cs_struct *handle, csh ud, const uint8_t **code,
 
 	handle->errnum = CS_ERR_OK;
 
-	init_disasm_mcinst(&mci, handle);
+	const bool scan = init_disasm_mcinst(&mci, handle);
 	mci.csh = handle;
 
 	// relative branches need to know the address & size of current insn
@@ -1630,8 +1646,7 @@ static bool disasm_iter(struct cs_struct *handle, csh ud, const uint8_t **code,
 	mci.flat_insn->op_str[0] = '\0';
 #endif
 
-	r = handle->disasm(ud, *code, *size, &mci, &insn_size, *address,
-			   handle->getinsn_info);
+	r = decode_insn(handle, *code, *size, &mci, &insn_size, *address, scan);
 	if (r) {
 		mci.flat_insn->size = insn_size;
 
@@ -1720,7 +1735,7 @@ bool CAPSTONE_API cs_disasm_iter(csh ud, const uint8_t **code, size_t *size,
 	detail = insn->detail;
 	if (!handle->detail_opt)
 		insn->detail = NULL;
-	r = disasm_iter(handle, ud, code, size, address, insn);
+	r = disasm_iter(handle, code, size, address, insn);
 	insn->detail = detail;
 	return r;
 }

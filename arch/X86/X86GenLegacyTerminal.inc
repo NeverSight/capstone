@@ -729,246 +729,80 @@ static int readLegacyShape77(struct InternalInstruction *insn)
 		return X86_SCAN_INVALID;
 	return X86_SCAN_RAW_READY;
 }
-static int scanLegacyShape1(struct InternalInstruction *insn,
-				MCInst *mcInst, uint16_t *size)
-{
-	if ((!insn->consumedModRM && readModRMScan(insn)))
-		return X86_SCAN_INVALID;
-	if (finishDecodedInstruction(insn, false))
-		return X86_SCAN_INVALID;
-	*size = (uint16_t)insn->length;
-	if (beginTranslation(mcInst, insn))
-		return X86_SCAN_INVALID;
-	return X86_SCAN_COMPLETE;
-}
-static int scanLegacyShape2(struct InternalInstruction *insn,
-				MCInst *mcInst, uint16_t *size)
-{
-	if (readImmediateImpl(insn, 1, false))
-		return X86_SCAN_INVALID;
-	if (finishDecodedInstruction(insn, false))
-		return X86_SCAN_INVALID;
-	*size = (uint16_t)insn->length;
-	if (beginTranslation(mcInst, insn))
-		return X86_SCAN_INVALID;
-	return X86_SCAN_COMPLETE;
-}
-static int scanLegacyShape3(struct InternalInstruction *insn,
-				MCInst *mcInst, uint16_t *size)
-{
-	if (readImmediateImpl(insn, insn->immediateSize, false))
-		return X86_SCAN_INVALID;
-	if (finishDecodedInstruction(insn, false))
-		return X86_SCAN_INVALID;
-	*size = (uint16_t)insn->length;
-	if (beginTranslation(mcInst, insn))
-		return X86_SCAN_INVALID;
-	return X86_SCAN_COMPLETE;
-}
-static int scanLegacyShape4(struct InternalInstruction *insn,
-				MCInst *mcInst, uint16_t *size)
-{
-	if (finishDecodedInstruction(insn, false))
-		return X86_SCAN_INVALID;
-	*size = (uint16_t)insn->length;
-	if (beginTranslation(mcInst, insn))
-		return X86_SCAN_INVALID;
-	return X86_SCAN_COMPLETE;
-}
-static int scanLegacyShape5(struct InternalInstruction *insn,
-				MCInst *mcInst, uint16_t *size)
-{
-	if ((!insn->consumedModRM && readModRMScan(insn)) ||
-	    readImmediateImpl(insn, 1, false))
-		return X86_SCAN_INVALID;
-	if (finishDecodedInstruction(insn, false))
-		return X86_SCAN_INVALID;
-	*size = (uint16_t)insn->length;
-	if (beginTranslation(mcInst, insn))
-		return X86_SCAN_INVALID;
-	return X86_SCAN_COMPLETE;
-}
-static int scanLegacyShape6(struct InternalInstruction *insn,
-				MCInst *mcInst, uint16_t *size)
-{
-	if ((!insn->consumedModRM && readModRMScan(insn)) ||
-	    readImmediateImpl(insn, insn->immediateSize, false))
-		return X86_SCAN_INVALID;
-	if (finishDecodedInstruction(insn, false))
-		return X86_SCAN_INVALID;
-	*size = (uint16_t)insn->length;
-	if (beginTranslation(mcInst, insn))
-		return X86_SCAN_INVALID;
-	return X86_SCAN_COMPLETE;
-}
-static int scanLegacyShape7(struct InternalInstruction *insn,
-				MCInst *mcInst, uint16_t *size)
-{
-	if (readImmediateImpl(insn, insn->immediateSize, false) ||
-	    readImmediateImpl(insn, 2, false))
-		return X86_SCAN_INVALID;
-	if (finishDecodedInstruction(insn, false))
-		return X86_SCAN_INVALID;
-	*size = (uint16_t)insn->length;
-	if (beginTranslation(mcInst, insn))
-		return X86_SCAN_INVALID;
-	return X86_SCAN_COMPLETE;
-}
-static int scanLegacyShape8(struct InternalInstruction *insn,
-				MCInst *mcInst, uint16_t *size)
-{
-	if (readImmediateImpl(insn, 2, false))
-		return X86_SCAN_INVALID;
-	if (finishDecodedInstruction(insn, false))
-		return X86_SCAN_INVALID;
-	*size = (uint16_t)insn->length;
-	if (beginTranslation(mcInst, insn))
-		return X86_SCAN_INVALID;
-	return X86_SCAN_COMPLETE;
-}
-static int scanLegacyShape9(struct InternalInstruction *insn,
-				MCInst *mcInst, uint16_t *size)
-{
-	if (readImmediateImpl(insn, 2, false) ||
-	    readImmediateImpl(insn, 1, false))
-		return X86_SCAN_INVALID;
-	if (finishDecodedInstruction(insn, false))
-		return X86_SCAN_INVALID;
-	*size = (uint16_t)insn->length;
-	if (beginTranslation(mcInst, insn))
-		return X86_SCAN_INVALID;
-	return X86_SCAN_COMPLETE;
-}
-static int scanLegacyShape10(struct InternalInstruction *insn,
-				MCInst *mcInst, uint16_t *size)
-{
-	if (readImmediateImpl(insn, 4, false))
-		return X86_SCAN_INVALID;
-	if (finishDecodedInstruction(insn, false))
-		return X86_SCAN_INVALID;
-	*size = (uint16_t)insn->length;
-	if (beginTranslation(mcInst, insn))
-		return X86_SCAN_INVALID;
-	return X86_SCAN_COMPLETE;
-}
-static int scanLegacyShape11(struct InternalInstruction *insn,
-				MCInst *mcInst, uint16_t *size)
-{
-	if ((!insn->consumedModRM && readModRMScan(insn)) ||
-	    readImmediateImpl(insn, 4, false))
-		return X86_SCAN_INVALID;
-	if (finishDecodedInstruction(insn, false))
-		return X86_SCAN_INVALID;
-	*size = (uint16_t)insn->length;
-	if (beginTranslation(mcInst, insn))
-		return X86_SCAN_INVALID;
-	return X86_SCAN_COMPLETE;
-}
-static int scanLegacyShape12(struct InternalInstruction *insn,
-				MCInst *mcInst, uint16_t *size)
-{
-	if (readImmediateImpl(insn, 8, false))
-		return X86_SCAN_INVALID;
-	if (finishDecodedInstruction(insn, false))
-		return X86_SCAN_INVALID;
-	*size = (uint16_t)insn->length;
-	if (beginTranslation(mcInst, insn))
-		return X86_SCAN_INVALID;
-	return X86_SCAN_COMPLETE;
-}
-static int scanLegacyShape13(struct InternalInstruction *insn,
-				MCInst *mcInst, uint16_t *size)
-{
-	if (readImmediateImpl(insn, insn->immediateSize, false) ||
-	    readImmediateImpl(insn, insn->immediateSize, false))
-		return X86_SCAN_INVALID;
-	if (finishDecodedInstruction(insn, false))
-		return X86_SCAN_INVALID;
-	*size = (uint16_t)insn->length;
-	if (beginTranslation(mcInst, insn))
-		return X86_SCAN_INVALID;
-	return X86_SCAN_COMPLETE;
-}
-static int (*const x86LegacyScanHandlers[])(struct InternalInstruction *, MCInst *, uint16_t *) = {
-	NULL,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape2,
-	scanLegacyShape3,
-	scanLegacyShape4,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape4,
-	scanLegacyShape4,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape2,
-	scanLegacyShape5,
-	scanLegacyShape5,
-	scanLegacyShape5,
-	scanLegacyShape6,
-	scanLegacyShape6,
-	scanLegacyShape6,
-	scanLegacyShape5,
-	scanLegacyShape5,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape7,
-	scanLegacyShape2,
-	scanLegacyShape3,
-	scanLegacyShape5,
-	scanLegacyShape5,
-	scanLegacyShape5,
-	scanLegacyShape8,
-	scanLegacyShape9,
-	scanLegacyShape2,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape10,
-	scanLegacyShape3,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape4,
-	scanLegacyShape10,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape11,
-	scanLegacyShape11,
-	scanLegacyShape11,
-	scanLegacyShape5,
-	scanLegacyShape5,
-	scanLegacyShape4,
-	scanLegacyShape12,
-	scanLegacyShape5,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape13,
-	scanLegacyShape8,
+static const uint8_t x86LegacyScanPatterns[] = {
+	0, 1, 1, 1, 1, 1, 1, 1, 1, 2, 3, 4, 1, 1, 1, 1, 1, 1, 4, 4, 1, 1, 2, 5, 5, 5, 6, 6, 6, 5, 5, 1, 1, 7, 2, 3, 5, 5, 5, 8, 9, 2, 1, 1, 10, 3, 1, 1, 1, 1, 1, 1, 1, 1, 4, 10, 1, 1, 1, 1, 1, 1, 1, 1, 1, 11, 11, 11, 5, 5, 4, 12, 5, 1, 1, 1, 13, 8
 };
+
+X86_DECODE_INLINE int scanLegacyOperands(struct InternalInstruction *insn,
+		MCInst *mcInst, uint16_t *size, unsigned int handler)
+{
+	switch (x86LegacyScanPatterns[handler]) {
+	case 1:
+		if ((!insn->consumedModRM && readModRMScan(insn)))
+			return X86_SCAN_INVALID;
+		break;
+	case 2:
+		if (readImmediateImpl(insn, 1, false))
+			return X86_SCAN_INVALID;
+		break;
+	case 3:
+		if (readImmediateImpl(insn, insn->immediateSize, false))
+			return X86_SCAN_INVALID;
+		break;
+	case 4:
+		break;
+	case 5:
+		if ((!insn->consumedModRM && readModRMScan(insn)) ||
+		    readImmediateImpl(insn, 1, false))
+			return X86_SCAN_INVALID;
+		break;
+	case 6:
+		if ((!insn->consumedModRM && readModRMScan(insn)) ||
+		    readImmediateImpl(insn, insn->immediateSize, false))
+			return X86_SCAN_INVALID;
+		break;
+	case 7:
+		if (readImmediateImpl(insn, insn->immediateSize, false) ||
+		    readImmediateImpl(insn, 2, false))
+			return X86_SCAN_INVALID;
+		break;
+	case 8:
+		if (readImmediateImpl(insn, 2, false))
+			return X86_SCAN_INVALID;
+		break;
+	case 9:
+		if (readImmediateImpl(insn, 2, false) ||
+		    readImmediateImpl(insn, 1, false))
+			return X86_SCAN_INVALID;
+		break;
+	case 10:
+		if (readImmediateImpl(insn, 4, false))
+			return X86_SCAN_INVALID;
+		break;
+	case 11:
+		if ((!insn->consumedModRM && readModRMScan(insn)) ||
+		    readImmediateImpl(insn, 4, false))
+			return X86_SCAN_INVALID;
+		break;
+	case 12:
+		if (readImmediateImpl(insn, 8, false))
+			return X86_SCAN_INVALID;
+		break;
+	case 13:
+		if (readImmediateImpl(insn, insn->immediateSize, false) ||
+		    readImmediateImpl(insn, insn->immediateSize, false))
+			return X86_SCAN_INVALID;
+		break;
+	default:
+		return X86_SCAN_INVALID;
+	}
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (mcInst && beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	return X86_SCAN_COMPLETE;
+}
 
 static int (*const x86LegacyHandlers[])(struct InternalInstruction *) = {
 	NULL,
@@ -1846,11 +1680,11 @@ static const uint64_t x86LegacyDecisions[4][2][256] = {
 },
 };
 
-static int decodeLegacyTerminal(struct InternalInstruction *insn,
-				MCInst *mcInst, uint16_t *size, uint64_t decision)
+X86_DECODE_INLINE int decodeLegacyTerminal(struct InternalInstruction *insn,
+				MCInst *mcInst, uint16_t *size, uint64_t decision, bool scan)
 {
 	uint32_t terminal;
-	if ((decision & (X86_TERMINAL_INDEXED | X86_TERMINAL_SPLIT)) && (mcInst ? readModRMScan(insn) : readModRM(insn)))
+	if ((decision & (X86_TERMINAL_INDEXED | X86_TERMINAL_SPLIT)) && (scan ? readModRMScan(insn) : readModRM(insn)))
 		return X86_SCAN_INVALID;
 	if (decision & X86_TERMINAL_INDEXED) {
 		unsigned int index = decision & X86_DECISION_OFFSET_MASK;
@@ -1877,8 +1711,8 @@ static int decodeLegacyTerminal(struct InternalInstruction *insn,
 	insn->spec = specifierForUID(insn->instructionID);
 	if (!insn->instructionID)
 		return X86_SCAN_INVALID;
-	if (mcInst)
-		return x86LegacyScanHandlers[terminal >> X86_TERMINAL_HANDLER_SHIFT](insn, mcInst, size);
+	if (scan)
+		return scanLegacyOperands(insn, mcInst, size, terminal >> X86_TERMINAL_HANDLER_SHIFT);
 	insn->operands = x86OperandSets[(terminal >> X86_TERMINAL_OPERAND_SHIFT) & X86_TERMINAL_OPERAND_MASK];
 	return x86LegacyHandlers[terminal >> X86_TERMINAL_HANDLER_SHIFT](insn);
 }
@@ -2609,246 +2443,80 @@ static int readLegacyShape77(struct InternalInstruction *insn)
 		return X86_SCAN_INVALID;
 	return X86_SCAN_RAW_READY;
 }
-static int scanLegacyShape1(struct InternalInstruction *insn,
-				MCInst *mcInst, uint16_t *size)
-{
-	if ((!insn->consumedModRM && readModRMScan(insn)))
-		return X86_SCAN_INVALID;
-	if (finishDecodedInstruction(insn, false))
-		return X86_SCAN_INVALID;
-	*size = (uint16_t)insn->length;
-	if (beginTranslation(mcInst, insn))
-		return X86_SCAN_INVALID;
-	return X86_SCAN_COMPLETE;
-}
-static int scanLegacyShape2(struct InternalInstruction *insn,
-				MCInst *mcInst, uint16_t *size)
-{
-	if (readImmediateImpl(insn, 1, false))
-		return X86_SCAN_INVALID;
-	if (finishDecodedInstruction(insn, false))
-		return X86_SCAN_INVALID;
-	*size = (uint16_t)insn->length;
-	if (beginTranslation(mcInst, insn))
-		return X86_SCAN_INVALID;
-	return X86_SCAN_COMPLETE;
-}
-static int scanLegacyShape3(struct InternalInstruction *insn,
-				MCInst *mcInst, uint16_t *size)
-{
-	if (readImmediateImpl(insn, insn->immediateSize, false))
-		return X86_SCAN_INVALID;
-	if (finishDecodedInstruction(insn, false))
-		return X86_SCAN_INVALID;
-	*size = (uint16_t)insn->length;
-	if (beginTranslation(mcInst, insn))
-		return X86_SCAN_INVALID;
-	return X86_SCAN_COMPLETE;
-}
-static int scanLegacyShape4(struct InternalInstruction *insn,
-				MCInst *mcInst, uint16_t *size)
-{
-	if (finishDecodedInstruction(insn, false))
-		return X86_SCAN_INVALID;
-	*size = (uint16_t)insn->length;
-	if (beginTranslation(mcInst, insn))
-		return X86_SCAN_INVALID;
-	return X86_SCAN_COMPLETE;
-}
-static int scanLegacyShape5(struct InternalInstruction *insn,
-				MCInst *mcInst, uint16_t *size)
-{
-	if ((!insn->consumedModRM && readModRMScan(insn)) ||
-	    readImmediateImpl(insn, 1, false))
-		return X86_SCAN_INVALID;
-	if (finishDecodedInstruction(insn, false))
-		return X86_SCAN_INVALID;
-	*size = (uint16_t)insn->length;
-	if (beginTranslation(mcInst, insn))
-		return X86_SCAN_INVALID;
-	return X86_SCAN_COMPLETE;
-}
-static int scanLegacyShape6(struct InternalInstruction *insn,
-				MCInst *mcInst, uint16_t *size)
-{
-	if ((!insn->consumedModRM && readModRMScan(insn)) ||
-	    readImmediateImpl(insn, insn->immediateSize, false))
-		return X86_SCAN_INVALID;
-	if (finishDecodedInstruction(insn, false))
-		return X86_SCAN_INVALID;
-	*size = (uint16_t)insn->length;
-	if (beginTranslation(mcInst, insn))
-		return X86_SCAN_INVALID;
-	return X86_SCAN_COMPLETE;
-}
-static int scanLegacyShape7(struct InternalInstruction *insn,
-				MCInst *mcInst, uint16_t *size)
-{
-	if (readImmediateImpl(insn, insn->immediateSize, false) ||
-	    readImmediateImpl(insn, 2, false))
-		return X86_SCAN_INVALID;
-	if (finishDecodedInstruction(insn, false))
-		return X86_SCAN_INVALID;
-	*size = (uint16_t)insn->length;
-	if (beginTranslation(mcInst, insn))
-		return X86_SCAN_INVALID;
-	return X86_SCAN_COMPLETE;
-}
-static int scanLegacyShape8(struct InternalInstruction *insn,
-				MCInst *mcInst, uint16_t *size)
-{
-	if (readImmediateImpl(insn, 2, false))
-		return X86_SCAN_INVALID;
-	if (finishDecodedInstruction(insn, false))
-		return X86_SCAN_INVALID;
-	*size = (uint16_t)insn->length;
-	if (beginTranslation(mcInst, insn))
-		return X86_SCAN_INVALID;
-	return X86_SCAN_COMPLETE;
-}
-static int scanLegacyShape9(struct InternalInstruction *insn,
-				MCInst *mcInst, uint16_t *size)
-{
-	if (readImmediateImpl(insn, 2, false) ||
-	    readImmediateImpl(insn, 1, false))
-		return X86_SCAN_INVALID;
-	if (finishDecodedInstruction(insn, false))
-		return X86_SCAN_INVALID;
-	*size = (uint16_t)insn->length;
-	if (beginTranslation(mcInst, insn))
-		return X86_SCAN_INVALID;
-	return X86_SCAN_COMPLETE;
-}
-static int scanLegacyShape10(struct InternalInstruction *insn,
-				MCInst *mcInst, uint16_t *size)
-{
-	if (readImmediateImpl(insn, 4, false))
-		return X86_SCAN_INVALID;
-	if (finishDecodedInstruction(insn, false))
-		return X86_SCAN_INVALID;
-	*size = (uint16_t)insn->length;
-	if (beginTranslation(mcInst, insn))
-		return X86_SCAN_INVALID;
-	return X86_SCAN_COMPLETE;
-}
-static int scanLegacyShape11(struct InternalInstruction *insn,
-				MCInst *mcInst, uint16_t *size)
-{
-	if ((!insn->consumedModRM && readModRMScan(insn)) ||
-	    readImmediateImpl(insn, 4, false))
-		return X86_SCAN_INVALID;
-	if (finishDecodedInstruction(insn, false))
-		return X86_SCAN_INVALID;
-	*size = (uint16_t)insn->length;
-	if (beginTranslation(mcInst, insn))
-		return X86_SCAN_INVALID;
-	return X86_SCAN_COMPLETE;
-}
-static int scanLegacyShape12(struct InternalInstruction *insn,
-				MCInst *mcInst, uint16_t *size)
-{
-	if (readImmediateImpl(insn, 8, false))
-		return X86_SCAN_INVALID;
-	if (finishDecodedInstruction(insn, false))
-		return X86_SCAN_INVALID;
-	*size = (uint16_t)insn->length;
-	if (beginTranslation(mcInst, insn))
-		return X86_SCAN_INVALID;
-	return X86_SCAN_COMPLETE;
-}
-static int scanLegacyShape13(struct InternalInstruction *insn,
-				MCInst *mcInst, uint16_t *size)
-{
-	if (readImmediateImpl(insn, insn->immediateSize, false) ||
-	    readImmediateImpl(insn, insn->immediateSize, false))
-		return X86_SCAN_INVALID;
-	if (finishDecodedInstruction(insn, false))
-		return X86_SCAN_INVALID;
-	*size = (uint16_t)insn->length;
-	if (beginTranslation(mcInst, insn))
-		return X86_SCAN_INVALID;
-	return X86_SCAN_COMPLETE;
-}
-static int (*const x86LegacyScanHandlers[])(struct InternalInstruction *, MCInst *, uint16_t *) = {
-	NULL,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape2,
-	scanLegacyShape3,
-	scanLegacyShape4,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape4,
-	scanLegacyShape4,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape2,
-	scanLegacyShape5,
-	scanLegacyShape5,
-	scanLegacyShape5,
-	scanLegacyShape6,
-	scanLegacyShape6,
-	scanLegacyShape6,
-	scanLegacyShape5,
-	scanLegacyShape5,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape7,
-	scanLegacyShape2,
-	scanLegacyShape3,
-	scanLegacyShape5,
-	scanLegacyShape5,
-	scanLegacyShape5,
-	scanLegacyShape8,
-	scanLegacyShape3,
-	scanLegacyShape9,
-	scanLegacyShape2,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape10,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape4,
-	scanLegacyShape10,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape11,
-	scanLegacyShape11,
-	scanLegacyShape11,
-	scanLegacyShape5,
-	scanLegacyShape5,
-	scanLegacyShape4,
-	scanLegacyShape12,
-	scanLegacyShape5,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape1,
-	scanLegacyShape13,
-	scanLegacyShape8,
+static const uint8_t x86LegacyScanPatterns[] = {
+	0, 1, 1, 1, 1, 1, 1, 1, 1, 2, 3, 4, 1, 1, 1, 1, 1, 1, 4, 4, 1, 1, 2, 5, 5, 5, 6, 6, 6, 5, 5, 1, 1, 7, 2, 3, 5, 5, 5, 8, 3, 9, 2, 1, 1, 10, 1, 1, 1, 1, 1, 1, 1, 1, 4, 10, 1, 1, 1, 1, 1, 1, 1, 1, 1, 11, 11, 11, 5, 5, 4, 12, 5, 1, 1, 1, 13, 8
 };
+
+X86_DECODE_INLINE int scanLegacyOperands(struct InternalInstruction *insn,
+		MCInst *mcInst, uint16_t *size, unsigned int handler)
+{
+	switch (x86LegacyScanPatterns[handler]) {
+	case 1:
+		if ((!insn->consumedModRM && readModRMScan(insn)))
+			return X86_SCAN_INVALID;
+		break;
+	case 2:
+		if (readImmediateImpl(insn, 1, false))
+			return X86_SCAN_INVALID;
+		break;
+	case 3:
+		if (readImmediateImpl(insn, insn->immediateSize, false))
+			return X86_SCAN_INVALID;
+		break;
+	case 4:
+		break;
+	case 5:
+		if ((!insn->consumedModRM && readModRMScan(insn)) ||
+		    readImmediateImpl(insn, 1, false))
+			return X86_SCAN_INVALID;
+		break;
+	case 6:
+		if ((!insn->consumedModRM && readModRMScan(insn)) ||
+		    readImmediateImpl(insn, insn->immediateSize, false))
+			return X86_SCAN_INVALID;
+		break;
+	case 7:
+		if (readImmediateImpl(insn, insn->immediateSize, false) ||
+		    readImmediateImpl(insn, 2, false))
+			return X86_SCAN_INVALID;
+		break;
+	case 8:
+		if (readImmediateImpl(insn, 2, false))
+			return X86_SCAN_INVALID;
+		break;
+	case 9:
+		if (readImmediateImpl(insn, 2, false) ||
+		    readImmediateImpl(insn, 1, false))
+			return X86_SCAN_INVALID;
+		break;
+	case 10:
+		if (readImmediateImpl(insn, 4, false))
+			return X86_SCAN_INVALID;
+		break;
+	case 11:
+		if ((!insn->consumedModRM && readModRMScan(insn)) ||
+		    readImmediateImpl(insn, 4, false))
+			return X86_SCAN_INVALID;
+		break;
+	case 12:
+		if (readImmediateImpl(insn, 8, false))
+			return X86_SCAN_INVALID;
+		break;
+	case 13:
+		if (readImmediateImpl(insn, insn->immediateSize, false) ||
+		    readImmediateImpl(insn, insn->immediateSize, false))
+			return X86_SCAN_INVALID;
+		break;
+	default:
+		return X86_SCAN_INVALID;
+	}
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (mcInst && beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	return X86_SCAN_COMPLETE;
+}
 
 static int (*const x86LegacyHandlers[])(struct InternalInstruction *) = {
 	NULL,
@@ -3762,11 +3430,11 @@ static const uint64_t x86LegacyDecisions[4][2][256] = {
 },
 };
 
-static int decodeLegacyTerminal(struct InternalInstruction *insn,
-				MCInst *mcInst, uint16_t *size, uint64_t decision)
+X86_DECODE_INLINE int decodeLegacyTerminal(struct InternalInstruction *insn,
+				MCInst *mcInst, uint16_t *size, uint64_t decision, bool scan)
 {
 	uint32_t terminal;
-	if ((decision & (X86_TERMINAL_INDEXED | X86_TERMINAL_SPLIT)) && (mcInst ? readModRMScan(insn) : readModRM(insn)))
+	if ((decision & (X86_TERMINAL_INDEXED | X86_TERMINAL_SPLIT)) && (scan ? readModRMScan(insn) : readModRM(insn)))
 		return X86_SCAN_INVALID;
 	if (decision & X86_TERMINAL_INDEXED) {
 		unsigned int index = decision & X86_DECISION_OFFSET_MASK;
@@ -3793,8 +3461,8 @@ static int decodeLegacyTerminal(struct InternalInstruction *insn,
 	insn->spec = specifierForUID(insn->instructionID);
 	if (!insn->instructionID)
 		return X86_SCAN_INVALID;
-	if (mcInst)
-		return x86LegacyScanHandlers[terminal >> X86_TERMINAL_HANDLER_SHIFT](insn, mcInst, size);
+	if (scan)
+		return scanLegacyOperands(insn, mcInst, size, terminal >> X86_TERMINAL_HANDLER_SHIFT);
 	insn->operands = x86OperandSets[(terminal >> X86_TERMINAL_OPERAND_SHIFT) & X86_TERMINAL_OPERAND_MASK];
 	return x86LegacyHandlers[terminal >> X86_TERMINAL_HANDLER_SHIFT](insn);
 }

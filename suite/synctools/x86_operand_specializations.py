@@ -696,11 +696,11 @@ def emit_terminal(suffix):
     lines += [
         "};",
         "",
-        "static int decodeLegacyTerminal(struct InternalInstruction *insn,",
-        "\t\t\t\tMCInst *mcInst, uint16_t *size, uint64_t decision)",
+        "X86_DECODE_INLINE int decodeLegacyTerminal(struct InternalInstruction *insn,",
+        "\t\t\t\tMCInst *mcInst, uint16_t *size, uint64_t decision, bool scan)",
         "{",
         "\tuint32_t terminal;",
-        "\tif ((decision & (X86_TERMINAL_INDEXED | X86_TERMINAL_SPLIT)) && (mcInst ? readModRMScan(insn) : readModRM(insn)))",
+        "\tif ((decision & (X86_TERMINAL_INDEXED | X86_TERMINAL_SPLIT)) && (scan ? readModRMScan(insn) : readModRM(insn)))",
         "\t\treturn X86_SCAN_INVALID;",
         "\tif (decision & X86_TERMINAL_INDEXED) {",
         "\t\tunsigned int index = decision & X86_DECISION_OFFSET_MASK;",
@@ -727,8 +727,8 @@ def emit_terminal(suffix):
         "\tinsn->spec = specifierForUID(insn->instructionID);",
         "\tif (!insn->instructionID)",
         "\t\treturn X86_SCAN_INVALID;",
-        "\tif (mcInst)",
-        "\t\treturn x86LegacyScanHandlers[terminal >> X86_TERMINAL_HANDLER_SHIFT](insn, mcInst, size);",
+        "\tif (scan)",
+        "\t\treturn scanLegacyOperands(insn, mcInst, size, terminal >> X86_TERMINAL_HANDLER_SHIFT);",
         "\tinsn->operands = x86OperandSets[(terminal >> X86_TERMINAL_OPERAND_SHIFT) & X86_TERMINAL_OPERAND_MASK];",
         "\treturn x86LegacyHandlers[terminal >> X86_TERMINAL_HANDLER_SHIFT](insn);",
         "}",
@@ -757,32 +757,37 @@ def emit_terminal(suffix):
         if scan_calls not in scan_groups:
             scan_groups[scan_calls] = len(scan_groups) + 1
         scan_handlers.append(scan_groups[scan_calls])
+    handlers += [
+        "static const uint8_t x86LegacyScanPatterns[] = {",
+        "\t0, " + ", ".join(str(handler) for handler in scan_handlers),
+        "};",
+        "",
+        "X86_DECODE_INLINE int scanLegacyOperands(struct InternalInstruction *insn,",
+        "\t\tMCInst *mcInst, uint16_t *size, unsigned int handler)",
+        "{",
+        "\tswitch (x86LegacyScanPatterns[handler]) {",
+    ]
     for calls, handler in scan_groups.items():
-        handlers += [
-            f"static int scanLegacyShape{handler}(struct InternalInstruction *insn,",
-            "\t\t\t\tMCInst *mcInst, uint16_t *size)",
-            "{",
-        ]
+        handlers.append(f"\tcase {handler}:")
         if calls:
             handlers += [
-                "\tif (" + " ||\n\t    ".join(calls) + ")",
-                "\t\treturn X86_SCAN_INVALID;",
+                "\t\tif (" + " ||\n\t\t    ".join(calls) + ")",
+                "\t\t\treturn X86_SCAN_INVALID;",
             ]
-        handlers += [
-            "\tif (finishDecodedInstruction(insn, false))",
-            "\t\treturn X86_SCAN_INVALID;",
-            "\t*size = (uint16_t)insn->length;",
-            "\tif (beginTranslation(mcInst, insn))",
-            "\t\treturn X86_SCAN_INVALID;",
-            "\treturn X86_SCAN_COMPLETE;",
-            "}",
-        ]
+        handlers.append("\t\tbreak;")
     handlers += [
-        "static int (*const x86LegacyScanHandlers[])(struct InternalInstruction *, MCInst *, uint16_t *) = {",
-        "\tNULL,",
+        "\tdefault:",
+        "\t\treturn X86_SCAN_INVALID;",
+        "\t}",
+        "\tif (finishDecodedInstruction(insn, false))",
+        "\t\treturn X86_SCAN_INVALID;",
+        "\t*size = (uint16_t)insn->length;",
+        "\tif (mcInst && beginTranslation(mcInst, insn))",
+        "\t\treturn X86_SCAN_INVALID;",
+        "\treturn X86_SCAN_COMPLETE;",
+        "}",
+        "",
     ]
-    handlers += [f"\tscanLegacyShape{handler}," for handler in scan_handlers]
-    handlers += ["};", ""]
     handlers += [
         "static int (*const x86LegacyHandlers[])(struct InternalInstruction *) = {",
         "\tNULL,",

@@ -245,6 +245,176 @@ static bool test_x86_scan_validation(void)
 	return success;
 }
 
+struct scan_transition {
+	csh handle;
+	unsigned calls;
+	bool options_ok;
+};
+
+static size_t switch_scan_options(const uint8_t *code, size_t size,
+				  size_t offset, void *user_data)
+{
+	struct scan_transition *state = user_data;
+	++state->calls;
+	state->options_ok &= size >= offset + 3 && code[offset] == 0x48 &&
+			     code[offset + 1] == 0x8d &&
+			     code[offset + 2] == 0xc0;
+	state->options_ok &=
+		cs_option(state->handle, CS_OPT_MODE, CS_MODE_16) == CS_ERR_OK;
+	state->options_ok &= cs_option(state->handle, CS_OPT_TEXT, CS_OPT_ON) ==
+			     CS_ERR_OK;
+	state->options_ok &=
+		cs_option(state->handle, CS_OPT_DETAIL, CS_OPT_ON) == CS_ERR_OK;
+	return 3;
+}
+
+static bool test_x86_scan_option_transition(void)
+{
+	/* Invalid LEA invokes skip-data while scanning. The callback changes
+	 * bitness and output policy before INC AX and RET on the same handle. */
+	static const uint8_t code[] = { 0x48, 0x8d, 0xc0, 0x40, 0xc3 };
+	const unsigned ids[] = { 0, X86_INS_INC, X86_INS_RET };
+	const uint16_t lengths[] = { 3, 1, 1 };
+	bool success = true;
+	for (unsigned batch = 0; batch != 2; ++batch) {
+		struct scan_transition state = { 0, 0, true };
+		if (!check(cs_open(CS_ARCH_X86, CS_MODE_64, &state.handle) ==
+				   CS_ERR_OK,
+			   "open scan transition decoder"))
+			return false;
+		cs_option(state.handle, CS_OPT_DETAIL, CS_OPT_ON);
+		cs_insn *iter = cs_malloc(state.handle);
+		if (!check(iter != NULL, "allocate retained detail")) {
+			cs_close(&state.handle);
+			return false;
+		}
+		cs_detail *saved_detail = iter->detail;
+		cs_option(state.handle, CS_OPT_DETAIL, CS_OPT_OFF);
+		cs_option(state.handle, CS_OPT_TEXT, CS_OPT_OFF);
+		cs_opt_skipdata setup = { ".byte", switch_scan_options,
+					  &state };
+		cs_option(state.handle, CS_OPT_SKIPDATA_SETUP, (size_t)&setup);
+		cs_option(state.handle, CS_OPT_SKIPDATA, CS_OPT_ON);
+		cs_insn *instructions = NULL;
+		size_t count = 0;
+		if (batch) {
+			count = cs_disasm(state.handle, code, sizeof(code),
+					  UINT64_MAX - 1, 0, &instructions);
+			success &= check(count == 3,
+					 "batch changes output policy");
+		}
+		const uint8_t *cursor = code;
+		size_t remaining = sizeof(code);
+		uint64_t address = UINT64_MAX - 1;
+		for (unsigned i = 0; i < 3 && (!batch || i < count); ++i) {
+			if (!batch &&
+			    !check(cs_disasm_iter(state.handle, &cursor,
+						  &remaining, &address, iter),
+				   "iterator changes output policy")) {
+				success = false;
+				break;
+			}
+			const cs_insn *actual = batch ? &instructions[i] : iter;
+			success &= check(
+				actual->id == ids[i] &&
+					actual->size == lengths[i] &&
+					actual->address ==
+						(i == 0 ? UINT64_MAX - 1 : i),
+				"transition retains IDs, lengths and wrapping addresses");
+			if (!batch)
+				success &= check(
+					iter->detail == saved_detail,
+					"callback retains iterator detail ownership");
+			if (i == 1)
+				success &= check(
+					actual->detail &&
+						strcmp(actual->mnemonic,
+						       "inc") == 0 &&
+						strcmp(actual->op_str, "ax") ==
+							0,
+					"next instruction uses new bitness, text and detail");
+		}
+		if (!batch)
+			success &= check(cursor == code + sizeof(code) &&
+						 remaining == 0 && address == 3,
+					 "iterator advances across callback");
+		success &= check(state.calls == 1 && state.options_ok,
+				 "skip-data changes options exactly once");
+		cs_free(instructions, count);
+		cs_free(iter, 1);
+		cs_close(&state.handle);
+	}
+	return success;
+}
+
+static bool test_x86_scan_mode_priority(void)
+{
+	/* Feature routing uses the 64-bit flag; decoding preserves the existing
+	 * 16-before-32-before-64 priority, including the default mode. */
+	static const struct {
+		cs_mode mode;
+		unsigned id;
+		uint16_t length;
+	} cases[] = {
+		{ 0, X86_INS_MOV, 3 },
+		{ CS_MODE_16 | CS_MODE_32, X86_INS_DEC, 1 },
+		{ CS_MODE_16 | CS_MODE_64, X86_INS_DEC, 1 },
+		{ CS_MODE_32 | CS_MODE_64, X86_INS_DEC, 1 },
+		{ CS_MODE_16 | CS_MODE_32 | CS_MODE_64, X86_INS_DEC, 1 },
+	};
+	static const uint8_t bytes[] = { 0x48, 0x8b, 0xc1 };
+	bool success = true;
+	for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+		for (unsigned detail = 0; detail != 2; ++detail) {
+			csh handle;
+			if (!check(cs_open(CS_ARCH_X86, CS_MODE_64, &handle) ==
+					   CS_ERR_OK,
+				   "open mode-priority decoder"))
+				return false;
+			success &= check(cs_option(handle, CS_OPT_MODE,
+						   cases[i].mode) == CS_ERR_OK,
+					 "select existing mode combination");
+			cs_option(handle, CS_OPT_TEXT, CS_OPT_OFF);
+			cs_option(handle, CS_OPT_DETAIL,
+				  detail ? CS_OPT_ON : CS_OPT_OFF);
+			cs_insn *iter = cs_malloc(handle);
+			if (!check(iter != NULL,
+				   "allocate mode-priority result")) {
+				cs_close(&handle);
+				return false;
+			}
+			cs_insn *batch = NULL;
+			size_t count = cs_disasm(handle, bytes, sizeof(bytes),
+						 0x1000, 1, &batch);
+			success &= check(
+				count == 1 && batch[0].id == cases[i].id &&
+					batch[0].size == cases[i].length,
+				"batch preserves bitness priority");
+			const uint8_t *cursor = bytes;
+			size_t remaining = sizeof(bytes);
+			uint64_t address = 0x1000;
+			bool decoded = cs_disasm_iter(
+				handle, &cursor, &remaining, &address, iter);
+			success &= check(
+				decoded && iter->id == cases[i].id &&
+					iter->size == cases[i].length &&
+					cursor == bytes + cases[i].length &&
+					remaining == sizeof(bytes) -
+							     cases[i].length &&
+					address == 0x1000 + cases[i].length,
+				"iterator preserves bitness priority and cursor");
+			if (decoded && count == 1)
+				success &=
+					check(same_scan(iter, batch),
+					      "mode-priority output matches");
+			cs_free(batch, count);
+			cs_free(iter, 1);
+			cs_close(&handle);
+		}
+	}
+	return success;
+}
+
 static bool test_aarch64(void)
 {
 	// mov w0, #1; bl 0x1004
@@ -290,6 +460,8 @@ int main(void)
 	if (!cs_support(CS_SUPPORT_X86_REDUCE))
 		success &= test_x86();
 	success &= test_x86_scan_validation();
+	success &= test_x86_scan_option_transition();
+	success &= test_x86_scan_mode_priority();
 	success &= test_aarch64();
 	return success ? 0 : 1;
 }

@@ -24,6 +24,18 @@ bool X86_getInstruction(csh handle, const uint8_t *code, size_t code_len,
 			MCInst *instr, uint16_t *size, uint64_t address,
 			void *info);
 
+/* The caller selects this entry only with text and detail disabled. */
+bool X86_getInstructionScan(csh handle, const uint8_t *code, size_t code_len,
+			    MCInst *instr, uint16_t *size);
+/* Scan-only entry after source extension dispatch. */
+bool X86_getInstructionAfterExtensions(csh ud, const uint8_t *code,
+				       size_t code_len, MCInst *instr,
+				       uint16_t *size,
+				       uint8_t extension_opcode);
+struct InternalInstruction;
+bool X86_completeScan(MCInst *instr, struct InternalInstruction *insn,
+		      uint16_t *size);
+
 void X86_init(MCRegisterInfo *MRI);
 
 #endif

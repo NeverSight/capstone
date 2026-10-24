@@ -57,6 +57,12 @@ intermediate operand slots in this mode. Text or detail output retains full
 operand construction. Memory validation and construction share one implementation
 specialized for the two constant store policies.
 
+The core reuses that initialization policy to select the x86 scan entry for
+each instruction. No allocation or callback intervenes after a scan selection;
+other selections call the normal backend with its live options. Skip-data
+callbacks can change options for the next instruction, and iterator detail
+pointer hiding/restoration remains outside the selected decoder.
+
 Without detail, the x86 mapping layer exposes its existing checked public-ID
 lookup as a private inline helper shared by the mapper and both core decode
 APIs. Cached holes preserve the current ID. Out-of-range IDs, unavailable
@@ -148,7 +154,8 @@ with a constant materialization policy. Raw decoding retains all fields and
 failed-read state. Scan terminals consume and bounds-check the same bytes but
 retain only control state before the shared final checks and opcode setup;
 they do not build register/address values merely to discard them. Identical
-scan read sequences share a handler. The completed scan result does not expose
+scan read sequences share a generated switch case and one finalization. The
+completed scan result does not expose
 a raw instruction. Its null-`MCInst` entry still returns the same raw state as
 the generic reader. VVVV and EVEX/VSIB checks remain on the paths that need them.
 Other encodings retain generic ID selection, prefix validation and final checks.
@@ -166,6 +173,34 @@ are restored after raw decoding and before backend translation, while
 scalar-compare P2 restoration stays in the successful public-output path. The
 GFNI displacement correction remains before backend translation. Public output
 modes and instruction state remain caller-local.
+
+The dedicated scan entry shares the parser with raw decoding. Its scalar
+terminals return only their validated internal ID and length before completing
+the `MCInst` opcode fields; they need no intermediate opcode translation because
+terminal admission excludes acquire/release prefixes and opcode-changing
+operands. This ID-only result is private to the scan entry. Existing decoder
+entries retain their raw/`MCInst` contracts. Prefix, opcode, ID selection, prefix
+validation, terminal, checked scalar reads and compact ModR/M helpers stay inline
+so the compiler can remove unused local state.
+
+The extension selector also supplies the bounded first non-prefix offset. The
+scan entry uses that offset only for no-prefix and single-REX terminal admission,
+with the decoder's existing bitness priority. Compact terminal state stays local
+to its shared readers: the opcode reader returns to generic decoding before
+three-byte maps and operand-bearing 3DNow headers, which are outside the terminal
+tables. The outlined generic fallback owns a separate state. No terminal copies
+register/address values merely to discard them, and byte consumption, bounds and
+legality still come from the shared readers.
+
+The scan entry consumes the existing extension selector once. Source-owned
+extensions keep their handlers and precedence; EVEX enters the same backend
+after extension dispatch, retaining normalization and restoration. Generic raw
+results share backend size assignment, displacement correction and scan
+translation. The normal backend inlines the same post-extension implementation
+with its original option checks; the scan-only entry uses a constant policy so
+it does not carry full-output construction. Public ID mapping, aliases, byte
+copying and cursor advancement
+remain in the common core for both decoding APIs.
 
 Instruction ID selection specializes the existing rules for each bitness. In
 32- and 64-bit legacy encodings without operand/address-size or repeat prefixes,

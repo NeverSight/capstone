@@ -31,9 +31,18 @@
 #include "../../utils.h"
 
 #include "X86DisassemblerDecoder.h"
+#include "X86Disassembler.h"
 #include "X86Mapping.h"
 #include "X86FeatureExtension.h"
 #include "X86DisassemblerTranslator.h"
+
+#if defined(_MSC_VER)
+#define X86_DECODE_INLINE static __forceinline
+#elif defined(__GNUC__)
+#define X86_DECODE_INLINE static inline __attribute__((always_inline))
+#else
+#define X86_DECODE_INLINE static inline
+#endif
 
 /// Specifies whether a ModR/M byte is needed and (if so) which
 /// instruction each possible value of the ModR/M byte corresponds to.  Once
@@ -223,7 +232,8 @@ static void unconsumeByte(struct InternalInstruction *insn)
 }
 
 #define CONSUME_FUNC(name, type) \
-	static int name(struct InternalInstruction *insn, type *ptr) \
+	X86_DECODE_INLINE int name(struct InternalInstruction *insn, \
+				   type *ptr) \
 	{ \
 		uint64_t combined = 0; \
 		size_t cursor = insn->readerCursor; \
@@ -369,6 +379,17 @@ typedef enum {
 	PREFIX_READ_SIMPLE_LEGACY,
 } PrefixReadStatus;
 
+X86_DECODE_INLINE PrefixReadStatus
+readSimpleLegacyPrefix(struct InternalInstruction *insn, size_t offset)
+{
+	if (offset)
+		insn->rexPrefix = insn->code[0];
+	insn->readerCursor = offset;
+	insn->vectorExtensionType = TYPE_NO_VEX_XOP;
+	setInstructionSizes(insn, false, false);
+	return PREFIX_READ_SIMPLE_LEGACY;
+}
+
 /*
  * readPrefixes - Consumes all of an instruction's prefix bytes, and marks the
  *   instruction as having them.  Also sets the instruction's default operand,
@@ -379,7 +400,7 @@ typedef enum {
  *                an ordinary opcode after no prefix or one REX; other successful
  *                prefix sequences return generic.
  */
-static PrefixReadStatus readPrefixes(struct InternalInstruction *insn)
+X86_DECODE_INLINE PrefixReadStatus readPrefixes(struct InternalInstruction *insn)
 {
 	bool isPrefix = true;
 	bool vexForbiddenPrefix;
@@ -411,11 +432,7 @@ static PrefixReadStatus readPrefixes(struct InternalInstruction *insn)
 		if ((feature_prefix_flags[byte] & FEATURE_ESCAPE) ||
 		    byte == 0xc5 || byte == 0x8f)
 			goto legacyPrefixesRead;
-		insn->readerCursor = offset;
-		insn->vectorExtensionType = TYPE_NO_VEX_XOP;
-		/* The initialized state has no overrides on this prefix-free path. */
-		setInstructionSizes(insn, false, false);
-		return PREFIX_READ_SIMPLE_LEGACY;
+		return readSimpleLegacyPrefix(insn, offset);
 	}
 
 	while (isPrefix) {
@@ -760,7 +777,7 @@ legacyPrefixesRead:
 
 static int readModRM(struct InternalInstruction *insn);
 
-static bool isRex2Map0PrefixByte(uint8_t byte)
+X86_DECODE_INLINE bool isRex2Map0PrefixByte(uint8_t byte)
 {
 	if ((byte >= 0x40 && byte <= 0x4f) || byte == 0xc4 || byte == 0xc5 ||
 	    byte == 0xd5 || byte == 0x62)
@@ -788,9 +805,13 @@ static bool isRex2Map0PrefixByte(uint8_t byte)
  *   extended or escape opcodes).
  *
  * @param insn  - The instruction whose opcode is to be read.
- * @return      - 0 if the opcode could be read successfully; nonzero otherwise.
+ * @return      - 0 on success, -1 on a read failure, or OPCODE_READ_GENERIC
+ *                for maps outside terminal tables when terminalOnly is true.
  */
-static int readOpcode(struct InternalInstruction *insn, bool simpleLegacy)
+enum { OPCODE_READ_GENERIC = 1 };
+
+X86_DECODE_INLINE int readOpcode(struct InternalInstruction *insn,
+				 bool simpleLegacy, bool terminalOnly)
 {
 	uint8_t current;
 
@@ -897,6 +918,12 @@ legacyOpcode:
 
 		if (consumeByte(insn, &current))
 			return -1;
+
+		/* Terminal tables contain only the one- and two-byte maps. Keep
+         * operand-bearing 3DNow headers out of compact-only local state. */
+		if (terminalOnly &&
+		    (current == 0x38 || current == 0x3a || current == 0x0f))
+			return OPCODE_READ_GENERIC;
 
 		if (current == 0x38) {
 			// dbgprintf(insn, "Found a three-byte escape prefix (0x%hhx)", current);
@@ -1554,7 +1581,7 @@ getIDForMode(struct InternalInstruction *insn, cs_mode mode,
 	return 0;
 }
 
-static int getIDSlow(struct InternalInstruction *insn, cs_mode mode)
+X86_DECODE_INLINE int getIDSlow(struct InternalInstruction *insn, cs_mode mode)
 {
 	switch (insn->mode) {
 	case MODE_16BIT:
@@ -1566,7 +1593,7 @@ static int getIDSlow(struct InternalInstruction *insn, cs_mode mode)
 	}
 }
 
-static int getID(struct InternalInstruction *insn, cs_mode mode)
+X86_DECODE_INLINE int getID(struct InternalInstruction *insn, cs_mode mode)
 {
 	uint16_t attrMask;
 	uint16_t instructionID;
@@ -1588,14 +1615,6 @@ static int getID(struct InternalInstruction *insn, cs_mode mode)
 
 	return getIDSlow(insn, mode);
 }
-
-#if defined(_MSC_VER)
-#define X86_DECODE_INLINE static __forceinline
-#elif defined(__GNUC__)
-#define X86_DECODE_INLINE static inline __attribute__((always_inline))
-#else
-#define X86_DECODE_INLINE static inline
-#endif
 
 /* Readers share byte consumption and error ordering. Ordinary scalar scan
  * terminals use a constant false materialization policy after the generator
@@ -1959,7 +1978,7 @@ static int readModRM(struct InternalInstruction *insn)
 	return readModRMImpl(insn, true);
 }
 
-static int readModRMScan(struct InternalInstruction *insn)
+X86_DECODE_INLINE int readModRMScan(struct InternalInstruction *insn)
 {
 	return readModRMImpl(insn, false);
 }
@@ -2634,7 +2653,7 @@ static bool isRex2ForbiddenExtendedStateInstruction(uint16_t instructionID)
 
 // return True if instruction is illegal to use with prefixes
 // This also check & fix the isPrefixNN when a prefix is irrelevant.
-static bool checkPrefix(struct InternalInstruction *insn)
+X86_DECODE_INLINE bool checkPrefix(struct InternalInstruction *insn)
 {
 	if (insn->hasRex2 &&
 	    isRex2ForbiddenExtendedStateInstruction(insn->instructionID))
@@ -2834,9 +2853,9 @@ static bool checkPrefix(struct InternalInstruction *insn)
 }
 
 /* Prefix and opcode reads are shared by generic and generated terminals. */
-X86_DECODE_INLINE PrefixReadStatus
-readInstructionHeader(struct InternalInstruction *insn, const uint8_t *code,
-		      size_t codeSize, cs_mode mode)
+X86_DECODE_INLINE void
+initializeInstructionHeader(struct InternalInstruction *insn,
+			    const uint8_t *code, size_t codeSize, cs_mode mode)
 {
 	insn->code = code;
 	insn->codeSize = codeSize;
@@ -2848,12 +2867,19 @@ readInstructionHeader(struct InternalInstruction *insn, const uint8_t *code,
 	else
 		insn->mode = MODE_64BIT;
 	insn->numImmediatesConsumed = 0;
+}
+
+X86_DECODE_INLINE PrefixReadStatus
+readInstructionHeader(struct InternalInstruction *insn, const uint8_t *code,
+		      size_t codeSize, cs_mode mode)
+{
+	initializeInstructionHeader(insn, code, codeSize, mode);
 
 	const PrefixReadStatus prefixResult = readPrefixes(insn);
 	if (prefixResult == PREFIX_READ_INVALID)
 		return -1;
 	const bool simpleLegacy = prefixResult == PREFIX_READ_SIMPLE_LEGACY;
-	if (readOpcode(insn, simpleLegacy))
+	if (readOpcode(insn, simpleLegacy, false))
 		return PREFIX_READ_INVALID;
 
 	return prefixResult;
@@ -2892,7 +2918,6 @@ X86_DECODE_INLINE int finishDecodedInstruction(struct InternalInstruction *insn,
 
 #include "X86GenLegacyTerminal.inc"
 
-#undef X86_DECODE_INLINE
 
 int decodeInstruction(struct InternalInstruction *insn, const uint8_t *code,
 		      size_t codeSize, cs_mode mode)
@@ -2913,12 +2938,29 @@ static int readOperandsScan(struct InternalInstruction *insn, MCInst *mcInst,
 	return X86_SCAN_RAW_READY;
 }
 
+X86_DECODE_INLINE uint64_t
+legacyTerminalDecision(const struct InternalInstruction *insn)
+{
+	if (insn->opcodeType != ONEBYTE && insn->opcodeType != TWOBYTE)
+		return 0;
+	const unsigned int row = insn->mode == MODE_64BIT ?
+					 1 + wFromREX(insn->rexPrefix) :
+				 insn->mode == MODE_16BIT ? 3 :
+							    0;
+	return x86LegacyDecisions[row][insn->opcodeType == TWOBYTE]
+				 [insn->opcode];
+}
+
+/* Private to the direct scan entry; existing decoder entries never return it. */
+enum { X86_SCAN_UID_READY = 2 };
+
 /* Ordinary legacy terminals have no LOCK, REX2 or vector prefixes. Other
  * encodings retain generic ID selection and prefix validation before operands.
  * EVEX keeps its raw policy and backend restoration order. */
-int decodeInstructionScan(struct InternalInstruction *insn, const uint8_t *code,
+X86_DECODE_INLINE int
+decodeInstructionScanImpl(struct InternalInstruction *insn, const uint8_t *code,
 			  size_t codeSize, cs_mode mode, MCInst *mcInst,
-			  uint16_t *size)
+			  uint16_t *size, bool directTerminal)
 {
 	const PrefixReadStatus prefixResult =
 		readInstructionHeader(insn, code, codeSize, mode);
@@ -2926,16 +2968,15 @@ int decodeInstructionScan(struct InternalInstruction *insn, const uint8_t *code,
 		return X86_SCAN_INVALID;
 	if (prefixResult == PREFIX_READ_SIMPLE_LEGACY &&
 	    (insn->opcodeType == ONEBYTE || insn->opcodeType == TWOBYTE)) {
-		const unsigned int row =
-			insn->mode == MODE_64BIT ?
-				((insn->rexPrefix & 0x08) ? 2 : 1) :
-				(insn->mode == MODE_16BIT ? 3 : 0);
-		const uint64_t decision =
-			x86LegacyDecisions[row][insn->opcodeType == TWOBYTE]
-					  [insn->opcode];
-		if (decision)
-			return decodeLegacyTerminal(insn, mcInst, size,
-						    decision);
+		const uint64_t decision = legacyTerminalDecision(insn);
+		if (decision) {
+			int result = decodeLegacyTerminal(
+				insn, directTerminal ? NULL : mcInst, size,
+				decision, directTerminal || mcInst != NULL);
+			return directTerminal && result == X86_SCAN_COMPLETE ?
+				       X86_SCAN_UID_READY :
+				       result;
+		}
 	}
 	if (getID(insn, mode) || insn->instructionID == 0 || checkPrefix(insn))
 		return X86_SCAN_INVALID;
@@ -2945,5 +2986,98 @@ int decodeInstructionScan(struct InternalInstruction *insn, const uint8_t *code,
 		return X86_SCAN_INVALID;
 	return X86_SCAN_RAW_READY;
 }
+
+int decodeInstructionScan(struct InternalInstruction *insn, const uint8_t *code,
+			  size_t codeSize, cs_mode mode, MCInst *mcInst,
+			  uint16_t *size)
+{
+	return decodeInstructionScanImpl(insn, code, codeSize, mode, mcInst,
+					 size, false);
+}
+
+enum { X86_SCAN_NOT_HANDLED = 3 };
+
+/* Only the compact readers see this state. Generic/raw decoding starts its
+ * own state if the generated table has no terminal for this header. */
+X86_DECODE_INLINE int trySimpleLegacyScan(const uint8_t *code, size_t codeSize,
+					  cs_mode mode, uint8_t opcode,
+					  size_t opcodeOffset, MCInst *mcInst,
+					  uint16_t *size)
+{
+	if (opcodeOffset >= 2)
+		return X86_SCAN_NOT_HANDLED;
+	InternalInstruction insn = { 0 };
+	initializeInstructionHeader(&insn, code, codeSize, mode);
+	const uint8_t prefixMask =
+		FEATURE_LEGACY_PREFIX | FEATURE_ESCAPE |
+		(insn.mode == MODE_64BIT ? FEATURE_REX_PREFIX : 0);
+	if ((feature_prefix_flags[opcode] & prefixMask) || opcode == 0xc5 ||
+	    opcode == 0x8f || (opcodeOffset && !isREX(&insn, code[0])))
+		return X86_SCAN_NOT_HANDLED;
+	readSimpleLegacyPrefix(&insn, opcodeOffset);
+	int opcodeResult = readOpcode(&insn, true, true);
+	if (opcodeResult)
+		return opcodeResult == OPCODE_READ_GENERIC ?
+			       X86_SCAN_NOT_HANDLED :
+			       X86_SCAN_INVALID;
+	const uint64_t decision = legacyTerminalDecision(&insn);
+	if (!decision)
+		return X86_SCAN_NOT_HANDLED;
+	int result = decodeLegacyTerminal(&insn, NULL, size, decision, true);
+	if (result == X86_SCAN_COMPLETE) {
+		MCInst_clear(mcInst);
+		MCInst_setOpcode(mcInst, insn.instructionID);
+	}
+	return result;
+}
+
+#if defined(_MSC_VER)
+__declspec(noinline)
+#elif defined(__GNUC__)
+__attribute__((noinline))
+#endif
+static bool decodeGenericScan(const uint8_t *code, size_t code_len,
+			      cs_mode mode, MCInst *instr, uint16_t *size)
+{
+	InternalInstruction insn = { 0 };
+	int ret = decodeInstructionScanImpl(&insn, code, code_len, mode, instr,
+					    size, true);
+	if (ret == X86_SCAN_UID_READY) {
+		MCInst_clear(instr);
+		MCInst_setOpcode(instr, insn.instructionID);
+		return true;
+	}
+	if (ret != X86_SCAN_RAW_READY)
+		return ret == X86_SCAN_COMPLETE;
+	return X86_completeScan(instr, &insn, size);
+}
+
+bool X86_getInstructionScan(csh ud, const uint8_t *code, size_t code_len,
+			    MCInst *instr, uint16_t *size)
+{
+	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
+	uint8_t opcode;
+	size_t opcodeOffset;
+	if (X86_mayDecodeFeatureExtensionImpl(code, code_len,
+					      (handle->mode & CS_MODE_64) != 0,
+					      &opcode, &opcodeOffset)) {
+		x86_feature_decode_result result = X86_decodeFeatureExtension(
+			ud, code, code_len, instr, size, opcode);
+		if (result == X86_FEATURE_DECODED)
+			return true;
+		if (result == X86_FEATURE_INVALID)
+			return false;
+	}
+	if (opcode == 0x62)
+		return X86_getInstructionAfterExtensions(ud, code, code_len,
+							 instr, size, opcode);
+	int terminal = trySimpleLegacyScan(code, code_len, handle->mode, opcode,
+					   opcodeOffset, instr, size);
+	if (terminal != X86_SCAN_NOT_HANDLED)
+		return terminal == X86_SCAN_COMPLETE;
+	return decodeGenericScan(code, code_len, handle->mode, instr, size);
+}
+
+#undef X86_DECODE_INLINE
 
 #endif

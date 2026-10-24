@@ -592,56 +592,47 @@ decodeEVEXInstruction(InternalInstruction *insn, const uint8_t *code,
 	return 0;
 }
 
-// Public interface for the disassembler
-bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
-			MCInst *instr, uint16_t *size, uint64_t address,
-			void *_info)
+static void prepareTranslation(InternalInstruction *insn)
+{
+#ifndef CAPSTONE_X86_REDUCE
+	if (insn->displacementSize == 1 &&
+	    gfniAffineBroadcastNeedsDisp8Scale(insn))
+		insn->displacement *= 8;
+#endif
+}
+
+bool X86_completeScan(MCInst *instr, InternalInstruction *insn, uint16_t *size)
+{
+	*size = (uint16_t)insn->length;
+	prepareTranslation(insn);
+	return !translateInstruction(instr, insn, false);
+}
+
+#if defined(_MSC_VER)
+#define X86_BACKEND_INLINE static __forceinline
+#elif defined(__GNUC__)
+#define X86_BACKEND_INLINE static inline __attribute__((always_inline))
+#else
+#define X86_BACKEND_INLINE static inline
+#endif
+
+X86_BACKEND_INLINE bool
+getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
+			      MCInst *instr, uint16_t *size,
+			      uint8_t extension_opcode, bool scanOnly)
 {
 	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
 	bool scalar_compare_p2_normalized = false;
 	uint8_t original_scalar_compare_p2 = 0;
-	uint8_t extension_opcode;
-	x86_feature_decode_result extension_result;
 	int ret;
 	bool result;
-
-	if (instr->flat_insn->detail) {
-		// instr->flat_insn->detail initialization: 3 alternatives
-
-		// 1. The whole structure, this is how it's done in other arch disassemblers
-		// Probably overkill since cs_detail is huge because of the 36 operands of ARM
-
-		//memset(instr->flat_insn->detail, 0, sizeof(cs_detail));
-
-		// 2. Only the part relevant to x86
-		memset(instr->flat_insn->detail, 0,
-		       offsetof(cs_detail, x86) + sizeof(cs_x86));
-
-		// 3. The relevant part except for x86.operands
-		// sizeof(cs_x86) is 0x1c0, sizeof(x86.operands) is 0x180
-		// marginally faster, should be okay since x86.op_count is set to 0
-
-		//memset(instr->flat_insn->detail, 0, offsetof(cs_detail, x86)+offsetof(cs_x86, operands));
-	}
-
-	extension_result = X86_FEATURE_NOT_HANDLED;
-	if (X86_mayDecodeFeatureExtension(code, code_len,
-					  (handle->mode & CS_MODE_64) != 0,
-					  &extension_opcode))
-		extension_result = X86_decodeFeatureExtension(
-			ud, code, code_len, instr, size, extension_opcode);
-	if (extension_result == X86_FEATURE_DECODED) {
-		return true;
-	}
-	if (extension_result == X86_FEATURE_INVALID)
-		return false;
 
 	InternalInstruction insn = { 0 };
 	if (extension_opcode == 0x62)
 		ret = decodeEVEXInstruction(&insn, code, code_len, handle->mode,
 					    &scalar_compare_p2_normalized,
 					    &original_scalar_compare_p2);
-	else if (handle->no_text && !handle->detail_opt) {
+	else if (scanOnly || (handle->no_text && !handle->detail_opt)) {
 		ret = decodeInstructionScan(&insn, code, code_len, handle->mode,
 					    instr, size);
 		if (ret != X86_SCAN_RAW_READY)
@@ -655,13 +646,8 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 	} else {
 		*size = (uint16_t)insn.length;
 
-#ifndef CAPSTONE_X86_REDUCE
-		if (insn.displacementSize == 1 &&
-		    gfniAffineBroadcastNeedsDisp8Scale(&insn))
-			insn.displacement *= 8;
-#endif
-
-		if (handle->no_text && !handle->detail_opt)
+		prepareTranslation(&insn);
+		if (scanOnly || (handle->no_text && !handle->detail_opt))
 			return !translateInstruction(instr, &insn, false);
 		result = !translateInstruction(instr, &insn, true);
 		if (result) {
@@ -712,5 +698,59 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 		return result;
 	}
 }
+
+// Public interface for the disassembler
+bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
+			MCInst *instr, uint16_t *size, uint64_t address,
+			void *_info)
+{
+	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
+	uint8_t extension_opcode;
+	x86_feature_decode_result extension_result;
+
+	if (instr->flat_insn->detail) {
+		// instr->flat_insn->detail initialization: 3 alternatives
+
+		// 1. The whole structure, this is how it's done in other arch disassemblers
+		// Probably overkill since cs_detail is huge because of the 36 operands of ARM
+
+		//memset(instr->flat_insn->detail, 0, sizeof(cs_detail));
+
+		// 2. Only the part relevant to x86
+		memset(instr->flat_insn->detail, 0,
+		       offsetof(cs_detail, x86) + sizeof(cs_x86));
+
+		// 3. The relevant part except for x86.operands
+		// sizeof(cs_x86) is 0x1c0, sizeof(x86.operands) is 0x180
+		// marginally faster, should be okay since x86.op_count is set to 0
+
+		//memset(instr->flat_insn->detail, 0, offsetof(cs_detail, x86)+offsetof(cs_x86, operands));
+	}
+
+	extension_result = X86_FEATURE_NOT_HANDLED;
+	if (X86_mayDecodeFeatureExtension(code, code_len,
+					  (handle->mode & CS_MODE_64) != 0,
+					  &extension_opcode))
+		extension_result = X86_decodeFeatureExtension(
+			ud, code, code_len, instr, size, extension_opcode);
+	if (extension_result == X86_FEATURE_DECODED) {
+		return true;
+	}
+	if (extension_result == X86_FEATURE_INVALID)
+		return false;
+
+	return getInstructionAfterExtensions(ud, code, code_len, instr, size,
+					     extension_opcode, false);
+}
+
+bool X86_getInstructionAfterExtensions(csh ud, const uint8_t *code,
+				       size_t code_len, MCInst *instr,
+				       uint16_t *size, uint8_t extension_opcode)
+{
+	return getInstructionAfterExtensions(ud, code, code_len, instr, size,
+					     extension_opcode, true);
+}
+
+#undef X86_BACKEND_INLINE
 
 #endif

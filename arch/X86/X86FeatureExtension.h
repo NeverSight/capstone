@@ -203,16 +203,19 @@ static inline bool may_be_0f_feature_extension(const uint8_t *suffix,
  * 40..4f opcodes end the scan; subsequent instructions cannot be extensions
  * of the current INC/DEC. opcode receives the first non-prefix byte, or zero
  * if the input is empty or contains only prefixes. */
-static inline bool X86_mayDecodeFeatureExtension(const uint8_t *code,
-						 size_t code_len,
-						 bool is_64_bit,
-						 uint8_t *opcode)
+static inline bool X86_mayDecodeFeatureExtensionImpl(const uint8_t *code,
+						     size_t code_len,
+						     bool is_64_bit,
+						     uint8_t *opcode,
+						     size_t *opcodeOffset)
 {
 	const uint8_t prefix_mask = FEATURE_LEGACY_PREFIX |
 				    (is_64_bit ? FEATURE_REX_PREFIX : 0);
 	size_t offset = 0;
 
 	*opcode = 0;
+	if (opcodeOffset)
+		*opcodeOffset = SIZE_MAX;
 	while (offset < code_len) {
 		uint8_t byte = code[offset];
 		uint8_t flags = feature_prefix_flags[byte];
@@ -220,6 +223,8 @@ static inline bool X86_mayDecodeFeatureExtension(const uint8_t *code,
 		if (flags & prefix_mask)
 			continue;
 		*opcode = byte;
+		if (opcodeOffset)
+			*opcodeOffset = offset - 1;
 		if (flags == FEATURE_0F_ESCAPE)
 			return may_be_0f_feature_extension(code + offset,
 							   code_len - offset);
@@ -230,6 +235,15 @@ static inline bool X86_mayDecodeFeatureExtension(const uint8_t *code,
 		       (code[offset] & 0x1f) != 1;
 	}
 	return false;
+}
+
+static inline bool X86_mayDecodeFeatureExtension(const uint8_t *code,
+						 size_t code_len,
+						 bool is_64_bit,
+						 uint8_t *opcode)
+{
+	return X86_mayDecodeFeatureExtensionImpl(code, code_len, is_64_bit,
+						 opcode, NULL);
 }
 
 /* Called only after X86_mayDecodeFeatureExtension selects an escape. */
