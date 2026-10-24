@@ -704,7 +704,9 @@ enum X86DecodeScanResult {
 /* With mcInst, COMPLETE includes scan translation and writes size; RAW_READY
  * leaves MCInst and size untouched for the caller's original translation path.
  * INVALID may leave size written if selected-case translation failed. NULL
- * mcInst retains raw decoding with only 0/-1 results. The caller selects scan
+ * mcInst retains raw decoding with only 0/-1 results. Only RAW_READY promises
+ * a materialized raw instruction; COMPLETE supplies the finished scan output.
+ * The caller selects scan
  * after extension dispatch; EVEX remains raw so the backend keeps its existing
  * prefix normalization and restoration order. */
 int decodeInstructionScan(struct InternalInstruction *insn, const uint8_t *code,

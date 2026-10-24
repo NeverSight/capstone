@@ -147,6 +147,51 @@ static bool check_escape_boundaries(uint8_t *end)
 		unsigned id;
 		size_t instruction_size;
 	} cases[] = {
+		/* Ordinary terminals must retain checked opcode, addressing and
+		 * immediate reads, including invalid branches of a ModR/M group. */
+		{ CS_MODE_64, { 0xc3 }, 1, X86_INS_RET, 1 },
+		{ CS_MODE_64, { 0x40, 0x88, 0xe0 }, 3, X86_INS_MOV, 3 },
+		{ CS_MODE_64,
+		  { 0x48, 0x83, 0x44, 0x24, 0x7f, 0x01 },
+		  6,
+		  X86_INS_ADD,
+		  6 },
+		{ CS_MODE_32,
+		  { 0xb8, 0x44, 0x33, 0x22, 0x11 },
+		  5,
+		  X86_INS_MOV,
+		  5 },
+		{ CS_MODE_32, { 0xfe, 0xf8 }, 2, X86_INS_INVALID, 0 },
+		{ CS_MODE_16, { 0x83, 0x46, 0x7f, 0x01 }, 4, X86_INS_ADD, 4 },
+		{ CS_MODE_16, { 0xe8, 0x01, 0x00, 0x90 }, 4, X86_INS_CALL, 3 },
+		/* Scan and raw readers share SIB/no-base, relative and 16-bit
+		 * displacement boundaries, including every incomplete value. */
+		{ CS_MODE_64,
+		  { 0x49, 0x8b, 0x04, 0x25, 0x80, 0xff, 0xff, 0xff },
+		  8,
+		  X86_INS_MOV,
+		  8 },
+		{ CS_MODE_64,
+		  { 0x48, 0x8b, 0x05, 0x80, 0xff, 0xff, 0xff },
+		  7,
+		  X86_INS_MOV,
+		  7 },
+		{ CS_MODE_32,
+		  { 0x8b, 0x84, 0x8d, 0x80, 0xff, 0xff, 0xff },
+		  7,
+		  X86_INS_MOV,
+		  7 },
+		{ CS_MODE_16, { 0x8b, 0x06, 0x80, 0xff }, 4, X86_INS_MOV, 4 },
+		{ CS_MODE_16, { 0x8b, 0x86, 0x80, 0xff }, 4, X86_INS_MOV, 4 },
+		{ CS_MODE_64, { 0x48, 0x8d, 0xc0 }, 3, X86_INS_INVALID, 0 },
+		{ CS_MODE_32, { 0xc8, 0x34, 0x12, 0x08 }, 4, X86_INS_ENTER, 4 },
+		/* UD1's runtime operands and unequal 16-bit lookup read policies
+		 * remain on the generic path, including every truncation. */
+		{ CS_MODE_64, { 0x0f, 0xb9, 0xc0 }, 3, X86_INS_UD1, 3 },
+		{ CS_MODE_16, { 0x0f, 0x6c, 0xc0 }, 3, X86_INS_INVALID, 0 },
+#ifndef CAPSTONE_X86_REDUCE
+		{ CS_MODE_16, { 0x0f, 0x53, 0xc0 }, 3, X86_INS_RCPPS, 3 },
+#endif
 		{ CS_MODE_64, { 0x0f, 0xa2 }, 2, X86_INS_CPUID, 2 },
 		{ CS_MODE_64, { 0x0f, 0x01, 0xc6 }, 3, X86_INS_WRMSRNS, 3 },
 		{ CS_MODE_64, { 0xf3, 0x0f, 0x01, 0xee }, 4, X86_INS_CLUI, 4 },

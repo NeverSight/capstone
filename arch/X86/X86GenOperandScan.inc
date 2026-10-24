@@ -11,7 +11,7 @@ case 0:
 	insn->operands = &x86OperandSets[insn->spec->operands][0];
 	hasVVVV = !readVVVV(insn);
 	needVVVV = hasVVVV && (insn->vvvv != 0);
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -27,7 +27,7 @@ case 1:
 	needVVVV = hasVVVV && (insn->vvvv != 0);
 	if (readImmediate(insn, 1))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -47,7 +47,7 @@ case 2:
 	needVVVV = hasVVVV && (insn->vvvv != 0);
 	if (readImmediate(insn, insn->immediateSize))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -69,7 +69,7 @@ case 3:
 	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
 	    readImmediate(insn, insn->immediateSize))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -94,7 +94,7 @@ case 4:
 	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
 	    readImmediate(insn, 1))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -119,7 +119,7 @@ case 5:
 	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
 	    fixupRegisterOperand(insn, TYPE_Rv))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -143,7 +143,7 @@ case 6:
 	    fixupRMOperand(insn, TYPE_Rv, ENCODING_RM) ||
 	    readImmediate(insn, insn->immediateSize))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -171,7 +171,7 @@ case 7:
 	    fixupRMOperand(insn, TYPE_Rv, ENCODING_RM) ||
 	    readImmediate(insn, 1))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -199,7 +199,7 @@ case 8:
 	    fixupRegisterOperand(insn, TYPE_Rv) ||
 	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -226,7 +226,7 @@ case 9:
 	    fixupRMOperand(insn, TYPE_Rv, ENCODING_RM) ||
 	    fixupRegisterOperand(insn, TYPE_Rv))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -253,7 +253,7 @@ case 10:
 	    fixupRegisterOperand(insn, TYPE_Rv) ||
 	    fixupRMOperand(insn, TYPE_Rv, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -278,7 +278,7 @@ case 11:
 	needVVVV = hasVVVV && (insn->vvvv != 0);
 	if (readImmediate(insn, 4))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -300,7 +300,7 @@ case 12:
 	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
 	    readImmediate(insn, 4))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -325,7 +325,7 @@ case 13:
 	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
 	    fixupRegisterOperand(insn, TYPE_R64))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -349,7 +349,7 @@ case 14:
 	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM) ||
 	    readImmediate(insn, 4))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -377,7 +377,7 @@ case 15:
 	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM) ||
 	    readImmediate(insn, 1))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -405,7 +405,7 @@ case 16:
 	    fixupRegisterOperand(insn, TYPE_R64) ||
 	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -432,7 +432,7 @@ case 17:
 	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM) ||
 	    fixupRegisterOperand(insn, TYPE_R64))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -459,7 +459,7 @@ case 18:
 	    fixupRegisterOperand(insn, TYPE_R64) ||
 	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -486,7 +486,7 @@ case 19:
 	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
 	    fixupRegisterOperand(insn, TYPE_R8))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -510,7 +510,7 @@ case 20:
 	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM) ||
 	    readImmediate(insn, 1))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -538,7 +538,7 @@ case 21:
 	    fixupRegisterOperand(insn, TYPE_R8) ||
 	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -565,7 +565,7 @@ case 22:
 	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM) ||
 	    fixupRegisterOperand(insn, TYPE_R8))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -592,7 +592,7 @@ case 23:
 	    fixupRegisterOperand(insn, TYPE_R8) ||
 	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -619,7 +619,7 @@ case 24:
 	    fixupRegisterOperand(insn, TYPE_R32) ||
 	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -646,7 +646,7 @@ case 25:
 	    fixupRegisterOperand(insn, TYPE_R32) ||
 	    fixupRMOperand(insn, TYPE_R32, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -674,7 +674,7 @@ case 26:
 	    readVVVVOperand(insn, TYPE_R32, hasVVVV, &needVVVV) ||
 	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -700,7 +700,7 @@ case 27:
 	    readVVVVOperand(insn, TYPE_R32, hasVVVV, &needVVVV) ||
 	    fixupRMOperand(insn, TYPE_R32, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -726,7 +726,7 @@ case 28:
 	    readVVVVOperand(insn, TYPE_R64, hasVVVV, &needVVVV) ||
 	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -752,7 +752,7 @@ case 29:
 	    readVVVVOperand(insn, TYPE_R64, hasVVVV, &needVVVV) ||
 	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -777,7 +777,7 @@ case 30:
 	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
 	    fixupRegisterOperand(insn, TYPE_R16))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -801,7 +801,7 @@ case 31:
 	    fixupRMOperand(insn, TYPE_R16, ENCODING_RM) ||
 	    fixupRegisterOperand(insn, TYPE_R16))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -826,7 +826,7 @@ case 32:
 	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
 	    readVVVVOperand(insn, TYPE_R32, hasVVVV, &needVVVV))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -852,7 +852,7 @@ case 33:
 	    fixupRMOperand(insn, TYPE_R32, ENCODING_RM) ||
 	    readVVVVOperand(insn, TYPE_R32, hasVVVV, &needVVVV))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -878,7 +878,7 @@ case 34:
 	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
 	    readVVVVOperand(insn, TYPE_R64, hasVVVV, &needVVVV))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -904,7 +904,7 @@ case 35:
 	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM) ||
 	    readVVVVOperand(insn, TYPE_R64, hasVVVV, &needVVVV))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -929,7 +929,7 @@ case 44:
 	    fixupRegisterOperand(insn, TYPE_Rv) ||
 	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -953,7 +953,7 @@ case 45:
 	    fixupRegisterOperand(insn, TYPE_Rv) ||
 	    fixupRMOperand(insn, TYPE_Rv, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -977,7 +977,7 @@ case 46:
 	    fixupRegisterOperand(insn, TYPE_R64) ||
 	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -1001,7 +1001,7 @@ case 47:
 	    fixupRegisterOperand(insn, TYPE_R64) ||
 	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -1023,7 +1023,7 @@ case 48:
 	needVVVV = hasVVVV && (insn->vvvv != 0);
 	if (readOpcodeRegister(insn, 0))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -1045,7 +1045,7 @@ case 49:
 	needVVVV = hasVVVV && (insn->vvvv != 0);
 	if (readOpcodeRegister(insn, 8))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -1069,7 +1069,7 @@ case 50:
 	    fixupRMOperand(insn, TYPE_Rv, ENCODING_RM) ||
 	    readImmediate(insn, 1))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -1094,7 +1094,7 @@ case 51:
 	    fixupRMOperand(insn, TYPE_Rv, ENCODING_RM) ||
 	    fixupRegisterOperand(insn, TYPE_Rv))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -1118,7 +1118,7 @@ case 52:
 	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM) ||
 	    readImmediate(insn, 1))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -1143,7 +1143,7 @@ case 53:
 	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM) ||
 	    fixupRegisterOperand(insn, TYPE_R64))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -1166,7 +1166,7 @@ case 54:
 	if ((!insn->consumedModRM && readModRM(insn)) ||
 	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -1186,7 +1186,7 @@ case 55:
 	if ((!insn->consumedModRM && readModRM(insn)) ||
 	    fixupRMOperand(insn, TYPE_Rv, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -1205,7 +1205,7 @@ case 56:
 	needVVVV = hasVVVV && (insn->vvvv != 0);
 	if (readImmediate(insn, 4))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -1226,7 +1226,7 @@ case 57:
 	if ((!insn->consumedModRM && readModRM(insn)) ||
 	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -1245,7 +1245,7 @@ case 58:
 	needVVVV = hasVVVV && (insn->vvvv != 0);
 	if (readImmediate(insn, 2))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -1267,7 +1267,7 @@ case 59:
 	    fixupRMOperand(insn, TYPE_Rv, ENCODING_RM) ||
 	    readImmediate(insn, insn->immediateSize))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -1292,7 +1292,7 @@ case 60:
 	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM) ||
 	    readImmediate(insn, 4))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -1317,7 +1317,7 @@ case 61:
 	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM) ||
 	    readImmediate(insn, 1))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -1342,7 +1342,7 @@ case 62:
 	    fixupRegisterOperand(insn, TYPE_R8) ||
 	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -1366,7 +1366,7 @@ case 63:
 	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM) ||
 	    fixupRegisterOperand(insn, TYPE_R8))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -1390,7 +1390,7 @@ case 64:
 	    fixupRegisterOperand(insn, TYPE_R8) ||
 	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -1413,7 +1413,7 @@ case 66:
 	if ((!insn->consumedModRM && readModRM(insn)) ||
 	    fixupRMOperand(insn, TYPE_Rv, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -1436,7 +1436,7 @@ case 67:
 	if ((!insn->consumedModRM && readModRM(insn)) ||
 	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -1459,7 +1459,7 @@ case 68:
 	if ((!insn->consumedModRM && readModRM(insn)) ||
 	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -1482,7 +1482,7 @@ case 69:
 	if ((!insn->consumedModRM && readModRM(insn)) ||
 	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -1502,7 +1502,7 @@ case 70:
 	if (readImmediate(insn, 2) ||
 	    readImmediate(insn, 1))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -1527,7 +1527,7 @@ case 71:
 	if (readImmediate(insn, insn->immediateSize) ||
 	    readImmediate(insn, insn->immediateSize))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -1552,7 +1552,7 @@ case 72:
 	if (readImmediate(insn, insn->immediateSize) ||
 	    readImmediate(insn, 2))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -1576,7 +1576,7 @@ case 79:
 	needVVVV = hasVVVV && (insn->vvvv != 0);
 	if (readImmediate(insn, 1))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -1597,7 +1597,7 @@ case 80:
 	if ((!insn->consumedModRM && readModRM(insn)) ||
 	    fixupRMOperand(insn, TYPE_R32, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -1618,7 +1618,7 @@ case 82:
 	    fixupRegisterOperand(insn, TYPE_R32) ||
 	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -1640,7 +1640,7 @@ case 83:
 	needVVVV = hasVVVV && (insn->vvvv != 0);
 	if (readImmediate(insn, 1))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -1660,7 +1660,7 @@ case 84:
 	needVVVV = hasVVVV && (insn->vvvv != 0);
 	if (readImmediate(insn, insn->immediateSize))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -1682,7 +1682,7 @@ case 85:
 	    fixupRegisterOperand(insn, TYPE_R64) ||
 	    fixupRMOperand(insn, TYPE_R32, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -1705,7 +1705,7 @@ case 86:
 	if ((!insn->consumedModRM && readModRM(insn)) ||
 	    fixupRMOperand(insn, TYPE_R16, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -1724,7 +1724,7 @@ case 88:
 	needVVVV = hasVVVV && (insn->vvvv != 0);
 	if (readImmediate(insn, 2))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -1745,7 +1745,7 @@ case 95:
 	if (readOpcodeRegister(insn, 0) ||
 	    readImmediate(insn, insn->immediateSize))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -1769,7 +1769,7 @@ case 107:
 	if (readOpcodeRegister(insn, 8) ||
 	    readImmediate(insn, 8))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -1793,7 +1793,7 @@ case 110:
 	if (readOpcodeRegister(insn, 1) ||
 	    readImmediate(insn, 1))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -1818,7 +1818,7 @@ case 111:
 	    fixupRegisterOperand(insn, TYPE_R16) ||
 	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -1842,7 +1842,7 @@ case 112:
 	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
 	    fixupRegisterOperand(insn, TYPE_R32))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -1866,7 +1866,7 @@ case 113:
 	    fixupRegisterOperand(insn, TYPE_Rv) ||
 	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -1890,7 +1890,7 @@ case 114:
 	    fixupRegisterOperand(insn, TYPE_Rv) ||
 	    fixupRMOperand(insn, TYPE_R16, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -1914,7 +1914,7 @@ case 115:
 	    fixupRegisterOperand(insn, TYPE_R64) ||
 	    fixupRMOperand(insn, TYPE_R16, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -1938,7 +1938,7 @@ case 116:
 	    fixupRegisterOperand(insn, TYPE_R64) ||
 	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -1960,7 +1960,7 @@ case 117:
 	needVVVV = hasVVVV && (insn->vvvv != 0);
 	if (readOpcodeRegister(insn, 0))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -1979,7 +1979,7 @@ case 118:
 	needVVVV = hasVVVV && (insn->vvvv != 0);
 	if (readOpcodeRegister(insn, 8))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -2000,7 +2000,7 @@ case 119:
 	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
 	    readImmediate(insn, 1))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -2025,7 +2025,7 @@ case 120:
 	    fixupRMOperand(insn, TYPE_Rv, ENCODING_RM) ||
 	    readImmediate(insn, 1))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -2053,7 +2053,7 @@ case 121:
 	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM) ||
 	    readImmediate(insn, 1))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -2081,7 +2081,7 @@ case 122:
 	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM) ||
 	    readImmediate(insn, 1))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -2108,7 +2108,7 @@ case 123:
 	if ((!insn->consumedModRM && readModRM(insn)) ||
 	    fixupRMOperand(insn, TYPE_R32, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -2132,7 +2132,7 @@ case 132:
 	    fixupRMOperand(insn, TYPE_R32, ENCODING_RM) ||
 	    fixupRegisterOperand(insn, TYPE_R32))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -2156,7 +2156,7 @@ case 133:
 	    fixupRegisterOperand(insn, TYPE_R32) ||
 	    fixupRMOperand(insn, TYPE_R32, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -2180,7 +2180,7 @@ case 140:
 	    fixupRegisterOperand(insn, TYPE_R16) ||
 	    fixupRMOperand(insn, TYPE_R32, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -2205,7 +2205,7 @@ case 0:
 	insn->operands = &x86OperandSets[insn->spec->operands][0];
 	hasVVVV = !readVVVV(insn);
 	needVVVV = hasVVVV && (insn->vvvv != 0);
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -2221,7 +2221,7 @@ case 1:
 	needVVVV = hasVVVV && (insn->vvvv != 0);
 	if (readImmediate(insn, 1))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -2241,7 +2241,7 @@ case 2:
 	needVVVV = hasVVVV && (insn->vvvv != 0);
 	if (readImmediate(insn, insn->immediateSize))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -2263,7 +2263,7 @@ case 3:
 	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
 	    readImmediate(insn, insn->immediateSize))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -2288,7 +2288,7 @@ case 4:
 	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
 	    readImmediate(insn, 1))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -2313,7 +2313,7 @@ case 5:
 	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
 	    fixupRegisterOperand(insn, TYPE_Rv))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -2337,7 +2337,7 @@ case 6:
 	    fixupRMOperand(insn, TYPE_Rv, ENCODING_RM) ||
 	    readImmediate(insn, insn->immediateSize))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -2365,7 +2365,7 @@ case 7:
 	    fixupRMOperand(insn, TYPE_Rv, ENCODING_RM) ||
 	    readImmediate(insn, 1))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -2393,7 +2393,7 @@ case 8:
 	    fixupRegisterOperand(insn, TYPE_Rv) ||
 	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -2420,7 +2420,7 @@ case 9:
 	    fixupRMOperand(insn, TYPE_Rv, ENCODING_RM) ||
 	    fixupRegisterOperand(insn, TYPE_Rv))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -2447,7 +2447,7 @@ case 10:
 	    fixupRegisterOperand(insn, TYPE_Rv) ||
 	    fixupRMOperand(insn, TYPE_Rv, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -2472,7 +2472,7 @@ case 11:
 	needVVVV = hasVVVV && (insn->vvvv != 0);
 	if (readImmediate(insn, 4))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -2494,7 +2494,7 @@ case 12:
 	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
 	    readImmediate(insn, 4))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -2519,7 +2519,7 @@ case 13:
 	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
 	    fixupRegisterOperand(insn, TYPE_R64))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -2543,7 +2543,7 @@ case 14:
 	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM) ||
 	    readImmediate(insn, 4))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -2571,7 +2571,7 @@ case 15:
 	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM) ||
 	    readImmediate(insn, 1))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -2599,7 +2599,7 @@ case 16:
 	    fixupRegisterOperand(insn, TYPE_R64) ||
 	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -2626,7 +2626,7 @@ case 17:
 	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM) ||
 	    fixupRegisterOperand(insn, TYPE_R64))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -2653,7 +2653,7 @@ case 18:
 	    fixupRegisterOperand(insn, TYPE_R64) ||
 	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -2680,7 +2680,7 @@ case 19:
 	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
 	    fixupRegisterOperand(insn, TYPE_R8))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -2704,7 +2704,7 @@ case 20:
 	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM) ||
 	    readImmediate(insn, 1))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -2732,7 +2732,7 @@ case 21:
 	    fixupRegisterOperand(insn, TYPE_R8) ||
 	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -2759,7 +2759,7 @@ case 22:
 	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM) ||
 	    fixupRegisterOperand(insn, TYPE_R8))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -2786,7 +2786,7 @@ case 23:
 	    fixupRegisterOperand(insn, TYPE_R8) ||
 	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -2813,7 +2813,7 @@ case 24:
 	    fixupRegisterOperand(insn, TYPE_R32) ||
 	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -2840,7 +2840,7 @@ case 25:
 	    fixupRegisterOperand(insn, TYPE_R32) ||
 	    fixupRMOperand(insn, TYPE_R32, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -2866,7 +2866,7 @@ case 28:
 	if ((!insn->consumedModRM && readModRM(insn)) ||
 	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -2888,7 +2888,7 @@ case 34:
 	    readVVVVOperand(insn, TYPE_R32, hasVVVV, &needVVVV) ||
 	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -2914,7 +2914,7 @@ case 35:
 	    readVVVVOperand(insn, TYPE_R32, hasVVVV, &needVVVV) ||
 	    fixupRMOperand(insn, TYPE_R32, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -2940,7 +2940,7 @@ case 36:
 	    readVVVVOperand(insn, TYPE_R64, hasVVVV, &needVVVV) ||
 	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -2966,7 +2966,7 @@ case 37:
 	    readVVVVOperand(insn, TYPE_R64, hasVVVV, &needVVVV) ||
 	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -2991,7 +2991,7 @@ case 38:
 	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
 	    fixupRegisterOperand(insn, TYPE_R16))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -3015,7 +3015,7 @@ case 39:
 	    fixupRMOperand(insn, TYPE_R16, ENCODING_RM) ||
 	    fixupRegisterOperand(insn, TYPE_R16))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -3040,7 +3040,7 @@ case 40:
 	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
 	    readVVVVOperand(insn, TYPE_R32, hasVVVV, &needVVVV))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -3066,7 +3066,7 @@ case 41:
 	    fixupRMOperand(insn, TYPE_R32, ENCODING_RM) ||
 	    readVVVVOperand(insn, TYPE_R32, hasVVVV, &needVVVV))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -3092,7 +3092,7 @@ case 42:
 	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
 	    readVVVVOperand(insn, TYPE_R64, hasVVVV, &needVVVV))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -3118,7 +3118,7 @@ case 43:
 	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM) ||
 	    readVVVVOperand(insn, TYPE_R64, hasVVVV, &needVVVV))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -3143,7 +3143,7 @@ case 60:
 	    fixupRegisterOperand(insn, TYPE_Rv) ||
 	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -3167,7 +3167,7 @@ case 61:
 	    fixupRegisterOperand(insn, TYPE_Rv) ||
 	    fixupRMOperand(insn, TYPE_Rv, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -3191,7 +3191,7 @@ case 62:
 	    fixupRegisterOperand(insn, TYPE_R64) ||
 	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -3215,7 +3215,7 @@ case 63:
 	    fixupRegisterOperand(insn, TYPE_R64) ||
 	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -3237,7 +3237,7 @@ case 64:
 	needVVVV = hasVVVV && (insn->vvvv != 0);
 	if (readOpcodeRegister(insn, 0))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -3259,7 +3259,7 @@ case 65:
 	needVVVV = hasVVVV && (insn->vvvv != 0);
 	if (readOpcodeRegister(insn, 8))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -3283,7 +3283,7 @@ case 66:
 	    fixupRMOperand(insn, TYPE_Rv, ENCODING_RM) ||
 	    readImmediate(insn, 1))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -3308,7 +3308,7 @@ case 67:
 	    fixupRMOperand(insn, TYPE_Rv, ENCODING_RM) ||
 	    fixupRegisterOperand(insn, TYPE_Rv))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -3332,7 +3332,7 @@ case 68:
 	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM) ||
 	    readImmediate(insn, 1))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -3357,7 +3357,7 @@ case 69:
 	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM) ||
 	    fixupRegisterOperand(insn, TYPE_R64))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -3380,7 +3380,7 @@ case 70:
 	if ((!insn->consumedModRM && readModRM(insn)) ||
 	    fixupRMOperand(insn, TYPE_Rv, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -3399,7 +3399,7 @@ case 71:
 	needVVVV = hasVVVV && (insn->vvvv != 0);
 	if (readImmediate(insn, 4))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -3420,7 +3420,7 @@ case 72:
 	if ((!insn->consumedModRM && readModRM(insn)) ||
 	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -3439,7 +3439,7 @@ case 73:
 	needVVVV = hasVVVV && (insn->vvvv != 0);
 	if (readImmediate(insn, 2))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -3461,7 +3461,7 @@ case 74:
 	    fixupRMOperand(insn, TYPE_Rv, ENCODING_RM) ||
 	    readImmediate(insn, insn->immediateSize))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -3486,7 +3486,7 @@ case 75:
 	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM) ||
 	    readImmediate(insn, 4))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -3511,7 +3511,7 @@ case 76:
 	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM) ||
 	    readImmediate(insn, 1))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -3536,7 +3536,7 @@ case 77:
 	    fixupRegisterOperand(insn, TYPE_R8) ||
 	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -3560,7 +3560,7 @@ case 78:
 	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM) ||
 	    fixupRegisterOperand(insn, TYPE_R8))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -3584,7 +3584,7 @@ case 79:
 	    fixupRegisterOperand(insn, TYPE_R8) ||
 	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -3608,7 +3608,7 @@ case 83:
 	    fixupRegisterOperand(insn, TYPE_R32) ||
 	    fixupRMOperand(insn, TYPE_Rv, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -3635,7 +3635,7 @@ case 84:
 	    fixupRegisterOperand(insn, TYPE_R32) ||
 	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -3662,7 +3662,7 @@ case 85:
 	    fixupRegisterOperand(insn, TYPE_R64) ||
 	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -3689,7 +3689,7 @@ case 87:
 	    fixupRegisterOperand(insn, TYPE_R32) ||
 	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -3712,7 +3712,7 @@ case 91:
 	if ((!insn->consumedModRM && readModRM(insn)) ||
 	    fixupRMOperand(insn, TYPE_Rv, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -3735,7 +3735,7 @@ case 92:
 	if ((!insn->consumedModRM && readModRM(insn)) ||
 	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -3758,7 +3758,7 @@ case 93:
 	if ((!insn->consumedModRM && readModRM(insn)) ||
 	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -3781,7 +3781,7 @@ case 94:
 	if ((!insn->consumedModRM && readModRM(insn)) ||
 	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -3801,7 +3801,7 @@ case 95:
 	if (readImmediate(insn, 2) ||
 	    readImmediate(insn, 1))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -3826,7 +3826,7 @@ case 99:
 	if (readImmediate(insn, insn->immediateSize) ||
 	    readImmediate(insn, insn->immediateSize))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -3851,7 +3851,7 @@ case 100:
 	if (readImmediate(insn, insn->immediateSize) ||
 	    readImmediate(insn, 2))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -3875,7 +3875,7 @@ case 107:
 	needVVVV = hasVVVV && (insn->vvvv != 0);
 	if (readImmediate(insn, 1))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -3896,7 +3896,7 @@ case 108:
 	if ((!insn->consumedModRM && readModRM(insn)) ||
 	    fixupRMOperand(insn, TYPE_R32, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -3915,7 +3915,7 @@ case 111:
 	needVVVV = hasVVVV && (insn->vvvv != 0);
 	if (readImmediate(insn, 1))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -3935,7 +3935,7 @@ case 112:
 	needVVVV = hasVVVV && (insn->vvvv != 0);
 	if (readImmediate(insn, insn->immediateSize))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -3957,7 +3957,7 @@ case 122:
 	    fixupRegisterOperand(insn, TYPE_R64) ||
 	    fixupRMOperand(insn, TYPE_R32, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -3980,7 +3980,7 @@ case 123:
 	if ((!insn->consumedModRM && readModRM(insn)) ||
 	    fixupRMOperand(insn, TYPE_R16, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -3999,7 +3999,7 @@ case 125:
 	needVVVV = hasVVVV && (insn->vvvv != 0);
 	if (readImmediate(insn, 2))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -4020,7 +4020,7 @@ case 153:
 	if (readOpcodeRegister(insn, 0) ||
 	    readImmediate(insn, insn->immediateSize))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -4044,7 +4044,7 @@ case 165:
 	if (readOpcodeRegister(insn, 8) ||
 	    readImmediate(insn, 8))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -4068,7 +4068,7 @@ case 168:
 	if (readOpcodeRegister(insn, 1) ||
 	    readImmediate(insn, 1))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -4093,7 +4093,7 @@ case 171:
 	    fixupRegisterOperand(insn, TYPE_R16) ||
 	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -4117,7 +4117,7 @@ case 172:
 	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
 	    fixupRegisterOperand(insn, TYPE_R32))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -4141,7 +4141,7 @@ case 176:
 	    fixupRegisterOperand(insn, TYPE_Rv) ||
 	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -4165,7 +4165,7 @@ case 177:
 	    fixupRegisterOperand(insn, TYPE_Rv) ||
 	    fixupRMOperand(insn, TYPE_R16, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -4189,7 +4189,7 @@ case 178:
 	    fixupRegisterOperand(insn, TYPE_R64) ||
 	    fixupRMOperand(insn, TYPE_R16, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -4213,7 +4213,7 @@ case 179:
 	    fixupRegisterOperand(insn, TYPE_R64) ||
 	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -4235,7 +4235,7 @@ case 184:
 	needVVVV = hasVVVV && (insn->vvvv != 0);
 	if (readOpcodeRegister(insn, 0))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -4254,7 +4254,7 @@ case 185:
 	needVVVV = hasVVVV && (insn->vvvv != 0);
 	if (readOpcodeRegister(insn, 8))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -4275,7 +4275,7 @@ case 187:
 	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
 	    readImmediate(insn, 1))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -4300,7 +4300,7 @@ case 188:
 	    fixupRMOperand(insn, TYPE_Rv, ENCODING_RM) ||
 	    readImmediate(insn, 1))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -4328,7 +4328,7 @@ case 189:
 	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM) ||
 	    readImmediate(insn, 1))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -4356,7 +4356,7 @@ case 190:
 	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM) ||
 	    readImmediate(insn, 1))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -4383,7 +4383,7 @@ case 191:
 	if ((!insn->consumedModRM && readModRM(insn)) ||
 	    fixupRMOperand(insn, TYPE_R32, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -4408,7 +4408,7 @@ case 204:
 	    readVVVVOperand(insn, TYPE_YMM, hasVVVV, &needVVVV) ||
 	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -4434,7 +4434,7 @@ case 205:
 	    readVVVVOperand(insn, TYPE_YMM, hasVVVV, &needVVVV) ||
 	    fixupRMOperand(insn, TYPE_YMM, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -4460,7 +4460,7 @@ case 235:
 	    readVVVVOperand(insn, TYPE_XMM, hasVVVV, &needVVVV) ||
 	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -4486,7 +4486,7 @@ case 236:
 	    readVVVVOperand(insn, TYPE_XMM, hasVVVV, &needVVVV) ||
 	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -4512,7 +4512,7 @@ case 481:
 	    readVVVVOperand(insn, TYPE_XMM, hasVVVV, &needVVVV) ||
 	    fixupRMOperand(insn, TYPE_R32, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -4538,7 +4538,7 @@ case 484:
 	    readVVVVOperand(insn, TYPE_XMM, hasVVVV, &needVVVV) ||
 	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -4564,7 +4564,7 @@ case 527:
 	    readVVVVOperand(insn, TYPE_YMM, hasVVVV, &needVVVV) ||
 	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -4593,7 +4593,7 @@ case 528:
 	    readVVVVOperand(insn, TYPE_YMM, hasVVVV, &needVVVV) ||
 	    fixupRMOperand(insn, TYPE_YMM, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -4622,7 +4622,7 @@ case 538:
 	    readVVVVOperand(insn, TYPE_XMM, hasVVVV, &needVVVV) ||
 	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -4651,7 +4651,7 @@ case 539:
 	    readVVVVOperand(insn, TYPE_XMM, hasVVVV, &needVVVV) ||
 	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -4680,7 +4680,7 @@ case 572:
 	    readVSIBOperand(insn, TYPE_MVSIBX, ENCODING_VSIB, hasVVVV, &needVVVV) ||
 	    readVVVVOperand(insn, TYPE_YMM, hasVVVV, &needVVVV))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -4710,7 +4710,7 @@ case 576:
 	    readVSIBOperand(insn, TYPE_MVSIBX, ENCODING_VSIB, hasVVVV, &needVVVV) ||
 	    readVVVVOperand(insn, TYPE_XMM, hasVVVV, &needVVVV))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -4740,7 +4740,7 @@ case 577:
 	    readVSIBOperand(insn, TYPE_MVSIBY, ENCODING_VSIB, hasVVVV, &needVVVV) ||
 	    readVVVVOperand(insn, TYPE_YMM, hasVVVV, &needVVVV))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -4770,7 +4770,7 @@ case 586:
 	    readVSIBOperand(insn, TYPE_MVSIBY, ENCODING_VSIB, hasVVVV, &needVVVV) ||
 	    readVVVVOperand(insn, TYPE_XMM, hasVVVV, &needVVVV))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -4800,7 +4800,7 @@ case 661:
 	    readVVVVOperand(insn, TYPE_YMM, hasVVVV, &needVVVV) ||
 	    fixupRegisterOperand(insn, TYPE_YMM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -4826,7 +4826,7 @@ case 662:
 	    readVVVVOperand(insn, TYPE_XMM, hasVVVV, &needVVVV) ||
 	    fixupRegisterOperand(insn, TYPE_XMM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -4852,7 +4852,7 @@ case 685:
 	    readVVVVOperand(insn, TYPE_XMM, hasVVVV, &needVVVV) ||
 	    fixupRegisterOperand(insn, TYPE_XMM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -4877,7 +4877,7 @@ case 686:
 	    fixupRMOperand(insn, TYPE_R32, ENCODING_RM) ||
 	    fixupRegisterOperand(insn, TYPE_R32))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -4901,7 +4901,7 @@ case 687:
 	    fixupRegisterOperand(insn, TYPE_R32) ||
 	    fixupRMOperand(insn, TYPE_R32, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -4926,7 +4926,7 @@ case 890:
 	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
 	    readVVVVOperand(insn, TYPE_XMM, hasVVVV, &needVVVV))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -4952,7 +4952,7 @@ case 891:
 	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM) ||
 	    readVVVVOperand(insn, TYPE_XMM, hasVVVV, &needVVVV))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -4978,7 +4978,7 @@ case 904:
 	    readVVVVOperand(insn, TYPE_YMM, hasVVVV, &needVVVV) ||
 	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))
@@ -5003,7 +5003,7 @@ case 926:
 	    fixupRegisterOperand(insn, TYPE_R16) ||
 	    fixupRMOperand(insn, TYPE_R32, ENCODING_RM))
 		return X86_SCAN_INVALID;
-	if (needVVVV || finishDecodedInstruction(insn))
+	if (needVVVV || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	*size = (uint16_t)insn->length;
 	if (beginTranslation(mcInst, insn))

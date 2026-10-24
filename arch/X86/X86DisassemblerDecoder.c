@@ -1589,6 +1589,18 @@ static int getID(struct InternalInstruction *insn, cs_mode mode)
 	return getIDSlow(insn, mode);
 }
 
+#if defined(_MSC_VER)
+#define X86_DECODE_INLINE static __forceinline
+#elif defined(__GNUC__)
+#define X86_DECODE_INLINE static inline __attribute__((always_inline))
+#else
+#define X86_DECODE_INLINE static inline
+#endif
+
+/* Readers share byte consumption and error ordering. Ordinary scalar scan
+ * terminals use a constant false materialization policy after the generator
+ * proves their operand classes and ModR/M forms. Other callers retain every
+ * raw field, including state left by failed reads. */
 /*
  * readSIB - Consumes the SIB byte to determine addressing information for an
  *   instruction.
@@ -1596,28 +1608,32 @@ static int getID(struct InternalInstruction *insn, cs_mode mode)
  * @param insn  - The instruction whose SIB byte is to be read.
  * @return      - 0 if the SIB byte was successfully read; nonzero otherwise.
  */
-static int readSIB(struct InternalInstruction *insn)
+X86_DECODE_INLINE int readSIB(struct InternalInstruction *insn,
+			      bool materialize)
 {
 	SIBBase sibBaseBase = SIB_BASE_NONE;
 	uint8_t index, base;
 
 	// dbgprintf(insn, "readSIB()");
 
-	if (insn->consumedSIB)
+	if (materialize && insn->consumedSIB)
 		return 0;
 
-	insn->consumedSIB = true;
+	if (materialize)
+		insn->consumedSIB = true;
 
 	switch (insn->addressSize) {
 	case 2:
 		// dbgprintf(insn, "SIB-based addressing doesn't work in 16-bit mode");
 		return -1;
 	case 4:
-		insn->sibIndexBase = SIB_INDEX_EAX;
+		if (materialize)
+			insn->sibIndexBase = SIB_INDEX_EAX;
 		sibBaseBase = SIB_BASE_EAX;
 		break;
 	case 8:
-		insn->sibIndexBase = SIB_INDEX_RAX;
+		if (materialize)
+			insn->sibIndexBase = SIB_INDEX_RAX;
 		sibBaseBase = SIB_BASE_RAX;
 		break;
 	}
@@ -1625,16 +1641,18 @@ static int readSIB(struct InternalInstruction *insn)
 	if (consumeByte(insn, &insn->sib))
 		return -1;
 
-	index = indexFromSIB(insn->sib) |
-		(xFromREX(insn->rexPrefix) << 3);
+	if (materialize) {
+		index = indexFromSIB(insn->sib) |
+			(xFromREX(insn->rexPrefix) << 3);
 
-	if (index == 0x4) {
-		insn->sibIndex = SIB_INDEX_NONE;
-	} else {
-		insn->sibIndex = (SIBIndex)(insn->sibIndexBase + index);
+		if (index == 0x4) {
+			insn->sibIndex = SIB_INDEX_NONE;
+		} else {
+			insn->sibIndex = (SIBIndex)(insn->sibIndexBase + index);
+		}
+
+		insn->sibScale = 1 << scaleFromSIB(insn->sib);
 	}
-
-	insn->sibScale = 1 << scaleFromSIB(insn->sib);
 
 	base = baseFromSIB(insn->sib) | (bFromREX(insn->rexPrefix) << 3);
 
@@ -1644,15 +1662,18 @@ static int readSIB(struct InternalInstruction *insn)
 		switch (modFromModRM(insn->modRM)) {
 		case 0x0:
 			insn->eaDisplacement = EA_DISP_32;
-			insn->sibBase = SIB_BASE_NONE;
+			if (materialize)
+				insn->sibBase = SIB_BASE_NONE;
 			break;
 		case 0x1:
 			insn->eaDisplacement = EA_DISP_8;
-			insn->sibBase = (SIBBase)(sibBaseBase + base);
+			if (materialize)
+				insn->sibBase = (SIBBase)(sibBaseBase + base);
 			break;
 		case 0x2:
 			insn->eaDisplacement = EA_DISP_32;
-			insn->sibBase = (SIBBase)(sibBaseBase + base);
+			if (materialize)
+				insn->sibBase = (SIBBase)(sibBaseBase + base);
 			break;
 		case 0x3:
 			// debug("Cannot have Mod = 0b11 and a SIB byte");
@@ -1660,7 +1681,8 @@ static int readSIB(struct InternalInstruction *insn)
 		}
 		break;
 	default:
-		insn->sibBase = (SIBBase)(sibBaseBase + base);
+		if (materialize)
+			insn->sibBase = (SIBBase)(sibBaseBase + base);
 		break;
 	}
 
@@ -1674,7 +1696,8 @@ static int readSIB(struct InternalInstruction *insn)
  * @return      - 0 if the displacement byte was successfully read; nonzero
  *                otherwise.
  */
-static int readDisplacement(struct InternalInstruction *insn)
+X86_DECODE_INLINE int readDisplacement(struct InternalInstruction *insn,
+				       bool materialize)
 {
 	int8_t d8;
 	int16_t d16;
@@ -1682,33 +1705,42 @@ static int readDisplacement(struct InternalInstruction *insn)
 
 	// dbgprintf(insn, "readDisplacement()");
 
-	if (insn->consumedDisplacement)
+	if (materialize && insn->consumedDisplacement)
 		return 0;
 
-	insn->consumedDisplacement = true;
-	insn->displacementOffset = insn->readerCursor;
+	if (materialize) {
+		insn->consumedDisplacement = true;
+		insn->displacementOffset = insn->readerCursor;
+	}
 
 	switch (insn->eaDisplacement) {
 	case EA_DISP_NONE:
-		insn->consumedDisplacement = false;
+		if (materialize)
+			insn->consumedDisplacement = false;
 		break;
 	case EA_DISP_8:
 		if (consumeInt8(insn, &d8))
 			return -1;
-		insn->displacementSize = 1;
-		insn->displacement = d8;
+		if (materialize) {
+			insn->displacementSize = 1;
+			insn->displacement = d8;
+		}
 		break;
 	case EA_DISP_16:
 		if (consumeInt16(insn, &d16))
 			return -1;
-		insn->displacementSize = 2;
-		insn->displacement = d16;
+		if (materialize) {
+			insn->displacementSize = 2;
+			insn->displacement = d16;
+		}
 		break;
 	case EA_DISP_32:
 		if (consumeInt32(insn, &d32))
 			return -1;
-		insn->displacementSize = 4;
-		insn->displacement = d32;
+		if (materialize) {
+			insn->displacementSize = 4;
+			insn->displacement = d32;
+		}
 		break;
 	}
 
@@ -1722,7 +1754,8 @@ static int readDisplacement(struct InternalInstruction *insn)
  * @param insn  - The instruction whose addressing information is to be read.
  * @return      - 0 if the information was successfully read; nonzero otherwise.
  */
-static int readModRM(struct InternalInstruction *insn)
+X86_DECODE_INLINE int readModRMImpl(struct InternalInstruction *insn,
+				    bool materialize)
 {
 	uint8_t mod, rm, reg, evexrm;
 
@@ -1731,7 +1764,8 @@ static int readModRM(struct InternalInstruction *insn)
 	if (insn->consumedModRM)
 		return 0;
 
-	insn->modRMOffset = (uint8_t)insn->readerCursor;
+	if (materialize)
+		insn->modRMOffset = (uint8_t)insn->readerCursor;
 
 	if (consumeByte(insn, &insn->modRM))
 		return -1;
@@ -1748,39 +1782,42 @@ static int readModRM(struct InternalInstruction *insn)
 
 	mod = modFromModRM(insn->modRM);
 	rm = rmFromModRM(insn->modRM);
-	reg = regFromModRM(insn->modRM);
+	evexrm = 0;
+	if (materialize) {
+		reg = regFromModRM(insn->modRM);
 
-	/*
+		/*
 	 * This goes by insn->registerSize to pick the correct register, which messes
 	 * up if we're using (say) XMM or 8-bit register operands.  That gets fixed in
 	 * readOperands().
 	 */
-	switch (insn->registerSize) {
-	case 2:
-		insn->regBase = MODRM_REG_AX;
-		insn->eaRegBase = EA_REG_AX;
-		break;
-	case 4:
-		insn->regBase = MODRM_REG_EAX;
-		insn->eaRegBase = EA_REG_EAX;
-		break;
-	case 8:
-		insn->regBase = MODRM_REG_RAX;
-		insn->eaRegBase = EA_REG_RAX;
-		break;
-	}
+		switch (insn->registerSize) {
+		case 2:
+			insn->regBase = MODRM_REG_AX;
+			insn->eaRegBase = EA_REG_AX;
+			break;
+		case 4:
+			insn->regBase = MODRM_REG_EAX;
+			insn->eaRegBase = EA_REG_EAX;
+			break;
+		case 8:
+			insn->regBase = MODRM_REG_RAX;
+			insn->eaRegBase = EA_REG_RAX;
+			break;
+		}
 
-	reg |= rFromREX(insn->rexPrefix) << 3;
+		reg |= rFromREX(insn->rexPrefix) << 3;
+		if (insn->vectorExtensionType == TYPE_EVEX &&
+		    insn->mode == MODE_64BIT) {
+			reg |= r2FromEVEX2of4(insn->vectorExtensionPrefix[1])
+			       << 4;
+			evexrm = xFromEVEX2of4(insn->vectorExtensionPrefix[1])
+				 << 4;
+		}
+
+		insn->reg = (Reg)(insn->regBase + reg);
+	}
 	rm |= bFromREX(insn->rexPrefix) << 3;
-
-	evexrm = 0;
-	if (insn->vectorExtensionType == TYPE_EVEX &&
-	    insn->mode == MODE_64BIT) {
-		reg |= r2FromEVEX2of4(insn->vectorExtensionPrefix[1]) << 4;
-		evexrm = xFromEVEX2of4(insn->vectorExtensionPrefix[1]) << 4;
-	}
-
-	insn->reg = (Reg)(insn->regBase + reg);
 
 	switch (insn->addressSize) {
 	case 2: {
@@ -1789,31 +1826,44 @@ static int readModRM(struct InternalInstruction *insn)
 		switch (mod) {
 		case 0x0:
 			if (rm == 0x6) {
-				insn->eaBase = EA_BASE_NONE;
+				if (materialize) {
+					insn->eaBase = EA_BASE_NONE;
+				}
 				insn->eaDisplacement = EA_DISP_16;
-				if (readDisplacement(insn))
+				if (readDisplacement(insn, materialize))
 					return -1;
 			} else {
-				insn->eaBase = (EABase)(eaBaseBase + rm);
+				if (materialize) {
+					insn->eaBase =
+						(EABase)(eaBaseBase + rm);
+				}
 				insn->eaDisplacement = EA_DISP_NONE;
 			}
 			break;
 		case 0x1:
-			insn->eaBase = (EABase)(eaBaseBase + rm);
+			if (materialize) {
+				insn->eaBase = (EABase)(eaBaseBase + rm);
+			}
 			insn->eaDisplacement = EA_DISP_8;
-			insn->displacementSize = 1;
-			if (readDisplacement(insn))
+			if (materialize) {
+				insn->displacementSize = 1;
+			}
+			if (readDisplacement(insn, materialize))
 				return -1;
 			break;
 		case 0x2:
-			insn->eaBase = (EABase)(eaBaseBase + rm);
+			if (materialize) {
+				insn->eaBase = (EABase)(eaBaseBase + rm);
+			}
 			insn->eaDisplacement = EA_DISP_16;
-			if (readDisplacement(insn))
+			if (readDisplacement(insn, materialize))
 				return -1;
 			break;
 		case 0x3:
-			insn->eaBase = (EABase)(insn->eaRegBase + rm);
-			if (readDisplacement(insn))
+			if (materialize) {
+				insn->eaBase = (EABase)(insn->eaRegBase + rm);
+			}
+			if (readDisplacement(insn, materialize))
 				return -1;
 			break;
 		}
@@ -1836,45 +1886,64 @@ static int readModRM(struct InternalInstruction *insn)
 			// the extension bits (REX.b and EVEX.x) are ignored.
 			switch (rm & 7) {
 			case 0x4: // SIB byte is present
-				insn->eaBase = (insn->addressSize == 4 ?
-							EA_BASE_sib :
-							EA_BASE_sib64);
-				if (readSIB(insn) || readDisplacement(insn))
+				if (materialize) {
+					insn->eaBase = (insn->addressSize == 4 ?
+								EA_BASE_sib :
+								EA_BASE_sib64);
+				}
+				if (readSIB(insn, materialize) ||
+				    readDisplacement(insn, materialize))
 					return -1;
 				break;
 			case 0x5: // RIP-relative
-				insn->eaBase = EA_BASE_NONE;
+				if (materialize) {
+					insn->eaBase = EA_BASE_NONE;
+				}
 				insn->eaDisplacement = EA_DISP_32;
-				if (readDisplacement(insn))
+				if (readDisplacement(insn, materialize))
 					return -1;
 				break;
 			default:
-				insn->eaBase = (EABase)(eaBaseBase + rm);
+				if (materialize) {
+					insn->eaBase =
+						(EABase)(eaBaseBase + rm);
+				}
 				break;
 			}
 			break;
 		case 0x1:
-			insn->displacementSize = 1;
+			if (materialize) {
+				insn->displacementSize = 1;
+			}
 			/* FALLTHROUGH */
 		case 0x2:
 			insn->eaDisplacement =
 				(mod == 0x1 ? EA_DISP_8 : EA_DISP_32);
 			switch (rm & 7) {
 			case 0x4: // SIB byte is present
-				insn->eaBase = EA_BASE_sib;
-				if (readSIB(insn) || readDisplacement(insn))
+				if (materialize) {
+					insn->eaBase = EA_BASE_sib;
+				}
+				if (readSIB(insn, materialize) ||
+				    readDisplacement(insn, materialize))
 					return -1;
 				break;
 			default:
-				insn->eaBase = (EABase)(eaBaseBase + rm);
-				if (readDisplacement(insn))
+				if (materialize) {
+					insn->eaBase =
+						(EABase)(eaBaseBase + rm);
+				}
+				if (readDisplacement(insn, materialize))
 					return -1;
 				break;
 			}
 			break;
 		case 0x3:
 			insn->eaDisplacement = EA_DISP_NONE;
-			insn->eaBase = (EABase)(insn->eaRegBase + rm + evexrm);
+			if (materialize) {
+				insn->eaBase =
+					(EABase)(insn->eaRegBase + rm + evexrm);
+			}
 			break;
 		}
 
@@ -1885,20 +1954,22 @@ static int readModRM(struct InternalInstruction *insn)
 	return 0;
 }
 
+static int readModRM(struct InternalInstruction *insn)
+{
+	return readModRMImpl(insn, true);
+}
+
+static int readModRMScan(struct InternalInstruction *insn)
+{
+	return readModRMImpl(insn, false);
+}
+
 /* Specializations below pass constant operand classes to the same readers
  * and validators as the generic operand interpreter. */
-#if defined(_MSC_VER)
-#define X86_OPERAND_INLINE static __forceinline
-#elif defined(__GNUC__)
-#define X86_OPERAND_INLINE static inline __attribute__((always_inline))
-#else
-#define X86_OPERAND_INLINE static inline
-#endif
-
 #define GENERIC_FIXUP_FUNC(name, base, prefix, mask, rm_field) \
-	X86_OPERAND_INLINE uint16_t name(struct InternalInstruction *insn, \
-					 OperandType type, uint8_t index, \
-					 uint8_t *valid) \
+	X86_DECODE_INLINE uint16_t name(struct InternalInstruction *insn, \
+					OperandType type, uint8_t index, \
+					uint8_t *valid) \
 	{ \
 		*valid = 1; \
 		switch (type) { \
@@ -1993,8 +2064,8 @@ GENERIC_FIXUP_FUNC(fixupRMValue, insn->eaRegBase, EA_REG, 0xf, true)
  *                RAX.
  * @return      - 0 on success; nonzero otherwise.
  */
-X86_OPERAND_INLINE int readOpcodeRegister(struct InternalInstruction *insn,
-					  uint8_t size)
+X86_DECODE_INLINE int readOpcodeRegister(struct InternalInstruction *insn,
+					 uint8_t size)
 {
 	if (size == 0)
 		size = insn->registerSize;
@@ -2042,7 +2113,8 @@ X86_OPERAND_INLINE int readOpcodeRegister(struct InternalInstruction *insn,
  * @return      - 0 if the immediate was successfully consumed; nonzero
  *                otherwise.
  */
-static int readImmediate(struct InternalInstruction *insn, uint8_t size)
+X86_DECODE_INLINE int readImmediateImpl(struct InternalInstruction *insn,
+					uint8_t size, bool materialize)
 {
 	uint8_t imm8;
 	uint16_t imm16;
@@ -2059,37 +2131,47 @@ static int readImmediate(struct InternalInstruction *insn, uint8_t size)
 	else
 		insn->immediateSize = size;
 
-	insn->immediateOffset = insn->readerCursor;
+	if (materialize)
+		insn->immediateOffset = insn->readerCursor;
 
 	switch (size) {
 	case 1:
 		if (consumeByte(insn, &imm8))
 			return -1;
 
-		insn->immediates[insn->numImmediatesConsumed] = imm8;
+		if (materialize)
+			insn->immediates[insn->numImmediatesConsumed] = imm8;
 		break;
 	case 2:
 		if (consumeUInt16(insn, &imm16))
 			return -1;
 
-		insn->immediates[insn->numImmediatesConsumed] = imm16;
+		if (materialize)
+			insn->immediates[insn->numImmediatesConsumed] = imm16;
 		break;
 	case 4:
 		if (consumeUInt32(insn, &imm32))
 			return -1;
 
-		insn->immediates[insn->numImmediatesConsumed] = imm32;
+		if (materialize)
+			insn->immediates[insn->numImmediatesConsumed] = imm32;
 		break;
 	case 8:
 		if (consumeUInt64(insn, &imm64))
 			return -1;
-		insn->immediates[insn->numImmediatesConsumed] = imm64;
+		if (materialize)
+			insn->immediates[insn->numImmediatesConsumed] = imm64;
 		break;
 	}
 
 	insn->numImmediatesConsumed++;
 
 	return 0;
+}
+
+static int readImmediate(struct InternalInstruction *insn, uint8_t size)
+{
+	return readImmediateImpl(insn, size, true);
 }
 
 /*
@@ -2142,7 +2224,7 @@ static int readMaskRegister(struct InternalInstruction *insn)
 }
 
 /* The caller has already consumed ModR/M and any addressing bytes. */
-X86_OPERAND_INLINE int fixupRegisterOperand(struct InternalInstruction *insn,
+X86_DECODE_INLINE int fixupRegisterOperand(struct InternalInstruction *insn,
 					    OperandType type)
 {
 	uint8_t valid;
@@ -2153,7 +2235,7 @@ X86_OPERAND_INLINE int fixupRegisterOperand(struct InternalInstruction *insn,
 	return 0;
 }
 
-X86_OPERAND_INLINE int fixupRMOperand(struct InternalInstruction *insn,
+X86_DECODE_INLINE int fixupRMOperand(struct InternalInstruction *insn,
 				      OperandType type,
 				      OperandEncoding encoding)
 {
@@ -2171,7 +2253,7 @@ X86_OPERAND_INLINE int fixupRMOperand(struct InternalInstruction *insn,
 	return 0;
 }
 
-X86_OPERAND_INLINE int readVSIBOperand(struct InternalInstruction *insn,
+X86_DECODE_INLINE int readVSIBOperand(struct InternalInstruction *insn,
 				       OperandType type,
 				       OperandEncoding encoding, int hasVVVV,
 				       int *needVVVV)
@@ -2226,7 +2308,7 @@ X86_OPERAND_INLINE int readVSIBOperand(struct InternalInstruction *insn,
 	return 0;
 }
 
-X86_OPERAND_INLINE int readVVVVOperand(struct InternalInstruction *insn,
+X86_DECODE_INLINE int readVVVVOperand(struct InternalInstruction *insn,
 				       OperandType type, int hasVVVV,
 				       int *needVVVV)
 {
@@ -2433,8 +2515,6 @@ CASE_ENCODING_RM:
 	return 0;
 }
 
-#undef X86_OPERAND_INLINE
-
 /*
  * checkEVEX - Rejects the EVEX encodings that the decode tables accept but
  *   that are #UD, as XED rejects them: zeroing without an opmask, the reserved
@@ -2444,7 +2524,7 @@ CASE_ENCODING_RM:
  * @param insn  - The EVEX instruction whose operands have been read.
  * @return      - 0 if the EVEX prefix is legal; nonzero otherwise.
  */
-static int checkEVEX(const struct InternalInstruction *insn)
+X86_DECODE_INLINE int checkEVEX(const struct InternalInstruction *insn)
 {
 	uint8_t p2;
 	bool registerForm;
@@ -2753,18 +2833,10 @@ static bool checkPrefix(struct InternalInstruction *insn)
 	return false;
 }
 
-#if defined(_MSC_VER)
-#define X86_DECODE_INLINE static __forceinline
-#elif defined(__GNUC__)
-#define X86_DECODE_INLINE static inline __attribute__((always_inline))
-#else
-#define X86_DECODE_INLINE static inline
-#endif
-
-/* Prefix/opcode selection and final checks are shared by both operand paths. */
-X86_DECODE_INLINE int beginDecodedInstruction(struct InternalInstruction *insn,
-					      const uint8_t *code,
-					      size_t codeSize, cs_mode mode)
+/* Prefix and opcode reads are shared by generic and generated terminals. */
+X86_DECODE_INLINE PrefixReadStatus
+readInstructionHeader(struct InternalInstruction *insn, const uint8_t *code,
+		      size_t codeSize, cs_mode mode)
 {
 	insn->code = code;
 	insn->codeSize = codeSize;
@@ -2781,22 +2853,24 @@ X86_DECODE_INLINE int beginDecodedInstruction(struct InternalInstruction *insn,
 	if (prefixResult == PREFIX_READ_INVALID)
 		return -1;
 	const bool simpleLegacy = prefixResult == PREFIX_READ_SIMPLE_LEGACY;
-	if (readOpcode(insn, simpleLegacy) || getID(insn, mode) ||
-	    insn->instructionID == 0 || checkPrefix(insn))
-		return -1;
+	if (readOpcode(insn, simpleLegacy))
+		return PREFIX_READ_INVALID;
 
-	return 0;
+	return prefixResult;
 }
 
-X86_DECODE_INLINE int finishDecodedInstruction(struct InternalInstruction *insn)
+X86_DECODE_INLINE int finishDecodedInstruction(struct InternalInstruction *insn,
+					       bool vectorChecks)
 {
-	if (insn->vectorExtensionType == TYPE_EVEX && checkEVEX(insn))
-		return -1;
+	if (vectorChecks) {
+		if (insn->vectorExtensionType == TYPE_EVEX && checkEVEX(insn))
+			return -1;
 
-	/* Only a decoded VSIB index can participate in a gather conflict. */
-	const int index = vectorIndexNumber(insn->sibIndex);
-	if (index >= 0 && checkGatherRegisters(insn, index))
-		return -1;
+		/* Only a decoded VSIB index can participate in a gather conflict. */
+		const int index = vectorIndexNumber(insn->sibIndex);
+		if (index >= 0 && checkGatherRegisters(insn, index))
+			return -1;
+	}
 
 	/* MOV can read CS (8C /1), but loading CS (8E /1) always raises #UD.
 	 * Segment selectors ignore REX/REX2 register extension bits. */
@@ -2816,6 +2890,8 @@ X86_DECODE_INLINE int finishDecodedInstruction(struct InternalInstruction *insn)
 	return 0;
 }
 
+#include "X86GenLegacyTerminal.inc"
+
 #undef X86_DECODE_INLINE
 
 int decodeInstruction(struct InternalInstruction *insn, const uint8_t *code,
@@ -2832,22 +2908,40 @@ static int readOperandsScan(struct InternalInstruction *insn, MCInst *mcInst,
 #include "X86GenOperandScan.inc"
 	}
 
-	if (readOperands(insn) || finishDecodedInstruction(insn))
+	if (readOperands(insn) || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	return X86_SCAN_RAW_READY;
 }
 
-/* A single parser selects raw or scan operands only after prefix validation.
- * EVEX keeps the raw policy and its existing backend restoration order. */
+/* Ordinary legacy terminals have no LOCK, REX2 or vector prefixes. Other
+ * encodings retain generic ID selection and prefix validation before operands.
+ * EVEX keeps its raw policy and backend restoration order. */
 int decodeInstructionScan(struct InternalInstruction *insn, const uint8_t *code,
 			  size_t codeSize, cs_mode mode, MCInst *mcInst,
 			  uint16_t *size)
 {
-	if (beginDecodedInstruction(insn, code, codeSize, mode))
-		return -1;
+	const PrefixReadStatus prefixResult =
+		readInstructionHeader(insn, code, codeSize, mode);
+	if (prefixResult == PREFIX_READ_INVALID)
+		return X86_SCAN_INVALID;
+	if (prefixResult == PREFIX_READ_SIMPLE_LEGACY &&
+	    (insn->opcodeType == ONEBYTE || insn->opcodeType == TWOBYTE)) {
+		const unsigned int row =
+			insn->mode == MODE_64BIT ?
+				((insn->rexPrefix & 0x08) ? 2 : 1) :
+				(insn->mode == MODE_16BIT ? 3 : 0);
+		const uint64_t decision =
+			x86LegacyDecisions[row][insn->opcodeType == TWOBYTE]
+					  [insn->opcode];
+		if (decision)
+			return decodeLegacyTerminal(insn, mcInst, size,
+						    decision);
+	}
+	if (getID(insn, mode) || insn->instructionID == 0 || checkPrefix(insn))
+		return X86_SCAN_INVALID;
 	if (mcInst)
 		return readOperandsScan(insn, mcInst, size);
-	if (readOperands(insn) || finishDecodedInstruction(insn))
+	if (readOperands(insn) || finishDecodedInstruction(insn, true))
 		return X86_SCAN_INVALID;
 	return X86_SCAN_RAW_READY;
 }

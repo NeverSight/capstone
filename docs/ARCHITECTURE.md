@@ -90,9 +90,10 @@ Both paths retain checked reads and full instruction-state initialization.
 The x86 operand reader and translator specialize common scalar and vector
 operand sets from the full and reduced `X86GenDisassemblerTables*.inc`
 descriptors. Run `python3 suite/synctools/x86_operand_specializations.py` whenever
-those descriptors change; `--check` verifies `X86GenOperandRead.inc`,
-`X86GenOperandTranslate.inc` and `X86GenOperandScan.inc` without writing, and runs
-in the unit suite when Python is available.
+those descriptors, opcode tables or `X86Lookup16*.inc` change; `--check` verifies
+`X86GenOperandRead.inc`, `X86GenOperandTranslate.inc`, `X86GenOperandScan.inc` and
+`X86GenLegacyTerminal.inc` without writing, and runs in the unit suite when Python
+is available.
 
 The reader selects up to two scalar or four vector operands after ignoring
 duplicates. It calls the same register, memory, immediate, VVVV, writemask and
@@ -116,9 +117,43 @@ initialization and operand validation. The shared private
 `X86DisassemblerTranslator.h` owns the translation implementations for both
 paths.
 
-One shared parser core performs prefix/opcode selection and prefix validation
-before choosing raw or combined operands. UD1 and unselected shapes use the
-original reader. After reading and final checks succeed, the private
+One shared parser reads prefixes and opcodes before selecting a terminal or
+generic ID lookup. Ordinary legacy instructions with no prefix or one REX use
+generated terminal plans for selected scalar operand shapes in the one-byte
+and two-byte maps. Each terminal packs the instruction ID, operand-set index
+and operand-handler index, avoiding ID-to-descriptor-to-shape lookups at runtime.
+The plans derive from the same full/reduced opcode tables and operand helpers;
+they do not define another instruction set. Direct decisions embed terminals;
+indexed decisions retain their ModR/M read and branch selection, including
+invalid IDs. Generation checks every selected ModR/M value and packed result.
+
+The 16-bit row composes the existing primary and operand-size lookups only when
+their decision kinds match. Both then require the same read, and the second
+lookup either reads nothing or reuses an already successful ModR/M read.
+Equivalence comes from the existing lookup ranges. Different read requirements,
+address-size repairs, opcode 90 and UD1's runtime operand override retain generic
+selection. No failed secondary read or cursor update is removed from that path.
+
+The terminal admission rule excludes LOCK, REX2 and vector prefixes. Generation
+also checks every selected ModR/M against both operand sequences: REG and
+opcode-register operands must be GPRs, an RM operand must match its register or
+memory form, and immediates must neither encode registers nor change the opcode.
+Any incompatible descriptor keeps the generic path. Under this admission rule,
+REX produces only valid GPR indices, and a successful legacy address read
+produces valid base/index registers. These facts discharge the operand fixup
+and translation checks for scan terminals before code generation.
+
+The same ModR/M, SIB, displacement and immediate readers serve both outputs,
+with a constant materialization policy. Raw decoding retains all fields and
+failed-read state. Scan terminals consume and bounds-check the same bytes but
+retain only control state before the shared final checks and opcode setup;
+they do not build register/address values merely to discard them. Identical
+scan read sequences share a handler. The completed scan result does not expose
+a raw instruction. Its null-`MCInst` entry still returns the same raw state as
+the generic reader. VVVV and EVEX/VSIB checks remain on the paths that need them.
+Other encodings retain generic ID selection, prefix validation and final checks.
+UD1 and unselected shapes use the original reader. After reading and final
+checks succeed, the private
 `X86_SCAN_RAW_READY` result returns them to the backend's size assignment,
 displacement correction and translation. It does not mean translation has
 succeeded. Selected cases complete translation before returning

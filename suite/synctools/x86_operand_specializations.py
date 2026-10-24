@@ -8,11 +8,20 @@ from collections import defaultdict
 from pathlib import Path
 import re
 
+import x86_disassembler_tables as tables
+
 ROOT = Path(__file__).resolve().parents[2]
 X86 = ROOT / "arch" / "X86"
 OUTPUT = X86 / "X86GenOperandRead.inc"
 TRANSLATE_OUTPUT = X86 / "X86GenOperandTranslate.inc"
 SCAN_OUTPUT = X86 / "X86GenOperandScan.inc"
+TERMINAL_OUTPUT = X86 / "X86GenLegacyTerminal.inc"
+TERMINAL_UID_BITS = 14
+TERMINAL_OPERAND_BITS = 10
+TERMINAL_HANDLER_SHIFT = TERMINAL_UID_BITS + TERMINAL_OPERAND_BITS
+TERMINAL_BITS = 31
+TERMINAL_SPLIT = 1 << 62
+TERMINAL_INDEXED = 1 << 63
 
 # These scalar immediate types cannot split an immediate into registers.
 # Register-immediates and opcode-changing predicates stay with the generic reader.
@@ -104,17 +113,25 @@ def read_specializations(suffix):
             yield index, operands
 
 
-def read_operand_calls(operands):
+def read_operand_calls(operands, *, materialize=True):
     calls = []
     has_modrm = False
     for encoding, operand_type in operands:
+        if not materialize:
+            tables.require(
+                encoding in ENCODINGS and operand_type in TYPES,
+                "Compact readers require ordinary scalar operands",
+            )
         if encoding in ({"ENCODING_REG"} | RM_ENCODINGS) and not has_modrm:
-            calls.append("(!insn->consumedModRM && readModRM(insn))")
+            reader = "readModRM" if materialize else "readModRMScan"
+            calls.append(f"(!insn->consumedModRM && {reader}(insn))")
             has_modrm = True
         if encoding == "ENCODING_REG":
-            calls.append(f"fixupRegisterOperand(insn, {operand_type})")
+            if materialize:
+                calls.append(f"fixupRegisterOperand(insn, {operand_type})")
         elif encoding in RM_ENCODINGS:
-            calls.append(f"fixupRMOperand(insn, {operand_type}, {encoding})")
+            if materialize:
+                calls.append(f"fixupRMOperand(insn, {operand_type}, {encoding})")
         elif encoding in VSIB_ENCODINGS:
             calls.append(
                 f"readVSIBOperand(insn, {operand_type}, {encoding}, hasVVVV, &needVVVV)"
@@ -125,8 +142,13 @@ def read_operand_calls(operands):
         elif encoding == "ENCODING_WRITEMASK":
             calls.append("readMaskRegister(insn)")
         elif encoding in IMMEDIATES:
-            calls.append(f"readImmediate(insn, {IMMEDIATES[encoding]})")
-        else:
+            reader = (
+                f"readImmediate(insn, {IMMEDIATES[encoding]})"
+                if materialize
+                else f"readImmediateImpl(insn, {IMMEDIATES[encoding]}, false)"
+            )
+            calls.append(reader)
+        elif materialize:
             calls.append(f"readOpcodeRegister(insn, {REGISTERS[encoding]})")
     return calls
 
@@ -317,7 +339,7 @@ def emit_scan(suffix):
             lines.append("\t\treturn X86_SCAN_INVALID;")
         lines.extend(
             [
-                "\tif (needVVVV || finishDecodedInstruction(insn))",
+                "\tif (needVVVV || finishDecodedInstruction(insn, true))",
                 "\t\treturn X86_SCAN_INVALID;",
                 "\t*size = (uint16_t)insn->length;",
                 "\tif (beginTranslation(mcInst, insn))",
@@ -332,6 +354,442 @@ def emit_scan(suffix):
         lines.extend(["\treturn X86_SCAN_COMPLETE;", "}"])
     lines.extend(["default:", "\tbreak;", "}"])
     return "\n".join(lines)
+
+
+def instruction_specifiers(source):
+    matches = re.findall(
+        r"static const struct InstructionSpecifier x86DisassemblerInstrSpecifiers"
+        r"\[(\d+)\] = \{(.*?)\n\};",
+        source,
+        re.S,
+    )
+    tables.require(len(matches) == 1, "Expected one instruction specifier table")
+    bound, body = matches[0]
+    entries = tables.scan_entries(
+        tables.uncomment(body),
+        re.compile(r"\s*\{\s*(\d+)\s*,\s*\}\s*,"),
+        "instruction specifier",
+    )
+    tables.require(len(entries) == int(bound), "Instruction specifier count changed")
+    return [tables.integer_value(value, "operand set") for (value,) in entries]
+
+
+def equivalents16(suffix):
+    lookup16 = (X86 / f"X86Lookup16{suffix}.inc").read_text()
+    pair_body = lookup16.split(
+        "static const x86_op_id_pair x86_16_bit_eq_tbl[] = {", 1
+    )[1].split("};", 1)[0]
+    pairs = [
+        tuple(tables.integer_value(value, "16-bit equivalence pair") for value in pair)
+        for pair in tables.scan_entries(
+            tables.uncomment(pair_body),
+            re.compile(r"\s*\{\s*(\d+),\s*(\d+)\s*\}\s*,"),
+            "16-bit equivalence pair",
+        )
+    ]
+    lookup_body = lookup16.split("static const uint16_t x86_16_bit_eq_lookup[] = {", 1)[
+        1
+    ].split("};", 1)[0]
+    lookup = tables.numeric_values(
+        tables.uncomment(lookup_body), "16-bit equivalence index"
+    )
+    equivalent = set()
+    # Follow the actual lookup ranges, just as is16BitEquivalent does.
+    for uid, first in enumerate(lookup):
+        tables.require(first <= len(pairs), "16-bit equivalence index out of bounds")
+        if first:
+            i = first - 1
+            while i < len(pairs) and pairs[i][0] == uid:
+                equivalent.add(pairs[i])
+                i += 1
+    return equivalent
+
+
+def packed_terminal(terminal):
+    uid, operands, handler = terminal
+    tables.require(0 <= uid < (1 << TERMINAL_UID_BITS), "Terminal UID exceeds storage")
+    tables.require(
+        0 <= operands < (1 << TERMINAL_OPERAND_BITS),
+        "Terminal operand set exceeds storage",
+    )
+    tables.require(
+        0 <= handler < (1 << (TERMINAL_BITS - TERMINAL_HANDLER_SHIFT)),
+        "Terminal handler exceeds storage",
+    )
+    return uid | (operands << TERMINAL_UID_BITS) | (handler << TERMINAL_HANDLER_SHIFT)
+
+
+def packed_terminal_decision(first, kind, words, kinds):
+    if not first:
+        return 0
+    if kind == "MODRM_ONEENTRY":
+        return words[first]
+    if kind == "MODRM_SPLITRM":
+        return words[first] | (words[first + 1] << TERMINAL_BITS) | TERMINAL_SPLIT
+    tables.require(first <= tables.OFFSET_MASK, "Terminal offset exceeds storage")
+    return TERMINAL_INDEXED | (kinds[kind] << tables.TYPE_SHIFT) | first
+
+
+def scalar_terminal_form(operands, modrm):
+    """Prove that checked ordinary-legacy reads produce legal scan operands.
+
+    REX extends GPR indices only to 15, and 16-bit addressing cannot have REX.
+    Every successfully read legacy address has a valid base/index. Explicitly
+    exclude operand classes that require a further check or change the opcode.
+    """
+    gprs = {"TYPE_R8", "TYPE_R16", "TYPE_R32", "TYPE_R64", "TYPE_Rv"}
+    immediates = {"TYPE_REL", "TYPE_RELv", "TYPE_IMM", "TYPE_UIMM8"}
+    for encoding, operand_type in operands:
+        if encoding == "ENCODING_RM":
+            if operand_type not in gprs | {"TYPE_M"}:
+                return False
+            if (operand_type == "TYPE_M") == (modrm >= 0xC0):
+                return False
+        elif encoding == "ENCODING_REG" or encoding in REGISTERS:
+            if operand_type not in gprs:
+                return False
+        elif encoding in IMMEDIATES:
+            if operand_type not in immediates:
+                return False
+        else:
+            return False
+    return True
+
+
+def legacy_terminal_model(suffix):
+
+    common = (X86 / "X86DisassemblerDecoderCommon.h").read_text()
+    contexts, kinds, names = tables.parse_common(common)
+    source = (X86 / f"X86GenDisassemblerTables{suffix}.inc").read_text()
+    ids = tables.parse_ids(source, contexts)
+    maps = tables.parse_maps(
+        (X86 / f"X86GenDisassemblerTables{suffix}2.inc").read_text(),
+        names[:4] if suffix else names,
+        len(contexts),
+    )
+    specifiers = instruction_specifiers(source)
+    reads = dict(read_specializations(suffix))
+    translations = dict(translation_specializations(suffix))
+    selected = {
+        i: (ops, translations[i])
+        for i, ops in reads.items()
+        if i in translations and all(e in ENCODINGS and t in TYPES for e, t in ops)
+    }
+    ud1 = int(
+        re.search(
+            r"X86_UD1\s*=\s*(\d+)", (X86 / f"X86GenInstrInfo{suffix}.inc").read_text()
+        )[1]
+    )
+    groups = {}
+    terminals = [(0, 0, 0)]
+    sequences = {}
+    rows = []
+    selected_counts = []
+    # These are the exact contexts used by the existing unprefixed getID path.
+    context_body = (
+        source.split("static const uint8_t x86DisassemblerContexts[", 1)[1]
+        .split("\n};", 1)[0]
+        .split("{", 1)[1]
+    )
+    context_values = tables.comma_values(
+        tables.uncomment(context_body), "attribute contexts"
+    )
+    # Keep the runtime row selector tied to the attribute definitions. A change
+    # to these attributes must update the selector and generator together.
+    attributes = dict(re.findall(r"ENUM_ENTRY\((ATTR_\w+),\s*([^\n]+?)\)", common))
+    tables.require(
+        [
+            attributes.get(name)
+            for name in ("ATTR_NONE", "ATTR_64BIT", "ATTR_REXW", "ATTR_OPSIZE")
+        ]
+        == ["0x00", "(0x1 << 0", "(0x1 << 3", "(0x1 << 4"],
+        "Unprefixed attribute values changed",
+    )
+    tables.require(
+        [context_values[i] for i in (0, 1, 9, 16)]
+        == ["IC", "IC_64BIT", "IC_64BIT_REXW", "IC_OPSIZE"],
+        "Unprefixed attribute contexts changed",
+    )
+    equivalent = equivalents16(suffix)
+    for context_name in ("IC", "IC_64BIT", "IC_64BIT_REXW", "MODE16"):
+        mode16 = context_name == "MODE16"
+        if mode16:
+            context_name = "IC"
+        row_maps = []
+        for name, indices, source_rows in maps[:2]:
+            number = indices[contexts.index(context_name)]
+            source_row = (
+                source_rows[number - 1] if number else (("MODRM_ONEENTRY", 0),) * 256
+            )
+            if mode16:
+                second_number = indices[contexts.index("IC_OPSIZE")]
+                second_row = (
+                    source_rows[second_number - 1]
+                    if second_number
+                    else (("MODRM_ONEENTRY", 0),) * 256
+                )
+            row = []
+            for opcode, (kind, offset) in enumerate(source_row):
+                count = {
+                    "MODRM_ONEENTRY": 1,
+                    "MODRM_SPLITRM": 2,
+                    "MODRM_SPLITREG": 16,
+                    "MODRM_SPLITMISC": 72,
+                    "MODRM_FULL": 256,
+                }[kind]
+                uids = tuple(ids[offset : offset + count])
+                tables.require(len(uids) == count, "Incomplete terminal sequence")
+                if mode16:
+                    second_kind, second_offset = second_row[opcode]
+                    # Equal kinds preserve both lookups' ordered reads: either
+                    # neither reads ModR/M, or the second reuses the first read.
+                    # A secondary read that could fail independently stays in
+                    # getIDForMode, as do its address-size repairs.
+                    if (
+                        kind != second_kind
+                        or (
+                            name == names[0]
+                            and (opcode == 0xE3 or 0xA0 <= opcode <= 0xA3)
+                        )
+                        or (name == names[1] and opcode == 0xAE)
+                    ):
+                        row.append((0, "MODRM_ONEENTRY"))
+                        continue
+                    other_uids = ids[second_offset : second_offset + count]
+                    tables.require(
+                        len(other_uids) == count,
+                        "Incomplete secondary terminal sequence",
+                    )
+                    uids = tuple(
+                        b if (a, b) in equivalent else a
+                        for a, b in zip(uids, other_uids)
+                    )
+                if (
+                    # Opcode 90 has XCHG/PAUSE repair; UD1 overrides its generated
+                    # descriptor at runtime. Neither is an ordinary terminal.
+                    opcode == 0x90
+                    or ud1 in uids
+                    or not any(uids)
+                    or any(uid and specifiers[uid] not in selected for uid in uids)
+                ):
+                    row.append((0, "MODRM_ONEENTRY"))
+                    continue
+                # Prove both reader and translator requirements for every
+                # selected ModR/M, including duplicates. A future descriptor
+                # that needs another validation keeps the generic path.
+                safe = True
+                for modrm in range(256):
+                    uid = uids[tables.source_id(range(256), kind, 0, modrm)]
+                    if uid:
+                        read_ops, translate_ops = selected[specifiers[uid]]
+                        safe &= scalar_terminal_form(read_ops + translate_ops, modrm)
+                if not safe:
+                    row.append((0, "MODRM_ONEENTRY"))
+                    continue
+                key = (kind, uids)
+                if key not in sequences:
+                    sequences[key] = len(terminals)
+                    for uid in uids:
+                        operands = specifiers[uid]
+                        shape = selected.get(operands)
+                        if uid and shape not in groups:
+                            groups[shape] = len(groups) + 1
+                        terminals.append((uid, operands, groups[shape] if uid else 0))
+                first = sequences[key]
+                row.append((first, kind))
+                # Exhaust every ModR/M selection, including invalid IDs. The
+                # decision kind separately retains the ordered read requirement.
+                for modrm in range(256):
+                    delta = tables.source_id(range(256), kind, 0, modrm)
+                    expected = tables.source_id(ids, kind, offset, modrm)
+                    if mode16:
+                        second = tables.source_id(
+                            ids, second_kind, second_offset, modrm
+                        )
+                        if (expected, second) in equivalent:
+                            expected = second
+                    tables.require(
+                        terminals[first + delta][0] == expected,
+                        "Terminal ID mismatch",
+                    )
+                    tables.require(
+                        terminals[first + delta][1]
+                        == specifiers[terminals[first + delta][0]],
+                        "Terminal descriptor mismatch",
+                    )
+            selected_counts.append(sum(bool(first) for first, _ in row))
+            row_maps.append(row)
+        rows.append(row_maps)
+    words = [packed_terminal(t) for t in terminals]
+    reverse_kinds = {value: key for key, value in kinds.items()}
+    for row_maps in rows:
+        for row in row_maps:
+            for first, kind in row:
+                if not first:
+                    continue
+                word = packed_terminal_decision(first, kind, words, kinds)
+                tables.require(
+                    bool(word & (TERMINAL_INDEXED | TERMINAL_SPLIT))
+                    == (kind != "MODRM_ONEENTRY"),
+                    "Terminal read requirement changed",
+                )
+                for modrm in range(256):
+                    expected = terminals[
+                        first + tables.source_id(range(256), kind, 0, modrm)
+                    ]
+                    if word & TERMINAL_INDEXED:
+                        offset = word & tables.OFFSET_MASK
+                        packed_kind = reverse_kinds[
+                            (word >> tables.TYPE_SHIFT) & tables.TYPE_MASK
+                        ]
+                        result = words[
+                            offset + tables.source_id(range(256), packed_kind, 0, modrm)
+                        ]
+                    else:
+                        shift = (
+                            TERMINAL_BITS
+                            if word & TERMINAL_SPLIT and modrm >= 0xC0
+                            else 0
+                        )
+                        result = (word >> shift) & ((1 << TERMINAL_BITS) - 1)
+                    tables.require(
+                        result == packed_terminal(expected), "Packed terminal changed"
+                    )
+    return groups, terminals, rows, selected_counts, words, kinds
+
+
+def emit_terminal(suffix):
+    groups, terminals, rows, selected_counts, words, kinds = legacy_terminal_model(
+        suffix
+    )
+    lines = [
+        f"/* {len(terminals)} terminals, {len(groups)} operand handlers; selected opcodes {selected_counts}. */",
+        f"#define X86_TERMINAL_INDEXED UINT64_C(0x{TERMINAL_INDEXED:x})",
+        f"#define X86_TERMINAL_SPLIT UINT64_C(0x{TERMINAL_SPLIT:x})",
+        f"#define X86_TERMINAL_MASK UINT64_C(0x{(1 << TERMINAL_BITS) - 1:x})",
+        f"#define X86_TERMINAL_REGISTER_SHIFT {TERMINAL_BITS}",
+        f"#define X86_TERMINAL_UID_MASK 0x{(1 << TERMINAL_UID_BITS) - 1:x}u",
+        f"#define X86_TERMINAL_OPERAND_SHIFT {TERMINAL_UID_BITS}",
+        f"#define X86_TERMINAL_OPERAND_MASK 0x{(1 << TERMINAL_OPERAND_BITS) - 1:x}u",
+        f"#define X86_TERMINAL_HANDLER_SHIFT {TERMINAL_HANDLER_SHIFT}",
+        "static const uint32_t x86LegacyTerminals[] = {",
+    ]
+    lines += [
+        "\t" + ", ".join(f"0x{word:08x}u" for word in words[start : start + 8]) + ","
+        for start in range(0, len(words), 8)
+    ]
+    lines += ["};", "static const uint64_t x86LegacyDecisions[4][2][256] = {"]
+    for row_maps in rows:
+        lines.append("{")
+        for row in row_maps:
+            lines.append("{")
+            values = []
+            for first, kind in row:
+                word = packed_terminal_decision(first, kind, words, kinds)
+                values.append(f"UINT64_C(0x{word:016x})" if word else "0")
+            lines += [
+                "\t" + ", ".join(values[start : start + 4]) + ","
+                for start in range(0, 256, 4)
+            ]
+            lines.append("},")
+        lines.append("},")
+    lines += [
+        "};",
+        "",
+        "static int decodeLegacyTerminal(struct InternalInstruction *insn,",
+        "\t\t\t\tMCInst *mcInst, uint16_t *size, uint64_t decision)",
+        "{",
+        "\tuint32_t terminal;",
+        "\tif ((decision & (X86_TERMINAL_INDEXED | X86_TERMINAL_SPLIT)) && (mcInst ? readModRMScan(insn) : readModRM(insn)))",
+        "\t\treturn X86_SCAN_INVALID;",
+        "\tif (decision & X86_TERMINAL_INDEXED) {",
+        "\t\tunsigned int index = decision & X86_DECISION_OFFSET_MASK;",
+        "\t\tswitch ((decision >> X86_DECISION_TYPE_SHIFT) & X86_DECISION_TYPE_MASK) {",
+        "\t\tcase MODRM_SPLITREG:",
+        "\t\t\tindex += regFromModRM(insn->modRM) + (insn->modRM >= 0xc0 ? 8 : 0);",
+        "\t\t\tbreak;",
+        "\t\tcase MODRM_SPLITMISC:",
+        "\t\t\tindex += insn->modRM >= 0xc0 ? (insn->modRM & 0x3f) + 8 : regFromModRM(insn->modRM);",
+        "\t\t\tbreak;",
+        "\t\tcase MODRM_FULL:",
+        "\t\t\tindex += insn->modRM;",
+        "\t\t\tbreak;",
+        "\t\tdefault:",
+        "\t\t\treturn X86_SCAN_INVALID;",
+        "\t\t}",
+        "\t\tterminal = x86LegacyTerminals[index];",
+        "\t} else {",
+        "\t\tunsigned int shift = (decision & X86_TERMINAL_SPLIT) && insn->modRM >= 0xc0 ?",
+        "\t\t\tX86_TERMINAL_REGISTER_SHIFT : 0;",
+        "\t\tterminal = (decision >> shift) & X86_TERMINAL_MASK;",
+        "\t}",
+        "\tinsn->instructionID = terminal & X86_TERMINAL_UID_MASK;",
+        "\tinsn->spec = specifierForUID(insn->instructionID);",
+        "\tif (!insn->instructionID)",
+        "\t\treturn X86_SCAN_INVALID;",
+        "\tif (mcInst)",
+        "\t\treturn x86LegacyScanHandlers[terminal >> X86_TERMINAL_HANDLER_SHIFT](insn, mcInst, size);",
+        "\tinsn->operands = x86OperandSets[(terminal >> X86_TERMINAL_OPERAND_SHIFT) & X86_TERMINAL_OPERAND_MASK];",
+        "\treturn x86LegacyHandlers[terminal >> X86_TERMINAL_HANDLER_SHIFT](insn);",
+        "}",
+    ]
+    handlers = []
+    scan_groups = {}
+    scan_handlers = []
+    for (read_ops, _), handler in groups.items():
+        handlers += [
+            f"static int readLegacyShape{handler}(struct InternalInstruction *insn)",
+            "{",
+        ]
+        calls = read_operand_calls(read_ops)
+        if calls:
+            handlers += [
+                "\tif (" + " ||\n\t    ".join(calls) + ")",
+                "\t\treturn X86_SCAN_INVALID;",
+            ]
+        handlers += [
+            "\tif (finishDecodedInstruction(insn, false))",
+            "\t\treturn X86_SCAN_INVALID;",
+            "\treturn X86_SCAN_RAW_READY;",
+            "}",
+        ]
+        scan_calls = tuple(read_operand_calls(read_ops, materialize=False))
+        if scan_calls not in scan_groups:
+            scan_groups[scan_calls] = len(scan_groups) + 1
+        scan_handlers.append(scan_groups[scan_calls])
+    for calls, handler in scan_groups.items():
+        handlers += [
+            f"static int scanLegacyShape{handler}(struct InternalInstruction *insn,",
+            "\t\t\t\tMCInst *mcInst, uint16_t *size)",
+            "{",
+        ]
+        if calls:
+            handlers += [
+                "\tif (" + " ||\n\t    ".join(calls) + ")",
+                "\t\treturn X86_SCAN_INVALID;",
+            ]
+        handlers += [
+            "\tif (finishDecodedInstruction(insn, false))",
+            "\t\treturn X86_SCAN_INVALID;",
+            "\t*size = (uint16_t)insn->length;",
+            "\tif (beginTranslation(mcInst, insn))",
+            "\t\treturn X86_SCAN_INVALID;",
+            "\treturn X86_SCAN_COMPLETE;",
+            "}",
+        ]
+    handlers += [
+        "static int (*const x86LegacyScanHandlers[])(struct InternalInstruction *, MCInst *, uint16_t *) = {",
+        "\tNULL,",
+    ]
+    handlers += [f"\tscanLegacyShape{handler}," for handler in scan_handlers]
+    handlers += ["};", ""]
+    handlers += [
+        "static int (*const x86LegacyHandlers[])(struct InternalInstruction *) = {",
+        "\tNULL,",
+    ]
+    handlers += [f"\treadLegacyShape{handler}," for handler in groups.values()]
+    handlers += ["};", ""]
+    return "\n".join(handlers + lines)
 
 
 def generated_output(emit):
@@ -355,9 +813,10 @@ def main():
         (OUTPUT, emit_switch),
         (TRANSLATE_OUTPUT, emit_translation),
         (SCAN_OUTPUT, emit_scan),
+        (TERMINAL_OUTPUT, emit_terminal),
     ]
-    for path, emit in outputs:
-        output = generated_output(emit)
+    generated = [(path, generated_output(emit)) for path, emit in outputs]
+    for path, output in generated:
         if args.check:
             if not path.exists() or path.read_text(encoding="utf-8") != output:
                 parser.exit(1, f"{path} is stale; run {Path(__file__).name}\n")
