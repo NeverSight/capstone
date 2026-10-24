@@ -8,11 +8,11 @@ from collections import defaultdict
 from pathlib import Path
 import re
 
-
 ROOT = Path(__file__).resolve().parents[2]
 X86 = ROOT / "arch" / "X86"
 OUTPUT = X86 / "X86GenOperandRead.inc"
 TRANSLATE_OUTPUT = X86 / "X86GenOperandTranslate.inc"
+SCAN_OUTPUT = X86 / "X86GenOperandScan.inc"
 
 # These scalar immediate types cannot split an immediate into registers.
 # Register-immediates and opcode-changing predicates stay with the generic reader.
@@ -86,8 +86,7 @@ VECTOR_ENCODINGS = (
 )
 
 
-def emit_switch(suffix):
-    groups = defaultdict(list)
+def read_specializations(suffix):
     for index, operands in enumerate(
         read_sets(X86 / f"X86GenDisassemblerTables{suffix}.inc")
     ):
@@ -102,36 +101,45 @@ def emit_switch(suffix):
                 for encoding, operand_type in operands
             )
         ):
-            groups[operands].append(index)
+            yield index, operands
+
+
+def read_operand_calls(operands):
+    calls = []
+    has_modrm = False
+    for encoding, operand_type in operands:
+        if encoding in ({"ENCODING_REG"} | RM_ENCODINGS) and not has_modrm:
+            calls.append("(!insn->consumedModRM && readModRM(insn))")
+            has_modrm = True
+        if encoding == "ENCODING_REG":
+            calls.append(f"fixupRegisterOperand(insn, {operand_type})")
+        elif encoding in RM_ENCODINGS:
+            calls.append(f"fixupRMOperand(insn, {operand_type}, {encoding})")
+        elif encoding in VSIB_ENCODINGS:
+            calls.append(
+                f"readVSIBOperand(insn, {operand_type}, {encoding}, hasVVVV, &needVVVV)"
+            )
+            has_modrm = True
+        elif encoding == "ENCODING_VVVV":
+            calls.append(f"readVVVVOperand(insn, {operand_type}, hasVVVV, &needVVVV)")
+        elif encoding == "ENCODING_WRITEMASK":
+            calls.append("readMaskRegister(insn)")
+        elif encoding in IMMEDIATES:
+            calls.append(f"readImmediate(insn, {IMMEDIATES[encoding]})")
+        else:
+            calls.append(f"readOpcodeRegister(insn, {REGISTERS[encoding]})")
+    return calls
+
+
+def emit_switch(suffix):
+    groups = defaultdict(list)
+    for index, operands in read_specializations(suffix):
+        groups[operands].append(index)
 
     lines = ["switch (insn->spec->operands) {"]
     for operands, indices in groups.items():
         lines.extend(f"case {index}:" for index in indices)
-        calls = []
-        has_modrm = False
-        for encoding, operand_type in operands:
-            if encoding in ({"ENCODING_REG"} | RM_ENCODINGS) and not has_modrm:
-                calls.append("(!insn->consumedModRM && readModRM(insn))")
-                has_modrm = True
-            if encoding == "ENCODING_REG":
-                calls.append(f"fixupRegisterOperand(insn, {operand_type})")
-            elif encoding in RM_ENCODINGS:
-                calls.append(f"fixupRMOperand(insn, {operand_type}, {encoding})")
-            elif encoding in VSIB_ENCODINGS:
-                calls.append(
-                    f"readVSIBOperand(insn, {operand_type}, {encoding}, hasVVVV, &needVVVV)"
-                )
-                has_modrm = True
-            elif encoding == "ENCODING_VVVV":
-                calls.append(
-                    f"readVVVVOperand(insn, {operand_type}, hasVVVV, &needVVVV)"
-                )
-            elif encoding == "ENCODING_WRITEMASK":
-                calls.append("readMaskRegister(insn)")
-            elif encoding in IMMEDIATES:
-                calls.append(f"readImmediate(insn, {IMMEDIATES[encoding]})")
-            else:
-                calls.append(f"readOpcodeRegister(insn, {REGISTERS[encoding]})")
+        calls = read_operand_calls(operands)
         if calls:
             lines.append("\tif (" + " ||\n\t    ".join(calls) + ")")
             lines.append("\t\treturn -1;")
@@ -173,8 +181,7 @@ def translation_operand(operand):
     return encoding, operand_type
 
 
-def emit_translation(suffix):
-    groups = defaultdict(list)
+def translation_specializations(suffix):
     for index, operands in enumerate(
         read_sets(
             X86 / f"X86GenDisassemblerTables{suffix}.inc", include_duplicates=True
@@ -197,56 +204,132 @@ def emit_translation(suffix):
                 for encoding, operand_type in operands
             )
         ):
-            groups[operands].append(index)
+            yield index, operands
+
+
+def translation_body(operands, *, emit_operands="emitOperands", failure_result="true"):
+    lines = []
+    for index, (encoding, operand_type) in enumerate(operands):
+        if encoding in {"ENCODING_VVVV", "ENCODING_WRITEMASK"}:
+            continue
+        lines.append(
+            f"\tstatic const OperandSpecifier op{index} = "
+            f"{{ {encoding}, {operand_type} }};"
+        )
+    for index, (encoding, _) in enumerate(operands):
+        if encoding == "ENCODING_VVVV":
+            lines.append(f"\ttranslateRegister(mcInst, insn->vvvv, {emit_operands});")
+            continue
+        if encoding == "ENCODING_WRITEMASK":
+            lines.extend(
+                [
+                    f"\tif (translateMaskRegister(mcInst, insn->writemask, {emit_operands}))",
+                    f"\t\treturn {failure_result};",
+                ]
+            )
+            continue
+        if encoding in IMMEDIATES:
+            lines.extend(
+                [
+                    "\ttranslateImmediate(",
+                    "\t\tmcInst, insn->immediates[insn->numImmediatesTranslated++],",
+                    f"\t\t&op{index}, insn, {emit_operands});",
+                ]
+            )
+            continue
+        function = (
+            "translateRegRegister"
+            if encoding == "ENCODING_REG"
+            else (
+                "translateRM"
+                if encoding == "ENCODING_RM"
+                else "translateOpcodeRegister"
+            )
+        )
+        lines.extend(
+            [
+                f"\tif ({function}(mcInst, &op{index}, insn, {emit_operands}))",
+                f"\t\treturn {failure_result};",
+            ]
+        )
+    return lines
+
+
+def emit_translation(suffix):
+    groups = defaultdict(list)
+    for index, operands in translation_specializations(suffix):
+        groups[operands].append(index)
 
     lines = ["switch (insn->spec->operands) {"]
     for operands, indices in groups.items():
         lines.extend(f"case {index}:" for index in indices)
         lines.append("{")
-        for index, (encoding, operand_type) in enumerate(operands):
-            if encoding in {"ENCODING_VVVV", "ENCODING_WRITEMASK"}:
-                continue
-            lines.append(
-                f"\tstatic const OperandSpecifier op{index} = "
-                f"{{ {encoding}, {operand_type} }};"
-            )
-        for index, (encoding, _) in enumerate(operands):
-            if encoding == "ENCODING_VVVV":
-                lines.append("\ttranslateRegister(mcInst, insn->vvvv, emitOperands);")
-                continue
-            if encoding == "ENCODING_WRITEMASK":
-                lines.extend(
-                    [
-                        "\tif (translateMaskRegister(mcInst, insn->writemask, emitOperands))",
-                        "\t\treturn true;",
-                    ]
-                )
-                continue
-            if encoding in IMMEDIATES:
-                lines.extend(
-                    [
-                        "\ttranslateImmediate(",
-                        "\t\tmcInst, insn->immediates[insn->numImmediatesTranslated++],",
-                        f"\t\t&op{index}, insn, emitOperands);",
-                    ]
-                )
-                continue
-            function = (
-                "translateRegRegister"
-                if encoding == "ENCODING_REG"
-                else (
-                    "translateRM"
-                    if encoding == "ENCODING_RM"
-                    else "translateOpcodeRegister"
-                )
-            )
-            lines.extend(
-                [
-                    f"\tif ({function}(mcInst, &op{index}, insn, emitOperands))",
-                    "\t\treturn true;",
-                ]
-            )
+        lines.extend(translation_body(operands))
         lines.extend(["\treturn false;", "}"])
+    lines.extend(["default:", "\tbreak;", "}"])
+    return "\n".join(lines)
+
+
+def emit_scan(suffix):
+    translations_by_index = dict(translation_specializations(suffix))
+    groups = defaultdict(list)
+    for index, operands in read_specializations(suffix):
+        # Bound the fused code to scalar and three-operand VEX shapes.
+        scalar = all(
+            encoding in ENCODINGS and operand_type in TYPES
+            for encoding, operand_type in operands
+        )
+        vex = (
+            len(operands) == 3
+            and {encoding for encoding, _ in operands}
+            in (
+                {"ENCODING_REG", "ENCODING_VVVV", "ENCODING_RM"},
+                {"ENCODING_REG", "ENCODING_VVVV", "ENCODING_VSIB"},
+            )
+            and all(
+                operand_type
+                in TYPES | {"TYPE_XMM", "TYPE_YMM", "TYPE_MVSIBX", "TYPE_MVSIBY"}
+                for _, operand_type in operands
+            )
+        )
+        if index in translations_by_index and (scalar or vex):
+            # DUP is absent from the read sequence but remains significant to
+            # translation order and multiplicity. Both sequences identify a case.
+            groups[(operands, translations_by_index[index])].append(index)
+
+    lines = ["switch (insn->spec->operands) {"]
+    for (reads, translations), indices in groups.items():
+        lines.extend(f"case {index}:" for index in indices)
+        lines.append("{")
+        # A selection miss goes directly to the generic reader's own setup.
+        lines.extend(
+            [
+                "\tint hasVVVV, needVVVV;",
+                "",
+                "\tinsn->operands = &x86OperandSets[insn->spec->operands][0];",
+                "\thasVVVV = !readVVVV(insn);",
+                "\tneedVVVV = hasVVVV && (insn->vvvv != 0);",
+            ]
+        )
+        calls = read_operand_calls(reads)
+        if calls:
+            lines.append("\tif (" + " ||\n\t    ".join(calls) + ")")
+            lines.append("\t\treturn X86_SCAN_INVALID;")
+        lines.extend(
+            [
+                "\tif (needVVVV || finishDecodedInstruction(insn))",
+                "\t\treturn X86_SCAN_INVALID;",
+                "\t*size = (uint16_t)insn->length;",
+                "\tif (beginTranslation(mcInst, insn))",
+                "\t\treturn X86_SCAN_INVALID;",
+            ]
+        )
+        lines.extend(
+            translation_body(
+                translations, emit_operands="false", failure_result="X86_SCAN_INVALID"
+            )
+        )
+        lines.extend(["\treturn X86_SCAN_COMPLETE;", "}"])
     lines.extend(["default:", "\tbreak;", "}"])
     return "\n".join(lines)
 
@@ -268,7 +351,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true", help="reject stale output")
     args = parser.parse_args()
-    outputs = [(OUTPUT, emit_switch), (TRANSLATE_OUTPUT, emit_translation)]
+    outputs = [
+        (OUTPUT, emit_switch),
+        (TRANSLATE_OUTPUT, emit_translation),
+        (SCAN_OUTPUT, emit_scan),
+    ]
     for path, emit in outputs:
         output = generated_output(emit)
         if args.check:

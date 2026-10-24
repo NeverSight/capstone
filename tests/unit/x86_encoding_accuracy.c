@@ -122,6 +122,8 @@ static bool decode_reference(csh handle, const uint8_t *bytes, size_t size,
 		ok &= decoded == (length != 0);
 		if (decoded)
 			ok &= iter->id == id && iter->size == length &&
+			      iter->address == 0x1000 &&
+			      memcmp(iter->bytes, bytes, length) == 0 &&
 			      cursor == bytes + length &&
 			      remaining == size - length &&
 			      address == 0x1000 + length;
@@ -133,6 +135,7 @@ static bool decode_reference(csh handle, const uint8_t *bytes, size_t size,
 	}
 	if (length)
 		ok &= count == 1 && batch->id == id && batch->size == length &&
+		      batch->address == 0x1000 &&
 		      memcmp(batch->bytes, bytes, length) == 0;
 	else
 		ok &= count == 0;
@@ -154,6 +157,58 @@ static bool decode(csh handle, const uint8_t *bytes, size_t size, unsigned id,
 		   size_t length)
 {
 	return decode_reference(handle, bytes, size, id, length, NULL);
+}
+
+/* Run these fixed acceptance/ID expectations under every text/detail setting.
+ * This covers operand validation shared by scan and output-producing paths;
+ * the reader, lock and UD1 checks below cover their mode-dependent forms. */
+static bool check_scan_validation(csh handle, cs_mode mode)
+{
+	static const struct {
+		uint8_t bytes[8];
+		size_t size;
+		unsigned id;
+	} cases[] = {
+		{ { 0xc3 }, 1, X86_INS_RET },
+		{ { 0x48, 0x01, 0xd8 }, 3, X86_INS_ADD },
+		{ { 0x48, 0x83, 0x44, 0x24, 0x08, 0x81 }, 6, X86_INS_ADD },
+		{ { 0x48, 0x8d, 0xc0 }, 3, X86_INS_INVALID },
+		{ { 0xd5, 0x7f, 0x8b, 0x44, 0xb7, 0xe0 }, 6, X86_INS_MOV },
+		{ { 0xd5, 0xc0, 0x20, 0xc0 }, 4, X86_INS_INVALID },
+#ifndef CAPSTONE_X86_REDUCE
+		/* An empty operand list still rejects reserved VEX.vvvv. */
+		{ { 0xc5, 0xf8, 0x77 }, 3, X86_INS_VZEROUPPER },
+		{ { 0xc5, 0xf0, 0x77 }, 3, X86_INS_INVALID },
+		{ { 0xc5, 0xf8, 0x58, 0xc1 }, 4, X86_INS_VADDPS },
+		/* VSIB is required and destination, index and mask must differ. */
+		{ { 0xc4, 0xe2, 0x69, 0x92, 0x04, 0x88 },
+		  6,
+		  X86_INS_VGATHERDPS },
+		{ { 0xc4, 0xe2, 0x69, 0x92, 0x00 }, 5, X86_INS_INVALID },
+		{ { 0xc4, 0xe2, 0x69, 0x92, 0x04, 0x80 }, 6, X86_INS_INVALID },
+		{ { 0xc4, 0xe2, 0x79, 0x92, 0x04, 0x88 }, 6, X86_INS_INVALID },
+		/* Scalar LLIG normalization retains its reserved-length check. */
+		{ { 0x62, 0xf1, 0x6e, 0x28, 0xc2, 0xcb, 0x20 },
+		  7,
+		  X86_INS_VCMPSS },
+		{ { 0x62, 0xf1, 0x6e, 0x68, 0xc2, 0xcb, 0x20 },
+		  7,
+		  X86_INS_INVALID },
+#endif
+	};
+	if (mode != CS_MODE_64)
+		return true;
+	bool ok = true;
+	for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+		const size_t length = cases[i].id ? cases[i].size : 0;
+		ok &= decode(handle, cases[i].bytes, cases[i].size, cases[i].id,
+			     length);
+		if (length)
+			for (size_t n = 0; n < length; ++n)
+				ok &= decode(handle, cases[i].bytes, n,
+					     X86_INS_INVALID, 0);
+	}
+	return ok;
 }
 
 /* Public APIs must retain mapping, printer aliases and detail when the
@@ -906,6 +961,8 @@ int main(void)
 						handle, modes[m], detail);
 					ok &= check_lock(handle, modes[m]);
 					ok &= check_segments(handle, modes[m]);
+					ok &= check_scan_validation(handle,
+								    modes[m]);
 					const uint8_t ud0[] = { 0x0f, 0xff };
 					const uint8_t ud2[] = { 0x0f, 0x0b };
 					ok &= decode(handle, ud0, sizeof(ud0),
@@ -921,6 +978,14 @@ int main(void)
 								syntaxes[s],
 								detail, text);
 					uint8_t maximum[16];
+					memset(maximum, 0x66, sizeof(maximum));
+					maximum[14] = 0xc3;
+					ok &= decode(handle, maximum, 15,
+						     X86_INS_RET, 15);
+					maximum[14] = 0x66;
+					maximum[15] = 0xc3;
+					ok &= decode(handle, maximum, 16,
+						     X86_INS_INVALID, 0);
 					memset(maximum, 0x66, sizeof(maximum));
 					memcpy(maximum + 12, "\x0f\xb9\xc0", 3);
 					ok &= decode(handle, maximum, 15,

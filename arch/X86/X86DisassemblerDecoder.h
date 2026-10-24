@@ -692,6 +692,25 @@ typedef struct InternalInstruction {
 int decodeInstruction(struct InternalInstruction *insn, const uint8_t *code,
 		      size_t codeSize, cs_mode mode);
 
+struct MCInst;
+
+/* Private scan result; raw decoding retains its existing 0/-1 contract. */
+enum X86DecodeScanResult {
+	X86_SCAN_INVALID = -1,
+	X86_SCAN_RAW_READY = 0,
+	X86_SCAN_COMPLETE = 1
+};
+
+/* With mcInst, COMPLETE includes scan translation and writes size; RAW_READY
+ * leaves MCInst and size untouched for the caller's original translation path.
+ * INVALID may leave size written if selected-case translation failed. NULL
+ * mcInst retains raw decoding with only 0/-1 results. The caller selects scan
+ * after extension dispatch; EVEX remains raw so the backend keeps its existing
+ * prefix normalization and restoration order. */
+int decodeInstructionScan(struct InternalInstruction *insn, const uint8_t *code,
+			  size_t codeSize, cs_mode mode, struct MCInst *mcInst,
+			  uint16_t *size);
+
 //const char *x86DisassemblerGetInstrName(unsigned Opcode, const void *mii);
 
 #endif

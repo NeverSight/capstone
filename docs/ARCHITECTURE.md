@@ -87,9 +87,9 @@ checked opcode reader and full instruction-state initialization.
 The x86 operand reader and translator specialize common scalar and vector
 operand sets from the full and reduced `X86GenDisassemblerTables*.inc`
 descriptors. Run `python3 suite/synctools/x86_operand_specializations.py` whenever
-those descriptors change; `--check` verifies both `X86GenOperandRead.inc` and
-`X86GenOperandTranslate.inc` without writing, and runs in the unit suite when
-Python is available.
+those descriptors change; `--check` verifies `X86GenOperandRead.inc`,
+`X86GenOperandTranslate.inc` and `X86GenOperandScan.inc` without writing, and runs
+in the unit suite when Python is available.
 
 The reader selects up to two scalar or four vector operands after ignoring
 duplicates. It calls the same register, memory, immediate, VVVV, writemask and
@@ -100,6 +100,34 @@ including forward references. Scaled R/M and VSIB encodings share translation
 sequences after the reader has applied their addressing rules. Register-encoded
 immediates, opcode-changing comparison predicates, UD1's runtime override and
 other operand shapes retain their generic paths.
+
+With text and detail disabled, selected scalar and three-operand VEX shapes
+combine operand reading and translation validation in one generated dispatch.
+The latter have one REG, one VVVV and one RM or VSIB operand, with scalar,
+XMM/YMM or matching memory types. This bounds generated code while covering
+arithmetic and gather families. Cases derive from the intersection of reader
+and translator descriptors, keyed by both sequences so duplicate translation
+order is preserved. Operand setup runs only after a case matches. All reads
+finish before the shared final decode checks, size assignment, opcode
+initialization and operand validation. The shared private
+`X86DisassemblerTranslator.h` owns the translation implementations for both
+paths.
+
+One shared parser core performs prefix/opcode selection and prefix validation
+before choosing raw or combined operands. UD1 and unselected shapes use the
+original reader. After reading and final checks succeed, the private
+`X86_SCAN_RAW_READY` result returns them to the backend's size assignment,
+displacement correction and translation. It does not mean translation has
+succeeded. Selected cases complete translation before returning
+`X86_SCAN_COMPLETE`; the raw entry with a null `MCInst` retains its existing
+zero-on-success/nonzero-on-error contract.
+
+Source-owned extension dispatch still precedes the generated parser. EVEX keeps
+its raw path and existing normalization and restoration order: APX prefix bits
+are restored after raw decoding and before backend translation, while
+scalar-compare P2 restoration stays in the successful public-output path. The
+GFNI displacement correction remains before backend translation. Public output
+modes and instruction state remain caller-local.
 
 Instruction ID selection specializes the existing rules for each bitness. In
 32- and 64-bit legacy encodings without operand/address-size or repeat prefixes,

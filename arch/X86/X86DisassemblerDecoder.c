@@ -33,6 +33,7 @@
 #include "X86DisassemblerDecoder.h"
 #include "X86Mapping.h"
 #include "X86FeatureExtension.h"
+#include "X86DisassemblerTranslator.h"
 
 /// Specifies whether a ModR/M byte is needed and (if so) which
 /// instruction each possible value of the ModR/M byte corresponds to.  Once
@@ -910,14 +911,6 @@ static int readOpcode(struct InternalInstruction *insn)
 
 	return 0;
 }
-
-// Hacky for FEMMS
-#define GET_INSTRINFO_ENUM
-#ifndef CAPSTONE_X86_REDUCE
-#include "X86GenInstrInfo.inc"
-#else
-#include "X86GenInstrInfo_reduce.inc"
-#endif
 
 /*
  * getIDWithAttrMask - Determines the ID of an instruction, consuming
@@ -2736,19 +2729,18 @@ static bool checkPrefix(struct InternalInstruction *insn)
 	return false;
 }
 
-/*
- * decodeInstruction - Reads and interprets a full instruction provided by the
- *   user.
- *
- * @param insn      - A pointer to the instruction to be populated.  Must be
- *                    pre-allocated.
- * @param code      - The instruction bytes.
- * @param codeSize  - The number of readable bytes.
- * @param mode      - Capstone mode flags.
- * @return          - 0 if instruction is valid; nonzero if not.
- */
-int decodeInstruction(struct InternalInstruction *insn, const uint8_t *code,
-		      size_t codeSize, cs_mode mode)
+#if defined(_MSC_VER)
+#define X86_DECODE_INLINE static __forceinline
+#elif defined(__GNUC__)
+#define X86_DECODE_INLINE static inline __attribute__((always_inline))
+#else
+#define X86_DECODE_INLINE static inline
+#endif
+
+/* Prefix/opcode selection and final checks are shared by both operand paths. */
+X86_DECODE_INLINE int beginDecodedInstruction(struct InternalInstruction *insn,
+					      const uint8_t *code,
+					      size_t codeSize, cs_mode mode)
 {
 	insn->code = code;
 	insn->codeSize = codeSize;
@@ -2762,9 +2754,14 @@ int decodeInstruction(struct InternalInstruction *insn, const uint8_t *code,
 	insn->numImmediatesConsumed = 0;
 
 	if (readPrefixes(insn) || readOpcode(insn) || getID(insn, mode) ||
-	    insn->instructionID == 0 || checkPrefix(insn) || readOperands(insn))
+	    insn->instructionID == 0 || checkPrefix(insn))
 		return -1;
 
+	return 0;
+}
+
+X86_DECODE_INLINE int finishDecodedInstruction(struct InternalInstruction *insn)
+{
 	if (insn->vectorExtensionType == TYPE_EVEX && checkEVEX(insn))
 		return -1;
 
@@ -2789,6 +2786,42 @@ int decodeInstruction(struct InternalInstruction *insn, const uint8_t *code,
 		insn->operandSize = insn->registerSize;
 
 	return 0;
+}
+
+#undef X86_DECODE_INLINE
+
+int decodeInstruction(struct InternalInstruction *insn, const uint8_t *code,
+		      size_t codeSize, cs_mode mode)
+{
+	return decodeInstructionScan(insn, code, codeSize, mode, NULL, NULL);
+}
+
+/* All selected operands are read and validated within one dispatch. */
+static int readOperandsScan(struct InternalInstruction *insn, MCInst *mcInst,
+			    uint16_t *size)
+{
+	if (insn->instructionID != X86_UD1) {
+#include "X86GenOperandScan.inc"
+	}
+
+	if (readOperands(insn) || finishDecodedInstruction(insn))
+		return X86_SCAN_INVALID;
+	return X86_SCAN_RAW_READY;
+}
+
+/* A single parser selects raw or scan operands only after prefix validation.
+ * EVEX keeps the raw policy and its existing backend restoration order. */
+int decodeInstructionScan(struct InternalInstruction *insn, const uint8_t *code,
+			  size_t codeSize, cs_mode mode, MCInst *mcInst,
+			  uint16_t *size)
+{
+	if (beginDecodedInstruction(insn, code, codeSize, mode))
+		return -1;
+	if (mcInst)
+		return readOperandsScan(insn, mcInst, size);
+	if (readOperands(insn) || finishDecodedInstruction(insn))
+		return X86_SCAN_INVALID;
+	return X86_SCAN_RAW_READY;
 }
 
 #endif
