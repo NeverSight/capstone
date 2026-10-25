@@ -923,14 +923,24 @@ static int str_replace(char *result, char *target, const char *str1, char *str2)
 }
 #endif
 
+/* Keep successful compact decoding contiguous with cached mapping and
+ * short copies; cold fallback blocks otherwise split the inline path. */
+#if defined(__GNUC__)
+#define CS_DECODE_LIKELY(x) __builtin_expect(!!(x), 1)
+#define CS_DECODE_UNLIKELY(x) __builtin_expect(!!(x), 0)
+#else
+#define CS_DECODE_LIKELY(x) (x)
+#define CS_DECODE_UNLIKELY(x) (x)
+#endif
+
 static inline void map_insn_id(cs_struct *handle, cs_insn *insn,
 			       unsigned int id)
 {
 #ifdef CAPSTONE_HAS_X86
 	/* The LUT contains only generated 16-bit opcodes; source-owned
 	 * feature opcodes exceed its bound and keep the normal mapper. */
-	if (handle->arch == CS_ARCH_X86 &&
-	    X86_get_insn_id_no_detail(handle, insn, id))
+	if (CS_DECODE_LIKELY(handle->arch == CS_ARCH_X86 &&
+			     X86_get_insn_id_no_detail(handle, insn, id)))
 		return;
 #endif
 	handle->insn_id(handle, insn, id);
@@ -962,8 +972,8 @@ CS_DECODE_INLINE void fill_insn_without_text(cs_insn *insn, unsigned opcode_pub,
 	code += insn->size - copy_size;
 	/* Constant-size chunks let short copies inline. The head and tail may
 	 * overlap, but both stay within the instruction. */
-	if (copy_size >= 8) {
-		if (copy_size > 16) {
+	if (CS_DECODE_UNLIKELY(copy_size >= 8)) {
+		if (CS_DECODE_UNLIKELY(copy_size > 16)) {
 			memcpy(insn->bytes, code, copy_size);
 		} else {
 			memcpy(insn->bytes, code, 8);
@@ -984,7 +994,7 @@ CS_DECODE_INLINE void fill_insn_without_text(cs_insn *insn, unsigned opcode_pub,
 	insn->op_str[0] = '\0';
 
 	// alias instruction might have ID saved in OpcodePub
-	if (opcode_pub)
+	if (CS_DECODE_UNLIKELY(opcode_pub))
 		insn->id = opcode_pub;
 }
 
@@ -1088,10 +1098,10 @@ CS_DECODE_INLINE bool decode_insn(cs_struct *handle, const uint8_t *code,
 				  uint16_t *insn_size, bool scan, bool batch)
 {
 #ifdef CAPSTONE_HAS_X86
-	if (scan) {
+	if (CS_DECODE_LIKELY(scan)) {
 		X86ScanResult result;
-		if (!X86_getInstructionScanResult((csh)(uintptr_t)handle, code,
-						  size, insn, &result))
+		if (CS_DECODE_UNLIKELY(!X86_getInstructionScanResult(
+			    (csh)(uintptr_t)handle, code, size, insn, &result)))
 			return false;
 		*insn_size = result.length;
 		insn->size = result.length;
@@ -1461,7 +1471,7 @@ size_t CAPSTONE_API cs_disasm(csh ud, const uint8_t *buffer, size_t size,
 
 		r = decode_insn(handle, buffer, size, insn_cache, &insn_size,
 				scan, true);
-		if (r) {
+		if (CS_DECODE_LIKELY(r)) {
 			next_offset = insn_size;
 		} else {
 			// encounter a broken instruction
@@ -1651,7 +1661,7 @@ CS_DECODE_INLINE bool disasm_iter(struct cs_struct *handle,
 #endif
 
 	r = decode_insn(handle, *code, *size, insn, &insn_size, scan, false);
-	if (r) {
+	if (CS_DECODE_LIKELY(r)) {
 		*code += insn_size;
 		*size -= insn_size;
 		*address += insn_size;
@@ -1717,7 +1727,7 @@ bool CAPSTONE_API cs_disasm_iter(csh ud, const uint8_t **code, size_t *size,
 	// whether that pointer is set, so a decode without detail hides it, as
 	// cs_disasm() never allocates it then; the detail is left as it was.
 	detail = insn->detail;
-	if (!handle->detail_opt)
+	if (CS_DECODE_LIKELY(!handle->detail_opt))
 		insn->detail = NULL;
 	r = disasm_iter(handle, code, size, address, insn);
 	insn->detail = detail;
@@ -1725,6 +1735,8 @@ bool CAPSTONE_API cs_disasm_iter(csh ud, const uint8_t **code, size_t *size,
 }
 
 #undef CS_DECODE_INLINE
+#undef CS_DECODE_LIKELY
+#undef CS_DECODE_UNLIKELY
 
 // return friendly name of register in a string
 CAPSTONE_EXPORT
