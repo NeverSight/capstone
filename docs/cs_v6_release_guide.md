@@ -771,6 +771,8 @@ These issues will be addressed in the next releases. For a more detailed descrip
 `FLDENV` and `FNSTENV` report a 14- or 28-byte memory operand according to
 the effective operand size, including the `66` override. `FRSTOR` and
 `FNSAVE` include the eight saved binary80 registers, reporting 94 or 108 bytes.
-These extents are independent of address size and REX.W. Loads report memory
-read access; saves report memory write access. Both Intel and AT&T syntax
+These extents are independent of address size. In 64-bit mode, effective REX.W
+selects the full 28/108-byte image even when `66` is present; a REX prefix
+cancelled by a later legacy prefix has no effect. Loads report memory read
+access; saves report memory write access. Both Intel and AT&T syntax
 provide the same detail, without a scalar `dword ptr` label for saved state.

@@ -12359,8 +12359,9 @@ static void repair_x87_environment_detail(csh handle, cs_insn *insn)
 	if (x86->op_count != 1 || x86->operands[0].type != X86_OP_MEM)
 		return;
 	const cs_struct *capstone = (const cs_struct *)(uintptr_t)handle;
-	x86->operands[0].size = x86_x87_environment_size(
-		capstone->mode, x86->prefix[2] == 0x66, registers);
+	x86->operands[0].size =
+		x86_x87_environment_size(capstone->mode, x86->prefix[2] == 0x66,
+					 (x86->rex & 8) != 0, registers);
 	x86->operands[0].access = insn->id == X86_INS_FLDENV ||
 						  insn->id == X86_INS_FRSTOR ?
 					  CS_AC_READ :

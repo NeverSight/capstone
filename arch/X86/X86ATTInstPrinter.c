@@ -193,6 +193,8 @@ static void printf32mem(MCInst *MI, unsigned OpNo, SStream *O)
 	case X86_FRSTORm:
 		MI->x86opsize = x86_x87_environment_size(
 			MI->csh->mode, MI->x86_prefix[2] == 0x66,
+			MI->flat_insn->detail &&
+				(MI->flat_insn->detail->x86.rex & 8),
 			MCInst_getOpcode(MI) == X86_FSAVEm ||
 				MCInst_getOpcode(MI) == X86_FRSTORm);
 		break;

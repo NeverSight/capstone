@@ -129,11 +129,14 @@ static inline int x86_get_bit_mode(cs_mode mode)
 	return mode & (CS_MODE_64 | CS_MODE_32 | CS_MODE_16);
 }
 
-static inline uint8_t
-x86_x87_environment_size(cs_mode mode, bool operand_override, bool registers)
+static inline uint8_t x86_x87_environment_size(cs_mode mode,
+					       bool operand_override,
+					       bool rex_w, bool registers)
 {
-	const bool short_environment = (x86_get_bit_mode(mode) == CS_MODE_16) !=
-				       operand_override;
+	/* REX.W selects the 32-bit image, including when 66 is also present. */
+	const bool short_environment =
+		((x86_get_bit_mode(mode) == CS_MODE_16) != operand_override) &&
+		!(x86_get_bit_mode(mode) == CS_MODE_64 && rex_w);
 	return (short_environment ? 14 : 28) + (registers ? 80 : 0);
 }
 
