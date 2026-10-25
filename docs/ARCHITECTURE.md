@@ -82,9 +82,16 @@ selections call the normal backend with its live options and a fully initialized
 `MCInst`, even if an allocation callback changes those options. Full decoding
 and printing own their temporary objects in a separate function. Public ID
 mapping, byte copying, aliases, pseudo-opcode adjustments and cursor updates
-remain in the core. Skip-data callbacks can change options for the next
-instruction; iterator detail-pointer hiding and restoration remain outside
-the selected decoder.
+remain owned by the shared core helpers in `cs_disasm_internal.h`. When x86 is
+enabled, its decoder translation unit instantiates the iterator core from that header
+beside the inline scan decoder. Otherwise `cs.c` instantiates it. Each public
+entry delegates to that same inline core.
+This allows the compiler to combine scan and output state without link-time
+optimization, an extra dispatch boundary or duplicate iterator policies.
+Input validation and option selection retain their original order.
+Batch decoding retains its existing entry and allocation behavior. Skip-data
+callbacks can change options for the next instruction; common iterator helpers
+hide and restore the detail pointer around decoding and callback execution.
 
 Without detail, the x86 mapping layer exposes its existing checked public-ID
 lookup as a private inline helper shared by the mapper and both core decode

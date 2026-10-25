@@ -4,6 +4,13 @@
 #ifndef CS_PRIV_H
 #define CS_PRIV_H
 
+/* Shared implementation helpers are not additions to the public ABI. */
+#if defined(__GNUC__) && !defined(_WIN32)
+#define CAPSTONE_INTERNAL __attribute__((visibility("hidden")))
+#else
+#define CAPSTONE_INTERNAL
+#endif
+
 #include "cs_assert.h"
 #include <capstone/capstone.h>
 

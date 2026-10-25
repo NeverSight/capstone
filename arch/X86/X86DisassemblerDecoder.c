@@ -3315,8 +3315,9 @@ static bool decodeVexTerminalResult(csh ud, const uint8_t *code,
 	return completeTerminalScanResult(result, instructionID, status);
 }
 
-bool X86_getInstructionScanResult(csh ud, const uint8_t *code, size_t code_len,
-				  cs_insn *insn, X86ScanResult *result)
+X86_DECODE_INLINE bool getInstructionScanResult(csh ud, const uint8_t *code,
+						size_t code_len, cs_insn *insn,
+						X86ScanResult *result)
 {
 	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
 	uint8_t opcode;
@@ -3357,6 +3358,27 @@ bool X86_getInstructionScanResult(csh ud, const uint8_t *code, size_t code_len,
 	return decodeScanResultFallback(ud, code, code_len, insn, result,
 					opcode, false);
 }
+
+bool X86_getInstructionScanResult(csh ud, const uint8_t *code, size_t code_len,
+				  cs_insn *insn, X86ScanResult *result)
+{
+	return getInstructionScanResult(ud, code, code_len, insn, result);
+}
+
+#define CS_DECODE_SCAN getInstructionScanResult
+#include "../../cs_disasm_internal.h"
+#undef CS_DECODE_SCAN
+
+CAPSTONE_EXPORT
+bool CAPSTONE_API cs_disasm_iter(csh ud, const uint8_t **code, size_t *size,
+				 uint64_t *address, cs_insn *insn)
+{
+	return cs_disasm_iter_core(ud, code, size, address, insn);
+}
+
+#undef CS_DECODE_INLINE
+#undef CS_DECODE_LIKELY
+#undef CS_DECODE_UNLIKELY
 
 #undef X86_DECODE_INLINE
 
