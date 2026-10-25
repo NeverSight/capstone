@@ -1,0 +1,44 @@
+name: x87 memory semantics
+
+on:
+  push:
+    paths:
+      - 'arch/X86/**'
+      - 'tests/unit/x86_x87_environment*'
+      - 'tests/unit/CMakeLists.txt'
+      - '.github/workflows/x87-hardware.yml'
+  pull_request:
+    paths:
+      - 'arch/X86/**'
+      - 'tests/unit/x86_x87_environment*'
+      - 'tests/unit/CMakeLists.txt'
+      - '.github/workflows/x87-hardware.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  execute:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Record execution CPU
+        run: |
+          uname -a
+          lscpu
+      - name: Build x87 checks
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libyaml-dev
+          cmake -S . -B build-x87 -DCMAKE_BUILD_TYPE=Release \
+            -DCAPSTONE_ARCHITECTURE_DEFAULT=OFF -DCAPSTONE_X86_SUPPORT=ON \
+            -DCAPSTONE_BUILD_CSTEST=ON -DCAPSTONE_BUILD_CSTOOL=OFF
+          cmake --build build-x87 --target x86_x87_environment x86_x87_environment_hardware -j2
+      - name: Compare decoded operands with CPU memory access
+        run: ctest --test-dir build-x87 --verbose -R '^unit_x86_x87_environment(_hardware)?$'
