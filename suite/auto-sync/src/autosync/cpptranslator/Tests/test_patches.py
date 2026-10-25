@@ -379,7 +379,7 @@ public:
         )
 
     def test_direct_decoder_includes(self):
-        for arch in ("ARM", "AArch64", "RISCV", "PPC"):
+        for arch in ("ARM", "AArch64", "RISCV", "LoongArch", "Sparc", "PPC"):
             with self.subTest(arch=arch):
                 syntax = f'#include "{arch}GenDisassemblerTables.inc"\n'.encode()
                 expected = syntax

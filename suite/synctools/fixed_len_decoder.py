@@ -9,7 +9,7 @@ import argparse
 import hashlib
 import re
 
-# The three backends have the same driver. Refuse changed driver semantics until
+# The supported backends have the same driver. Refuse changed driver semantics until
 # its state transitions, failure handling and integer widths have been reviewed.
 DRIVER = "294f3d96b91037ef613f4e036e91dc055861c901fc3a741f5708908ad4452ab3"
 ROOT = Path(__file__).resolve().parents[2]
@@ -228,7 +228,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true")
     args = ap.parse_args()
-    for arch in ("AArch64", "ARM", "RISCV"):
+    for arch in ("AArch64", "ARM", "RISCV", "LoongArch", "Sparc"):
         src = ROOT / f"arch/{arch}/{arch}GenDisassemblerTables.inc"
         text = src.read_text(encoding="utf-8")
         start = text.index("#define DecodeInstruction(")
@@ -250,6 +250,12 @@ def main():
         for name, body in tables:
             width = int(name[-2:])
             require(width in (16, 32), "Unsupported instruction width")
+            w = width // 8
+            require(
+                f"DecodeInstruction(decodeInstruction_{w},fieldFromInstruction_{w},"
+                f"decodeToMCInst_{w},uint{width}_t)" in re.sub(r"\s+", "", text[end:]),
+                "Review changed decoder input width before regenerating",
+            )
             nodes = parse(body)
             output.append(emit(name, nodes, width))
             counts.append((name, len(nodes)))

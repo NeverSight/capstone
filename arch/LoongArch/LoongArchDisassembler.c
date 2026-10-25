@@ -167,6 +167,7 @@ DEFINE_decodeSImmOperand(26, 2);
 DEFINE_decodeSImmOperand(13, 0);
 
 #include "LoongArchGenDisassemblerTables.inc"
+#include "LoongArchGenDirectDecoder.inc"
 
 static DecodeStatus getInstruction(MCInst *MI, uint64_t *Size,
 				   const uint8_t *Bytes, size_t BytesLen,

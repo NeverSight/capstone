@@ -2,7 +2,8 @@ cmake_minimum_required(VERSION 3.15)
 
 enable_testing()
 set(UNIT_TEST_SOURCES sstream.c utils.c api.c mcinst.c mapping.c)
-if(CAPSTONE_ARM_SUPPORT OR CAPSTONE_AARCH64_SUPPORT OR CAPSTONE_RISCV_SUPPORT)
+if(CAPSTONE_ARM_SUPPORT OR CAPSTONE_AARCH64_SUPPORT OR CAPSTONE_RISCV_SUPPORT
+   OR CAPSTONE_LOONGARCH_SUPPORT OR CAPSTONE_SPARC_SUPPORT)
     find_package(Python3 3.8 COMPONENTS Interpreter QUIET)
     if(Python3_Interpreter_FOUND)
         add_test(NAME unit_fixed_len_decoder

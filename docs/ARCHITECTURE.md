@@ -23,7 +23,7 @@ and controlling the decoding procedure.
 
 ### Direct decoder generation
 
-ARM, AArch64 and RISC-V lower their generated decoder state machines to C
+ARM, AArch64, RISC-V, LoongArch and SPARC lower their generated decoder state machines to C
 branches with `suite/synctools/fixed_len_decoder.py`. The existing LLVM tables
 remain the instruction authority. Lowering preserves field extraction,
 predicate order, soft failures, operand decoder calls and incomplete-decode
@@ -32,7 +32,7 @@ control-flow edge enters its interior. Operand decoding and mapping are shared
 with the original interpreter; text, detail and scan use the same decoder.
 
 Run the generator after updating these architectures; `--check` verifies the
-derived files and runs in the unit suite. Generation validates byte offsets,
+derived files and runs in the unit suite. Generation validates decoder input types, byte offsets,
 ULEB128 widths and every branch target. It refuses a changed interpreter body
 until its semantics have been reviewed. Auto-Sync adds the derived include after
 the original table include. Unrecognized table pointers retain the interpreter.

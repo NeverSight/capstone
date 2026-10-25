@@ -42,7 +42,7 @@ class Includes(Patch):
                 + bytes(self.arch, "utf8")
                 + b'GenDisassemblerTables.inc"\n'
             )
-            if self.arch in ("ARM", "AArch64", "RISCV"):
+            if self.arch in ("ARM", "AArch64", "RISCV", "LoongArch", "Sparc"):
                 result += (
                     b'#include "'
                     + bytes(self.arch, "utf8")

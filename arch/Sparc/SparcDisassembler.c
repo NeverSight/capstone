@@ -279,6 +279,7 @@ static DecodeStatus DecodeSIMM13(MCInst *Inst, unsigned insn, uint64_t Address,
 				 const void *Decoder);
 
 #include "SparcGenDisassemblerTables.inc"
+#include "SparcGenDirectDecoder.inc"
 
 static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
 				   const uint8_t *Bytes, size_t BytesLen,
