@@ -8,6 +8,8 @@ if(CAPSTONE_ARM_SUPPORT OR CAPSTONE_AARCH64_SUPPORT OR CAPSTONE_RISCV_SUPPORT
     if(Python3_Interpreter_FOUND)
         add_test(NAME unit_fixed_len_decoder
             COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/suite/synctools/fixed_len_decoder.py" --check)
+        add_test(NAME unit_fixed_len_decoder_newlines
+            COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/test_fixed_len_decoder.py")
     endif()
 endif()
 if(CAPSTONE_X86_SUPPORT)
