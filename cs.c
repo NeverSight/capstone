@@ -942,10 +942,20 @@ static inline bool use_x86_scan(const cs_struct *handle)
 	       !handle->detail_opt;
 }
 
+/* Keep the compact decode and bounded copy in the caller. Outlining either
+ * wrapper gives short instructions an extra call and saved-register frame. */
+#if defined(_MSC_VER)
+#define CS_DECODE_INLINE static __forceinline
+#elif defined(__GNUC__)
+#define CS_DECODE_INLINE static inline __attribute__((always_inline))
+#else
+#define CS_DECODE_INLINE static inline
+#endif
+
 // fill the parts of insn that do not come from printing it, for a handle
 // with CS_OPT_TEXT off
-static inline void fill_insn_without_text(cs_insn *insn, unsigned opcode_pub,
-					  const uint8_t *code)
+CS_DECODE_INLINE void fill_insn_without_text(cs_insn *insn, unsigned opcode_pub,
+					     const uint8_t *code)
 {
 	uint16_t copy_size = MIN(sizeof(insn->bytes), insn->size);
 
@@ -1073,9 +1083,9 @@ static bool decode_full_insn(cs_struct *handle, const uint8_t *code,
 	return true;
 }
 
-static inline bool decode_insn(cs_struct *handle, const uint8_t *code,
-			       size_t size, cs_insn *insn, uint16_t *insn_size,
-			       bool scan, bool batch)
+CS_DECODE_INLINE bool decode_insn(cs_struct *handle, const uint8_t *code,
+				  size_t size, cs_insn *insn,
+				  uint16_t *insn_size, bool scan, bool batch)
 {
 #ifdef CAPSTONE_HAS_X86
 	if (scan) {
@@ -1623,8 +1633,9 @@ cs_insn *CAPSTONE_API cs_malloc(csh ud)
 	return insn;
 }
 
-static bool disasm_iter(struct cs_struct *handle, const uint8_t **code,
-			size_t *size, uint64_t *address, cs_insn *insn)
+CS_DECODE_INLINE bool disasm_iter(struct cs_struct *handle,
+				  const uint8_t **code, size_t *size,
+				  uint64_t *address, cs_insn *insn)
 {
 	uint16_t insn_size;
 	bool r;
@@ -1712,6 +1723,8 @@ bool CAPSTONE_API cs_disasm_iter(csh ud, const uint8_t **code, size_t *size,
 	insn->detail = detail;
 	return r;
 }
+
+#undef CS_DECODE_INLINE
 
 // return friendly name of register in a string
 CAPSTONE_EXPORT
