@@ -30,6 +30,18 @@ For a full list of all the developers, please see the release page.
 
 With all that said, we hope you enjoy the new release!
 
+## x86 legacy atomic decoding
+
+Legacy AADD/AAND/AOR/AXOR and all sixteen VEX CMPccXADD conditions now
+decode with the existing public IDs. RAO reads its register and reads/writes
+memory without changing flags. CMPccXADD reads/writes its comparator and
+memory, reads the addend and modifies the six arithmetic flags. Operand
+ordering is preserved in Intel and ATT syntax. Source-owned decoding keeps
+REX/VEX register extensions, SIB, relative/absolute displacement and 16-bit
+addressing metadata consistent with the raw instruction bytes. Reserved
+VEX fields, LOCK, non-memory operands and truncated inputs are rejected.
+No public enum or structure layout changes are required.
+
 ## x86 explicit MSR decoding
 
 VEX MAP7 immediate `RDMSR` and `WRMSRNS` are decoded in 64-bit mode using

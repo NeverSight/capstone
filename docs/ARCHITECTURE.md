@@ -114,6 +114,15 @@ must be routed to its handler here as well as validated by that handler. The
 legacy pointer-load ambiguity, duplicate-prefix policy and reserved-map-4
 rejection remain ahead of fallback to the generated decoder.
 
+Legacy RAO-INT (`0F 38 FC` with its operation-selecting mandatory prefix) and
+VEX CMPccXADD use the source-owned atomic handler in `X86Mapping.c`. They
+reuse the existing atomic mapping and printers while retaining their own
+raw prefix, opcode, REX and displacement metadata. RAO supports 16/32/64-bit
+code modes; VEX CMPccXADD requires 64-bit mode. The memory reader owns SIB,
+address-size overrides and 16-bit addressing. The handler rejects LOCK,
+register-only operands, conflicting mandatory prefixes and reserved VEX
+fields before returning a decoded instruction.
+
 The prefix reader shares the selector's byte classification. A first ordinary
 opcode, optionally after one REX in 64-bit mode, skips the legacy prefix loop;
 vector escapes reuse the existing payload parser. Other prefix sequences keep

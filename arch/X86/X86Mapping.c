@@ -2520,6 +2520,125 @@ static x86_feature_decode_result decode_apx_enqueue(csh handle,const uint8_t*cod
 	const cs_struct*arch=(const cs_struct*)(uintptr_t)handle;const uint8_t*e;size_t off=0;uint8_t segp=0,p0,p1,p2,m,pp,w;bool a32=false,bad=false;x86_reg reg,seg;unsigned rn,feature;x86_feature_memory mm;while(off<len&&code[off]!=0x62){uint8_t p=code[off];if(is_apx_evex_segment_prefix(p))segp=p;else if(p==0x67)a32=true;else if(p==0x66||p==0xf0||p==0xf2||p==0xf3||is_effective_rex(code,len,off))bad=true;else if(p<0x40||p>0x4f)return X86_FEATURE_NOT_HANDLED;++off;}if(off==len||len-off<2||(code[off+1]&7)!=4)return X86_FEATURE_NOT_HANDLED;if(len-off<5)return X86_FEATURE_INVALID;e=&code[off];if(e[4]!=0xf8)return X86_FEATURE_NOT_HANDLED;if(!(arch->mode&CS_MODE_64)||bad||len-off<6||off+6>15)return X86_FEATURE_INVALID;p0=e[1];p1=e[2];p2=e[3];m=e[5];pp=p1&3;if(pp<1||(m&0xc0)==0xc0||(p1&0x78)!=0x78||p2!=8)return X86_FEATURE_INVALID;feature=pp==3?X86_FEATURE_APX_ENQCMD:pp==2?X86_FEATURE_APX_ENQCMDS:X86_FEATURE_APX_MOVDIR64B;w=a32?4:8;rn=((~p0&0x80)>>4)|(~p0&0x10)|((m>>3)&7);reg=rex2_register(rn,w);if(reg==X86_REG_INVALID||!decode_apx_evex_memory(code,len,off+5,p0,p1,a32,&mm))return X86_FEATURE_INVALID;seg=apx_segment_register(segp);MCInst_clear(in);MCInst_setOpcode(in,feature);MCOperand_CreateImm0(in,reg);add_feature_memory_operands(in,&mm);MCOperand_CreateImm0(in,seg);MCOperand_CreateImm0(in,w);*size=(uint16_t)mm.length;set_apx_evex_encoding_detail(in,e,off,segp,a32,&mm);return X86_FEATURE_DECODED;
 }
 
+static x86_feature_decode_result decode_legacy_atomic(csh handle,
+						      const uint8_t *code,
+						      size_t len, MCInst *in,
+						      uint16_t *size)
+{
+	const cs_struct *arch = (const cs_struct *)(uintptr_t)handle;
+	const bool mode64 = (arch->mode & CS_MODE_64) != 0;
+	const bool mode32 = (arch->mode & CS_MODE_32) != 0;
+	size_t off = 0, mo;
+	unsigned segments = 0, addresses = 0, mandatory_count = 0;
+	uint8_t segp = 0, mandatory = 0, rex = 0, width, address, modrm;
+	unsigned source_number, add_number = 0, base_ext, index_ext, feature;
+	bool lock = false, compare;
+	x86_feature_memory memory;
+	cs_x86 *x;
+	while (off < len && off < 15) {
+		uint8_t p = code[off];
+		if (mode64 && p >= 0x40 && p <= 0x4f) {
+			rex = p;
+			++off;
+			continue;
+		}
+		if (is_apx_evex_segment_prefix(p)) {
+			segp = p;
+			++segments;
+		} else if (p == 0x67)
+			++addresses;
+		else if (p == 0x66 || p == 0xf2 || p == 0xf3) {
+			mandatory = p;
+			++mandatory_count;
+		} else if (p == 0xf0)
+			lock = true;
+		else
+			break;
+		rex = 0;
+		++off;
+	}
+	if (off >= len || off >= 15)
+		return X86_FEATURE_NOT_HANDLED;
+	compare = code[off] == 0xc4;
+	if (compare) {
+		if (len - off < 4 || (code[off + 1] & 0x1f) != 2 ||
+		    code[off + 3] < 0xe0 || code[off + 3] > 0xef)
+			return X86_FEATURE_NOT_HANDLED;
+		if (!mode64 || mandatory_count || rex ||
+		    (code[off + 2] & 7) != 1)
+			return X86_FEATURE_INVALID;
+		mo = off + 4;
+		width = (code[off + 2] & 0x80) ? 8 : 4;
+		base_ext = (~code[off + 1] & 0x20) >> 2;
+		index_ext = (~code[off + 1] & 0x40) >> 3;
+		source_number = (~code[off + 1] & 0x80) >> 4;
+		add_number = (~code[off + 2] & 0x78) >> 3;
+		feature = X86_FEATURE_APX_CMPCCXADD_BASE + code[off + 3] - 0xe0;
+	} else {
+		if (len - off < 3 || code[off] != 0x0f ||
+		    code[off + 1] != 0x38 || code[off + 2] != 0xfc)
+			return X86_FEATURE_NOT_HANDLED;
+		if (mandatory_count > 1)
+			return X86_FEATURE_INVALID;
+		mo = off + 3;
+		width = (rex & 8) ? 8 : 4;
+		base_ext = (rex & 1) ? 8 : 0;
+		index_ext = (rex & 2) ? 8 : 0;
+		source_number = (rex & 4) ? 8 : 0;
+		feature = mandatory == 0x66 ? X86_FEATURE_APX_AAND :
+			  mandatory == 0xf2 ? X86_FEATURE_APX_AOR :
+			  mandatory == 0xf3 ? X86_FEATURE_APX_AXOR :
+					      X86_FEATURE_APX_AADD;
+	}
+	if (lock || segments > 1 || addresses > 1 || mo >= len || mo >= 15 ||
+	    (code[mo] & 0xc0) == 0xc0)
+		return X86_FEATURE_INVALID;
+	modrm = code[mo];
+	source_number |= (modrm >> 3) & 7;
+	address = mode64 ? (addresses ? 4 : 8) :
+		  mode32 ? (addresses ? 2 : 4) :
+			   (addresses ? 4 : 2);
+	if (address == 2) {
+		if (!decode_feature_memory16(code, len, mo, &memory))
+			return X86_FEATURE_INVALID;
+	} else if (!decode_feature_memory(code, len, mo, false, address == 4,
+					  base_ext, index_ext, &memory))
+		return X86_FEATURE_INVALID;
+	if (!mode64 && address == 4 && (modrm & 0xc7) == 5 && !memory.has_sib)
+		memory.base = X86_REG_INVALID;
+	MCInst_clear(in);
+	MCInst_setOpcode(in, feature);
+	MCOperand_CreateImm0(in, rex2_register(source_number, width));
+	if (compare)
+		MCOperand_CreateImm0(in, rex2_register(add_number, width));
+	add_feature_memory_operands(in, &memory);
+	MCOperand_CreateImm0(in, apx_segment_register(segp));
+	MCOperand_CreateImm0(in, address);
+	MCOperand_CreateImm0(in, width);
+	*size = (uint16_t)memory.length;
+	if (!in->flat_insn->detail)
+		return X86_FEATURE_DECODED;
+	x = &in->flat_insn->detail->x86;
+	x->prefix[0] = mandatory == 0x66 ? 0 : mandatory;
+	x->prefix[1] = segp;
+	x->prefix[2] = mandatory == 0x66 ? 0x66 : 0;
+	x->prefix[3] = addresses ? 0x67 : 0;
+	memcpy(in->x86_prefix, x->prefix, sizeof(x->prefix));
+	memcpy(x->opcode, code + off, 3);
+	x->rex = rex;
+	x->addr_size = address;
+	x->modrm = modrm;
+	x->encoding.modrm_offset = (uint8_t)mo;
+	x->sib = memory.sib;
+	x->sib_base = memory.has_sib ? memory.base : X86_REG_INVALID;
+	x->sib_index = memory.has_sib ? memory.index : X86_REG_INVALID;
+	x->sib_scale = memory.has_sib ? memory.scale : 0;
+	x->disp = memory.displacement;
+	x->encoding.disp_offset = memory.displacement_offset;
+	x->encoding.disp_size = memory.displacement_size;
+	return X86_FEATURE_DECODED;
+}
+
 static x86_feature_decode_result decode_apx_rao(csh handle,const uint8_t*code,size_t len,MCInst*in,uint16_t*size)
 {
 	const cs_struct*arch=(const cs_struct*)(uintptr_t)handle;const uint8_t*e;size_t off=0;uint8_t segp=0,p0,p1,p2,m,pp,w;bool a32=false,bad=false;x86_reg reg,seg;unsigned rn,feature,seg_count=0,a32_count=0;x86_feature_memory mm;while(off<len&&code[off]!=0x62){uint8_t p=code[off];if(is_apx_evex_segment_prefix(p)){segp=p;++seg_count;}else if(p==0x67){a32=true;++a32_count;}else if(p==0x66||p==0xf0||p==0xf2||p==0xf3||is_effective_rex(code,len,off))bad=true;else if(p<0x40||p>0x4f)return X86_FEATURE_NOT_HANDLED;++off;}if(off==len||len-off<2||(code[off+1]&7)!=4)return X86_FEATURE_NOT_HANDLED;if(len-off<5)return X86_FEATURE_INVALID;e=&code[off];if(e[4]!=0xfc)return X86_FEATURE_NOT_HANDLED;if(!(arch->mode&CS_MODE_64)||bad||seg_count>1||a32_count>1||len-off<6||off+6>15)return X86_FEATURE_INVALID;p0=e[1];p1=e[2];p2=e[3];m=e[5];pp=p1&3;if((m&0xc0)==0xc0||(p1&0x78)!=0x78||p2!=8)return X86_FEATURE_INVALID;feature=pp==0?X86_FEATURE_APX_AADD:pp==1?X86_FEATURE_APX_AAND:pp==3?X86_FEATURE_APX_AOR:X86_FEATURE_APX_AXOR;w=(p1&0x80)?8:4;rn=((~p0&0x80)>>4)|(~p0&0x10)|((m>>3)&7);reg=rex2_register(rn,w);if(reg==X86_REG_INVALID||!decode_apx_evex_memory(code,len,off+5,p0,p1,a32,&mm))return X86_FEATURE_INVALID;seg=apx_segment_register(segp);MCInst_clear(in);MCInst_setOpcode(in,feature);MCOperand_CreateImm0(in,reg);add_feature_memory_operands(in,&mm);MCOperand_CreateImm0(in,seg);MCOperand_CreateImm0(in,a32?4:8);MCOperand_CreateImm0(in,w);*size=(uint16_t)mm.length;set_apx_evex_encoding_detail(in,e,off,segp,a32,&mm);return X86_FEATURE_DECODED;
@@ -4688,6 +4807,10 @@ X86_decodeFeatureExtension(csh handle, const uint8_t *code, size_t code_len,
 		if (code_len - offset < 2)
 			return X86_FEATURE_NOT_HANDLED;
 		if (code[offset + 1] == 0x38) {
+			result = decode_legacy_atomic(handle, code, code_len,
+						      instr, size);
+			if (result != X86_FEATURE_NOT_HANDLED)
+				return result;
 			result = decode_legacy_cet_store(handle, code, code_len,
 							 instr, size);
 			if (result != X86_FEATURE_NOT_HANDLED)
@@ -4709,6 +4832,10 @@ X86_decodeFeatureExtension(csh handle, const uint8_t *code, size_t code_len,
 		return X86_FEATURE_INVALID;
 
 	if (opcode == 0xc4) {
+		result = decode_legacy_atomic(handle, code, code_len, instr,
+					      size);
+		if (result != X86_FEATURE_NOT_HANDLED)
+			return result;
 		result = decode_system_legacy_vex(handle, code, code_len, instr,
 						  size);
 		if (result != X86_FEATURE_NOT_HANDLED)
