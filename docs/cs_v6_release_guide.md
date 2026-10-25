@@ -776,3 +776,16 @@ selects the full 28/108-byte image even when `66` is present; a REX prefix
 cancelled by a later legacy prefix has no effect. Loads report memory read
 access; saves report memory write access. Both Intel and AT&T syntax
 provide the same detail, without a scalar `dword ptr` label for saved state.
+
+## Optional private x86 scan integration
+
+`CAPSTONE_X86_SCAN_ADAPTER=ON` builds a private static-link hook declared in
+`arch/X86/X86ScanAdapter.h`; it is not part of the installed `cs_*` API.
+It requires the full x86 decoder and is off by default. Disabled builds
+contain no hook dispatch or adapter state. An enabled handle consults its
+trusted adapter only in vector scan slow paths with text and detail off.
+The adapter must preserve the handle's exact validity, instruction ID and
+length profile. Zero or an out-of-range result retains ordinary decoding;
+Capstone still owns output, errors and iterator advancement. A mode change
+disables a mismatched adapter. Its owner must detach it before releasing the
+callback context or reusing the handle for another consumer.

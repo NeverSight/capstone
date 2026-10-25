@@ -3152,6 +3152,24 @@ bool X86_getInstructionScan(csh ud, const uint8_t *code, size_t code_len,
 	return decodeGenericScan(code, code_len, handle->mode, instr, size);
 }
 
+#ifdef CAPSTONE_X86_SCAN_ADAPTER
+CAPSTONE_INTERNAL bool X86_setScanAdapter(csh ud, cs_mode mode,
+					  X86ScanAdapter adapter,
+					  void *user_data)
+{
+	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
+	if (!handle || handle->arch != CS_ARCH_X86)
+		return false;
+	if (adapter && ((mode != CS_MODE_32 && mode != CS_MODE_64) ||
+			handle->mode != mode))
+		return false;
+	handle->x86_scan_adapter = adapter;
+	handle->x86_scan_adapter_data = adapter ? user_data : NULL;
+	handle->x86_scan_adapter_mode = adapter ? mode : 0;
+	return true;
+}
+#endif
+
 /* Only generic and extension decoding need an MCInst in the core scan path. */
 #if defined(_MSC_VER)
 __declspec(noinline)
@@ -3164,6 +3182,25 @@ static bool decodeScanResultFallback(csh ud, const uint8_t *code,
 				     bool tryExtension)
 {
 	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
+#ifdef CAPSTONE_X86_SCAN_ADAPTER
+	/* Keep the compact scalar and VEX readers free of adapter overhead. */
+	if (code_len && ((code[0] & 0xfe) == 0xc4 || code[0] == 0x62) &&
+	    handle->x86_scan_adapter &&
+	    handle->x86_scan_adapter_mode == handle->mode) {
+		const uint32_t packed = handle->x86_scan_adapter(
+			handle->x86_scan_adapter_data, code, code_len);
+		const unsigned id = packed >> 8;
+		const unsigned length = packed & 0xff;
+		if (id && id < X86_INS_ENDING && length && length <= 15 &&
+		    length <= code_len) {
+			result->opcode = 0;
+			result->opcode_pub = id;
+			result->length = (uint16_t)length;
+			result->popcode_adjust = 0;
+			return true;
+		}
+	}
+#endif
 	MCInst instr;
 	instr.Opcode = 0;
 	instr.OpcodePub = 0;

@@ -86,6 +86,9 @@ Capstone allows some more customization via the following options:
 - `CAPSTONE_BUILD_DIET`: change this to ON to make the binaries more compact.
 - `CAPSTONE_X86_REDUCE`: change this to ON to make X86 binary smaller.
 - `CAPSTONE_X86_ATT_DISABLE`: change this to ON to disable AT&T syntax on x86.
+- `CAPSTONE_X86_SCAN_ADAPTER`: opt in to the private static-link x86 scan
+  adapter hook. Requires the full x86 decoder. Off by default; disabled builds
+  contain neither callback dispatch nor per-handle adapter state.
 
 By default, Capstone use system dynamic memory management, and both DIET and X86_REDUCE
 modes are disabled. To use your own memory allocations, turn ON both DIET &

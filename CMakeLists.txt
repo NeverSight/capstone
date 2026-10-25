@@ -152,7 +152,15 @@ endforeach()
 
 option(CAPSTONE_X86_REDUCE "x86 with reduce instruction sets to minimize library" OFF)
 option(CAPSTONE_X86_ATT_DISABLE "Disable x86 AT&T syntax" OFF)
+option(CAPSTONE_X86_SCAN_ADAPTER "Build the private x86 scan adapter hook" OFF)
 option(CAPSTONE_OSXKERNEL_SUPPORT "Support to embed Capstone into OS X Kernel extensions" OFF)
+
+if(CAPSTONE_X86_SCAN_ADAPTER)
+    if(NOT CAPSTONE_X86_SUPPORT OR CAPSTONE_X86_REDUCE)
+        message(FATAL_ERROR "The private scan adapter requires the full x86 decoder")
+    endif()
+    add_definitions(-DCAPSTONE_X86_SCAN_ADAPTER)
+endif()
 
 if(CAPSTONE_BUILD_DIET)
     add_definitions(-DCAPSTONE_DIET)
