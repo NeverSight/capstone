@@ -10,6 +10,21 @@
 extern "C" {
 #endif
 
+typedef struct X86ScanBatchResult {
+	size_t count;
+	size_t bytes;
+} X86ScanBatchResult;
+
+/* Private static-link classification entry. Requires an x86 handle with text,
+ * detail and skip-data disabled. Writes (public_id << 8) | length for a
+ * contiguous validated prefix, stopping at invalid input or output capacity.
+ * The returned byte count excludes the first invalid instruction. Output after
+ * count is untouched. Input and output must not overlap; no pointer is retained.
+ * Empty input/output or an incompatible handle returns {0, 0} unchanged. */
+X86ScanBatchResult X86_scanBatch(csh handle, const uint8_t *code, size_t size,
+				 uint64_t address, uint32_t *output,
+				 size_t capacity);
+
 /* Requires CAPSTONE_X86_SCAN_ADAPTER. Private static-link integration, not
  * an installed cs_* API. The callback
  * must use the handle's exact 32/64-bit profile and return (public_id << 8) |

@@ -4,6 +4,7 @@
 #include <capstone/capstone.h>
 #include <stdio.h>
 #include <string.h>
+#include "../../arch/X86/X86ScanAdapter.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -94,7 +95,7 @@ static bool check_short_copies(uint8_t *end)
 
 static bool check_escape(csh handle, cs_insn *iter, uint8_t *end,
 			 const uint8_t *code, size_t size, unsigned id,
-			 size_t instruction_size)
+			 size_t instruction_size, bool scan)
 {
 	bool ok = true;
 	for (size_t n = 0; n <= size; ++n) {
@@ -109,6 +110,18 @@ static bool check_escape(csh handle, cs_insn *iter, uint8_t *end,
 			cs_disasm_iter(handle, &cursor, &left, &address, iter);
 		size_t count =
 			cs_disasm(handle, start, n, UINT64_MAX - 2, 1, &batch);
+		if (scan) {
+			uint32_t output[2] = { UINT32_MAX, UINT32_MAX };
+			X86ScanBatchResult scanned = X86_scanBatch(
+				handle, start, n, UINT64_MAX - 2, output, 1);
+			ok &= scanned.count == (expected ? 1 : 0) &&
+			      scanned.bytes ==
+				      (expected ? instruction_size : 0) &&
+			      output[0] ==
+				      (expected ? (id << 8) | instruction_size :
+						  UINT32_MAX) &&
+			      output[1] == UINT32_MAX;
+		}
 		ok &= decoded == expected && count == (expected ? 1 : 0);
 		if (decoded && count == 1) {
 			ok &= iter->id == id && batch->id == id &&
@@ -296,7 +309,8 @@ static bool check_escape_boundaries(uint8_t *end)
 			}
 			ok &= check_escape(handle, iter, end, cases[i].code,
 					   cases[i].size, cases[i].id,
-					   cases[i].instruction_size);
+					   cases[i].instruction_size,
+					   options == 0);
 			cs_free(iter, 1);
 		}
 		cs_close(&handle);

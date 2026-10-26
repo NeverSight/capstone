@@ -107,6 +107,23 @@ CS_DECODE_INLINE void fill_insn_without_text(cs_insn *insn, unsigned opcode_pub,
 #ifndef CS_DECODE_SCAN
 #define CS_DECODE_SCAN X86_getInstructionScanResult
 #endif
+#ifdef CAPSTONE_HAS_X86
+CS_DECODE_INLINE void finish_x86_scan(cs_struct *handle, cs_insn *insn,
+				      const X86ScanResult *result,
+				      const uint8_t *code, bool batch,
+				      bool store_bytes)
+{
+	insn->size = result->length;
+	map_insn_id(handle, insn, result->opcode);
+	if (store_bytes)
+		fill_insn_without_text(insn, 0, code);
+	if (CS_DECODE_UNLIKELY(result->opcode_pub))
+		insn->id = result->opcode_pub;
+	if (!batch || insn->id != X86_INS_VCMP)
+		insn->id += result->popcode_adjust;
+}
+#endif
+
 CS_DECODE_INLINE bool decode_insn(cs_struct *handle, const uint8_t *code,
 				  size_t size, cs_insn *insn,
 				  uint16_t *insn_size, bool scan, bool batch)
@@ -118,11 +135,7 @@ CS_DECODE_INLINE bool decode_insn(cs_struct *handle, const uint8_t *code,
 			    (csh)(uintptr_t)handle, code, size, insn, &result)))
 			return false;
 		*insn_size = result.length;
-		insn->size = result.length;
-		map_insn_id(handle, insn, result.opcode);
-		fill_insn_without_text(insn, result.opcode_pub, code);
-		if (!batch || insn->id != X86_INS_VCMP)
-			insn->id += result.popcode_adjust;
+		finish_x86_scan(handle, insn, &result, code, batch, true);
 		return true;
 	}
 #endif

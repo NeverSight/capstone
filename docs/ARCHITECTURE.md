@@ -89,6 +89,18 @@ entry delegates to that same inline core.
 This allows the compiler to combine scan and output state without link-time
 optimization, an extra dispatch boundary or duplicate iterator policies.
 Input validation and option selection retain their original order.
+The private `X86_scanBatch` entry keeps the bounded classification loop in the
+same translation unit. It uses the same decoder, checked ID mapping, aliases
+and pseudo-opcode adjustment as `cs_disasm_iter`, returning owned ID/length
+records without writing unused instruction bytes or text. It accepts only
+x86 handles with text, detail and skip-data disabled, stops before an invalid
+instruction, and retains no input or output pointer. Ordinary public decode
+APIs retain their existing outputs. After source-owned VEX extensions decline
+an encoding, the fallback tries the generated compact VEX reader before the
+generic operand path. The source extension dispatcher selects disjoint VEX
+map/opcode families before invoking their handlers, avoiding repeated scans
+through unrelated families. This selection stays in the cold extension path;
+each handler retains prefix, operand and truncation validation.
 Batch decoding retains its existing entry and allocation behavior. Skip-data
 callbacks can change options for the next instruction; common iterator helpers
 hide and restore the detail pointer around decoding and callback execution.
