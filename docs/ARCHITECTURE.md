@@ -39,6 +39,20 @@ the original table include. Unrecognized table pointers retain the interpreter.
 This trades additional machine code for removal of repeated bytecode dispatch
 and runtime decoding of table parameters, without changing the public API.
 
+### AArch64 operand postprocessing
+
+AArch64 projects descriptor requirements with
+`suite/synctools/aarch64_postprocess.py`. Per-opcode flags skip implicit operand
+insertion and tied-operand traversals only when those traversals perform no
+writes. Instructions requiring them keep the original helpers, including on
+decode failure; decoding, legality checks and operand order are unchanged.
+
+Run the generator after updating AArch64 descriptors or translating its decoder.
+It regenerates `AArch64GenPostprocess.inc` and reapplies the two local guards.
+`--check` verifies both outputs and rejects changes to the owning helper bodies
+until their skip conditions are reviewed. The native unit check evaluates all
+descriptors with the actual enum and constraint definitions.
+
 ### Component 2 - Mapping logic
 
 The mapping component has three different task:

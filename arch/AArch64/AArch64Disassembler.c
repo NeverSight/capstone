@@ -327,6 +327,7 @@ static DecodeStatus DecodePRFMRegInstruction(MCInst *Inst, uint32_t insn,
 
 #include "AArch64GenDisassemblerTables.inc"
 #include "AArch64GenDirectDecoder.inc"
+#include "AArch64GenPostprocess.inc"
 
 #define Success MCDisassembler_Success
 #define Fail MCDisassembler_Fail
@@ -352,42 +353,50 @@ static DecodeStatus getInstruction(csh handle, const uint8_t *Bytes,
 		DecodeStatus Result = decodeInstruction_4(Tables[i], MI, Insn,
 							  Address, Decoder);
 
-		// Table is indexed backwards
-		const MCInstrDesc Desc =
-			AArch64Descs.Insts[ARR_SIZE(AArch64Descs.Insts) - 1 -
-					   MCInst_getOpcode(MI)];
+		if (AArch64PostprocessFlags[MCInst_getOpcode(MI)] &
+		    AARCH64_POSTPROCESS_IMPLICIT) {
+			// Table is indexed backwards
+			const MCInstrDesc Desc =
+				AArch64Descs.Insts[ARR_SIZE(AArch64Descs.Insts) -
+						   1 - MCInst_getOpcode(MI)];
 
-		// For Scalable Matrix Extension (SME) instructions that have an
-		// implicit operand for the accumulator (ZA) or implicit immediate zero
-		// which isn't encoded, manually insert operand.
-		for (unsigned j = 0; j < Desc.NumOperands; j++) {
-			if (Desc.OpInfo[j].OperandType ==
-			    MCOI_OPERAND_REGISTER) {
-				switch (Desc.OpInfo[j].RegClass) {
-				default:
-					break;
-				case AArch64_MPRRegClassID:
+			// For Scalable Matrix Extension (SME) instructions that have an
+			// implicit operand for the accumulator (ZA) or implicit immediate zero
+			// which isn't encoded, manually insert operand.
+			for (unsigned j = 0; j < Desc.NumOperands; j++) {
+				if (Desc.OpInfo[j].OperandType ==
+				    MCOI_OPERAND_REGISTER) {
+					switch (Desc.OpInfo[j].RegClass) {
+					default:
+						break;
+					case AArch64_MPRRegClassID:
+						MCInst_insert0(
+							MI, j,
+							MCOperand_CreateReg1(
+								MI,
+								AArch64_ZA));
+						break;
+					case AArch64_MPR8RegClassID:
+						MCInst_insert0(
+							MI, j,
+							MCOperand_CreateReg1(
+								MI,
+								AArch64_ZAB0));
+						break;
+					case AArch64_ZTRRegClassID:
+						MCInst_insert0(
+							MI, j,
+							MCOperand_CreateReg1(
+								MI,
+								AArch64_ZT0));
+						break;
+					}
+				} else if (Desc.OpInfo[j].OperandType ==
+					   AARCH64_OP_IMPLICIT_IMM_0) {
 					MCInst_insert0(MI, j,
-						       MCOperand_CreateReg1(
-							       MI, AArch64_ZA));
-					break;
-				case AArch64_MPR8RegClassID:
-					MCInst_insert0(MI, j,
-						       MCOperand_CreateReg1(
-							       MI,
-							       AArch64_ZAB0));
-					break;
-				case AArch64_ZTRRegClassID:
-					MCInst_insert0(MI, j,
-						       MCOperand_CreateReg1(
-							       MI,
-							       AArch64_ZT0));
-					break;
+						       MCOperand_CreateImm1(MI,
+									    0));
 				}
-			} else if (Desc.OpInfo[j].OperandType ==
-				   AARCH64_OP_IMPLICIT_IMM_0) {
-				MCInst_insert0(MI, j,
-					       MCOperand_CreateImm1(MI, 0));
 			}
 		}
 
@@ -416,8 +425,10 @@ DecodeStatus AArch64_LLVM_getInstruction(csh handle, const uint8_t *Bytes,
 	DecodeStatus Result = MCDisassembler_Fail;
 	Result =
 		getInstruction(handle, Bytes, ByteLen, MI, Size, Address, Info);
-	MCInst_handleWriteback(MI, AArch64Descs.Insts,
-			       ARR_SIZE(AArch64Descs.Insts));
+	if (AArch64PostprocessFlags[MCInst_getOpcode(MI)] &
+	    AARCH64_POSTPROCESS_TIED)
+		MCInst_handleWriteback(MI, AArch64Descs.Insts,
+				       ARR_SIZE(AArch64Descs.Insts));
 	return Result;
 }
 

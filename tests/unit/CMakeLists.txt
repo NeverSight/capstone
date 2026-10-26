@@ -12,6 +12,15 @@ if(CAPSTONE_ARM_SUPPORT OR CAPSTONE_AARCH64_SUPPORT OR CAPSTONE_RISCV_SUPPORT
             COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/test_fixed_len_decoder.py")
     endif()
 endif()
+if(CAPSTONE_AARCH64_SUPPORT)
+    list(APPEND UNIT_TEST_SOURCES aarch64_postprocess.c)
+    if(Python3_Interpreter_FOUND)
+        add_test(NAME unit_aarch64_postprocess_generator
+            COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/suite/synctools/aarch64_postprocess.py" --check)
+        add_test(NAME unit_aarch64_postprocess_newlines
+            COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/test_aarch64_postprocess.py")
+    endif()
+endif()
 if(CAPSTONE_X86_SUPPORT)
     list(APPEND UNIT_TEST_SOURCES x86_scan_batch.c x86_call_target.c)
     find_package(Python3 3.8 COMPONENTS Interpreter QUIET)
