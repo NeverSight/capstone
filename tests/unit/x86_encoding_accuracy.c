@@ -78,6 +78,30 @@ static bool check_inherited_moffs_size(void)
 	return true;
 }
 
+/* Public terminal coverage must not alter raw selection when the caller
+ * supplies existing size flags, including the state left by a failed read. */
+static bool check_inherited_three_operand_size(void)
+{
+	const uint8_t bytes[] = { 0x69, 0x00 };
+	for (unsigned flags = 0; flags < 4; ++flags) {
+		InternalInstruction insn = { 0 };
+		insn.hasOpSize = (flags & 1) != 0;
+		insn.hasAdSize = (flags & 2) != 0;
+		const int status = decodeInstructionScan(
+			&insn, bytes, sizeof(bytes), CS_MODE_32, NULL, NULL);
+		const unsigned expected = flags & 1 ? X86_IMUL16rmi :
+						      X86_IMUL32rmi;
+		if (status != -1 || insn.instructionID != expected ||
+		    insn.readerCursor != 2 || !insn.consumedModRM ||
+		    insn.immediateOffset != 2 ||
+		    insn.numImmediatesConsumed != 0) {
+			fprintf(stderr, "raw IMUL inherited flags %u\n", flags);
+			return false;
+		}
+	}
+	return true;
+}
+
 static bool check_internal_scan_mode(void)
 {
 	const uint8_t bytes[] = { 0x66, 0xb8, 0x34, 0x12, 0x90, 0x90 };
@@ -997,7 +1021,8 @@ int main(void)
 	const cs_mode modes[] = { CS_MODE_16, CS_MODE_32, CS_MODE_64 };
 	const unsigned syntaxes[] = { CS_OPT_SYNTAX_INTEL, CS_OPT_SYNTAX_ATT };
 	bool ok = check_operand_sets() && check_internal_scan_mode() &&
-		  check_inherited_moffs_size() && check_id_cache() &&
+		  check_inherited_moffs_size() &&
+		  check_inherited_three_operand_size() && check_id_cache() &&
 		  check_instruction_names();
 	for (size_t m = 0; m < sizeof(modes) / sizeof(modes[0]); ++m)
 		for (size_t s = 0; s < sizeof(syntaxes) / sizeof(syntaxes[0]);

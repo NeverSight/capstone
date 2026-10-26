@@ -433,6 +433,7 @@ static DecodeStatus decodeUImmLog2XLenNonZeroOperand(MCInst *Inst, uint32_t Imm,
 
 #include "RISCVGenDisassemblerTables.inc"
 #include "RISCVGenDirectDecoder.inc"
+#include "RISCVGenWriteback.inc"
 
 static DecodeStatus decodeRVCInstrRdRs1ImmZero(MCInst *Inst, uint32_t Insn,
 					       uint64_t Address,
@@ -769,8 +770,9 @@ bool RISCV_LLVM_getInstruction(csh handle, const uint8_t *Bytes, size_t ByteLen,
 	DecodeStatus ret =
 		RISCV_getInstruction(MI, Size, Bytes, ByteLen, Address, NULL);
 
-	MCInst_handleWriteback(MI, RISCVDescs.Insts,
-			       ARR_SIZE(RISCVDescs.Insts));
+	if (RISCVWritebackFlags[MCInst_getOpcode(MI)])
+		MCInst_handleWriteback(MI, RISCVDescs.Insts,
+				       ARR_SIZE(RISCVDescs.Insts));
 
 	return ret != MCDisassembler_Fail;
 }

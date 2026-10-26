@@ -4,9 +4,11 @@
 import importlib.util
 from pathlib import Path
 import tempfile
+import sys
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "suite/synctools"))
 SPEC = importlib.util.spec_from_file_location(
     "aarch64_postprocess", ROOT / "suite/synctools/aarch64_postprocess.py"
 )

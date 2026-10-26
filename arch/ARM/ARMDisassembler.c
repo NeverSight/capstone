@@ -604,6 +604,7 @@ static DecodeStatus DecodeT2AddSubSPImm(MCInst *Inst, unsigned Insn,
 
 #include "ARMGenDisassemblerTables.inc"
 #include "ARMGenDirectDecoder.inc"
+#include "ARMGenWriteback.inc"
 
 // Post-decoding checks
 
@@ -1164,7 +1165,9 @@ static DecodeStatus getInstruction(csh ud, const uint8_t *Bytes,
 	else
 		Result = getARMInstruction(ud, Bytes, BytesLen, MI, Size,
 					   Address, Info);
-	MCInst_handleWriteback(MI, ARMDescs.Insts, ARR_SIZE(ARMDescs.Insts));
+	if (ARMWritebackFlags[MCInst_getOpcode(MI)])
+		MCInst_handleWriteback(MI, ARMDescs.Insts,
+				       ARR_SIZE(ARMDescs.Insts));
 	return Result;
 }
 

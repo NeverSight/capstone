@@ -39,7 +39,7 @@ the original table include. Unrecognized table pointers retain the interpreter.
 This trades additional machine code for removal of repeated bytecode dispatch
 and runtime decoding of table parameters, without changing the public API.
 
-### AArch64 operand postprocessing
+### Operand postprocessing
 
 AArch64 projects descriptor requirements with
 `suite/synctools/aarch64_postprocess.py`. Per-opcode flags skip implicit operand
@@ -52,6 +52,13 @@ It regenerates `AArch64GenPostprocess.inc` and reapplies the two local guards.
 `--check` verifies both outputs and rejects changes to the owning helper bodies
 until their skip conditions are reviewed. The native unit check evaluates all
 descriptors with the actual enum and constraint definitions.
+
+ARM and RISC-V similarly project tied-operand requirements with
+`suite/synctools/operand_writeback.py`. Opcodes without tied operands skip the
+writeback descriptor traversal; flagged opcodes retain the owning helper,
+including its existing invocation after failed decoding. Native tests compare
+every projected flag with the actual descriptor objects. The AArch64 generator
+shares the writeback helper audit, so a helper change has one review boundary.
 
 ### Component 2 - Mapping logic
 
@@ -114,6 +121,10 @@ For an unprefixed two-byte VEX header, public iteration inlines the existing
 VEX reader with a constant C5 prefix after source-feature selection. Its shared
 operand, reserved-field and truncation checks remain in that reader; admission
 misses use the original fallback.
+Ordinary generated C4 headers try that same reader before materializing an
+`MCInst`. The adapter still runs first, and the existing feature-family check
+excludes source-owned extensions before this shortcut. Admission misses enter
+the generic helper with the same decoding and output rules.
 Successful compact x86 results consume at most 15 bytes. The public iterator
 uses that validated bound to omit generic truncation, large-copy dispatch and
 a redundant size write. Allocated output retains the generic copy policy,
@@ -227,6 +238,14 @@ from `X86MappingInsn*.inc` and `x86.h`. It uses the same operand readers and
 decision kinds, while avoiding a subsequent UID-to-public-ID lookup. Raw and
 operand-producing decoding retain internal IDs and their original state writes.
 
+Public scans additionally admit three-operand scalar and ordinary XMM/MMX
+descriptors when their exact ordered reads already occur in the compact scan
+dispatch. Generation proves every descriptor's register/memory requirements
+before merging handlers with identical reader calls. New reader sequences stay
+generic, keeping the common iterator's dispatch bounded. Raw tables and handler
+numbering remain unchanged: the raw entry can inherit size flags from its
+caller, including on truncated input, while public scan state starts fresh.
+
 The public iterator also uses the projection's unused operand-set bits to
 separate the ModR/M requirement from the optional immediate-read sequence.
 Generation reconstructs and checks the original ordered reader calls. The
@@ -245,11 +264,13 @@ address-size repairs and UD1's runtime operand override retain generic
 selection. No failed secondary read or cursor update is removed from that path.
 
 The terminal admission rule excludes LOCK, REX2 and vector prefixes. Generation
-also checks every selected ModR/M against both operand sequences: REG and
-opcode-register operands must be GPRs, an RM operand must match its register or
+also checks every selected ModR/M against both operand sequences: REG operands
+must be admitted GPR, XMM or MMX classes; opcode-register operands must be GPRs.
+An RM operand must match its register or
 memory form, and immediates must neither encode registers nor change the opcode.
 Any incompatible descriptor keeps the generic path. Under this admission rule,
-REX produces only valid GPR indices, and a successful legacy address read
+REX produces only valid GPR/XMM indices, MMX indices are masked to three bits,
+and a successful legacy address read
 produces valid base/index registers. These facts discharge the operand fixup
 and translation checks for scan terminals before code generation. Segment,
 control and debug registers are excluded, so these compact readers also omit

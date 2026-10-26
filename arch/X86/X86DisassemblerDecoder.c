@@ -3256,30 +3256,11 @@ __declspec(noinline)
 __attribute__((noinline))
 #endif
 static CS_PRESERVE_MOST bool
-decodeScanResultFallback(csh ud, const uint8_t *code, size_t code_len,
-			 cs_insn *insn, X86ScanResult *result, uint8_t opcode,
-			 bool tryExtension)
+decodeScanResultGeneric(csh ud, const uint8_t *code, size_t code_len,
+			cs_insn *insn, X86ScanResult *result, uint8_t opcode,
+			bool tryExtension)
 {
 	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
-#ifdef CAPSTONE_X86_SCAN_ADAPTER
-	/* Keep the compact scalar and VEX readers free of adapter overhead. */
-	if (code_len && ((code[0] & 0xfe) == 0xc4 || code[0] == 0x62) &&
-	    handle->x86_scan_adapter &&
-	    handle->x86_scan_adapter_mode == handle->mode) {
-		const uint32_t packed = handle->x86_scan_adapter(
-			handle->x86_scan_adapter_data, code, code_len);
-		const unsigned id = packed >> 8;
-		const unsigned length = packed & 0xff;
-		if (id && id < X86_INS_ENDING && length && length <= 15 &&
-		    length <= code_len) {
-			result->opcode = 0;
-			result->opcode_pub = id;
-			result->length = (uint16_t)length;
-			result->popcode_adjust = 0;
-			return true;
-		}
-	}
-#endif
 	MCInst instr;
 	instr.Opcode = 0;
 	instr.OpcodePub = 0;
@@ -3290,10 +3271,7 @@ decodeScanResultFallback(csh ud, const uint8_t *code, size_t code_len,
 	instr.flat_insn = insn;
 	uint16_t size;
 	x86_feature_decode_result extension = X86_FEATURE_NOT_HANDLED;
-	if (tryExtension && !(code_len >= 4 && code[0] == 0xc4 &&
-			      !(handle->mode & (CS_MODE_16 | CS_MODE_32)) &&
-			      X86_vexFeatureFamily(code[1] & 0x1f, code[3]) ==
-				      X86_VEX_FEATURE_NONE))
+	if (tryExtension)
 		extension = X86_decodeFeatureExtension(ud, code, code_len,
 						       &instr, &size, opcode);
 	if (extension == X86_FEATURE_INVALID)
@@ -3322,6 +3300,50 @@ decodeScanResultFallback(csh ud, const uint8_t *code, size_t code_len,
 	result->length = size;
 	result->popcode_adjust = instr.popcode_adjust;
 	return true;
+}
+
+#if defined(_MSC_VER)
+__declspec(noinline)
+#elif defined(__GNUC__)
+__attribute__((noinline))
+#endif
+static CS_PRESERVE_MOST bool
+decodeScanResultFallback(csh ud, const uint8_t *code, size_t code_len,
+			 cs_insn *insn, X86ScanResult *result, uint8_t opcode,
+			 bool tryExtension)
+{
+	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
+#ifdef CAPSTONE_X86_SCAN_ADAPTER
+	/* Keep the compact scalar and VEX readers free of adapter overhead. */
+	if (code_len && ((code[0] & 0xfe) == 0xc4 || code[0] == 0x62) &&
+	    handle->x86_scan_adapter &&
+	    handle->x86_scan_adapter_mode == handle->mode) {
+		const uint32_t packed = handle->x86_scan_adapter(
+			handle->x86_scan_adapter_data, code, code_len);
+		const unsigned id = packed >> 8;
+		const unsigned length = packed & 0xff;
+		if (id && id < X86_INS_ENDING && length && length <= 15 &&
+		    length <= code_len) {
+			result->opcode = 0;
+			result->opcode_pub = id;
+			result->length = (uint16_t)length;
+			result->popcode_adjust = 0;
+			return true;
+		}
+	}
+#endif
+	if (tryExtension && (code_len >= 4 && code[0] == 0xc4 &&
+			     !(handle->mode & (CS_MODE_16 | CS_MODE_32)) &&
+			     X86_vexFeatureFamily(code[1] & 0x1f, code[3]) ==
+				     X86_VEX_FEATURE_NONE)) {
+		const int status =
+			tryVexTerminalScan(code, code_len, code[0], result);
+		if (status != X86_SCAN_NOT_HANDLED)
+			return status == X86_SCAN_COMPLETE;
+		tryExtension = false;
+	}
+	return decodeScanResultGeneric(ud, code, code_len, insn, result, opcode,
+				       tryExtension);
 }
 
 X86_DECODE_INLINE bool completeTerminalScanResult(X86ScanResult *result,

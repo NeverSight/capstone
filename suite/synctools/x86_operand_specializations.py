@@ -114,13 +114,13 @@ VECTOR_ENCODINGS = (
 )
 
 
-def read_specializations(suffix):
+def read_specializations(suffix, *, scalar_limit=2):
     for index, operands in enumerate(
         read_sets(X86 / f"X86GenDisassemblerTables{suffix}.inc")
     ):
         vector = any(t in VECTOR_TYPES or e in VECTOR_ENCODINGS for e, t in operands)
         if (
-            len(operands) <= (4 if vector else 2)
+            len(operands) <= (4 if vector else scalar_limit)
             and sum(e in IMMEDIATES for e, _ in operands) <= 2
             and all(
                 encoding in (ENCODINGS | VECTOR_ENCODINGS)
@@ -138,8 +138,9 @@ def read_operand_calls(operands, *, materialize=True):
     for encoding, operand_type in operands:
         if not materialize:
             tables.require(
-                encoding in ENCODINGS and operand_type in TYPES,
-                "Compact readers require ordinary scalar operands",
+                encoding in ENCODINGS
+                and operand_type in TYPES | {"TYPE_XMM", "TYPE_MM64"},
+                "Compact readers require ordinary legacy operands",
             )
         if encoding in ({"ENCODING_REG"} | RM_ENCODINGS) and not has_modrm:
             reader = "readModRM" if materialize else "readModRMScan"
@@ -522,19 +523,25 @@ def emit_terminal_tables(name, words, rows, kinds):
 def scalar_terminal_form(operands, modrm):
     """Prove that checked ordinary-legacy reads produce legal scan operands.
 
-    REX extends GPR indices only to 15, and 16-bit addressing cannot have REX.
+    REX extends GPR and XMM indices only to 15; MMX masks them to three bits.
+    These register classes need no additional validation. Sixteen-bit
+    addressing cannot have REX.
     Every successfully read legacy address has a valid base/index. Explicitly
     exclude operand classes that require a further check or change the opcode.
     """
     gprs = {"TYPE_R8", "TYPE_R16", "TYPE_R32", "TYPE_R64", "TYPE_Rv"}
+    registers = gprs | {"TYPE_XMM", "TYPE_MM64"}
     immediates = {"TYPE_REL", "TYPE_RELv", "TYPE_IMM", "TYPE_UIMM8"}
     for encoding, operand_type in operands:
         if encoding == "ENCODING_RM":
-            if operand_type not in gprs | {"TYPE_M"}:
+            if operand_type not in registers | {"TYPE_M"}:
                 return False
             if (operand_type == "TYPE_M") == (modrm >= 0xC0):
                 return False
-        elif encoding == "ENCODING_REG" or encoding in REGISTERS:
+        elif encoding == "ENCODING_REG":
+            if operand_type not in registers:
+                return False
+        elif encoding in REGISTERS:
             if operand_type not in gprs:
                 return False
         elif encoding == "ENCODING_Ia":
@@ -548,7 +555,7 @@ def scalar_terminal_form(operands, modrm):
     return True
 
 
-def legacy_terminal_model(suffix):
+def legacy_terminal_model(suffix, *, public=False):
 
     common = (X86 / "X86DisassemblerDecoderCommon.h").read_text()
     contexts, kinds, names = tables.parse_common(common)
@@ -560,19 +567,37 @@ def legacy_terminal_model(suffix):
         len(contexts),
     )
     specifiers = instruction_specifiers(source)
-    reads = dict(read_specializations(suffix))
+    reads = dict(read_specializations(suffix, scalar_limit=3 if public else 2))
     translations = dict(translation_specializations(suffix))
     selected = {
         i: (ops, translations[i])
         for i, ops in reads.items()
-        if i in translations and all(e in ENCODINGS and t in TYPES for e, t in ops)
+        if i in translations
+        and all(
+            e in ENCODINGS
+            and t in (TYPES | {"TYPE_XMM", "TYPE_MM64"} if public else TYPES)
+            for e, t in ops
+        )
     }
+    if public:
+        # Expand descriptor coverage without adding a new reader sequence to
+        # the hot scan dispatch. Uncommon new sequences retain generic decoding.
+        raw_groups, _, _, _, _, _ = legacy_terminal_model(suffix)
+        existing_reads = {
+            tuple(read_operand_calls(ops, materialize=False)) for ops, _ in raw_groups
+        }
+        selected = {
+            i: shape
+            for i, shape in selected.items()
+            if tuple(read_operand_calls(shape[0], materialize=False)) in existing_reads
+        }
     ud1 = int(
         re.search(
             r"X86_UD1\s*=\s*(\d+)", (X86 / f"X86GenInstrInfo{suffix}.inc").read_text()
         )[1]
     )
     groups = {}
+    public_reader_shapes = {}
     terminals = [(0, 0, 0)]
     sequences = {}
     rows = []
@@ -693,6 +718,16 @@ def legacy_terminal_model(suffix):
                     for uid in uids:
                         operands = specifiers[uid]
                         shape = selected.get(operands)
+                        # Translation legality was proved above for this
+                        # descriptor. Only ordered reads remain in a
+                        # terminal handler; DUP expansion needs no handler.
+                        if public and shape is not None:
+                            calls = tuple(
+                                read_operand_calls(shape[0], materialize=False)
+                            )
+                            shape = public_reader_shapes.setdefault(
+                                calls, (shape[0], ())
+                            )
                         if uid and shape not in groups:
                             groups[shape] = len(groups) + 1
                         terminals.append((uid, operands, groups[shape] if uid else 0))
@@ -759,12 +794,56 @@ def legacy_terminal_model(suffix):
     return groups, terminals, rows, selected_counts, words, kinds
 
 
+def emit_public_legacy_handlers(groups):
+    # Native scan callers retain a handler dispatch. Public iterator flags use
+    # the same ordered readers, independently of raw-state handler numbering.
+    patterns = {}
+    handlers = {}
+    for (reads, _), handler in groups.items():
+        calls = tuple(read_operand_calls(reads, materialize=False))
+        if calls not in patterns:
+            patterns[calls] = len(patterns)
+        handlers[handler] = patterns[calls]
+    lines = [
+        "X86_DECODE_INLINE int scanLegacyPublicOperands(struct InternalInstruction *insn,",
+        "\t\tuint16_t *size, unsigned int handler)",
+        "{",
+        "\tswitch (handler) {",
+    ]
+    for calls, pattern in patterns.items():
+        lines += [
+            f"\tcase {handler}:" for handler, p in handlers.items() if p == pattern
+        ]
+        if calls:
+            lines += [
+                "\t\tif (" + " ||\n\t\t    ".join(calls) + ")",
+                "\t\t\treturn X86_SCAN_INVALID;",
+            ]
+        lines.append("\t\tbreak;")
+    lines += [
+        "\tdefault:",
+        "\t\treturn X86_SCAN_INVALID;",
+        "\t}",
+        "\tif (finishDecodedInstruction(insn, false))",
+        "\t\treturn X86_SCAN_INVALID;",
+        "\t*size = (uint16_t)insn->length;",
+        "\treturn X86_SCAN_COMPLETE;",
+        "}",
+        "",
+    ]
+    return lines
+
+
 def emit_terminal(suffix):
     groups, terminals, rows, selected_counts, words, kinds = legacy_terminal_model(
         suffix
     )
+    public_groups, public_terminals, public_rows, public_counts, _, _ = (
+        legacy_terminal_model(suffix, public=True)
+    )
     lines = [
-        f"/* {len(terminals)} terminals, {len(groups)} operand handlers; selected opcodes {selected_counts}. */",
+        f"/* {len(terminals)} raw terminals, {len(groups)} raw handlers; selected opcodes {selected_counts}. */",
+        f"/* {len(public_terminals)} public terminals, {len(public_groups)} public handlers; selected opcodes {public_counts}. */",
         f"#define X86_TERMINAL_INDEXED UINT64_C(0x{TERMINAL_INDEXED:x})",
         f"#define X86_TERMINAL_SPLIT UINT64_C(0x{TERMINAL_SPLIT:x})",
         f"#define X86_TERMINAL_MASK UINT64_C(0x{(1 << TERMINAL_BITS) - 1:x})",
@@ -782,7 +861,7 @@ def emit_terminal(suffix):
     modrm_call = "(!insn->consumedModRM && readModRMScan(insn))"
     public_tails = {(): 0}
     public_patterns = {0: 0}
-    for (read_ops, _), handler in groups.items():
+    for (read_ops, _), handler in public_groups.items():
         calls = tuple(read_operand_calls(read_ops, materialize=False))
         modrm = bool(calls and calls[0] == modrm_call)
         tail = calls[1:] if modrm else calls
@@ -794,7 +873,7 @@ def emit_terminal(suffix):
         tables.require(reconstructed == calls, "Public reader sequence changed")
     mapping = public_instruction_ids(suffix)
     public_words = []
-    for uid, _, handler in terminals:
+    for uid, _, handler in public_terminals:
         tables.require(not uid or uid in mapping, "Unmapped scalar terminal")
         public_words.append(
             packed_terminal(
@@ -803,7 +882,7 @@ def emit_terminal(suffix):
         )
     # Both projections retain the same decision kind, invalid entries and readers.
     lines += emit_terminal_tables("Legacy", words, rows, kinds)
-    lines += emit_terminal_tables("LegacyPublic", public_words, rows, kinds)
+    lines += emit_terminal_tables("LegacyPublic", public_words, public_rows, kinds)
     lines += [
         "X86_DECODE_INLINE int decodeLegacyTerminal(struct InternalInstruction *insn,",
         "\t\t\t\tMCInst *mcInst, uint16_t *size, uint64_t decision, bool scan, unsigned *publicID, bool readerFlags)",
@@ -838,7 +917,7 @@ def emit_terminal(suffix):
         "\t\t\treturn X86_SCAN_INVALID;",
         "\t\tint status = readerFlags ?",
         "\t\t    scanPublicLegacyOperands(insn, size, (terminal >> X86_TERMINAL_OPERAND_SHIFT) & X86_TERMINAL_OPERAND_MASK) :",
-        "\t\t    scanLegacyOperands(insn, NULL, size, terminal >> X86_TERMINAL_HANDLER_SHIFT);",
+        "\t\t    scanLegacyPublicOperands(insn, size, terminal >> X86_TERMINAL_HANDLER_SHIFT);",
         "\t\tif (status == X86_SCAN_COMPLETE)",
         "\t\t\t*publicID = instructionID;",
         "\t\treturn status;",
@@ -944,7 +1023,9 @@ def emit_terminal(suffix):
         "}",
         "",
     ]
-    return "\n".join(handlers + public_reader + lines)
+    return "\n".join(
+        handlers + emit_public_legacy_handlers(public_groups) + public_reader + lines
+    )
 
 
 def vex_scan_form(operands, register_form):

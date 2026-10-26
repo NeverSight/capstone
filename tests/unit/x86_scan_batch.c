@@ -69,6 +69,27 @@ static bool check_public_ids(csh handle, cs_insn *insn, size_t mode_index)
 		{ { 0xfe, 0xf8 },
 		  2,
 		  { X86_INS_INVALID, X86_INS_INVALID, X86_INS_INVALID } },
+		{ { 0x6b, 0xc0, 0x7f },
+		  3,
+		  { X86_INS_IMUL, X86_INS_IMUL, X86_INS_IMUL } },
+#ifndef CAPSTONE_X86_REDUCE
+		{ { 0x0f, 0x10, 0xc1 },
+		  3,
+		  { X86_INS_MOVUPS, X86_INS_MOVUPS, X86_INS_MOVUPS } },
+		{ { 0x0f, 0x11, 0x01 },
+		  3,
+		  { X86_INS_MOVUPS, X86_INS_MOVUPS, X86_INS_MOVUPS } },
+		{ { 0x0f, 0x57, 0xc0 },
+		  3,
+		  { X86_INS_XORPS, X86_INS_XORPS, X86_INS_XORPS } },
+		{ { 0x0f, 0x6f, 0xc1 },
+		  3,
+		  { X86_INS_MOVQ, X86_INS_MOVQ, X86_INS_MOVQ } },
+		/* MOVNTPS requires memory, even though the ModR/M byte is complete. */
+		{ { 0x0f, 0x2b, 0xc1 },
+		  3,
+		  { X86_INS_INVALID, X86_INS_INVALID, X86_INS_INVALID } },
+#endif
 		/* Source-owned refinements take precedence over generated terminals. */
 		{ { 0x0f, 0x01, 0xc6 },
 		  3,

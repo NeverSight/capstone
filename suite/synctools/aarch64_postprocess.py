@@ -7,31 +7,12 @@ import hashlib
 from pathlib import Path
 import re
 
+from operand_writeback import WRITEBACK_BODY, body_digest, function_body, require
+
 ROOT = Path(__file__).resolve().parents[2]
 # Skipping a descriptor traversal is valid only while an unflagged traversal
 # performs no writes. Review these owning helper bodies when they change.
 IMPLICIT_BODY = "c29bd689018a6889866190f3ad2711a5331b4c96d0af797e45346d4c4574afd8"
-WRITEBACK_BODY = "0f34dacc20441f8f80eedeb7280867aee0526c0b44fe395a1a16f587f1654f1d"
-
-
-def require(condition, message):
-    if not condition:
-        raise ValueError(message)
-
-
-def function_body(source, marker):
-    start = source.index("{", source.index(marker))
-    depth, end = 1, start + 1
-    while depth:
-        depth += (source[end] == "{") - (source[end] == "}")
-        end += 1
-    return source[start:end]
-
-
-def body_digest(body):
-    body = re.sub(r"//[^\n]*|/\*.*?\*/", "", body, flags=re.S)
-    return hashlib.sha256(re.sub(r"\s+", "", body).encode()).hexdigest()
-
 
 def generated_flags(source):
     text = source.read_text()
