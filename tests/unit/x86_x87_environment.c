@@ -101,6 +101,10 @@ static bool check_case(cs_mode mode, cs_opt_value syntax, unsigned options,
 
 int main(void)
 {
+	if (cs_support(CS_SUPPORT_X86_REDUCE)) {
+		puts("SKIP: the reduced instruction set omits x87 environments");
+		return 77;
+	}
 	const cs_mode modes[] = { CS_MODE_16, CS_MODE_32, CS_MODE_64 };
 	const cs_opt_value syntaxes[] = { CS_OPT_SYNTAX_INTEL,
 					  CS_OPT_SYNTAX_ATT };

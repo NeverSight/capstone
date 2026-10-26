@@ -119,6 +119,10 @@ static bool check_case(csh handle, const uint8_t *prefix, size_t prefix_length,
 
 int main(void)
 {
+	if (cs_support(CS_SUPPORT_X86_REDUCE)) {
+		puts("SKIP: the reduced instruction set omits x87 environments");
+		return 77;
+	}
 	unsigned a, b, c, d;
 	char vendor[13] = { 0 };
 	__cpuid(0, a, b, c, d);

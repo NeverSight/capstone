@@ -16,6 +16,11 @@ _Legacy (integration)_
 Legacy tests which only printed to `stdout`. In practice they only test if the code segfaults.
 Checking the produced output was not implemented.
 
+The x87 environment API and native memory-access tests report a CTest skip
+when `CAPSTONE_X86_REDUCE` omits those instructions. The native test also skips
+on unsupported hosts or under instruction translation; the API test still
+runs in full builds on any host.
+
 ### Testing tools and usage
 
 #### `cstest`

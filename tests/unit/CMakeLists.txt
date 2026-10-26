@@ -102,6 +102,7 @@ foreach(TSRC ${UNIT_TEST_SOURCES})
 endforeach()
 
 if(CAPSTONE_X86_SUPPORT)
+    set_tests_properties(unit_x86_x87_environment PROPERTIES SKIP_RETURN_CODE 77)
     set_tests_properties(unit_x86_x87_environment_hardware PROPERTIES
         SKIP_RETURN_CODE 77 TIMEOUT 120)
 endif()
