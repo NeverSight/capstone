@@ -4832,18 +4832,41 @@ X86_decodeFeatureExtension(csh handle, const uint8_t *code, size_t code_len,
 		return X86_FEATURE_INVALID;
 
 	if (opcode == 0xc4) {
-		result = decode_legacy_atomic(handle, code, code_len, instr,
-					      size);
-		if (result != X86_FEATURE_NOT_HANDLED)
-			return result;
-		result = decode_system_legacy_vex(handle, code, code_len, instr,
+		size_t offset = 0;
+		while (offset < code_len && code[offset] != 0xc4)
+			++offset;
+		if (code_len - offset < 4)
+			return X86_FEATURE_NOT_HANDLED;
+		const uint8_t map = code[offset + 1] & 0x1f;
+		const uint8_t vex_opcode = code[offset + 3];
+		/* These source-owned families have disjoint map/opcode selectors.
+		 * Keep ordinary VEX forms out of unrelated extension handlers;
+		 * each selected handler still owns prefix and operand validation. */
+		switch (map) {
+		case 2:
+			if (vex_opcode >= 0xe0 && vex_opcode <= 0xef)
+				return decode_legacy_atomic(
+					handle, code, code_len, instr, size);
+			if (vex_opcode >= 0xcb && vex_opcode <= 0xcd)
+				return decode_sha512_vex(handle, code, code_len,
+							 instr, size);
+			if ((vex_opcode >= 0x48 && vex_opcode <= 0x4b) ||
+			    vex_opcode == 0x5c || vex_opcode == 0x5e ||
+			    vex_opcode == 0x6c)
+				return decode_amx(handle, code, code_len, instr,
 						  size);
-		if (result != X86_FEATURE_NOT_HANDLED)
-			return result;
-		result = decode_sha512_vex(handle, code, code_len, instr, size);
-		if (result != X86_FEATURE_NOT_HANDLED)
-			return result;
-		return decode_amx(handle, code, code_len, instr, size);
+			return X86_FEATURE_NOT_HANDLED;
+		case 5:
+			return vex_opcode == 0xfd ?
+				       decode_amx(handle, code, code_len, instr,
+						  size) :
+				       X86_FEATURE_NOT_HANDLED;
+		case 7:
+			return decode_system_legacy_vex(handle, code, code_len,
+							instr, size);
+		default:
+			return X86_FEATURE_NOT_HANDLED;
+		}
 	}
 	if (opcode == 0xd5) {
 		result = decode_rex2_push_pop(handle, code, code_len, instr,

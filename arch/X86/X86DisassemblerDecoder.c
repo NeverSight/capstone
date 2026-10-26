@@ -35,6 +35,7 @@
 #include "X86Mapping.h"
 #include "X86FeatureExtension.h"
 #include "X86DisassemblerTranslator.h"
+#include "X86ScanAdapter.h"
 
 #if defined(_MSC_VER)
 #define X86_DECODE_INLINE static __forceinline
@@ -3170,6 +3171,11 @@ CAPSTONE_INTERNAL bool X86_setScanAdapter(csh ud, cs_mode mode,
 }
 #endif
 
+X86_DECODE_INLINE int tryVexTerminalScan(const uint8_t *code, size_t code_len,
+					 uint8_t prefix,
+					 unsigned *instructionID,
+					 uint16_t *size);
+
 /* Only generic and extension decoding need an MCInst in the core scan path. */
 #if defined(_MSC_VER)
 __declspec(noinline)
@@ -3217,6 +3223,23 @@ static bool decodeScanResultFallback(csh ud, const uint8_t *code,
 	if (extension == X86_FEATURE_INVALID)
 		return false;
 	if (extension != X86_FEATURE_DECODED) {
+		if (tryExtension &&
+		    !(handle->mode & (CS_MODE_16 | CS_MODE_32)) && code_len &&
+		    code[0] == 0xc4) {
+			unsigned instructionID = 0;
+			const int status = tryVexTerminalScan(code, code_len,
+							      code[0],
+							      &instructionID,
+							      &result->length);
+			if (status != X86_SCAN_NOT_HANDLED) {
+				if (status != X86_SCAN_COMPLETE)
+					return false;
+				result->opcode = instructionID;
+				result->opcode_pub = 0;
+				result->popcode_adjust = 0;
+				return true;
+			}
+		}
 		bool decoded = opcode == 0x62 ?
 				       X86_getInstructionAfterExtensions(
 					       ud, code, code_len, &instr,
@@ -3411,6 +3434,34 @@ bool CAPSTONE_API cs_disasm_iter(csh ud, const uint8_t **code, size_t *size,
 				 uint64_t *address, cs_insn *insn)
 {
 	return cs_disasm_iter_core(ud, code, size, address, insn);
+}
+
+CAPSTONE_INTERNAL X86ScanBatchResult X86_scanBatch(csh ud, const uint8_t *code,
+						   size_t size,
+						   uint64_t address,
+						   uint32_t *output,
+						   size_t capacity)
+{
+	X86ScanBatchResult batch = { 0, 0 };
+	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
+	if (!handle || !code || !size || !output || !capacity ||
+	    !use_x86_scan(handle) || handle->skipdata)
+		return batch;
+	cs_insn insn = { 0 };
+	handle->errnum = CS_ERR_OK;
+	while (batch.count < capacity && size) {
+		X86ScanResult result;
+		insn.address = address;
+		if (!getInstructionScanResult(ud, code, size, &insn, &result))
+			break;
+		finish_x86_scan(handle, &insn, &result, code, false, false);
+		output[batch.count++] = (insn.id << 8) | result.length;
+		batch.bytes += result.length;
+		code += result.length;
+		size -= result.length;
+		address += result.length;
+	}
+	return batch;
 }
 
 #undef CS_DECODE_INLINE
