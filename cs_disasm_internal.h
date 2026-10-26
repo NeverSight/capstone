@@ -106,8 +106,8 @@ CS_DECODE_INLINE void fill_insn_without_text(cs_insn *insn, unsigned opcode_pub,
 		insn->id = opcode_pub;
 }
 
-/* A decoder translation unit may bind its own inline scan implementation.
- * Other users retain the normal private decoder entry. */
+/* A decoder translation unit may bind an inline scan or combined scan/output
+ * implementation. Other users retain the normal private decoder entry. */
 #ifndef CS_DECODE_SCAN
 #define CS_DECODE_SCAN X86_getInstructionScanResult
 #endif
@@ -135,6 +135,10 @@ CS_DECODE_INLINE bool decode_insn(cs_struct *handle, const uint8_t *code,
 {
 #ifdef CAPSTONE_HAS_X86
 	if (CS_DECODE_LIKELY(scan)) {
+#ifdef CS_DECODE_SCAN_IMPL
+		return CS_DECODE_SCAN_IMPL(handle, code, size, insn, insn_size,
+					   batch);
+#else
 		X86ScanResult result;
 		if (CS_DECODE_UNLIKELY(!CS_DECODE_SCAN(
 			    (csh)(uintptr_t)handle, code, size, insn, &result)))
@@ -142,6 +146,7 @@ CS_DECODE_INLINE bool decode_insn(cs_struct *handle, const uint8_t *code,
 		*insn_size = result.length;
 		finish_x86_scan(handle, insn, &result, code, batch, true);
 		return true;
+#endif
 	}
 #endif
 	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);

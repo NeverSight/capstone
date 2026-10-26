@@ -777,17 +777,36 @@ def emit_terminal(suffix):
     ]
     lines += [f"\t{name}," for name, _, _, _ in TERMINAL_ROWS]
     lines += ["\tX86_TERMINAL_ROW_COUNT,", "};"]
+    # Public scans retain the exact reader calls, with the common ModR/M
+    # requirement separated from the optional immediate-tail dispatch.
+    modrm_call = "(!insn->consumedModRM && readModRMScan(insn))"
+    public_tails = {(): 0}
+    public_patterns = {0: 0}
+    for (read_ops, _), handler in groups.items():
+        calls = tuple(read_operand_calls(read_ops, materialize=False))
+        modrm = bool(calls and calls[0] == modrm_call)
+        tail = calls[1:] if modrm else calls
+        tables.require(modrm_call not in tail, "ModR/M reader must precede immediates")
+        if tail not in public_tails:
+            public_tails[tail] = len(public_tails)
+        public_patterns[handler] = (public_tails[tail] << 1) | modrm
+        reconstructed = ((modrm_call,) if modrm else ()) + tail
+        tables.require(reconstructed == calls, "Public reader sequence changed")
     mapping = public_instruction_ids(suffix)
     public_words = []
     for uid, _, handler in terminals:
         tables.require(not uid or uid in mapping, "Unmapped scalar terminal")
-        public_words.append(packed_terminal((mapping[uid] if uid else 0, 0, handler)))
+        public_words.append(
+            packed_terminal(
+                (mapping[uid] if uid else 0, public_patterns[handler], handler)
+            )
+        )
     # Both projections retain the same decision kind, invalid entries and readers.
     lines += emit_terminal_tables("Legacy", words, rows, kinds)
     lines += emit_terminal_tables("LegacyPublic", public_words, rows, kinds)
     lines += [
         "X86_DECODE_INLINE int decodeLegacyTerminal(struct InternalInstruction *insn,",
-        "\t\t\t\tMCInst *mcInst, uint16_t *size, uint64_t decision, bool scan, unsigned *publicID)",
+        "\t\t\t\tMCInst *mcInst, uint16_t *size, uint64_t decision, bool scan, unsigned *publicID, bool readerFlags)",
         "{",
         "\tuint32_t terminal;",
         "\tif ((decision & (X86_TERMINAL_INDEXED | X86_TERMINAL_SPLIT)) && (scan ? readModRMScan(insn) : readModRM(insn)))",
@@ -817,7 +836,9 @@ def emit_terminal(suffix):
         "\tif (publicID) {",
         "\t\tif (!instructionID)",
         "\t\t\treturn X86_SCAN_INVALID;",
-        "\t\tint status = scanLegacyOperands(insn, NULL, size, terminal >> X86_TERMINAL_HANDLER_SHIFT);",
+        "\t\tint status = readerFlags ?",
+        "\t\t    scanPublicLegacyOperands(insn, size, (terminal >> X86_TERMINAL_OPERAND_SHIFT) & X86_TERMINAL_OPERAND_MASK) :",
+        "\t\t    scanLegacyOperands(insn, NULL, size, terminal >> X86_TERMINAL_HANDLER_SHIFT);",
         "\t\tif (status == X86_SCAN_COMPLETE)",
         "\t\t\t*publicID = instructionID;",
         "\t\treturn status;",
@@ -893,7 +914,37 @@ def emit_terminal(suffix):
     ]
     handlers += [f"\treadLegacyShape{handler}," for handler in groups.values()]
     handlers += ["};", ""]
-    return "\n".join(handlers + lines)
+    public_reader = [
+        "X86_DECODE_INLINE int scanPublicLegacyOperands(struct InternalInstruction *insn,",
+        "\t\tuint16_t *size, unsigned int pattern)",
+        "{",
+        "\tif ((pattern & 1) && !insn->consumedModRM && readModRMScan(insn))",
+        "\t\treturn X86_SCAN_INVALID;",
+        "\tif (pattern >> 1) {",
+        "\t\tswitch (pattern >> 1) {",
+    ]
+    for calls, kind in public_tails.items():
+        if not kind:
+            continue
+        public_reader += [
+            f"\t\tcase {kind}:",
+            "\t\t\tif (" + " ||\n\t\t\t    ".join(calls) + ")",
+            "\t\t\t\treturn X86_SCAN_INVALID;",
+            "\t\t\tbreak;",
+        ]
+    public_reader += [
+        "\t\tdefault:",
+        "\t\t\treturn X86_SCAN_INVALID;",
+        "\t\t}",
+        "\t}",
+        "\tif (finishDecodedInstruction(insn, false))",
+        "\t\treturn X86_SCAN_INVALID;",
+        "\t*size = (uint16_t)insn->length;",
+        "\treturn X86_SCAN_COMPLETE;",
+        "}",
+        "",
+    ]
+    return "\n".join(handlers + public_reader + lines)
 
 
 def vex_scan_form(operands, register_form):
@@ -925,6 +976,60 @@ def vex_scan_form(operands, register_form):
         else:
             return False
     return True
+
+
+def emit_vex_scan_rows(suffix):
+    common = (X86 / "X86DisassemblerDecoderCommon.h").read_text()
+    contexts, kinds, names = tables.parse_common(common)
+    source = (X86 / f"X86GenDisassemblerTables{suffix}.inc").read_text()
+    context_body = re.search(
+        r"static const uint8_t x86DisassemblerContexts\[\d+\] = \{(.*?)\};",
+        tables.uncomment(source),
+        re.S,
+    )
+    tables.require(context_body is not None, "Missing VEX source context table")
+    context_values = tables.comma_values(context_body[1], "VEX contexts")
+    attrs = {
+        name: 1 << int(bit)
+        for name, bit in re.findall(
+            r"ENUM_ENTRY\((ATTR_\w+), \(0x1 << (\d+)\)\)", common
+        )
+    }
+    pp = (0, attrs["ATTR_OPSIZE"], attrs["ATTR_XS"], attrs["ATTR_XD"])
+    packed = (X86 / f"X86GenDisassemblerTablesPacked{suffix}.inc").read_text()
+    # References must use the current deduplicated row numbers, verified by
+    # the owning packed-table generator against every source decision.
+    expected, _, _, _ = tables.render(
+        X86, suffix, contexts, kinds, names[:4] if suffix else names, True
+    )
+    tables.require(packed == expected, "Regenerate packed x86 tables before VEX rows")
+    lines = [
+        "/* W, L and pp select existing validated opcode rows directly. */",
+        "static const struct ModRMDecision *const x86VexScanRows[3][16] = {",
+    ]
+    for name in names[1:4]:
+        index_body = re.search(
+            r"static const unsigned char index_" + name + r"\[\] = \{(.*?)\};",
+            packed,
+            re.S,
+        )
+        tables.require(index_body is not None, "Missing packed VEX opcode map")
+        indices = tables.numeric_values(index_body[1], "VEX packed indices")
+        tables.require(len(indices) == len(contexts), "VEX row context count changed")
+        lines.append("\t{")
+        for key in range(16):
+            attributes = attrs["ATTR_64BIT"] | attrs["ATTR_VEX"] | pp[key & 3]
+            if key & 4:
+                attributes |= attrs["ATTR_VEXL"]
+            if key & 8:
+                attributes |= attrs["ATTR_REXW"]
+            row = indices[contexts.index(context_values[attributes])]
+            lines.append(
+                f"\t\t{name}[{row - 1}].modRMDecisions," if row else "\t\tNULL,"
+            )
+        lines.append("\t},")
+    lines += ["};", ""]
+    return lines
 
 
 def emit_vex_scan(suffix):
@@ -998,7 +1103,7 @@ def emit_vex_scan(suffix):
             ]
         lines.append("\t\treturn X86_SCAN_COMPLETE;")
     lines += ["\tdefault:", "\t\treturn X86_SCAN_INVALID;", "\t}", "}"]
-    return "\n".join(lines)
+    return "\n".join(emit_vex_scan_rows(suffix) + lines)
 
 
 def generated_output(emit):

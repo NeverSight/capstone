@@ -202,6 +202,13 @@ from `X86MappingInsn*.inc` and `x86.h`. It uses the same operand readers and
 decision kinds, while avoiding a subsequent UID-to-public-ID lookup. Raw and
 operand-producing decoding retain internal IDs and their original state writes.
 
+The public iterator also uses the projection's unused operand-set bits to
+separate the ModR/M requirement from the optional immediate-read sequence.
+Generation reconstructs and checks the original ordered reader calls. The
+handler index remains available to native batches and other scan callers,
+which retain their existing dispatch. Both choices use the same readers,
+legality decisions and finalization.
+
 The 16-bit rows compose the existing primary and operand-size lookups only when
 their decision kinds match. Both then require the same read, and the second
 lookup either reads nothing or reuses an already successful ModR/M read.
@@ -236,6 +243,11 @@ already satisfy the operand fixup and translation checks.
 The VEX metadata word combines these flags with the public ID from the same
 mapping source. Unmapped UIDs retain their existing mapping behavior. Neither
 projection changes opcode admission, prefix checks or operand-read ordering.
+
+For these C4/C5 forms, W/L/pp select generated pointers to the existing packed
+opcode rows. The generator verifies those row numbers against the owning
+packed-table generator before emitting them. Prefix parsing and map validation
+still precede this lookup, and the same metadata and operand checks follow it.
 
 Source-owned extensions retain precedence. The extension dispatcher and compact
 C4 fallback share a map/opcode family classifier. An ordinary unprefixed C4
@@ -289,6 +301,14 @@ flags and 0F refinement predicate defer possible source-owned extensions before
 a generated invalid terminal can reject them. Mixed mode flags retain the
 original extension-selector ordering because its CS_MODE_64 test differs from
 the raw decoder's 16/32-bit priority.
+
+The public iterator completes an admitted terminal through the shared output
+helper before joining fallback result handling. This keeps its public ID,
+length and zero alias adjustment separate from the result object passed by
+address to cold decoders. Initial admission and fallback routing remain shared
+with native batches; the fallback selector stays inline and does not repeat
+initial parsing. Byte copying, detail-pointer lifetime, callbacks and cursor
+updates retain their common core policy.
 
 On an admission miss, the extension selector supplies the bounded first
 non-prefix offset. Ordinary terminal admission and the outlined compact reader

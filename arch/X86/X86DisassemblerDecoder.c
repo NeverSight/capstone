@@ -3028,7 +3028,7 @@ decodeInstructionScanImpl(struct InternalInstruction *insn, const uint8_t *code,
 			int result = decodeLegacyTerminal(
 				insn, directTerminal ? NULL : mcInst, size,
 				decision, directTerminal || mcInst != NULL,
-				NULL);
+				NULL, false);
 			return directTerminal && result == X86_SCAN_COMPLETE ?
 				       X86_SCAN_UID_READY :
 				       result;
@@ -3059,7 +3059,8 @@ X86_DECODE_INLINE int trySimpleLegacyScan(const uint8_t *code, size_t codeSize,
 					  cs_mode mode, uint8_t opcode,
 					  size_t opcodeOffset,
 					  unsigned *instructionID,
-					  uint16_t *size, bool publicID)
+					  uint16_t *size, bool publicID,
+					  bool readerFlags)
 {
 	if (opcodeOffset >= 2)
 		return X86_SCAN_NOT_HANDLED;
@@ -3082,7 +3083,8 @@ X86_DECODE_INLINE int trySimpleLegacyScan(const uint8_t *code, size_t codeSize,
 	if (!decision)
 		return X86_SCAN_NOT_HANDLED;
 	int result = decodeLegacyTerminal(&insn, NULL, size, decision, true,
-					  publicID ? instructionID : NULL);
+					  publicID ? instructionID : NULL,
+					  readerFlags);
 	if (result == X86_SCAN_COMPLETE && !publicID)
 		*instructionID = insn.instructionID;
 	return result;
@@ -3109,11 +3111,10 @@ static bool decodeGenericScan(const uint8_t *code, size_t code_len,
 	return X86_completeScan(instr, &insn, size);
 }
 
-X86_DECODE_INLINE int tryLegacyPrefixedScan(const uint8_t *code,
-					    size_t code_len, cs_mode mode,
-					    unsigned *instructionID,
-					    uint16_t *size, bool publicID,
-					    bool guardExtensions)
+X86_DECODE_INLINE int
+tryLegacyPrefixedScan(const uint8_t *code, size_t code_len, cs_mode mode,
+		      unsigned *instructionID, uint16_t *size, bool publicID,
+		      bool guardExtensions, bool readerFlags)
 {
 	InternalInstruction insn = { 0 };
 	/* Retain the decoder's bitness priority for mixed mode flags. */
@@ -3161,7 +3162,8 @@ X86_DECODE_INLINE int tryLegacyPrefixedScan(const uint8_t *code,
 	if (!decision)
 		return X86_SCAN_NOT_HANDLED;
 	int result = decodeLegacyTerminal(&insn, NULL, size, decision, true,
-					  publicID ? instructionID : NULL);
+					  publicID ? instructionID : NULL,
+					  readerFlags);
 	if (result == X86_SCAN_COMPLETE && !publicID)
 		*instructionID = insn.instructionID;
 	return result;
@@ -3178,7 +3180,8 @@ static bool decode16BitSizePrefixedScan(const uint8_t *code, size_t code_len,
 {
 	unsigned instructionID;
 	int result = tryLegacyPrefixedScan(code, code_len, CS_MODE_16,
-					   &instructionID, size, false, false);
+					   &instructionID, size, false, false,
+					   false);
 	if (result == X86_SCAN_NOT_HANDLED)
 		return decodeGenericScan(code, code_len, mode, instr, size);
 	if (result != X86_SCAN_COMPLETE)
@@ -3210,7 +3213,7 @@ bool X86_getInstructionScan(csh ud, const uint8_t *code, size_t code_len,
 	unsigned instructionID;
 	int terminal = trySimpleLegacyScan(code, code_len, handle->mode, opcode,
 					   opcodeOffset, &instructionID, size,
-					   false);
+					   false, false);
 	if (terminal != X86_SCAN_NOT_HANDLED) {
 		if (terminal != X86_SCAN_COMPLETE)
 			return false;
@@ -3348,15 +3351,15 @@ static bool decodeLegacyPrefixedResult(csh ud, const uint8_t *code,
 	if (mode & CS_MODE_16)
 		status = tryLegacyPrefixedScan(code, code_len, CS_MODE_16,
 					       &instructionID, &result->length,
-					       true, false);
+					       true, false, false);
 	else if (mode & CS_MODE_32)
 		status = tryLegacyPrefixedScan(code, code_len, CS_MODE_32,
 					       &instructionID, &result->length,
-					       true, false);
+					       true, false, false);
 	else
 		status = tryLegacyPrefixedScan(code, code_len, CS_MODE_64,
 					       &instructionID, &result->length,
-					       true, false);
+					       true, false, false);
 	if (status == X86_SCAN_NOT_HANDLED)
 		return decodeScanResultFallback(ud, code, code_len, insn,
 						result, 0, false);
@@ -3385,18 +3388,12 @@ X86_DECODE_INLINE int tryVexTerminalScan(const uint8_t *code, size_t code_len,
 		return X86_SCAN_NOT_HANDLED;
 	const uint8_t payload =
 		insn.vectorExtensionPrefix[prefix == 0xc4 ? 2 : 1];
-	uint16_t attributes = ATTR_64BIT | ATTR_VEX |
-			      mandatoryPrefixAttributes(
-				      prefix == 0xc4 ? ppFromVEX3of3(payload) :
-						       ppFromVEX2of2(payload));
-	if (prefix == 0xc4 ? lFromVEX3of3(payload) : lFromVEX2of2(payload))
-		attributes |= ATTR_VEXL;
-	if (wFromREX(insn.rexPrefix))
-		attributes |= ATTR_REXW;
-	const struct ModRMDecision *decision = getModRMDecision(
-		insn.opcodeType, contextForAttrs(attributes), insn.opcode);
-	if (!decision)
+	const unsigned row = (payload & 7) | (wFromREX(insn.rexPrefix) << 3);
+	const struct ModRMDecision *decisions =
+		x86VexScanRows[insn.opcodeType - TWOBYTE][row];
+	if (!decisions)
 		return X86_SCAN_INVALID;
+	const struct ModRMDecision *decision = &decisions[insn.opcode];
 	const uint32_t packed = decision->packed;
 	const bool decisionModRM =
 		(packed & (X86_DECISION_INDEXED | X86_DECISION_SPLIT)) != 0;
@@ -3456,7 +3453,7 @@ static bool decodeVexTerminalResult(csh ud, const uint8_t *code,
 X86_DECODE_INLINE int tryInitialLegacyScan(const uint8_t *code, size_t code_len,
 					   cs_mode mode, bool feature64,
 					   unsigned *instructionID,
-					   uint16_t *size)
+					   uint16_t *size, bool readerFlags)
 {
 	if (!code_len || (mode == CS_MODE_64) != feature64)
 		return X86_SCAN_NOT_HANDLED;
@@ -3464,7 +3461,8 @@ X86_DECODE_INLINE int tryInitialLegacyScan(const uint8_t *code, size_t code_len,
 	size_t offset = 0;
 	if (mode == CS_MODE_16 && (opcode == 0x66 || opcode == 0x67))
 		return tryLegacyPrefixedScan(code, code_len, CS_MODE_16,
-					     instructionID, size, true, true);
+					     instructionID, size, true, true,
+					     readerFlags);
 	if (mode == CS_MODE_64 && (opcode & 0xf0) == 0x40) {
 		if (code_len < 2)
 			return X86_SCAN_NOT_HANDLED;
@@ -3476,31 +3474,37 @@ X86_DECODE_INLINE int tryInitialLegacyScan(const uint8_t *code, size_t code_len,
 				      code + offset + 1, code_len - offset - 1))
 		return X86_SCAN_NOT_HANDLED;
 	return trySimpleLegacyScan(code, code_len, mode, opcode, offset,
-				   instructionID, size, true);
+				   instructionID, size, true, readerFlags);
 }
 
-X86_DECODE_INLINE bool getInstructionScanResult(csh ud, const uint8_t *code,
-						size_t code_len, cs_insn *insn,
-						X86ScanResult *result)
+X86_DECODE_INLINE int tryInitialScanResult(cs_struct *handle,
+					   const uint8_t *code, size_t code_len,
+					   unsigned *instructionID,
+					   uint16_t *length, bool readerFlags)
 {
-	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
-	unsigned initialID = 0;
 	int initial;
 	const bool feature64 = (handle->mode & CS_MODE_64) != 0;
 	if (!(handle->mode & (CS_MODE_16 | CS_MODE_32)))
 		initial = tryInitialLegacyScan(code, code_len, CS_MODE_64,
-					       feature64, &initialID,
-					       &result->length);
+					       feature64, instructionID, length,
+					       readerFlags);
 	else if (handle->mode & CS_MODE_16)
 		initial = tryInitialLegacyScan(code, code_len, CS_MODE_16,
-					       feature64, &initialID,
-					       &result->length);
+					       feature64, instructionID, length,
+					       readerFlags);
 	else
 		initial = tryInitialLegacyScan(code, code_len, CS_MODE_32,
-					       feature64, &initialID,
-					       &result->length);
-	if (initial != X86_SCAN_NOT_HANDLED)
-		return completeTerminalScanResult(result, initialID, initial);
+					       feature64, instructionID, length,
+					       readerFlags);
+	return initial;
+}
+
+X86_DECODE_INLINE bool
+getInstructionScanResultAfterInitial(csh ud, const uint8_t *code,
+				     size_t code_len, cs_insn *insn,
+				     X86ScanResult *result, bool readerFlags)
+{
+	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
 	uint8_t opcode;
 	size_t opcodeOffset;
 	bool extension = X86_mayDecodeFeatureExtensionImpl(
@@ -3516,15 +3520,18 @@ X86_DECODE_INLINE bool getInstructionScanResult(csh ud, const uint8_t *code,
 	if (!(handle->mode & (CS_MODE_16 | CS_MODE_32)))
 		status = trySimpleLegacyScan(code, code_len, CS_MODE_64, opcode,
 					     opcodeOffset, &instructionID,
-					     &result->length, true);
+					     &result->length, true,
+					     readerFlags);
 	else if (handle->mode & CS_MODE_16)
 		status = trySimpleLegacyScan(code, code_len, CS_MODE_16, opcode,
 					     opcodeOffset, &instructionID,
-					     &result->length, true);
+					     &result->length, true,
+					     readerFlags);
 	else
 		status = trySimpleLegacyScan(code, code_len, CS_MODE_32, opcode,
 					     opcodeOffset, &instructionID,
-					     &result->length, true);
+					     &result->length, true,
+					     readerFlags);
 	if (status != X86_SCAN_NOT_HANDLED)
 		return completeTerminalScanResult(result, instructionID,
 						  status);
@@ -3539,15 +3546,67 @@ X86_DECODE_INLINE bool getInstructionScanResult(csh ud, const uint8_t *code,
 					opcode, false);
 }
 
+X86_DECODE_INLINE bool getInstructionScanResult(csh ud, const uint8_t *code,
+						size_t code_len, cs_insn *insn,
+						X86ScanResult *result,
+						bool readerFlags)
+{
+	unsigned instructionID = 0;
+	int initial = tryInitialScanResult((cs_struct *)(uintptr_t)ud, code,
+					   code_len, &instructionID,
+					   &result->length, readerFlags);
+	if (initial != X86_SCAN_NOT_HANDLED)
+		return completeTerminalScanResult(result, instructionID,
+						  initial);
+	return getInstructionScanResultAfterInitial(ud, code, code_len, insn,
+						    result, readerFlags);
+}
+
 bool X86_getInstructionScanResult(csh ud, const uint8_t *code, size_t code_len,
 				  cs_insn *insn, X86ScanResult *result)
 {
-	return getInstructionScanResult(ud, code, code_len, insn, result);
+	return getInstructionScanResult(ud, code, code_len, insn, result,
+					false);
 }
 
-#define CS_DECODE_SCAN getInstructionScanResult
+X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
+					  const uint8_t *code, size_t size,
+					  cs_insn *insn, uint16_t *insn_size,
+					  bool batch);
+
+#define CS_DECODE_SCAN_IMPL decodeIteratorScan
 #include "../../cs_disasm_internal.h"
-#undef CS_DECODE_SCAN
+#undef CS_DECODE_SCAN_IMPL
+
+/* Keep the admitted terminal's public ID and zero alias adjustment visible
+ * through output completion. Cold helpers can take the fallback result's
+ * address without forcing terminal output through that escaped object. */
+X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
+					  const uint8_t *code, size_t size,
+					  cs_insn *insn, uint16_t *insn_size,
+					  bool batch)
+{
+	unsigned instructionID = 0;
+	uint16_t length;
+	int initial = tryInitialScanResult(handle, code, size, &instructionID,
+					   &length, true);
+	if (initial == X86_SCAN_NOT_HANDLED) {
+		X86ScanResult result;
+		if (!getInstructionScanResultAfterInitial(
+			    (csh)(uintptr_t)handle, code, size, insn, &result,
+			    true))
+			return false;
+		*insn_size = result.length;
+		finish_x86_scan(handle, insn, &result, code, batch, true);
+		return true;
+	}
+	if (initial != X86_SCAN_COMPLETE)
+		return false;
+	X86ScanResult result = { 0, instructionID, length, 0 };
+	*insn_size = length;
+	finish_x86_scan(handle, insn, &result, code, batch, true);
+	return true;
+}
 
 CAPSTONE_EXPORT
 X86_DECODE_ALIGN
@@ -3574,7 +3633,8 @@ CAPSTONE_INTERNAL X86ScanBatchResult X86_scanBatch(csh ud, const uint8_t *code,
 	while (batch.count < capacity && size) {
 		X86ScanResult result;
 		insn.address = address;
-		if (!getInstructionScanResult(ud, code, size, &insn, &result))
+		if (!getInstructionScanResult(ud, code, size, &insn, &result,
+					      false))
 			break;
 		finish_x86_scan(handle, &insn, &result, code, false, false);
 		output[batch.count++] = (insn.id << 8) | result.length;
