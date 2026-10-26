@@ -20,6 +20,54 @@ static bool check(bool condition, const char *message)
 	return condition;
 }
 
+static bool check_call_targets(uint8_t *end)
+{
+	static const cs_mode modes[] = { CS_MODE_16, CS_MODE_32, CS_MODE_64,
+					 CS_MODE_64 | CS_MODE_X86_AMD };
+	bool success = true;
+	for (size_t m = 0; m < sizeof(modes) / sizeof(modes[0]); ++m) {
+		csh handle;
+		if (cs_open(CS_ARCH_X86, modes[m], &handle) != CS_ERR_OK)
+			return false;
+		cs_option(handle, CS_OPT_DETAIL, CS_OPT_ON);
+		cs_insn *insn = cs_malloc(handle);
+		if (!insn) {
+			cs_close(&handle);
+			return false;
+		}
+		for (size_t prefixes = 0; prefixes <= 12; ++prefixes) {
+			uint8_t bytes[17];
+			memset(bytes, 0x66, prefixes);
+			bytes[prefixes] = 0xe8;
+			memset(bytes + prefixes + 1, 0xff, 4);
+			for (size_t n = 0; n <= prefixes + 5; ++n) {
+				uint8_t *start = end - n;
+				memcpy(start, bytes, n);
+				uint64_t target = 42, expected = 42;
+				uint16_t length = X86_scanCallTarget(
+					handle, start, n, UINT64_MAX - 1,
+					&target);
+				const uint8_t *cursor = start;
+				size_t left = n;
+				uint64_t address = UINT64_MAX - 1;
+				uint16_t expected_length = 0;
+				if (cs_disasm_iter(handle, &cursor, &left,
+						   &address, insn)) {
+					expected_length = insn->size;
+					expected = insn->detail->x86.operands[0]
+							   .imm;
+				}
+				success &= check(length == expected_length &&
+							 target == expected,
+						 "bounded CALL target query");
+			}
+		}
+		cs_free(insn, 1);
+		cs_close(&handle);
+	}
+	return success;
+}
+
 static bool check_short_copy(csh handle, cs_insn *iter, uint8_t *end,
 			     size_t length)
 {
@@ -389,6 +437,7 @@ int main(void)
 #endif
 	success &= check_short_copies(pages + page_size);
 	success &= check_escape_boundaries(pages + page_size);
+	success &= check_call_targets(pages + page_size);
 	for (i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
 		csh handle;
 		cs_insn *insn;

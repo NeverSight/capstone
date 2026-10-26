@@ -634,16 +634,9 @@ static void printPCRelImm(MCInst *MI, unsigned OpNo, SStream *O)
 {
 	MCOperand *Op = MCInst_getOperand(MI, OpNo);
 	if (MCOperand_isImm(Op)) {
-		int64_t imm = MCOperand_getImm(Op) + MI->flat_insn->size +
-			      MI->address;
-
-		// truncate imm for non-64bit
-		if (!(x86_has_feature(MI->csh->mode, CS_MODE_64))) {
-			imm = imm & 0xffffffff;
-		} else if ((x86_has_feature(MI->csh->mode, CS_MODE_X86_AMD)) &&
-			   MI->imm_size == 2) {
-			imm &= 0xffff;
-		}
+		int64_t imm = X86_relativeBranchTarget(
+			MI->csh->mode, MI->address, MI->flat_insn->size,
+			MCOperand_getImm(Op), MI->imm_size);
 
 		if (imm < 0) {
 			SStream_concat(O, "0x%" PRIx64, imm);

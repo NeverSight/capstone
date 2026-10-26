@@ -13,7 +13,7 @@ if(CAPSTONE_ARM_SUPPORT OR CAPSTONE_AARCH64_SUPPORT OR CAPSTONE_RISCV_SUPPORT
     endif()
 endif()
 if(CAPSTONE_X86_SUPPORT)
-    list(APPEND UNIT_TEST_SOURCES x86_scan_batch.c)
+    list(APPEND UNIT_TEST_SOURCES x86_scan_batch.c x86_call_target.c)
     find_package(Python3 3.8 COMPONENTS Interpreter QUIET)
     if(Python3_Interpreter_FOUND)
         add_test(NAME unit_x86_operand_specializations

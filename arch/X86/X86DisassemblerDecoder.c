@@ -36,6 +36,7 @@
 #include "X86FeatureExtension.h"
 #include "X86DisassemblerTranslator.h"
 #include "X86ScanAdapter.h"
+#include "X86InstPrinterCommon.h"
 
 #if defined(_MSC_VER)
 #define X86_DECODE_INLINE static __forceinline
@@ -3530,6 +3531,32 @@ CAPSTONE_INTERNAL X86ScanBatchResult X86_scanBatch(csh ud, const uint8_t *code,
 		address += result.length;
 	}
 	return batch;
+}
+
+CAPSTONE_INTERNAL uint16_t X86_scanCallTarget(csh ud, const uint8_t *code,
+					      size_t size, uint64_t address,
+					      uint64_t *target)
+{
+	const cs_struct *handle = (cs_struct *)(uintptr_t)ud;
+	if (!handle || handle->arch != CS_ARCH_X86 || !code || !size || !target)
+		return 0;
+	InternalInstruction insn = { 0 };
+	if (decodeInstruction(&insn, code, size, handle->mode))
+		return 0;
+	switch (insn.instructionID) {
+	case X86_CALLpcrel16:
+	case X86_CALLpcrel32:
+	case X86_CALL64pcrel32:
+		break;
+	default:
+		return 0;
+	}
+	*target = X86_relativeBranchTarget(
+		handle->mode, address, (uint16_t)insn.length,
+		translateRelativeImmediate(insn.immediates[0], insn.operands,
+					   insn.displacementSize),
+		insn.immSize);
+	return (uint16_t)insn.length;
 }
 
 #undef CS_DECODE_INLINE

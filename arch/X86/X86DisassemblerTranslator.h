@@ -256,6 +256,49 @@ static bool translateDstIndex(MCInst *mcInst, InternalInstruction *insn,
 	return false;
 }
 
+X86_TRANSLATE_INLINE uint64_t
+translateRelativeImmediate(uint64_t immediate, const OperandSpecifier *operand,
+			   uint8_t displacementSize)
+{
+	switch (operand->encoding) {
+	default:
+		break;
+	case ENCODING_Iv:
+		switch (displacementSize) {
+		default:
+			break;
+		case 1:
+			if (immediate & 0x80)
+				immediate |= ~(0xffull);
+			break;
+		case 2:
+			if (immediate & 0x8000)
+				immediate |= ~(0xffffull);
+			break;
+		case 4:
+			if (immediate & 0x80000000)
+				immediate |= ~(0xffffffffull);
+			break;
+		case 8:
+			break;
+		}
+		break;
+	case ENCODING_IB:
+		if (immediate & 0x80)
+			immediate |= ~(0xffull);
+		break;
+	case ENCODING_IW:
+		if (immediate & 0x8000)
+			immediate |= ~(0xffffull);
+		break;
+	case ENCODING_ID:
+		if (immediate & 0x80000000)
+			immediate |= ~(0xffffffffull);
+		break;
+	}
+	return immediate;
+}
+
 /// translateImmediate  - Appends an immediate operand to an MCInst.
 ///
 /// @param mcInst       - The MCInst to append to.
@@ -271,43 +314,8 @@ X86_TRANSLATE_INLINE void translateImmediate(MCInst *mcInst, uint64_t immediate,
 
 	type = (OperandType)operand->type;
 	if (type == TYPE_REL) {
-		//isBranch = true;
-		switch (operand->encoding) {
-		default:
-			break;
-		case ENCODING_Iv:
-			switch (insn->displacementSize) {
-			default:
-				break;
-			case 1:
-				if (immediate & 0x80)
-					immediate |= ~(0xffull);
-				break;
-			case 2:
-				if (immediate & 0x8000)
-					immediate |= ~(0xffffull);
-				break;
-			case 4:
-				if (immediate & 0x80000000)
-					immediate |= ~(0xffffffffull);
-				break;
-			case 8:
-				break;
-			}
-			break;
-		case ENCODING_IB:
-			if (immediate & 0x80)
-				immediate |= ~(0xffull);
-			break;
-		case ENCODING_IW:
-			if (immediate & 0x8000)
-				immediate |= ~(0xffffull);
-			break;
-		case ENCODING_ID:
-			if (immediate & 0x80000000)
-				immediate |= ~(0xffffffffull);
-			break;
-		}
+		immediate = translateRelativeImmediate(immediate, operand,
+						       insn->displacementSize);
 	} // By default sign-extend all X86 immediates based on their encoding.
 	else if (type == TYPE_IMM) {
 		switch (operand->encoding) {

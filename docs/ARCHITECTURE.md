@@ -101,6 +101,12 @@ generic operand path. The source extension dispatcher selects disjoint VEX
 map/opcode families before invoking their handlers, avoiding repeated scans
 through unrelated families. This selection stays in the cold extension path;
 each handler retains prefix, operand and truncation validation.
+The private `X86_scanCallTarget` query uses the ordinary raw decoder and only
+projects a direct near CALL's target. Immediate sign extension is shared with
+operand translation, and absolute target calculation is shared with both
+printers. It avoids constructing `MCInst`/`cs_insn` operands or changing handle
+options when a batch consumer needs one call target. It does not change the
+classification loop or the public text/detail contract.
 Batch decoding retains its existing entry and allocation behavior. Skip-data
 callbacks can change options for the next instruction; common iterator helpers
 hide and restore the detail pointer around decoding and callback execution.

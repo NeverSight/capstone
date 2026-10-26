@@ -791,6 +791,14 @@ provide the same detail, without a scalar `dword ptr` label for saved state.
 
 ## Optional private x86 scan integration
 
+`X86_scanBatch` and `X86_scanCallTarget` are private static-link entries in
+`arch/X86/X86ScanAdapter.h`, available without enabling the adapter. The CALL
+query returns the length and absolute target of a validated direct near call,
+using the same relative operand translation and address wrapping as full detail.
+It returns zero without writing the target for invalid input and other
+instructions, including indirect and far calls. It preserves handle options,
+errors and borrowed instruction storage; text and detail generation are omitted.
+
 `CAPSTONE_X86_SCAN_ADAPTER=ON` builds a private static-link hook declared in
 `arch/X86/X86ScanAdapter.h`; it is not part of the installed `cs_*` API.
 It requires the full x86 decoder and is off by default. Disabled builds

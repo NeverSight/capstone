@@ -25,6 +25,15 @@ X86ScanBatchResult X86_scanBatch(csh handle, const uint8_t *code, size_t size,
 				 uint64_t address, uint32_t *output,
 				 size_t capacity);
 
+/* Decode a direct near CALL and write its absolute target using the same
+ * operand-size and wrapping rules as full operand detail. Returns its length,
+ * or zero with target untouched for invalid input or any other instruction.
+ * Requires an x86 handle; text, detail, syntax and skip-data options do not
+ * affect this query. It neither changes handle options/errors nor retains
+ * input or instruction storage. Private static-link API, like X86_scanBatch. */
+uint16_t X86_scanCallTarget(csh handle, const uint8_t *code, size_t size,
+			    uint64_t address, uint64_t *target);
+
 /* Requires CAPSTONE_X86_SCAN_ADAPTER. Private static-link integration, not
  * an installed cs_* API. The callback
  * must use the handle's exact 32/64-bit profile and return (public_id << 8) |

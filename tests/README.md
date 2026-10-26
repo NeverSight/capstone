@@ -21,6 +21,12 @@ when `CAPSTONE_X86_REDUCE` omits those instructions. The native test also skips
 on unsupported hosts or under instruction translation; the API test still
 runs in full builds on any host.
 
+`unit_x86_call_target` compares the private direct-CALL query with full operand
+detail across bitness/vendor modes, both syntaxes, prefix pairs, REX2 payloads,
+truncations, wrapped addresses and malformed input. It also checks option
+independence and untouched output on rejection. `unit_x86_buffer_bounds` places
+complete and truncated calls immediately before an inaccessible page.
+
 ### Testing tools and usage
 
 #### `cstest`
