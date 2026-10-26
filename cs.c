@@ -1006,7 +1006,8 @@ bool cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
 	insn->size = *insn_size;
 	map_insn_id(handle, insn, mci.Opcode);
 	if (handle->no_text) {
-		fill_insn_without_text(insn, MCInst_getOpcodePub(&mci), code);
+		fill_insn_without_text(insn, MCInst_getOpcodePub(&mci), code,
+				       false);
 	} else {
 		SStream ss;
 		SStream_Init(&ss);

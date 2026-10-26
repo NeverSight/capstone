@@ -7,6 +7,13 @@
 #include "../../MCInst.h"
 #include "../../SStream.h"
 
+/* Keep scan entries and hot tables aligned when adjacent cold code changes. */
+#if defined(__GNUC__)
+#define X86_DECODE_ALIGN __attribute__((aligned(128)))
+#else
+#define X86_DECODE_ALIGN
+#endif
+
 // Keep source-owned instruction extensions outside the generated opcode range.
 #define X86_FEATURE_OPCODE_BASE 0x10000U
 #define X86_FEATURE_TILEZERO X86_FEATURE_OPCODE_BASE
@@ -166,7 +173,7 @@ enum {
 	FEATURE_0F_ESCAPE = 8,
 };
 
-static const uint8_t feature_prefix_flags[256] = {
+static const uint8_t feature_prefix_flags[256] X86_DECODE_ALIGN = {
 	/* 0x00 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8,
 	/* 0x10 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	/* 0x20 */ 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0,

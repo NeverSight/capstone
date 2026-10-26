@@ -3550,12 +3550,14 @@ bool X86_getInstructionScanResult(csh ud, const uint8_t *code, size_t code_len,
 #undef CS_DECODE_SCAN
 
 CAPSTONE_EXPORT
+X86_DECODE_ALIGN
 bool CAPSTONE_API cs_disasm_iter(csh ud, const uint8_t **code, size_t *size,
 				 uint64_t *address, cs_insn *insn)
 {
 	return cs_disasm_iter_core(ud, code, size, address, insn);
 }
 
+X86_DECODE_ALIGN
 CAPSTONE_INTERNAL X86ScanBatchResult X86_scanBatch(csh ud, const uint8_t *code,
 						   size_t size,
 						   uint64_t address,

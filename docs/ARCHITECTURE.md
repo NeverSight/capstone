@@ -89,6 +89,14 @@ entry delegates to that same inline core.
 This allows the compiler to combine scan and output state without link-time
 optimization, an extra dispatch boundary or duplicate iterator policies.
 Input validation and option selection retain their original order.
+Successful compact x86 results consume at most 15 bytes. The public iterator
+uses that validated bound to omit generic truncation, large-copy dispatch and
+a redundant size write. Allocated output retains the generic copy policy,
+keeping the shared core code unchanged in the qualification build; full decoding
+and other architectures also retain that policy. Copies still read only consumed
+input bytes and preserve the unused output tail. On GNU-compatible compilers, scan entries and their
+hot prefix, public-terminal and VEX tables have explicit 128-byte alignment so
+nearby cold-code changes do not move them to different alignment offsets.
 The private `X86_scanBatch` entry keeps the bounded classification loop in the
 same translation unit. It uses the same decoder, checked ID mapping, aliases
 and pseudo-opcode adjustment as `cs_disasm_iter`, returning owned ID/length

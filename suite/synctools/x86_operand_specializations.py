@@ -492,14 +492,15 @@ def public_instruction_ids(suffix):
 
 
 def emit_terminal_tables(name, words, rows, kinds):
-    lines = [f"static const uint32_t x86{name}Terminals[] = {{"]
+    alignment = " X86_DECODE_ALIGN" if name == "LegacyPublic" else ""
+    lines = [f"static const uint32_t x86{name}Terminals[]{alignment} = {{"]
     lines += [
         "\t" + ", ".join(f"0x{word:08x}u" for word in words[start : start + 8]) + ","
         for start in range(0, len(words), 8)
     ]
     lines += [
         "};",
-        f"static const uint64_t x86{name}Decisions[X86_TERMINAL_ROW_COUNT][2][256] = {{",
+        f"static const uint64_t x86{name}Decisions[X86_TERMINAL_ROW_COUNT][2][256]{alignment} = {{",
     ]
     for row_maps in rows:
         lines.append("{")
@@ -974,7 +975,7 @@ def emit_vex_scan(suffix):
         "enum { X86_VEX_SCAN_MEMORY = 1, X86_VEX_SCAN_REGISTER = 2,",
         "       X86_VEX_SCAN_MODRM = 4, X86_VEX_SCAN_VVVV = 8,",
         "       X86_VEX_SCAN_PATTERN_SHIFT = 4, X86_VEX_SCAN_PUBLIC_SHIFT = 8 };",
-        "static const uint32_t x86VexScanMetadata[] = {",
+        "static const uint32_t x86VexScanMetadata[] X86_DECODE_ALIGN = {",
     ]
     lines += [
         "\t" + ", ".join(f"0x{f:08x}u" for f in metadata[i : i + 8]) + ","

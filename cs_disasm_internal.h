@@ -69,15 +69,18 @@ static inline bool use_x86_scan(const cs_struct *handle)
 // fill the parts of insn that do not come from printing it, for a handle
 // with CS_OPT_TEXT off
 CS_DECODE_INLINE void fill_insn_without_text(cs_insn *insn, unsigned opcode_pub,
-					     const uint8_t *code)
+					     const uint8_t *code,
+					     bool short_insn)
 {
-	uint16_t copy_size = MIN(sizeof(insn->bytes), insn->size);
+	/* Successful compact x86 decoding guarantees at most 15 bytes. */
+	uint16_t copy_size = short_insn ? insn->size :
+					  MIN(sizeof(insn->bytes), insn->size);
 
 	code += insn->size - copy_size;
 	/* Constant-size chunks let short copies inline. The head and tail may
 	 * overlap, but both stay within the instruction. */
 	if (CS_DECODE_UNLIKELY(copy_size >= 8)) {
-		if (CS_DECODE_UNLIKELY(copy_size > 16)) {
+		if (!short_insn && CS_DECODE_UNLIKELY(copy_size > 16)) {
 			memcpy(insn->bytes, code, copy_size);
 		} else {
 			memcpy(insn->bytes, code, 8);
@@ -93,7 +96,8 @@ CS_DECODE_INLINE void fill_insn_without_text(cs_insn *insn, unsigned opcode_pub,
 	} else if (copy_size) {
 		insn->bytes[0] = code[0];
 	}
-	insn->size = copy_size;
+	if (!short_insn)
+		insn->size = copy_size;
 	insn->mnemonic[0] = '\0';
 	insn->op_str[0] = '\0';
 
@@ -119,7 +123,7 @@ CS_DECODE_INLINE void finish_x86_scan(cs_struct *handle, cs_insn *insn,
 	else
 		map_insn_id(handle, insn, result->opcode);
 	if (store_bytes)
-		fill_insn_without_text(insn, 0, code);
+		fill_insn_without_text(insn, 0, code, !batch);
 	if (!batch || insn->id != X86_INS_VCMP)
 		insn->id += result->popcode_adjust;
 }

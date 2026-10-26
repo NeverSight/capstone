@@ -25,7 +25,11 @@ runs in full builds on any host.
 detail across bitness/vendor modes, both syntaxes, prefix pairs, REX2 payloads,
 truncations, wrapped addresses and malformed input. It also checks option
 independence and untouched output on rejection. `unit_x86_buffer_bounds` places
-complete and truncated calls immediately before an inaccessible page.
+complete and truncated calls immediately before an inaccessible page. It also
+checks byte copies of lengths 1..15 in every x86 mode and text/detail setting,
+including the iterator's untouched output tail and allocated-array results.
+With the private adapter enabled, `unit_x86_scan_adapter` checks every accepted
+length and rejection of a 16-byte result even when 16 input bytes are available.
 
 `unit_x86_scan_batch` checks source-extension precedence (including mixed mode
 flags), bounded output against iteration, and explicit

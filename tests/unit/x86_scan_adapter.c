@@ -86,6 +86,28 @@ int main(void)
 		CHECK(!batch->mnemonic[0] && !batch->op_str[0]);
 		cs_free(batch, 1);
 	}
+	/* The compact copy trusts the adapter boundary's 15-byte limit. */
+	uint8_t padded[16] = { 0 };
+	memcpy(padded, code, sizeof(code));
+	cs_detail *saved_detail = insn->detail;
+	for (unsigned length = 1; length <= sizeof(padded); ++length) {
+		state.result = (X86_INS_VMOVAPS << 8) | length;
+		state.calls = 0;
+		const uint8_t *p = padded;
+		size_t left = sizeof(padded);
+		uint64_t address = 0x1000;
+		memset(insn->bytes, 0xa5, sizeof(insn->bytes));
+		CHECK(cs_disasm_iter(handle, &p, &left, &address, insn));
+		const unsigned expected = length <= 15 ? length : sizeof(code);
+		CHECK(state.calls == 1 && insn->id == X86_INS_VMOVAPS &&
+		      insn->size == expected && insn->detail == saved_detail);
+		CHECK(p == padded + expected &&
+		      left == sizeof(padded) - expected &&
+		      address == 0x1000 + expected);
+		CHECK(!memcmp(insn->bytes, padded, expected));
+		for (size_t i = expected; i < sizeof(insn->bytes); ++i)
+			CHECK(insn->bytes[i] == 0xa5);
+	}
 	/* Changing bitness disables the old profile until explicitly rebound. */
 	CHECK(cs_option(handle, CS_OPT_MODE, CS_MODE_32) == CS_ERR_OK);
 	state.calls = 0;

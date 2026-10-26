@@ -27,7 +27,9 @@ bool X86_getInstruction(csh handle, const uint8_t *code, size_t code_len,
 /* The caller selects this entry only with text and detail disabled. */
 bool X86_getInstructionScan(csh handle, const uint8_t *code, size_t code_len,
 			    MCInst *instr, uint16_t *size);
-/* Private result for text-free, detail-free core decoding. */
+/* Private result for text-free, detail-free core decoding.
+ * A successful decode consumes 1..15 bytes, including source extensions and
+ * adapter results; the core can copy those bytes without truncation. */
 typedef struct X86ScanResult {
 	unsigned opcode;
 	unsigned opcode_pub;
