@@ -11,6 +11,17 @@
 #define CAPSTONE_INTERNAL
 #endif
 
+/* Keep iterator state in registers across private decoder calls. Every
+ * declaration and definition uses the same internal calling convention. */
+#if defined(__clang__) && (defined(__aarch64__) || defined(__x86_64__))
+#if __has_attribute(preserve_most)
+#define CS_PRESERVE_MOST __attribute__((preserve_most))
+#endif
+#endif
+#ifndef CS_PRESERVE_MOST
+#define CS_PRESERVE_MOST
+#endif
+
 #include "cs_assert.h"
 #include <capstone/capstone.h>
 

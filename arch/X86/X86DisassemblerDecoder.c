@@ -3255,10 +3255,10 @@ __declspec(noinline)
 #elif defined(__GNUC__)
 __attribute__((noinline))
 #endif
-static bool decodeScanResultFallback(csh ud, const uint8_t *code,
-				     size_t code_len, cs_insn *insn,
-				     X86ScanResult *result, uint8_t opcode,
-				     bool tryExtension)
+static CS_PRESERVE_MOST bool
+decodeScanResultFallback(csh ud, const uint8_t *code, size_t code_len,
+			 cs_insn *insn, X86ScanResult *result, uint8_t opcode,
+			 bool tryExtension)
 {
 	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
 #ifdef CAPSTONE_X86_SCAN_ADAPTER
@@ -3341,9 +3341,9 @@ __declspec(noinline)
 #elif defined(__GNUC__)
 __attribute__((noinline))
 #endif
-static bool decodeLegacyPrefixedResult(csh ud, const uint8_t *code,
-				       size_t code_len, cs_insn *insn,
-				       X86ScanResult *result)
+static CS_PRESERVE_MOST bool
+decodeLegacyPrefixedResult(csh ud, const uint8_t *code, size_t code_len,
+			   cs_insn *insn, X86ScanResult *result)
 {
 	unsigned instructionID = 0;
 	const cs_mode mode = ((cs_struct *)(uintptr_t)ud)->mode;
@@ -3431,20 +3431,30 @@ X86_DECODE_INLINE int tryVexTerminalScan(const uint8_t *code, size_t code_len,
 	return X86_SCAN_COMPLETE;
 }
 
-#if defined(_MSC_VER)
-__declspec(noinline)
-#elif defined(__GNUC__)
-__attribute__((noinline))
-#endif
-static bool decodeVexTerminalResult(csh ud, const uint8_t *code,
-				    size_t code_len, cs_insn *insn,
-				    X86ScanResult *result, uint8_t prefix)
+/* Constant C5 admission folds the unused three-byte prefix handling. */
+X86_DECODE_INLINE bool
+decodeVexTerminalResultInline(csh ud, const uint8_t *code, size_t code_len,
+			      cs_insn *insn, X86ScanResult *result,
+			      uint8_t prefix)
 {
 	int status = tryVexTerminalScan(code, code_len, prefix, result);
 	if (status == X86_SCAN_NOT_HANDLED)
 		return decodeScanResultFallback(ud, code, code_len, insn,
 						result, prefix, false);
 	return status == X86_SCAN_COMPLETE;
+}
+
+#if defined(_MSC_VER)
+__declspec(noinline)
+#elif defined(__GNUC__)
+__attribute__((noinline))
+#endif
+static CS_PRESERVE_MOST bool
+decodeVexTerminalResult(csh ud, const uint8_t *code, size_t code_len,
+			cs_insn *insn, X86ScanResult *result, uint8_t prefix)
+{
+	return decodeVexTerminalResultInline(ud, code, code_len, insn, result,
+					     prefix);
 }
 
 /* Common headers enter the shared readers before the general prefix walk.
@@ -3513,6 +3523,11 @@ getInstructionScanResultAfterInitial(csh ud, const uint8_t *code,
 	if (extension || opcode == 0x62)
 		return decodeScanResultFallback(ud, code, code_len, insn,
 						result, opcode, extension);
+	if (readerFlags && opcode == 0xc5 && opcodeOffset == 0 &&
+	    !(handle->mode & (CS_MODE_16 | CS_MODE_32)))
+		return decodeVexTerminalResultInline(ud, code, code_len, insn,
+						     result, 0xc5);
+
 	unsigned instructionID = 0;
 	/* Constant bitness folds the terminal readers' mode and size tests.
 	 * Feature routing above still observes the original mode bits. */

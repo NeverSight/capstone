@@ -6,6 +6,7 @@
 
 #include "../../MCInst.h"
 #include "../../SStream.h"
+#include "../../cs_priv.h"
 
 /* Keep scan entries and hot tables aligned when adjacent cold code changes. */
 #if defined(__GNUC__)
@@ -192,8 +193,8 @@ static const uint8_t feature_prefix_flags[256] X86_DECODE_ALIGN = {
 	/* 0xf0 */ 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 };
 
-static inline bool may_be_0f_feature_extension(const uint8_t *suffix,
-					       size_t size)
+static inline CS_PRESERVE_MOST bool
+may_be_0f_feature_extension(const uint8_t *suffix, size_t size)
 {
 	return (size >= 1 && suffix[0] == 0x38) ||
 	       (size >= 2 &&

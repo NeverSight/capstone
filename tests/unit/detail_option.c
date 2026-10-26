@@ -79,6 +79,83 @@ static bool test_iter(cs_arch arch, cs_mode mode, const uint8_t *insn_code,
 	return success;
 }
 
+typedef struct {
+	cs_insn *insn;
+	cs_detail *expected, *alternate;
+	const uint8_t *bytes;
+	size_t result;
+	unsigned replace, calls;
+	bool observed;
+} skipdata_state;
+
+static size_t skipdata_callback(const uint8_t *bytes, size_t size,
+				size_t offset, void *opaque)
+{
+	skipdata_state *state = opaque;
+	++state->calls;
+	state->observed = state->insn->detail == state->expected &&
+			  bytes == state->bytes && size == 1 && offset == 0;
+	if (state->replace == 1)
+		state->insn->detail = NULL;
+	else if (state->replace == 2)
+		state->insn->detail = state->alternate;
+	return state->result;
+}
+
+/* Callback-visible detail and final restoration apply on failure as well as
+ * success, including when a callback replaces the pointer itself. */
+static bool test_skipdata_detail(unsigned allocated, unsigned detail,
+				 unsigned text, unsigned replace,
+				 unsigned result, uint8_t prefix)
+{
+	csh handle = 0;
+	bool success = true;
+	if (!check(cs_open(CS_ARCH_X86, CS_MODE_64, &handle) == CS_ERR_OK,
+		   "open skipdata handle"))
+		return false;
+	cs_option(handle, CS_OPT_DETAIL, allocated ? CS_OPT_ON : CS_OPT_OFF);
+	cs_insn *insn = cs_malloc(handle);
+	if (!check(insn != NULL, "allocate skipdata instruction")) {
+		cs_close(&handle);
+		return false;
+	}
+	cs_detail *original = insn->detail;
+	cs_detail alternate, before;
+	memset(&alternate, 0x3c, sizeof(alternate));
+	if (original) {
+		memset(original, 0xa5, sizeof(*original));
+		before = *original;
+	}
+	cs_option(handle, CS_OPT_DETAIL, detail ? CS_OPT_ON : CS_OPT_OFF);
+	cs_option(handle, CS_OPT_TEXT, text ? CS_OPT_ON : CS_OPT_OFF);
+	cs_option(handle, CS_OPT_SKIPDATA, CS_OPT_ON);
+	skipdata_state state = { insn,	     detail ? original : NULL,
+				 &alternate, &prefix,
+				 result,     replace,
+				 0,	     false };
+	cs_opt_skipdata setup = { ".byte", skipdata_callback, &state };
+	cs_option(handle, CS_OPT_SKIPDATA_SETUP, (size_t)&setup);
+	const uint8_t *cursor = &prefix;
+	size_t left = 1;
+	uint64_t address = 0x1000;
+	bool decoded = cs_disasm_iter(handle, &cursor, &left, &address, insn);
+	success &= check(decoded == (result == 1), "skipdata callback result");
+	success &= check(state.calls == 1 && state.observed,
+			 "skipdata callback sees the selected detail state");
+	success &= check(insn->detail == original,
+			 "skipdata restores the original detail pointer");
+	success &= check(cursor == &prefix + decoded && left == 1 - decoded &&
+				 address == 0x1000 + decoded,
+			 "skipdata updates cursors only on success");
+	if (original && !detail)
+		success &= check(memcmp(original, &before, sizeof(before)) == 0,
+				 "skipdata leaves hidden detail unchanged");
+	success &= check(cs_errno(handle) == CS_ERR_OK, "skipdata error state");
+	cs_free(insn, 1);
+	cs_close(&handle);
+	return success;
+}
+
 int main(void)
 {
 	// bl 0x1000
@@ -116,5 +193,19 @@ int main(void)
 	success &= test_iter(CS_ARCH_X86, CS_MODE_64, code, sizeof(code));
 	success &= test_iter(CS_ARCH_AARCH64, CS_MODE_ARM, aarch64_code,
 			     sizeof(aarch64_code));
+	const uint8_t truncated[] = { 0x0f, 0xc4, 0xc5 };
+	for (unsigned p = 0; p < sizeof(truncated); ++p)
+		for (unsigned allocated = 0; allocated < 2; ++allocated)
+			for (unsigned detail = 0; detail < 2; ++detail)
+				for (unsigned text = 0; text < 2; ++text)
+					for (unsigned replace = 0; replace < 3;
+					     ++replace)
+						for (unsigned result = 0;
+						     result < 3; ++result)
+							success &= test_skipdata_detail(
+								allocated,
+								detail, text,
+								replace, result,
+								truncated[p]);
 	return success ? 0 : 1;
 }

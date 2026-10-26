@@ -18,10 +18,12 @@
  * the compiler can combine scan and output state without an extra boundary.
  * Otherwise cs.c instantiates the same iterator. Input validation, option
  * selection and callbacks keep their original order. */
-CAPSTONE_INTERNAL bool cs_decode_full_insn(cs_struct *handle,
-					   const uint8_t *code, size_t size,
-					   cs_insn *insn, uint16_t *insn_size,
-					   bool batch);
+CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+		    cs_insn *insn, uint16_t *insn_size, bool batch);
+CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+cs_disasm_iter_skipdata(struct cs_struct *handle, const uint8_t **code,
+			size_t *size, uint64_t *address, cs_insn *insn);
 #ifndef CAPSTONE_DIET
 CAPSTONE_INTERNAL void cs_skipdata_opstr(char *opstr, const uint8_t *buffer,
 					 size_t size);
@@ -37,8 +39,8 @@ CAPSTONE_INTERNAL void cs_skipdata_opstr(char *opstr, const uint8_t *buffer,
 #define CS_DECODE_UNLIKELY(x) (x)
 #endif
 
-static inline void map_insn_id(cs_struct *handle, cs_insn *insn,
-			       unsigned int id)
+static inline CS_PRESERVE_MOST void map_insn_id(cs_struct *handle,
+						cs_insn *insn, unsigned int id)
 {
 #ifdef CAPSTONE_HAS_X86
 	/* The LUT contains only generated 16-bit opcodes; source-owned
@@ -175,46 +177,9 @@ CS_DECODE_INLINE bool cs_disasm_iter_body(struct cs_struct *handle,
 		*code += insn_size;
 		*size -= insn_size;
 		*address += insn_size;
-	} else { // encounter a broken instruction
-		size_t skipdata_bytes;
-
-		// if there is no request to skip data, or remaining data is too small,
-		// then bail out
-		if (!handle->skipdata || handle->skipdata_size > *size)
-			return false;
-
-		if (handle->skipdata_setup.callback) {
-			skipdata_bytes = handle->skipdata_setup.callback(
-				*code, *size, 0,
-				handle->skipdata_setup.user_data);
-			if (skipdata_bytes > *size)
-				// remaining data is not enough
-				return false;
-
-			if (!skipdata_bytes)
-				// user requested not to skip data, so bail out
-				return false;
-		} else
-			skipdata_bytes = handle->skipdata_size;
-
-		// we have to skip some amount of data, depending on arch & mode
-		insn->id = 0; // invalid ID for this "data" instruction
-		insn->address = *address;
-		insn->size = (uint16_t)MIN(skipdata_bytes, sizeof(insn->bytes));
-		memcpy(insn->bytes, *code,
-		       MIN(skipdata_bytes, sizeof(insn->bytes)));
-#ifdef CAPSTONE_DIET
-		insn->mnemonic[0] = '\0';
-		insn->op_str[0] = '\0';
-#else
-		strncpy(insn->mnemonic, handle->skipdata_setup.mnemonic,
-			sizeof(insn->mnemonic) - 1);
-		cs_skipdata_opstr(insn->op_str, *code, skipdata_bytes);
-#endif
-
-		*code += skipdata_bytes;
-		*size -= skipdata_bytes;
-		*address += skipdata_bytes;
+	} else {
+		return cs_disasm_iter_skipdata(handle, code, size, address,
+					       insn);
 	}
 
 	return true;

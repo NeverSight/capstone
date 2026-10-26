@@ -103,6 +103,17 @@ entry delegates to that same inline core.
 This allows the compiler to combine scan and output state without link-time
 optimization, an extra dispatch boundary or duplicate iterator policies.
 Input validation and option selection retain their original order.
+On Clang targets supporting `preserve_most` (AArch64 and x86-64), private
+scan, feature-check, mapping and full-output calls preserve additional registers.
+This lets the iterator retain its context across those calls with fewer entry
+and exit saves. The public API and callback calling conventions stay unchanged;
+other compilers use the ordinary internal calling convention. The shared core
+owns skip-data handling in an outlined helper, with detail hiding and restoration
+remaining around the entire decode and callback operation.
+For an unprefixed two-byte VEX header, public iteration inlines the existing
+VEX reader with a constant C5 prefix after source-feature selection. Its shared
+operand, reserved-field and truncation checks remain in that reader; admission
+misses use the original fallback.
 Successful compact x86 results consume at most 15 bytes. The public iterator
 uses that validated bound to omit generic truncation, large-copy dispatch and
 a redundant size write. Allocated output retains the generic copy policy,
