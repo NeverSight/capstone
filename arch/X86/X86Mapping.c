@@ -4837,31 +4837,17 @@ X86_decodeFeatureExtension(csh handle, const uint8_t *code, size_t code_len,
 			++offset;
 		if (code_len - offset < 4)
 			return X86_FEATURE_NOT_HANDLED;
-		const uint8_t map = code[offset + 1] & 0x1f;
-		const uint8_t vex_opcode = code[offset + 3];
-		/* These source-owned families have disjoint map/opcode selectors.
-		 * Keep ordinary VEX forms out of unrelated extension handlers;
-		 * each selected handler still owns prefix and operand validation. */
-		switch (map) {
-		case 2:
-			if (vex_opcode >= 0xe0 && vex_opcode <= 0xef)
-				return decode_legacy_atomic(
-					handle, code, code_len, instr, size);
-			if (vex_opcode >= 0xcb && vex_opcode <= 0xcd)
-				return decode_sha512_vex(handle, code, code_len,
-							 instr, size);
-			if ((vex_opcode >= 0x48 && vex_opcode <= 0x4b) ||
-			    vex_opcode == 0x5c || vex_opcode == 0x5e ||
-			    vex_opcode == 0x6c)
-				return decode_amx(handle, code, code_len, instr,
-						  size);
-			return X86_FEATURE_NOT_HANDLED;
-		case 5:
-			return vex_opcode == 0xfd ?
-				       decode_amx(handle, code, code_len, instr,
-						  size) :
-				       X86_FEATURE_NOT_HANDLED;
-		case 7:
+		switch (X86_vexFeatureFamily(code[offset + 1] & 0x1f,
+					     code[offset + 3])) {
+		case X86_VEX_FEATURE_ATOMIC:
+			return decode_legacy_atomic(handle, code, code_len,
+						    instr, size);
+		case X86_VEX_FEATURE_SHA512:
+			return decode_sha512_vex(handle, code, code_len, instr,
+						 size);
+		case X86_VEX_FEATURE_AMX:
+			return decode_amx(handle, code, code_len, instr, size);
+		case X86_VEX_FEATURE_SYSTEM:
 			return decode_system_legacy_vex(handle, code, code_len,
 							instr, size);
 		default:

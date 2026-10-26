@@ -191,7 +191,7 @@ Equivalence comes from the existing lookup ranges. Rows for operand/address-size
 prefix combinations keep the primary ID with an operand-size override and use
 the equivalent secondary ID without one; both still preserve the secondary
 lookup's read requirement. Different read requirements,
-address-size repairs, opcode 90 and UD1's runtime operand override retain generic
+address-size repairs and UD1's runtime operand override retain generic
 selection. No failed secondary read or cursor update is removed from that path.
 
 The terminal admission rule excludes LOCK, REX2 and vector prefixes. Generation
@@ -201,7 +201,11 @@ memory form, and immediates must neither encode registers nor change the opcode.
 Any incompatible descriptor keeps the generic path. Under this admission rule,
 REX produces only valid GPR indices, and a successful legacy address read
 produces valid base/index registers. These facts discharge the operand fixup
-and translation checks for scan terminals before code generation.
+and translation checks for scan terminals before code generation. Segment,
+control and debug registers are excluded, so these compact readers also omit
+the MOV-to-CS rejection and MOV-control/debug ModR/M repair. Generic and raw
+decoding retain those checks. Opcode 90 with REX.B keeps the XCHG repair path;
+F3/PAUSE is outside the prefix admission.
 
 The compact scan result also admits unprefixed 64-bit C4/C5 instructions with
 ordinary GPR, XMM/YMM, memory and plain immediate operands. Generated UID flags
@@ -212,7 +216,10 @@ consume the same bytes. An unused VVVV field must still be zero after inversion.
 Within these admitted forms, the VEX register indices and ordinary addresses
 already satisfy the operand fixup and translation checks.
 
-Source-owned extensions retain precedence. Legacy prefixes, other bitness,
+Source-owned extensions retain precedence. The extension dispatcher and compact
+C4 fallback share a map/opcode family classifier. An ordinary unprefixed C4
+instruction bypasses the source handler in the outlined fallback, without
+adding opcode-family tests to the ordinary scalar entry. Legacy prefixes, other bitness,
 VSIB, masks, register-encoded immediates, opcode-changing predicates and special
 size repairs keep generic decoding. An admission miss restarts that path from
 the original bytes. The raw and operand-producing interfaces retain their
@@ -225,8 +232,10 @@ failed-read state. Scan terminals consume and bounds-check the same bytes but
 retain only control state before the shared final checks and opcode setup;
 they do not build register/address values merely to discard them. Identical
 scan read sequences share a generated switch case and one finalization. The
-completed scan result does not expose
-a raw instruction. Its null-`MCInst` entry still returns the same raw state as
+MOFFS absolute addresses use the same address-size read and retain displacement
+and immediate metadata in raw output. Incoming raw size flags still use generic
+MOFFS ID selection, including truncated reads. The completed scan result does
+not expose a raw instruction. Its null-`MCInst` entry still returns the same raw state as
 the generic reader. VVVV and EVEX/VSIB checks remain on the paths that need them.
 Other encodings retain generic ID selection, prefix validation and final checks.
 UD1 and unselected shapes use the original reader. After reading and final
@@ -254,15 +263,17 @@ compiler can remove unused local state.
 
 The extension selector also supplies the bounded first non-prefix offset.
 Ordinary terminal admission uses that offset for no-prefix and single-REX
-headers with the decoder's existing bitness priority. A separate compact
-reader admits only operand/address-size prefix sequences in 16-bit mode,
-including repeats and either order. It checks each byte itself under the
-selected 16-bit mode: the extension selector's 64-bit flag can have a different
-priority for mixed mode flags. Prefix field updates and size calculation are
-shared with the full parser. The generated size-prefix rows are selected only
-after this admission; raw decoding retains its original row selection even
-when incoming raw state contains size-prefix flags. Other prefixes and
-address-dependent repairs retain generic decoding.
+headers with the decoder's existing bitness priority. An outlined compact reader
+also admits operand/address-size prefixes, segment prefixes and ordered REX
+prefixes in 32/64-bit mode, including repeats. In 16-bit mode it retains the
+size-prefix-only loop. Prefix field updates and size calculation use the full
+parser's helpers, including clearing REX when a legacy prefix follows it.
+Generated size-prefix rows select ordinary scalar instructions and multi-byte
+NOPs. REX.B opcode 90, relative-size repairs, 64-bit prefixed MOFFS and other
+unproven shapes restart generic decoding from the original bytes. These rows
+apply only to fresh compact state; raw decoding retains its original selection
+when incoming state already contains size flags. Each bitness enters the shared
+reader with a constant mode so unused size and prefix branches can fold away.
 
 Compact terminal state stays local to its shared readers. The opcode reader
 returns to generic decoding before three-byte maps and operand-bearing 3DNow

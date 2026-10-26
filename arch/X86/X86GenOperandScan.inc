@@ -1735,6 +1735,26 @@ case 88:
 		&op0, insn, false);
 	return X86_SCAN_COMPLETE;
 }
+case 93:
+{
+	int hasVVVV, needVVVV;
+
+	insn->operands = &x86OperandSets[insn->spec->operands][0];
+	hasVVVV = !readVVVV(insn);
+	needVVVV = hasVVVV && (insn->vvvv != 0);
+	if (readMemoryOffset(insn, true))
+		return X86_SCAN_INVALID;
+	if (needVVVV || finishDecodedInstruction(insn, true))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_Ia, TYPE_MOFFS };
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op0, insn, false);
+	return X86_SCAN_COMPLETE;
+}
 case 95:
 {
 	int hasVVVV, needVVVV;
@@ -4005,6 +4025,26 @@ case 125:
 	if (beginTranslation(mcInst, insn))
 		return X86_SCAN_INVALID;
 	static const OperandSpecifier op0 = { ENCODING_IW, TYPE_IMM };
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op0, insn, false);
+	return X86_SCAN_COMPLETE;
+}
+case 151:
+{
+	int hasVVVV, needVVVV;
+
+	insn->operands = &x86OperandSets[insn->spec->operands][0];
+	hasVVVV = !readVVVV(insn);
+	needVVVV = hasVVVV && (insn->vvvv != 0);
+	if (readMemoryOffset(insn, true))
+		return X86_SCAN_INVALID;
+	if (needVVVV || finishDecodedInstruction(insn, true))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_Ia, TYPE_MOFFS };
 	translateImmediate(
 		mcInst, insn->immediates[insn->numImmediatesTranslated++],
 		&op0, insn, false);

@@ -977,6 +977,14 @@ case 92:
 		&op2, insn, emitOperands);
 	return false;
 }
+case 93:
+{
+	static const OperandSpecifier op0 = { ENCODING_Ia, TYPE_MOFFS };
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op0, insn, emitOperands);
+	return false;
+}
 case 95:
 {
 	static const OperandSpecifier op0 = { ENCODING_Rv, TYPE_Rv };
@@ -2869,6 +2877,14 @@ case 150:
 	translateImmediate(
 		mcInst, insn->immediates[insn->numImmediatesTranslated++],
 		&op2, insn, emitOperands);
+	return false;
+}
+case 151:
+{
+	static const OperandSpecifier op0 = { ENCODING_Ia, TYPE_MOFFS };
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op0, insn, emitOperands);
 	return false;
 }
 case 153:

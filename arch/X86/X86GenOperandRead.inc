@@ -381,6 +381,10 @@ case 92:
 	    readImmediate(insn, insn->immediateSize))
 		return -1;
 	return needVVVV ? -1 : 0;
+case 93:
+	if (readMemoryOffset(insn, true))
+		return -1;
+	return needVVVV ? -1 : 0;
 case 95:
 	if (readOpcodeRegister(insn, 0) ||
 	    readImmediate(insn, insn->immediateSize))
@@ -1111,6 +1115,10 @@ case 150:
 	if ((!insn->consumedModRM && readModRM(insn)) ||
 	    fixupRMOperand(insn, TYPE_MM64, ENCODING_RM) ||
 	    readImmediate(insn, 1))
+		return -1;
+	return needVVVV ? -1 : 0;
+case 151:
+	if (readMemoryOffset(insn, true))
 		return -1;
 	return needVVVV ? -1 : 0;
 case 153:

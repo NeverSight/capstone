@@ -318,6 +318,14 @@ static int readLegacyShape33(struct InternalInstruction *insn)
 }
 static int readLegacyShape34(struct InternalInstruction *insn)
 {
+	if (readMemoryOffset(insn, true))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	return X86_SCAN_RAW_READY;
+}
+static int readLegacyShape35(struct InternalInstruction *insn)
+{
 	if (readOpcodeRegister(insn, 1) ||
 	    readImmediate(insn, 1))
 		return X86_SCAN_INVALID;
@@ -325,7 +333,7 @@ static int readLegacyShape34(struct InternalInstruction *insn)
 		return X86_SCAN_INVALID;
 	return X86_SCAN_RAW_READY;
 }
-static int readLegacyShape35(struct InternalInstruction *insn)
+static int readLegacyShape36(struct InternalInstruction *insn)
 {
 	if (readOpcodeRegister(insn, 0) ||
 	    readImmediate(insn, insn->immediateSize))
@@ -334,20 +342,10 @@ static int readLegacyShape35(struct InternalInstruction *insn)
 		return X86_SCAN_INVALID;
 	return X86_SCAN_RAW_READY;
 }
-static int readLegacyShape36(struct InternalInstruction *insn)
-{
-	if ((!insn->consumedModRM && readModRM(insn)) ||
-	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
-	    readImmediate(insn, 1))
-		return X86_SCAN_INVALID;
-	if (finishDecodedInstruction(insn, false))
-		return X86_SCAN_INVALID;
-	return X86_SCAN_RAW_READY;
-}
 static int readLegacyShape37(struct InternalInstruction *insn)
 {
 	if ((!insn->consumedModRM && readModRM(insn)) ||
-	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM) ||
+	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
 	    readImmediate(insn, 1))
 		return X86_SCAN_INVALID;
 	if (finishDecodedInstruction(insn, false))
@@ -357,7 +355,7 @@ static int readLegacyShape37(struct InternalInstruction *insn)
 static int readLegacyShape38(struct InternalInstruction *insn)
 {
 	if ((!insn->consumedModRM && readModRM(insn)) ||
-	    fixupRMOperand(insn, TYPE_Rv, ENCODING_RM) ||
+	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM) ||
 	    readImmediate(insn, 1))
 		return X86_SCAN_INVALID;
 	if (finishDecodedInstruction(insn, false))
@@ -366,13 +364,23 @@ static int readLegacyShape38(struct InternalInstruction *insn)
 }
 static int readLegacyShape39(struct InternalInstruction *insn)
 {
-	if (readImmediate(insn, 2))
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_Rv, ENCODING_RM) ||
+	    readImmediate(insn, 1))
 		return X86_SCAN_INVALID;
 	if (finishDecodedInstruction(insn, false))
 		return X86_SCAN_INVALID;
 	return X86_SCAN_RAW_READY;
 }
 static int readLegacyShape40(struct InternalInstruction *insn)
+{
+	if (readImmediate(insn, 2))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	return X86_SCAN_RAW_READY;
+}
+static int readLegacyShape41(struct InternalInstruction *insn)
 {
 	if (readImmediate(insn, 2) ||
 	    readImmediate(insn, 1))
@@ -381,18 +389,9 @@ static int readLegacyShape40(struct InternalInstruction *insn)
 		return X86_SCAN_INVALID;
 	return X86_SCAN_RAW_READY;
 }
-static int readLegacyShape41(struct InternalInstruction *insn)
-{
-	if (readImmediate(insn, 1))
-		return X86_SCAN_INVALID;
-	if (finishDecodedInstruction(insn, false))
-		return X86_SCAN_INVALID;
-	return X86_SCAN_RAW_READY;
-}
 static int readLegacyShape42(struct InternalInstruction *insn)
 {
-	if ((!insn->consumedModRM && readModRM(insn)) ||
-	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM))
+	if (readImmediate(insn, 1))
 		return X86_SCAN_INVALID;
 	if (finishDecodedInstruction(insn, false))
 		return X86_SCAN_INVALID;
@@ -401,7 +400,7 @@ static int readLegacyShape42(struct InternalInstruction *insn)
 static int readLegacyShape43(struct InternalInstruction *insn)
 {
 	if ((!insn->consumedModRM && readModRM(insn)) ||
-	    fixupRMOperand(insn, TYPE_Rv, ENCODING_RM))
+	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM))
 		return X86_SCAN_INVALID;
 	if (finishDecodedInstruction(insn, false))
 		return X86_SCAN_INVALID;
@@ -409,7 +408,8 @@ static int readLegacyShape43(struct InternalInstruction *insn)
 }
 static int readLegacyShape44(struct InternalInstruction *insn)
 {
-	if (readImmediate(insn, 4))
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_Rv, ENCODING_RM))
 		return X86_SCAN_INVALID;
 	if (finishDecodedInstruction(insn, false))
 		return X86_SCAN_INVALID;
@@ -417,7 +417,7 @@ static int readLegacyShape44(struct InternalInstruction *insn)
 }
 static int readLegacyShape45(struct InternalInstruction *insn)
 {
-	if (readImmediate(insn, insn->immediateSize))
+	if (readImmediate(insn, 4))
 		return X86_SCAN_INVALID;
 	if (finishDecodedInstruction(insn, false))
 		return X86_SCAN_INVALID;
@@ -425,8 +425,7 @@ static int readLegacyShape45(struct InternalInstruction *insn)
 }
 static int readLegacyShape46(struct InternalInstruction *insn)
 {
-	if ((!insn->consumedModRM && readModRM(insn)) ||
-	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM))
+	if (readImmediate(insn, insn->immediateSize))
 		return X86_SCAN_INVALID;
 	if (finishDecodedInstruction(insn, false))
 		return X86_SCAN_INVALID;
@@ -435,7 +434,7 @@ static int readLegacyShape46(struct InternalInstruction *insn)
 static int readLegacyShape47(struct InternalInstruction *insn)
 {
 	if ((!insn->consumedModRM && readModRM(insn)) ||
-	    fixupRMOperand(insn, TYPE_R16, ENCODING_RM))
+	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM))
 		return X86_SCAN_INVALID;
 	if (finishDecodedInstruction(insn, false))
 		return X86_SCAN_INVALID;
@@ -444,8 +443,7 @@ static int readLegacyShape47(struct InternalInstruction *insn)
 static int readLegacyShape48(struct InternalInstruction *insn)
 {
 	if ((!insn->consumedModRM && readModRM(insn)) ||
-	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
-	    fixupRegisterOperand(insn, TYPE_R32))
+	    fixupRMOperand(insn, TYPE_R16, ENCODING_RM))
 		return X86_SCAN_INVALID;
 	if (finishDecodedInstruction(insn, false))
 		return X86_SCAN_INVALID;
@@ -454,7 +452,7 @@ static int readLegacyShape48(struct InternalInstruction *insn)
 static int readLegacyShape49(struct InternalInstruction *insn)
 {
 	if ((!insn->consumedModRM && readModRM(insn)) ||
-	    fixupRMOperand(insn, TYPE_R32, ENCODING_RM) ||
+	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
 	    fixupRegisterOperand(insn, TYPE_R32))
 		return X86_SCAN_INVALID;
 	if (finishDecodedInstruction(insn, false))
@@ -464,8 +462,8 @@ static int readLegacyShape49(struct InternalInstruction *insn)
 static int readLegacyShape50(struct InternalInstruction *insn)
 {
 	if ((!insn->consumedModRM && readModRM(insn)) ||
-	    fixupRegisterOperand(insn, TYPE_R32) ||
-	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
+	    fixupRMOperand(insn, TYPE_R32, ENCODING_RM) ||
+	    fixupRegisterOperand(insn, TYPE_R32))
 		return X86_SCAN_INVALID;
 	if (finishDecodedInstruction(insn, false))
 		return X86_SCAN_INVALID;
@@ -475,7 +473,7 @@ static int readLegacyShape51(struct InternalInstruction *insn)
 {
 	if ((!insn->consumedModRM && readModRM(insn)) ||
 	    fixupRegisterOperand(insn, TYPE_R32) ||
-	    fixupRMOperand(insn, TYPE_R32, ENCODING_RM))
+	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
 		return X86_SCAN_INVALID;
 	if (finishDecodedInstruction(insn, false))
 		return X86_SCAN_INVALID;
@@ -484,8 +482,8 @@ static int readLegacyShape51(struct InternalInstruction *insn)
 static int readLegacyShape52(struct InternalInstruction *insn)
 {
 	if ((!insn->consumedModRM && readModRM(insn)) ||
-	    fixupRegisterOperand(insn, TYPE_Rv) ||
-	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM))
+	    fixupRegisterOperand(insn, TYPE_R32) ||
+	    fixupRMOperand(insn, TYPE_R32, ENCODING_RM))
 		return X86_SCAN_INVALID;
 	if (finishDecodedInstruction(insn, false))
 		return X86_SCAN_INVALID;
@@ -495,7 +493,7 @@ static int readLegacyShape53(struct InternalInstruction *insn)
 {
 	if ((!insn->consumedModRM && readModRM(insn)) ||
 	    fixupRegisterOperand(insn, TYPE_Rv) ||
-	    fixupRMOperand(insn, TYPE_R16, ENCODING_RM))
+	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM))
 		return X86_SCAN_INVALID;
 	if (finishDecodedInstruction(insn, false))
 		return X86_SCAN_INVALID;
@@ -503,7 +501,9 @@ static int readLegacyShape53(struct InternalInstruction *insn)
 }
 static int readLegacyShape54(struct InternalInstruction *insn)
 {
-	if (readOpcodeRegister(insn, 8))
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRegisterOperand(insn, TYPE_Rv) ||
+	    fixupRMOperand(insn, TYPE_R16, ENCODING_RM))
 		return X86_SCAN_INVALID;
 	if (finishDecodedInstruction(insn, false))
 		return X86_SCAN_INVALID;
@@ -511,7 +511,7 @@ static int readLegacyShape54(struct InternalInstruction *insn)
 }
 static int readLegacyShape55(struct InternalInstruction *insn)
 {
-	if (readImmediate(insn, 4))
+	if (readOpcodeRegister(insn, 8))
 		return X86_SCAN_INVALID;
 	if (finishDecodedInstruction(insn, false))
 		return X86_SCAN_INVALID;
@@ -519,8 +519,7 @@ static int readLegacyShape55(struct InternalInstruction *insn)
 }
 static int readLegacyShape56(struct InternalInstruction *insn)
 {
-	if ((!insn->consumedModRM && readModRM(insn)) ||
-	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM))
+	if (readImmediate(insn, 4))
 		return X86_SCAN_INVALID;
 	if (finishDecodedInstruction(insn, false))
 		return X86_SCAN_INVALID;
@@ -529,8 +528,7 @@ static int readLegacyShape56(struct InternalInstruction *insn)
 static int readLegacyShape57(struct InternalInstruction *insn)
 {
 	if ((!insn->consumedModRM && readModRM(insn)) ||
-	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
-	    fixupRegisterOperand(insn, TYPE_R64))
+	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM))
 		return X86_SCAN_INVALID;
 	if (finishDecodedInstruction(insn, false))
 		return X86_SCAN_INVALID;
@@ -539,7 +537,7 @@ static int readLegacyShape57(struct InternalInstruction *insn)
 static int readLegacyShape58(struct InternalInstruction *insn)
 {
 	if ((!insn->consumedModRM && readModRM(insn)) ||
-	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM) ||
+	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
 	    fixupRegisterOperand(insn, TYPE_R64))
 		return X86_SCAN_INVALID;
 	if (finishDecodedInstruction(insn, false))
@@ -549,8 +547,8 @@ static int readLegacyShape58(struct InternalInstruction *insn)
 static int readLegacyShape59(struct InternalInstruction *insn)
 {
 	if ((!insn->consumedModRM && readModRM(insn)) ||
-	    fixupRegisterOperand(insn, TYPE_R64) ||
-	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
+	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM) ||
+	    fixupRegisterOperand(insn, TYPE_R64))
 		return X86_SCAN_INVALID;
 	if (finishDecodedInstruction(insn, false))
 		return X86_SCAN_INVALID;
@@ -560,13 +558,23 @@ static int readLegacyShape60(struct InternalInstruction *insn)
 {
 	if ((!insn->consumedModRM && readModRM(insn)) ||
 	    fixupRegisterOperand(insn, TYPE_R64) ||
-	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM))
+	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
 		return X86_SCAN_INVALID;
 	if (finishDecodedInstruction(insn, false))
 		return X86_SCAN_INVALID;
 	return X86_SCAN_RAW_READY;
 }
 static int readLegacyShape61(struct InternalInstruction *insn)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRegisterOperand(insn, TYPE_R64) ||
+	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	return X86_SCAN_RAW_READY;
+}
+static int readLegacyShape62(struct InternalInstruction *insn)
 {
 	if ((!insn->consumedModRM && readModRM(insn)) ||
 	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM) ||
@@ -576,7 +584,7 @@ static int readLegacyShape61(struct InternalInstruction *insn)
 		return X86_SCAN_INVALID;
 	return X86_SCAN_RAW_READY;
 }
-static int readLegacyShape62(struct InternalInstruction *insn)
+static int readLegacyShape63(struct InternalInstruction *insn)
 {
 	if ((!insn->consumedModRM && readModRM(insn)) ||
 	    fixupRegisterOperand(insn, TYPE_R64) ||
@@ -586,7 +594,7 @@ static int readLegacyShape62(struct InternalInstruction *insn)
 		return X86_SCAN_INVALID;
 	return X86_SCAN_RAW_READY;
 }
-static int readLegacyShape63(struct InternalInstruction *insn)
+static int readLegacyShape64(struct InternalInstruction *insn)
 {
 	if ((!insn->consumedModRM && readModRM(insn)) ||
 	    fixupRegisterOperand(insn, TYPE_R64) ||
@@ -596,7 +604,7 @@ static int readLegacyShape63(struct InternalInstruction *insn)
 		return X86_SCAN_INVALID;
 	return X86_SCAN_RAW_READY;
 }
-static int readLegacyShape64(struct InternalInstruction *insn)
+static int readLegacyShape65(struct InternalInstruction *insn)
 {
 	if ((!insn->consumedModRM && readModRM(insn)) ||
 	    fixupRegisterOperand(insn, TYPE_R64) ||
@@ -606,20 +614,10 @@ static int readLegacyShape64(struct InternalInstruction *insn)
 		return X86_SCAN_INVALID;
 	return X86_SCAN_RAW_READY;
 }
-static int readLegacyShape65(struct InternalInstruction *insn)
-{
-	if ((!insn->consumedModRM && readModRM(insn)) ||
-	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
-	    readImmediate(insn, 4))
-		return X86_SCAN_INVALID;
-	if (finishDecodedInstruction(insn, false))
-		return X86_SCAN_INVALID;
-	return X86_SCAN_RAW_READY;
-}
 static int readLegacyShape66(struct InternalInstruction *insn)
 {
 	if ((!insn->consumedModRM && readModRM(insn)) ||
-	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM) ||
+	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
 	    readImmediate(insn, 4))
 		return X86_SCAN_INVALID;
 	if (finishDecodedInstruction(insn, false))
@@ -640,7 +638,7 @@ static int readLegacyShape68(struct InternalInstruction *insn)
 {
 	if ((!insn->consumedModRM && readModRM(insn)) ||
 	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM) ||
-	    readImmediate(insn, 1))
+	    readImmediate(insn, 4))
 		return X86_SCAN_INVALID;
 	if (finishDecodedInstruction(insn, false))
 		return X86_SCAN_INVALID;
@@ -658,13 +656,23 @@ static int readLegacyShape69(struct InternalInstruction *insn)
 }
 static int readLegacyShape70(struct InternalInstruction *insn)
 {
-	if (readOpcodeRegister(insn, 8))
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM) ||
+	    readImmediate(insn, 1))
 		return X86_SCAN_INVALID;
 	if (finishDecodedInstruction(insn, false))
 		return X86_SCAN_INVALID;
 	return X86_SCAN_RAW_READY;
 }
 static int readLegacyShape71(struct InternalInstruction *insn)
+{
+	if (readOpcodeRegister(insn, 8))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	return X86_SCAN_RAW_READY;
+}
+static int readLegacyShape72(struct InternalInstruction *insn)
 {
 	if (readOpcodeRegister(insn, 8) ||
 	    readImmediate(insn, 8))
@@ -673,7 +681,7 @@ static int readLegacyShape71(struct InternalInstruction *insn)
 		return X86_SCAN_INVALID;
 	return X86_SCAN_RAW_READY;
 }
-static int readLegacyShape72(struct InternalInstruction *insn)
+static int readLegacyShape73(struct InternalInstruction *insn)
 {
 	if ((!insn->consumedModRM && readModRM(insn)) ||
 	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM) ||
@@ -683,20 +691,10 @@ static int readLegacyShape72(struct InternalInstruction *insn)
 		return X86_SCAN_INVALID;
 	return X86_SCAN_RAW_READY;
 }
-static int readLegacyShape73(struct InternalInstruction *insn)
-{
-	if ((!insn->consumedModRM && readModRM(insn)) ||
-	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM))
-		return X86_SCAN_INVALID;
-	if (finishDecodedInstruction(insn, false))
-		return X86_SCAN_INVALID;
-	return X86_SCAN_RAW_READY;
-}
 static int readLegacyShape74(struct InternalInstruction *insn)
 {
 	if ((!insn->consumedModRM && readModRM(insn)) ||
-	    fixupRegisterOperand(insn, TYPE_R64) ||
-	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM))
+	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM))
 		return X86_SCAN_INVALID;
 	if (finishDecodedInstruction(insn, false))
 		return X86_SCAN_INVALID;
@@ -706,13 +704,23 @@ static int readLegacyShape75(struct InternalInstruction *insn)
 {
 	if ((!insn->consumedModRM && readModRM(insn)) ||
 	    fixupRegisterOperand(insn, TYPE_R64) ||
-	    fixupRMOperand(insn, TYPE_R16, ENCODING_RM))
+	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM))
 		return X86_SCAN_INVALID;
 	if (finishDecodedInstruction(insn, false))
 		return X86_SCAN_INVALID;
 	return X86_SCAN_RAW_READY;
 }
 static int readLegacyShape76(struct InternalInstruction *insn)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRegisterOperand(insn, TYPE_R64) ||
+	    fixupRMOperand(insn, TYPE_R16, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	return X86_SCAN_RAW_READY;
+}
+static int readLegacyShape77(struct InternalInstruction *insn)
 {
 	if (readImmediate(insn, insn->immediateSize) ||
 	    readImmediate(insn, insn->immediateSize))
@@ -721,9 +729,38 @@ static int readLegacyShape76(struct InternalInstruction *insn)
 		return X86_SCAN_INVALID;
 	return X86_SCAN_RAW_READY;
 }
-static int readLegacyShape77(struct InternalInstruction *insn)
+static int readLegacyShape78(struct InternalInstruction *insn)
 {
 	if (readImmediate(insn, 2))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	return X86_SCAN_RAW_READY;
+}
+static int readLegacyShape79(struct InternalInstruction *insn)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_R32, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	return X86_SCAN_RAW_READY;
+}
+static int readLegacyShape80(struct InternalInstruction *insn)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRegisterOperand(insn, TYPE_R16) ||
+	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	return X86_SCAN_RAW_READY;
+}
+static int readLegacyShape81(struct InternalInstruction *insn)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRegisterOperand(insn, TYPE_R16) ||
+	    fixupRMOperand(insn, TYPE_R32, ENCODING_RM))
 		return X86_SCAN_INVALID;
 	if (finishDecodedInstruction(insn, false))
 		return X86_SCAN_INVALID;
@@ -751,9 +788,8 @@ X86_DECODE_INLINE int scanLegacyOperands(struct InternalInstruction *insn,
 	case 21:
 	case 31:
 	case 32:
-	case 42:
 	case 43:
-	case 46:
+	case 44:
 	case 47:
 	case 48:
 	case 49:
@@ -761,7 +797,7 @@ X86_DECODE_INLINE int scanLegacyOperands(struct InternalInstruction *insn,
 	case 51:
 	case 52:
 	case 53:
-	case 56:
+	case 54:
 	case 57:
 	case 58:
 	case 59:
@@ -770,42 +806,46 @@ X86_DECODE_INLINE int scanLegacyOperands(struct InternalInstruction *insn,
 	case 62:
 	case 63:
 	case 64:
-	case 73:
+	case 65:
 	case 74:
 	case 75:
+	case 76:
+	case 79:
+	case 80:
+	case 81:
 		if ((!insn->consumedModRM && readModRMScan(insn)))
 			return X86_SCAN_INVALID;
 		break;
 	case 9:
 	case 22:
-	case 34:
-	case 41:
+	case 35:
+	case 42:
 		if (readImmediateImpl(insn, 1, false))
 			return X86_SCAN_INVALID;
 		break;
 	case 10:
-	case 35:
-	case 45:
+	case 36:
+	case 46:
 		if (readImmediateImpl(insn, insn->immediateSize, false))
 			return X86_SCAN_INVALID;
 		break;
 	case 11:
 	case 18:
 	case 19:
-	case 54:
-	case 70:
+	case 55:
+	case 71:
 		break;
 	case 23:
 	case 24:
 	case 25:
 	case 29:
 	case 30:
-	case 36:
 	case 37:
 	case 38:
-	case 68:
+	case 39:
 	case 69:
-	case 72:
+	case 70:
+	case 73:
 		if ((!insn->consumedModRM && readModRMScan(insn)) ||
 		    readImmediateImpl(insn, 1, false))
 			return X86_SCAN_INVALID;
@@ -822,33 +862,37 @@ X86_DECODE_INLINE int scanLegacyOperands(struct InternalInstruction *insn,
 		    readImmediateImpl(insn, 2, false))
 			return X86_SCAN_INVALID;
 		break;
-	case 39:
-	case 77:
-		if (readImmediateImpl(insn, 2, false))
+	case 34:
+		if (readMemoryOffset(insn, false))
 			return X86_SCAN_INVALID;
 		break;
 	case 40:
+	case 78:
+		if (readImmediateImpl(insn, 2, false))
+			return X86_SCAN_INVALID;
+		break;
+	case 41:
 		if (readImmediateImpl(insn, 2, false) ||
 		    readImmediateImpl(insn, 1, false))
 			return X86_SCAN_INVALID;
 		break;
-	case 44:
-	case 55:
+	case 45:
+	case 56:
 		if (readImmediateImpl(insn, 4, false))
 			return X86_SCAN_INVALID;
 		break;
-	case 65:
 	case 66:
 	case 67:
+	case 68:
 		if ((!insn->consumedModRM && readModRMScan(insn)) ||
 		    readImmediateImpl(insn, 4, false))
 			return X86_SCAN_INVALID;
 		break;
-	case 71:
+	case 72:
 		if (readImmediateImpl(insn, 8, false))
 			return X86_SCAN_INVALID;
 		break;
-	case 76:
+	case 77:
 		if (readImmediateImpl(insn, insn->immediateSize, false) ||
 		    readImmediateImpl(insn, insn->immediateSize, false))
 			return X86_SCAN_INVALID;
@@ -943,9 +987,13 @@ static int (*const x86LegacyHandlers[])(struct InternalInstruction *) = {
 	readLegacyShape75,
 	readLegacyShape76,
 	readLegacyShape77,
+	readLegacyShape78,
+	readLegacyShape79,
+	readLegacyShape80,
+	readLegacyShape81,
 };
 
-/* 1957 terminals, 77 operand handlers; selected opcodes [215, 110, 177, 110, 177, 110, 214, 106, 214, 106, 214, 108, 214, 108]. */
+/* 2205 terminals, 81 operand handlers; selected opcodes [220, 111, 182, 111, 182, 111, 220, 109, 220, 111, 220, 111, 182, 109, 181, 111, 181, 111, 182, 111, 215, 107, 215, 107, 215, 109, 215, 109]. */
 #define X86_TERMINAL_INDEXED UINT64_C(0x8000000000000000)
 #define X86_TERMINAL_SPLIT UINT64_C(0x4000000000000000)
 #define X86_TERMINAL_MASK UINT64_C(0x7fffffff)
@@ -981,223 +1029,254 @@ static const uint32_t x86LegacyTerminals[] = {
 	0x1e0c81fdu, 0x0104c5fbu, 0x0c0fc5feu, 0x030145edu, 0x0d0cc5f0u, 0x0104c359u, 0x0c0fc362u, 0x03014337u,
 	0x0d0cc340u, 0x0e0f8360u, 0x0f100364u, 0x100b033fu, 0x110b4341u, 0x100b02deu, 0x00000000u, 0x1f0d8408u,
 	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x200dc409u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x120c0644u,
-	0x0b000224u, 0x0b000181u, 0x2112023fu, 0x0b000438u, 0x0b000414u, 0x0b0004c6u, 0x0b0002d4u, 0x090045f8u,
-	0x0a0085eau, 0x221b835eu, 0x2317c33du, 0x241dc4a4u, 0x241dc4bcu, 0x241dc458u, 0x241dc470u, 0x241dc55du,
-	0x241dc585u, 0x170104dbu, 0x241dc4f4u, 0x251e84a7u, 0x251e84bfu, 0x251e845bu, 0x251e8473u, 0x251e8560u,
-	0x251e8588u, 0x180504deu, 0x251e84f7u, 0x241dc498u, 0x241dc4b0u, 0x241dc44cu, 0x241dc464u, 0x241dc551u,
-	0x241dc579u, 0x170104cfu, 0x241dc4e8u, 0x261e049bu, 0x261e04b3u, 0x261e044fu, 0x261e0467u, 0x261e0554u,
-	0x261e057cu, 0x1d01c4d2u, 0x261e04ebu, 0x27160489u, 0x0b00048cu, 0x100b02e4u, 0x00000000u, 0x100b02dcu,
-	0x00000000u, 0x17010358u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x190f435fu, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x1a00c336u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x1c0ec33eu, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x2811823cu, 0x0b0002e1u, 0x271602ffu, 0x0b000302u, 0x0b000283u, 0x2913c281u, 0x0b000284u,
-	0x0b000290u, 0x1f0d84a2u, 0x1f0d84bau, 0x1f0d8456u, 0x1f0d846eu, 0x1f0d855bu, 0x1f0d8583u, 0x1f0d84d9u,
-	0x1f0d84f2u, 0x2a1104a5u, 0x2a1104bdu, 0x2a110459u, 0x2a110471u, 0x2a11055eu, 0x2a110586u, 0x2a1104dcu,
-	0x2a1104f5u, 0x1f0d8496u, 0x1f0d84aeu, 0x1f0d844au, 0x1f0d8462u, 0x1f0d854fu, 0x1f0d8577u, 0x1f0d84cdu,
-	0x1f0d84e6u, 0x2b108499u, 0x2b1084b1u, 0x2b10844du, 0x2b108465u, 0x2b108552u, 0x2b10857au, 0x2b1084d0u,
-	0x2b1084e9u, 0x1f0d84a3u, 0x1f0d84bbu, 0x1f0d8457u, 0x1f0d846fu, 0x1f0d855cu, 0x1f0d8584u, 0x1f0d84dau,
-	0x1f0d84f3u, 0x2a1104a6u, 0x2a1104beu, 0x2a11045au, 0x2a110472u, 0x2a11055fu, 0x2a110587u, 0x2a1104ddu,
-	0x2a1104f6u, 0x1f0d8497u, 0x1f0d84afu, 0x1f0d844bu, 0x1f0d8463u, 0x1f0d8550u, 0x1f0d8578u, 0x1f0d84ceu,
-	0x1f0d84e7u, 0x2b10849au, 0x2b1084b2u, 0x2b10844eu, 0x2b108466u, 0x2b108553u, 0x2b10857bu, 0x2b1084d1u,
-	0x2b1084eau, 0x09004080u, 0x0900407fu, 0x0b0004dfu, 0x0b000652u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b0003a7u,
+	0x120c0644u, 0x0b000224u, 0x0b000181u, 0x2112023fu, 0x0b000438u, 0x0b000414u, 0x0b0004c6u, 0x0b0002d4u,
+	0x22174356u, 0x22174332u, 0x2217435cu, 0x22174339u, 0x090045f8u, 0x0a0085eau, 0x231b835eu, 0x2417c33du,
+	0x251dc4a4u, 0x251dc4bcu, 0x251dc458u, 0x251dc470u, 0x251dc55du, 0x251dc585u, 0x170104dbu, 0x251dc4f4u,
+	0x261e84a7u, 0x261e84bfu, 0x261e845bu, 0x261e8473u, 0x261e8560u, 0x261e8588u, 0x180504deu, 0x261e84f7u,
+	0x251dc498u, 0x251dc4b0u, 0x251dc44cu, 0x251dc464u, 0x251dc551u, 0x251dc579u, 0x170104cfu, 0x251dc4e8u,
+	0x271e049bu, 0x271e04b3u, 0x271e044fu, 0x271e0467u, 0x271e0554u, 0x271e057cu, 0x1d01c4d2u, 0x271e04ebu,
+	0x28160489u, 0x0b00048cu, 0x100b02e4u, 0x00000000u, 0x100b02dcu, 0x00000000u, 0x17010358u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x190f435fu, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x1a00c336u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x1c0ec33eu, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x2911823cu, 0x0b0002e1u,
+	0x281602ffu, 0x0b000302u, 0x0b000283u, 0x2a13c281u, 0x0b000284u, 0x0b000290u, 0x1f0d84a2u, 0x1f0d84bau,
+	0x1f0d8456u, 0x1f0d846eu, 0x1f0d855bu, 0x1f0d8583u, 0x1f0d84d9u, 0x1f0d84f2u, 0x2b1104a5u, 0x2b1104bdu,
+	0x2b110459u, 0x2b110471u, 0x2b11055eu, 0x2b110586u, 0x2b1104dcu, 0x2b1104f5u, 0x1f0d8496u, 0x1f0d84aeu,
+	0x1f0d844au, 0x1f0d8462u, 0x1f0d854fu, 0x1f0d8577u, 0x1f0d84cdu, 0x1f0d84e6u, 0x2c108499u, 0x2c1084b1u,
+	0x2c10844du, 0x2c108465u, 0x2c108552u, 0x2c10857au, 0x2c1084d0u, 0x2c1084e9u, 0x1f0d84a3u, 0x1f0d84bbu,
+	0x1f0d8457u, 0x1f0d846fu, 0x1f0d855cu, 0x1f0d8584u, 0x1f0d84dau, 0x1f0d84f3u, 0x2b1104a6u, 0x2b1104beu,
+	0x2b11045au, 0x2b110472u, 0x2b11055fu, 0x2b110587u, 0x2b1104ddu, 0x2b1104f6u, 0x1f0d8497u, 0x1f0d84afu,
+	0x1f0d844bu, 0x1f0d8463u, 0x1f0d8550u, 0x1f0d8578u, 0x1f0d84ceu, 0x1f0d84e7u, 0x2c10849au, 0x2c1084b2u,
+	0x2c10844eu, 0x2c108466u, 0x2c108553u, 0x2c10857bu, 0x2c1084d1u, 0x2c1084eau, 0x09004080u, 0x0900407fu,
+	0x0b0004dfu, 0x0b000652u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b000247u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x1614c2feu, 0x1614c2fdu, 0x1614c2fcu, 0x1614c29fu, 0x2a13c270u, 0x2a13c26eu,
+	0x2a13c3f6u, 0x2a13c3f4u, 0x2d0e017fu, 0x2e1502bdu, 0x21120244u, 0x1614c2bbu, 0x0b000271u, 0x0b00026fu,
+	0x0b0003f7u, 0x0b0003f5u, 0x0b0002f7u, 0x0b000282u, 0x0b000487u, 0x0b000488u, 0x0b000249u, 0x0b00018eu,
+	0x170105f9u, 0x170105fau, 0x1f0d83ccu, 0x1f0d83a5u, 0x1f0d8398u, 0x1f0d826au, 0x1f0d8238u, 0x1f0d8250u,
+	0x190f45fcu, 0x190f45fdu, 0x2b1103cdu, 0x2b1103a6u, 0x2f114399u, 0x2f11426bu, 0x2f114239u, 0x2f114251u,
+	0x1a00c5ebu, 0x1a00c5ecu, 0x1f0d83c8u, 0x1f0d83a1u, 0x1f0d8394u, 0x1f0d825au, 0x1f0d8234u, 0x1f0d824cu,
+	0x1c0ec5eeu, 0x1c0ec5efu, 0x2c1083c9u, 0x2c1083a2u, 0x200dc395u, 0x200dc25bu, 0x200dc235u, 0x200dc24du,
+	0x0b000184u, 0x0b0005a8u, 0x0b000189u, 0x0b0005abu, 0x0b000185u, 0x0b0005a9u, 0x1f0d827au, 0x1f0d8230u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x2b11027bu, 0x2b110231u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x1f0d8275u, 0x1f0d822bu,
+	0x1f0d8175u, 0x1f0d8240u, 0x1f0d82b3u, 0x1f0d8245u, 0x1f0d8428u, 0x00000000u, 0x2c108276u, 0x2c10822cu,
+	0x200dc177u, 0x00000000u, 0x200dc2b5u, 0x00000000u, 0x200dc429u, 0x00000000u, 0x1f0d859du, 0x1f0d85b3u,
+	0x1f0d82f1u, 0x1f0d830eu, 0x1f0d8611u, 0x1f0d8613u, 0x00000000u, 0x00000000u, 0x200dc59fu, 0x200dc5b1u,
+	0x301582f2u, 0x3015830fu, 0x30158612u, 0x30158614u, 0x00000000u, 0x00000000u, 0x1f0d8547u, 0x1f0d859au,
+	0x1f0d82e9u, 0x1f0d82efu, 0x1f0d85a3u, 0x00000000u, 0x1f0d82f5u, 0x1f0d8288u, 0x00000000u, 0x0b000615u,
+	0x0b000618u, 0x0b000622u, 0x0b00062bu, 0x0b0003fbu, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x0b000183u, 0x0b0005a7u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b000651u, 0x0b000683u,
+	0x00000000u, 0x00000000u, 0x0b000617u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b000623u, 0x0b00061bu,
+	0x0b000619u, 0x0b000625u, 0x0b0005aau, 0x0b000188u, 0x0b00059cu, 0x0b000289u, 0x200dc5a5u, 0x200dc5a5u,
+	0x200dc5a5u, 0x200dc5a5u, 0x200dc5a5u, 0x200dc5a5u, 0x200dc5a5u, 0x200dc5a5u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b00047bu, 0x0b000634u, 0x301582f6u, 0x301582f6u,
+	0x301582f6u, 0x301582f6u, 0x301582f6u, 0x301582f6u, 0x301582f6u, 0x301582f6u, 0x0b0005d8u, 0x0b000486u,
+	0x0b00031eu, 0x0b00039eu, 0x0b00018du, 0x00000000u, 0x00000000u, 0x00000000u, 0x100b02d7u, 0x110b42d8u,
+	0x100b0307u, 0x110b4308u, 0x0b0005d9u, 0x0b00018bu, 0x0b0005ddu, 0x0b000285u, 0x0b00062du, 0x0b00060cu,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x1f0d83b0u, 0x1f0d83b1u, 0x1f0d83b2u, 0x1f0d83b3u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x200dc3b4u, 0x200dc3b5u, 0x200dc3b6u, 0x200dc3b7u,
+	0x1f0d83bau, 0x110b43b8u, 0x1f0d8186u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x1f0d83bbu, 0x00000000u, 0x1f0d83bcu, 0x00000000u, 0x1f0d83b9u, 0x200dc3bdu,
+	0x0b000633u, 0x0b000485u, 0x0b000478u, 0x0b00047cu, 0x0b0005dau, 0x0b0005dbu, 0x0b000248u, 0x070201dfu,
+	0x080281e0u, 0x070201cdu, 0x080281ceu, 0x0702019du, 0x0802819eu, 0x07020197u, 0x08028198u, 0x070201a9u,
+	0x080281aau, 0x070201c7u, 0x080281c8u, 0x070201a3u, 0x080281a4u, 0x07020191u, 0x08028192u, 0x070201ebu,
+	0x080281ecu, 0x070201d9u, 0x080281dau, 0x070201e5u, 0x080281e6u, 0x070201d3u, 0x080281d4u, 0x070201bbu,
+	0x080281bcu, 0x070201b5u, 0x080281b6u, 0x070201c1u, 0x080281c2u, 0x070201afu, 0x080281b0u, 0x311c061eu,
+	0x3221061fu, 0x33148627u, 0x34214628u, 0x2e1502ccu, 0x2e1502c3u, 0x2e15029du, 0x2e150294u, 0x2e1502a2u,
+	0x2e1502c0u, 0x2e15029au, 0x2e150297u, 0x2e1502d3u, 0x2e1502c9u, 0x2e1502cfu, 0x2e1502c6u, 0x2e1502aeu,
+	0x2e1502a5u, 0x2e1502abu, 0x2e1502a8u, 0x1f0d853fu, 0x2f114540u, 0x1f0d8539u, 0x2f11453au, 0x1f0d852bu,
+	0x2f11452cu, 0x1f0d8525u, 0x2f114526u, 0x1f0d852du, 0x2f11452eu, 0x1f0d8537u, 0x2f114538u, 0x1f0d8529u,
+	0x2f11452au, 0x1f0d8527u, 0x2f114528u, 0x1f0d8544u, 0x2f114545u, 0x1f0d853du, 0x2f11453eu, 0x1f0d8541u,
+	0x2f114542u, 0x1f0d853bu, 0x2f11453cu, 0x1f0d8535u, 0x2f114536u, 0x1f0d852fu, 0x2f114530u, 0x1f0d8533u,
+	0x2f114534u, 0x1f0d8531u, 0x2f114532u, 0x0b00043bu, 0x0b000417u, 0x0b000221u, 0x03014142u, 0x0d0cc144u,
+	0x03014565u, 0x04024567u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x0b00031fu, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x0b000684u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x0b000685u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
 	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
 	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
 	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
 	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
 	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x0b000247u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x0b000686u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x0b00064fu, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x0b00064cu, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x0b00064eu, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x0b00064du, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x0b000650u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
 	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
 	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x1614c2feu, 0x1614c2fdu, 0x1614c2fcu,
-	0x1614c29fu, 0x2913c270u, 0x2913c26eu, 0x2913c3f6u, 0x2913c3f4u, 0x2c0e017fu, 0x2d1502bdu, 0x21120244u,
-	0x1614c2bbu, 0x0b000271u, 0x0b00026fu, 0x0b0003f7u, 0x0b0003f5u, 0x0b0002f7u, 0x0b000282u, 0x0b000487u,
-	0x0b000488u, 0x0b000249u, 0x0b00018eu, 0x170105f9u, 0x170105fau, 0x1f0d83ccu, 0x1f0d83a5u, 0x1f0d8398u,
-	0x1f0d826au, 0x1f0d8238u, 0x1f0d8250u, 0x190f45fcu, 0x190f45fdu, 0x2a1103cdu, 0x2a1103a6u, 0x2e114399u,
-	0x2e11426bu, 0x2e114239u, 0x2e114251u, 0x1a00c5ebu, 0x1a00c5ecu, 0x1f0d83c8u, 0x1f0d83a1u, 0x1f0d8394u,
-	0x1f0d825au, 0x1f0d8234u, 0x1f0d824cu, 0x1c0ec5eeu, 0x1c0ec5efu, 0x2b1083c9u, 0x2b1083a2u, 0x200dc395u,
-	0x200dc25bu, 0x200dc235u, 0x200dc24du, 0x0b000184u, 0x0b0005a8u, 0x0b000189u, 0x0b0005abu, 0x0b000185u,
-	0x0b0005a9u, 0x1f0d827au, 0x1f0d8230u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x2a11027bu, 0x2a110231u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x1f0d8275u, 0x1f0d822bu, 0x1f0d8175u, 0x1f0d8240u, 0x1f0d82b3u, 0x1f0d8245u, 0x1f0d8428u,
-	0x00000000u, 0x2b108276u, 0x2b10822cu, 0x200dc177u, 0x00000000u, 0x200dc2b5u, 0x00000000u, 0x200dc429u,
-	0x00000000u, 0x1f0d859du, 0x1f0d85b3u, 0x1f0d82f1u, 0x1f0d830eu, 0x1f0d8611u, 0x1f0d8613u, 0x00000000u,
-	0x00000000u, 0x200dc59fu, 0x200dc5b1u, 0x2f1582f2u, 0x2f15830fu, 0x2f158612u, 0x2f158614u, 0x00000000u,
-	0x00000000u, 0x1f0d8547u, 0x1f0d859au, 0x1f0d82e9u, 0x1f0d82efu, 0x1f0d85a3u, 0x00000000u, 0x1f0d82f5u,
-	0x1f0d8288u, 0x00000000u, 0x0b000615u, 0x0b000618u, 0x0b000622u, 0x0b00062bu, 0x0b0003fbu, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x0b000183u, 0x0b0005a7u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x0b000651u, 0x0b000683u, 0x00000000u, 0x00000000u, 0x0b000617u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x0b000623u, 0x0b00061bu, 0x0b000619u, 0x0b000625u, 0x0b0005aau, 0x0b000188u, 0x0b00059cu,
-	0x0b000289u, 0x200dc5a5u, 0x200dc5a5u, 0x200dc5a5u, 0x200dc5a5u, 0x200dc5a5u, 0x200dc5a5u, 0x200dc5a5u,
-	0x200dc5a5u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b00047bu,
-	0x0b000634u, 0x2f1582f6u, 0x2f1582f6u, 0x2f1582f6u, 0x2f1582f6u, 0x2f1582f6u, 0x2f1582f6u, 0x2f1582f6u,
-	0x2f1582f6u, 0x0b0005d8u, 0x0b000486u, 0x0b00031eu, 0x0b00039eu, 0x0b00018du, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x100b02d7u, 0x110b42d8u, 0x100b0307u, 0x110b4308u, 0x0b0005d9u, 0x0b00018bu, 0x0b0005ddu,
-	0x0b000285u, 0x0b00062du, 0x0b00060cu, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x1f0d83b0u,
-	0x1f0d83b1u, 0x1f0d83b2u, 0x1f0d83b3u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x200dc3b4u,
-	0x200dc3b5u, 0x200dc3b6u, 0x200dc3b7u, 0x1f0d83bau, 0x110b43b8u, 0x1f0d8186u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x0b00043eu, 0x0b00041au, 0x0b0004c4u, 0x03014166u, 0x04024168u, 0x0301458du,
+	0x0402458fu, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x1f0d867bu, 0x1f0d8677u, 0x1f0d867fu,
 	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x1f0d83bbu, 0x00000000u, 0x1f0d83bcu,
-	0x00000000u, 0x1f0d83b9u, 0x200dc3bdu, 0x0b000633u, 0x0b000485u, 0x0b000478u, 0x0b00047cu, 0x0b0005dau,
-	0x0b0005dbu, 0x0b000248u, 0x070201dfu, 0x080281e0u, 0x070201cdu, 0x080281ceu, 0x0702019du, 0x0802819eu,
-	0x07020197u, 0x08028198u, 0x070201a9u, 0x080281aau, 0x070201c7u, 0x080281c8u, 0x070201a3u, 0x080281a4u,
-	0x07020191u, 0x08028192u, 0x070201ebu, 0x080281ecu, 0x070201d9u, 0x080281dau, 0x070201e5u, 0x080281e6u,
-	0x070201d3u, 0x080281d4u, 0x070201bbu, 0x080281bcu, 0x070201b5u, 0x080281b6u, 0x070201c1u, 0x080281c2u,
-	0x070201afu, 0x080281b0u, 0x301c061eu, 0x3121061fu, 0x32148627u, 0x33214628u, 0x2d1502ccu, 0x2d1502c3u,
-	0x2d15029du, 0x2d150294u, 0x2d1502a2u, 0x2d1502c0u, 0x2d15029au, 0x2d150297u, 0x2d1502d3u, 0x2d1502c9u,
-	0x2d1502cfu, 0x2d1502c6u, 0x2d1502aeu, 0x2d1502a5u, 0x2d1502abu, 0x2d1502a8u, 0x1f0d8539u, 0x2e11453au,
-	0x1f0d852bu, 0x2e11452cu, 0x1f0d8525u, 0x2e114526u, 0x1f0d852du, 0x2e11452eu, 0x1f0d8537u, 0x2e114538u,
-	0x1f0d8529u, 0x2e11452au, 0x1f0d8527u, 0x2e114528u, 0x1f0d8544u, 0x2e114545u, 0x1f0d853du, 0x2e11453eu,
-	0x1f0d8541u, 0x2e114542u, 0x1f0d853bu, 0x2e11453cu, 0x1f0d8535u, 0x2e114536u, 0x1f0d852fu, 0x2e114530u,
-	0x1f0d8533u, 0x2e114534u, 0x1f0d8531u, 0x2e114532u, 0x0b00043bu, 0x0b000417u, 0x0b000221u, 0x03014142u,
-	0x0d0cc144u, 0x03014565u, 0x04024567u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x0b00031fu, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x0b000684u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x0b000685u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x0b000686u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x0b00064fu, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x0b00064cu, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x0b00064eu, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x0b00064du, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x0b000650u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x0b00043eu, 0x0b00041au, 0x0b0004c4u, 0x03014166u, 0x04024168u,
-	0x0301458du, 0x0402458fu, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x1f0d867bu, 0x1f0d8677u,
-	0x1f0d867fu, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x0702025cu, 0x0802825fu, 0x0104c21fu, 0x0c0fc220u, 0x0301421au, 0x0d0cc21bu,
-	0x100b030cu, 0x00000000u, 0x0301415au, 0x0402415cu, 0x100b02e6u, 0x00000000u, 0x100b02ecu, 0x00000000u,
-	0x100b0389u, 0x341c438cu, 0x100b0388u, 0x351c838bu, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x17010141u, 0x17010165u, 0x17010159u, 0x1701014du, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x1e0c8143u, 0x1d01c167u, 0x1d01c15bu, 0x1d01c14fu, 0x0301414eu, 0x04024150u, 0x100b0130u, 0x110b4131u,
-	0x100b0136u, 0x110b4137u, 0x100b0379u, 0x341c437cu, 0x100b0378u, 0x351c837bu, 0x00000000u, 0x1f0d821eu,
-	0x00000000u, 0x1f0d8679u, 0x1f0d867du, 0x1f0d8681u, 0x1f0d861cu, 0x1f0d861du, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x200dc47eu, 0x200dc481u, 0x120c013bu, 0x0b00060au,
-	0x0b00048fu, 0x361d842cu, 0x361d840au, 0x32148687u, 0x33214688u, 0x3702c42au, 0x0900442bu, 0x100b02dfu,
-	0x00000000u, 0x1f0d840bu, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x380e440cu, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x0b000439u, 0x0b000415u, 0x2716048au, 0x0b00048du, 0x0b0002e2u, 0x1614c2d0u, 0x2c0e017bu,
-	0x1f0d8275u, 0x1f0d822bu, 0x1f0d8179u, 0x1f0d8240u, 0x1f0d82b7u, 0x1f0d8245u, 0x1f0d842du, 0x00000000u,
-	0x2b108276u, 0x2b10822cu, 0x380e417cu, 0x00000000u, 0x380e42b9u, 0x00000000u, 0x380e442eu, 0x00000000u,
-	0x1f0d8548u, 0x1f0d859bu, 0x1f0d82eau, 0x1f0d82f0u, 0x1f0d85a3u, 0x00000000u, 0x1f0d82f5u, 0x1f0d8288u,
-	0x00000000u, 0x0b000615u, 0x0b000618u, 0x0b000622u, 0x0b00062bu, 0x0b0003fbu, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x0b000183u, 0x0b0005a7u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x0b000651u, 0x0b000683u, 0x00000000u, 0x00000000u, 0x0b000617u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x0b000624u, 0x0b00061bu, 0x0b00061au, 0x0b000626u, 0x0b0005aau, 0x0b000188u, 0x0b00059cu, 0x0b00028au,
-	0x200dc5a5u, 0x200dc5a5u, 0x200dc5a5u, 0x200dc5a5u, 0x200dc5a5u, 0x200dc5a5u, 0x200dc5a5u, 0x200dc5a5u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b00047bu, 0x0b000634u,
-	0x2f1582f6u, 0x2f1582f6u, 0x2f1582f6u, 0x2f1582f6u, 0x2f1582f6u, 0x2f1582f6u, 0x2f1582f6u, 0x2f1582f6u,
-	0x0b0005d8u, 0x0b000486u, 0x0b00031eu, 0x0b00039eu, 0x0b00018du, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x39034620u, 0x3a0d4621u, 0x3b0b8629u, 0x3c0bc62au, 0x0b00043cu, 0x0b000418u, 0x0b00043fu, 0x0b00041bu,
-	0x390340bfu, 0x3d0440c3u, 0x3e0400c2u, 0x3f0480c4u, 0x3702c0bcu, 0x390343e3u, 0x3d0443e7u, 0x3e0403e6u,
-	0x3f0483e8u, 0x3702c3e0u, 0x39034097u, 0x3d04409bu, 0x3e04009au, 0x3f04809cu, 0x3702c094u, 0x39034512u,
-	0x3d044516u, 0x3e040515u, 0x3f048517u, 0x3702c50fu, 0x390340e7u, 0x3d0440ebu, 0x3e0400eau, 0x3f0480ecu,
-	0x3702c0e4u, 0x390345c9u, 0x3d0445cdu, 0x3e0405ccu, 0x3f0485ceu, 0x3702c5c6u, 0x39034668u, 0x3d04466cu,
-	0x3e04066bu, 0x3f04866du, 0x3702c665u, 0x39034204u, 0x3a0d4208u, 0x3b0b8207u, 0x3c0bc209u, 0x3702c201u,
-	0x3b0b837fu, 0x40154382u, 0x410300bdu, 0x410303e1u, 0x41030095u, 0x41030510u, 0x410300e5u, 0x410305c7u,
-	0x41030666u, 0x41030202u, 0x420380c0u, 0x420383e4u, 0x42038098u, 0x42038513u, 0x420380e8u, 0x420385cau,
-	0x42038669u, 0x430f0205u, 0x170100beu, 0x170103e2u, 0x17010096u, 0x17010511u, 0x170100e6u, 0x170105c8u,
-	0x17010667u, 0x17010203u, 0x4403c0c1u, 0x4403c3e5u, 0x4403c099u, 0x4403c514u, 0x4403c0e9u, 0x4403c5cbu,
-	0x4403c66au, 0x450d0206u, 0x390345f4u, 0x3a0d45f7u, 0x39034349u, 0x3a0d4351u, 0x3b0b8350u, 0x3c0bc352u,
-	0x3b0b82e0u, 0x00000000u, 0x460c4647u, 0x0b000182u, 0x0b000222u, 0x3702c5f1u, 0x471ac34eu, 0x241dc49eu,
-	0x241dc4b6u, 0x241dc452u, 0x241dc46au, 0x241dc557u, 0x241dc57fu, 0x170104d5u, 0x241dc4eeu, 0x481e44a1u,
-	0x481e44b9u, 0x481e4455u, 0x481e446du, 0x481e455au, 0x481e4582u, 0x4403c4d8u, 0x481e44f1u, 0x41030348u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x430f034fu,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x27160300u,
-	0x0b000303u, 0x0b000291u, 0x1f0d849cu, 0x1f0d84b4u, 0x1f0d8450u, 0x1f0d8468u, 0x1f0d8555u, 0x1f0d857du,
-	0x1f0d84d3u, 0x1f0d84ecu, 0x4910c49fu, 0x4910c4b7u, 0x4910c453u, 0x4910c46bu, 0x4910c558u, 0x4910c580u,
-	0x4910c4d6u, 0x4910c4efu, 0x1f0d849du, 0x1f0d84b5u, 0x1f0d8451u, 0x1f0d8469u, 0x1f0d8556u, 0x1f0d857eu,
-	0x1f0d84d4u, 0x1f0d84edu, 0x4910c4a0u, 0x4910c4b8u, 0x4910c454u, 0x4910c46cu, 0x4910c559u, 0x4910c581u,
-	0x4910c4d7u, 0x4910c4f0u, 0x410305f2u, 0x410305f3u, 0x1f0d83cau, 0x1f0d83a3u, 0x1f0d8396u, 0x1f0d8262u,
-	0x1f0d8236u, 0x1f0d824eu, 0x430f05f5u, 0x430f05f6u, 0x4910c3cbu, 0x4910c3a4u, 0x380e4397u, 0x380e4263u,
-	0x380e4237u, 0x380e424fu, 0x1f0d8278u, 0x1f0d822eu, 0x1f0d8179u, 0x1f0d8241u, 0x1f0d82b7u, 0x1f0d8246u,
-	0x1f0d842du, 0x00000000u, 0x4910c279u, 0x4910c22fu, 0x380e417cu, 0x00000000u, 0x380e42b9u, 0x00000000u,
-	0x380e442eu, 0x00000000u, 0x1f0d859du, 0x1f0d85b3u, 0x1f0d82f1u, 0x1f0d830eu, 0x1f0d8611u, 0x1f0d8613u,
-	0x00000000u, 0x00000000u, 0x380e45a0u, 0x380e45b2u, 0x2f1582f2u, 0x2f15830fu, 0x2f158612u, 0x2f158614u,
-	0x00000000u, 0x00000000u, 0x1f0d8548u, 0x1f0d859bu, 0x1f0d82eau, 0x1f0d82f0u, 0x1f0d85a3u, 0x00000000u,
-	0x1f0d82f5u, 0x1f0d8288u, 0x00000000u, 0x0b000615u, 0x0b000618u, 0x0b000622u, 0x0b00062bu, 0x0b0003fbu,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b000183u, 0x0b0005a7u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x0b000651u, 0x0b000683u, 0x00000000u, 0x00000000u, 0x0b000617u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x0b000624u, 0x0b00061bu, 0x0b00061au, 0x0b000626u, 0x0b0005aau, 0x0b000188u,
-	0x0b00059cu, 0x0b00028au, 0x380e45a6u, 0x380e45a6u, 0x380e45a6u, 0x380e45a6u, 0x380e45a6u, 0x380e45a6u,
-	0x380e45a6u, 0x380e45a6u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x0b00047bu, 0x0b000634u, 0x2f1582f6u, 0x2f1582f6u, 0x2f1582f6u, 0x2f1582f6u, 0x2f1582f6u, 0x2f1582f6u,
-	0x2f1582f6u, 0x2f1582f6u, 0x0b0005d8u, 0x0b000486u, 0x0b00031eu, 0x0b00039eu, 0x0b00018du, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x3b0b82d9u, 0x401542dau, 0x3b0b8309u, 0x4015430au, 0x0b0005deu, 0x1f0d83beu,
-	0x380e43bfu, 0x0b0005dcu, 0x3e0401e1u, 0x3f0481e2u, 0x3e0401cfu, 0x3f0481d0u, 0x3e04019fu, 0x3f0481a0u,
-	0x3e040199u, 0x3f04819au, 0x3e0401abu, 0x3f0481acu, 0x3e0401c9u, 0x3f0481cau, 0x3e0401a5u, 0x3f0481a6u,
-	0x3e040193u, 0x3f048194u, 0x3e0401edu, 0x3f0481eeu, 0x3e0401dbu, 0x3f0481dcu, 0x3e0401e7u, 0x3f0481e8u,
-	0x3e0401d5u, 0x3f0481d6u, 0x3e0401bdu, 0x3f0481beu, 0x3e0401b7u, 0x3f0481b8u, 0x3e0401c3u, 0x3f0481c4u,
-	0x3e0401b1u, 0x3f0481b2u, 0x39034146u, 0x3a0d4148u, 0x39034569u, 0x3d04456bu, 0x3903416au, 0x3d04416cu,
-	0x39034591u, 0x3d044593u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x1f0d867cu, 0x1f0d8678u,
-	0x1f0d8680u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x3e040264u, 0x3f048267u, 0x3903421cu, 0x3a0d421du, 0x3b0b830du, 0x00000000u,
-	0x3903415eu, 0x3d044160u, 0x3b0b82e7u, 0x00000000u, 0x3b0b82edu, 0x00000000u, 0x3b0b838fu, 0x4a1d0391u,
-	0x3b0b838eu, 0x4b1cc390u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x17010145u, 0x17010169u,
-	0x1701015du, 0x17010151u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x450d0147u, 0x4403c16bu,
-	0x4403c15fu, 0x4403c153u, 0x39034152u, 0x3d044154u, 0x3b0b8132u, 0x3c0bc133u, 0x3b0b8138u, 0x3c0bc139u,
-	0x3b0b8380u, 0x4a1d0383u, 0x3b0b837eu, 0x4b1cc381u, 0x00000000u, 0x1f0d8217u, 0x00000000u, 0x1f0d867au,
-	0x1f0d867eu, 0x1f0d8682u, 0x1f0d861cu, 0x1f0d861du, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x380e447fu, 0x380e4482u, 0x460c413cu, 0x030140adu, 0x040240b1u, 0x070200b0u,
-	0x080280b2u, 0x0a0080aau, 0x0b000435u, 0x0b000411u, 0x030143d1u, 0x040243d5u, 0x070203d4u, 0x080283d6u,
-	0x0a0083ceu, 0x0b000431u, 0x03014085u, 0x04024089u, 0x07020088u, 0x0802808au, 0x0a008082u, 0x0b000440u,
-	0x0b00041cu, 0x03014500u, 0x04024504u, 0x07020503u, 0x08028505u, 0x0a0084fdu, 0x0b000433u, 0x0b00040fu,
-	0x030140d5u, 0x040240d9u, 0x070200d8u, 0x080280dau, 0x0a0080d2u, 0x030145b7u, 0x040245bbu, 0x070205bau,
-	0x080285bcu, 0x0a0085b4u, 0x03014656u, 0x0402465au, 0x07020659u, 0x0802865bu, 0x0a008653u, 0x030141f2u,
-	0x0d0cc1f6u, 0x100b01f5u, 0x110b41f7u, 0x0a0081efu, 0x120c0274u, 0x120c022au, 0x131d4423u, 0x131d4404u,
-	0x0b00042fu, 0x0b00040du, 0x100b012cu, 0x00000000u, 0x0a008442u, 0x09004422u, 0x1a00c0abu, 0x1a00c3cfu,
-	0x1a00c083u, 0x1a00c4feu, 0x1a00c0d3u, 0x1a00c5b5u, 0x1a00c654u, 0x1a00c1f0u, 0x1b0180aeu, 0x1b0183d2u,
-	0x1b018086u, 0x1b018501u, 0x1b0180d6u, 0x1b0185b8u, 0x1b018657u, 0x1c0ec1f3u, 0x170100acu, 0x170103d0u,
-	0x17010084u, 0x170104ffu, 0x170100d4u, 0x170105b6u, 0x17010655u, 0x170101f1u, 0x1d01c0afu, 0x1d01c3d3u,
-	0x1d01c087u, 0x1d01c502u, 0x1d01c0d7u, 0x1d01c5b9u, 0x1d01c658u, 0x1e0c81f4u, 0x030145e6u, 0x0d0cc5e9u,
-	0x03014324u, 0x0d0cc32cu, 0x100b032bu, 0x110b432du, 0x100b02ddu, 0x00000000u, 0x1f0d8405u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x200dc406u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x120c0641u, 0x4c11c23du,
-	0x0b000437u, 0x0b000413u, 0x0a0085e3u, 0x2317c329u, 0x241dc492u, 0x241dc4aau, 0x241dc446u, 0x241dc45eu,
-	0x241dc54bu, 0x241dc573u, 0x170104c9u, 0x241dc4e2u, 0x261e0495u, 0x261e04adu, 0x261e0449u, 0x261e0461u,
-	0x261e054eu, 0x261e0576u, 0x1d01c4ccu, 0x261e04e5u, 0x0a00848bu, 0x0b00048eu, 0x100b02e3u, 0x00000000u,
-	0x100b02dbu, 0x00000000u, 0x1a00c323u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x1c0ec32au, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x0a008301u, 0x0b000304u, 0x0b00028fu, 0x1f0d8490u, 0x1f0d84a8u, 0x1f0d8444u,
-	0x1f0d845cu, 0x1f0d8549u, 0x1f0d8571u, 0x1f0d84c7u, 0x1f0d84e0u, 0x2b108493u, 0x2b1084abu, 0x2b108447u,
-	0x2b10845fu, 0x2b10854cu, 0x2b108574u, 0x2b1084cau, 0x2b1084e3u, 0x1f0d8491u, 0x1f0d84a9u, 0x1f0d8445u,
-	0x1f0d845du, 0x1f0d854au, 0x1f0d8572u, 0x1f0d84c8u, 0x1f0d84e1u, 0x2b108494u, 0x2b1084acu, 0x2b108448u,
-	0x2b108460u, 0x2b10854du, 0x2b108575u, 0x2b1084cbu, 0x2b1084e4u, 0x2913c26cu, 0x2913c3f2u, 0x4d0e817eu,
-	0x4c11c242u, 0x0b00026du, 0x0b0003f3u, 0x1a00c5e4u, 0x1a00c5e5u, 0x1f0d83c6u, 0x1f0d839fu, 0x1f0d8392u,
-	0x1f0d8252u, 0x1f0d8232u, 0x1f0d824au, 0x1c0ec5e7u, 0x1c0ec5e8u, 0x2b1083c7u, 0x2b1083a0u, 0x200dc393u,
-	0x200dc253u, 0x200dc233u, 0x200dc24bu, 0x1f0d8272u, 0x1f0d8228u, 0x1f0d8171u, 0x1f0d823eu, 0x1f0d82afu,
-	0x1f0d8243u, 0x1f0d8424u, 0x00000000u, 0x2b108273u, 0x2b108229u, 0x200dc173u, 0x00000000u, 0x200dc2b1u,
-	0x00000000u, 0x200dc425u, 0x00000000u, 0x1f0d859du, 0x1f0d85b3u, 0x1f0d82f1u, 0x1f0d830eu, 0x1f0d8611u,
-	0x1f0d8613u, 0x00000000u, 0x00000000u, 0x200dc59eu, 0x200dc5b0u, 0x2f1582f2u, 0x2f15830fu, 0x2f158612u,
-	0x2f158614u, 0x00000000u, 0x00000000u, 0x1f0d8546u, 0x1f0d8599u, 0x1f0d82e8u, 0x1f0d82eeu, 0x1f0d85a3u,
+	0x00000000u, 0x0702025cu, 0x0802825fu, 0x0104c21fu, 0x0c0fc220u, 0x0301421au, 0x0d0cc21bu, 0x100b030cu,
+	0x00000000u, 0x0301415au, 0x0402415cu, 0x100b02e6u, 0x00000000u, 0x100b02ecu, 0x00000000u, 0x100b0389u,
+	0x351c438cu, 0x100b0388u, 0x361c838bu, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x17010141u,
+	0x17010165u, 0x17010159u, 0x1701014du, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x1e0c8143u,
+	0x1d01c167u, 0x1d01c15bu, 0x1d01c14fu, 0x0301414eu, 0x04024150u, 0x100b0130u, 0x110b4131u, 0x100b0136u,
+	0x110b4137u, 0x100b0379u, 0x351c437cu, 0x100b0378u, 0x361c837bu, 0x00000000u, 0x1f0d821eu, 0x00000000u,
+	0x1f0d8679u, 0x1f0d867du, 0x1f0d8681u, 0x1f0d861cu, 0x1f0d861du, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x200dc47eu, 0x200dc481u, 0x120c013bu, 0x0b00060au, 0x0b00048fu,
+	0x371d842cu, 0x371d840au, 0x33148687u, 0x34214688u, 0x3802c42au, 0x0900442bu, 0x100b02dfu, 0x00000000u,
+	0x1f0d840bu, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x390e440cu, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x0b000439u, 0x0b000415u, 0x22174357u, 0x22174333u, 0x2217435du, 0x2217433au, 0x2816048au, 0x0b00048du,
+	0x0b0002e2u, 0x1614c2d0u, 0x2d0e017bu, 0x1f0d8275u, 0x1f0d822bu, 0x1f0d8179u, 0x1f0d8240u, 0x1f0d82b7u,
+	0x1f0d8245u, 0x1f0d842du, 0x00000000u, 0x2c108276u, 0x2c10822cu, 0x390e417cu, 0x00000000u, 0x390e42b9u,
+	0x00000000u, 0x390e442eu, 0x00000000u, 0x1f0d8548u, 0x1f0d859bu, 0x1f0d82eau, 0x1f0d82f0u, 0x1f0d85a3u,
 	0x00000000u, 0x1f0d82f5u, 0x1f0d8288u, 0x00000000u, 0x0b000615u, 0x0b000618u, 0x0b000622u, 0x0b00062bu,
 	0x0b0003fbu, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b000183u, 0x0b0005a7u, 0x00000000u,
 	0x00000000u, 0x00000000u, 0x00000000u, 0x0b000651u, 0x0b000683u, 0x00000000u, 0x00000000u, 0x0b000617u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x0b000623u, 0x0b00061bu, 0x0b000619u, 0x0b000625u, 0x0b0005aau,
-	0x0b000188u, 0x0b00059cu, 0x0b000289u, 0x200dc5a4u, 0x200dc5a4u, 0x200dc5a4u, 0x200dc5a4u, 0x200dc5a4u,
-	0x200dc5a4u, 0x200dc5a4u, 0x200dc5a4u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x0b00047bu, 0x0b000634u, 0x2f1582f6u, 0x2f1582f6u, 0x2f1582f6u, 0x2f1582f6u, 0x2f1582f6u,
-	0x2f1582f6u, 0x2f1582f6u, 0x2f1582f6u, 0x0b0005d8u, 0x0b000486u, 0x0b00031eu, 0x0b00039eu, 0x0b00018du,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x100b02d5u, 0x110b42d6u, 0x100b0305u, 0x110b4306u, 0x1f0d83c1u,
-	0x110b43b8u, 0x1f0d83c3u, 0x00000000u, 0x1f0d83c4u, 0x00000000u, 0x1f0d83c0u, 0x200dc3c5u, 0x070201ddu,
-	0x080281deu, 0x070201cbu, 0x080281ccu, 0x0702019bu, 0x0802819cu, 0x07020195u, 0x08028196u, 0x070201a7u,
-	0x080281a8u, 0x070201c5u, 0x080281c6u, 0x070201a1u, 0x080281a2u, 0x0702018fu, 0x08028190u, 0x070201e9u,
-	0x080281eau, 0x070201d7u, 0x080281d8u, 0x070201e3u, 0x080281e4u, 0x070201d1u, 0x080281d2u, 0x070201b9u,
-	0x080281bau, 0x070201b3u, 0x080281b4u, 0x070201bfu, 0x080281c0u, 0x070201adu, 0x080281aeu, 0x0b00043au,
-	0x0b000416u, 0x0301413eu, 0x0d0cc140u, 0x03014561u, 0x04024563u, 0x0b00043du, 0x0b000419u, 0x03014162u,
-	0x04024164u, 0x03014589u, 0x0402458bu, 0x07020254u, 0x08028257u, 0x03014218u, 0x0d0cc219u, 0x100b030bu,
-	0x00000000u, 0x03014156u, 0x04024158u, 0x100b02e5u, 0x00000000u, 0x100b02ebu, 0x00000000u, 0x100b0385u,
-	0x341c4387u, 0x100b0384u, 0x110b4386u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x1701013du,
-	0x17010161u, 0x17010155u, 0x17010149u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x1e0c813fu,
-	0x1d01c163u, 0x1d01c157u, 0x1d01c14bu, 0x0301414au, 0x0402414cu, 0x100b012eu, 0x110b412fu, 0x100b0134u,
-	0x110b4135u, 0x100b0375u, 0x341c4377u, 0x100b0374u, 0x110b4376u, 0x00000000u, 0x1f0d821eu, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x0b000624u, 0x0b00061bu, 0x0b00061au, 0x0b000626u, 0x0b0005aau,
+	0x0b000188u, 0x0b00059cu, 0x0b00028au, 0x200dc5a5u, 0x200dc5a5u, 0x200dc5a5u, 0x200dc5a5u, 0x200dc5a5u,
+	0x200dc5a5u, 0x200dc5a5u, 0x200dc5a5u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x0b00047bu, 0x0b000634u, 0x301582f6u, 0x301582f6u, 0x301582f6u, 0x301582f6u, 0x301582f6u,
+	0x301582f6u, 0x301582f6u, 0x301582f6u, 0x0b0005d8u, 0x0b000486u, 0x0b00031eu, 0x0b00039eu, 0x0b00018du,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x3a034620u, 0x3b0d4621u, 0x3c0b8629u, 0x3d0bc62au, 0x0b00043cu,
+	0x0b000418u, 0x0b00043fu, 0x0b00041bu, 0x3a0340bfu, 0x3e0440c3u, 0x3f0400c2u, 0x400480c4u, 0x3802c0bcu,
+	0x3a0343e3u, 0x3e0443e7u, 0x3f0403e6u, 0x400483e8u, 0x3802c3e0u, 0x3a034097u, 0x3e04409bu, 0x3f04009au,
+	0x4004809cu, 0x3802c094u, 0x3a034512u, 0x3e044516u, 0x3f040515u, 0x40048517u, 0x3802c50fu, 0x3a0340e7u,
+	0x3e0440ebu, 0x3f0400eau, 0x400480ecu, 0x3802c0e4u, 0x3a0345c9u, 0x3e0445cdu, 0x3f0405ccu, 0x400485ceu,
+	0x3802c5c6u, 0x3a034668u, 0x3e04466cu, 0x3f04066bu, 0x4004866du, 0x3802c665u, 0x3a034204u, 0x3b0d4208u,
+	0x3c0b8207u, 0x3d0bc209u, 0x3802c201u, 0x3c0b837fu, 0x41154382u, 0x420300bdu, 0x420303e1u, 0x42030095u,
+	0x42030510u, 0x420300e5u, 0x420305c7u, 0x42030666u, 0x42030202u, 0x430380c0u, 0x430383e4u, 0x43038098u,
+	0x43038513u, 0x430380e8u, 0x430385cau, 0x43038669u, 0x440f0205u, 0x170100beu, 0x170103e2u, 0x17010096u,
+	0x17010511u, 0x170100e6u, 0x170105c8u, 0x17010667u, 0x17010203u, 0x4503c0c1u, 0x4503c3e5u, 0x4503c099u,
+	0x4503c514u, 0x4503c0e9u, 0x4503c5cbu, 0x4503c66au, 0x460d0206u, 0x3a0345f4u, 0x3b0d45f7u, 0x3a034349u,
+	0x3b0d4351u, 0x3c0b8350u, 0x3d0bc352u, 0x3c0b82e0u, 0x00000000u, 0x470c4647u, 0x0b000182u, 0x0b000222u,
+	0x22174345u, 0x2217434bu, 0x3802c5f1u, 0x481ac34eu, 0x251dc49eu, 0x251dc4b6u, 0x251dc452u, 0x251dc46au,
+	0x251dc557u, 0x251dc57fu, 0x170104d5u, 0x251dc4eeu, 0x491e44a1u, 0x491e44b9u, 0x491e4455u, 0x491e446du,
+	0x491e455au, 0x491e4582u, 0x4503c4d8u, 0x491e44f1u, 0x42030348u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x440f034fu, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x28160300u, 0x0b000303u, 0x0b000291u, 0x1f0d849cu,
+	0x1f0d84b4u, 0x1f0d8450u, 0x1f0d8468u, 0x1f0d8555u, 0x1f0d857du, 0x1f0d84d3u, 0x1f0d84ecu, 0x4a10c49fu,
+	0x4a10c4b7u, 0x4a10c453u, 0x4a10c46bu, 0x4a10c558u, 0x4a10c580u, 0x4a10c4d6u, 0x4a10c4efu, 0x1f0d849du,
+	0x1f0d84b5u, 0x1f0d8451u, 0x1f0d8469u, 0x1f0d8556u, 0x1f0d857eu, 0x1f0d84d4u, 0x1f0d84edu, 0x4a10c4a0u,
+	0x4a10c4b8u, 0x4a10c454u, 0x4a10c46cu, 0x4a10c559u, 0x4a10c581u, 0x4a10c4d7u, 0x4a10c4f0u, 0x420305f2u,
+	0x420305f3u, 0x1f0d83cau, 0x1f0d83a3u, 0x1f0d8396u, 0x1f0d8262u, 0x1f0d8236u, 0x1f0d824eu, 0x440f05f5u,
+	0x440f05f6u, 0x4a10c3cbu, 0x4a10c3a4u, 0x390e4397u, 0x390e4263u, 0x390e4237u, 0x390e424fu, 0x1f0d8278u,
+	0x1f0d822eu, 0x1f0d8179u, 0x1f0d8241u, 0x1f0d82b7u, 0x1f0d8246u, 0x1f0d842du, 0x00000000u, 0x4a10c279u,
+	0x4a10c22fu, 0x390e417cu, 0x00000000u, 0x390e42b9u, 0x00000000u, 0x390e442eu, 0x00000000u, 0x1f0d859du,
+	0x1f0d85b3u, 0x1f0d82f1u, 0x1f0d830eu, 0x1f0d8611u, 0x1f0d8613u, 0x00000000u, 0x00000000u, 0x390e45a0u,
+	0x390e45b2u, 0x301582f2u, 0x3015830fu, 0x30158612u, 0x30158614u, 0x00000000u, 0x00000000u, 0x1f0d8548u,
+	0x1f0d859bu, 0x1f0d82eau, 0x1f0d82f0u, 0x1f0d85a3u, 0x00000000u, 0x1f0d82f5u, 0x1f0d8288u, 0x00000000u,
+	0x0b000615u, 0x0b000618u, 0x0b000622u, 0x0b00062bu, 0x0b0003fbu, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x0b000183u, 0x0b0005a7u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b000651u,
+	0x0b000683u, 0x00000000u, 0x00000000u, 0x0b000617u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b000624u,
+	0x0b00061bu, 0x0b00061au, 0x0b000626u, 0x0b0005aau, 0x0b000188u, 0x0b00059cu, 0x0b00028au, 0x390e45a6u,
+	0x390e45a6u, 0x390e45a6u, 0x390e45a6u, 0x390e45a6u, 0x390e45a6u, 0x390e45a6u, 0x390e45a6u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b00047bu, 0x0b000634u, 0x301582f6u,
+	0x301582f6u, 0x301582f6u, 0x301582f6u, 0x301582f6u, 0x301582f6u, 0x301582f6u, 0x301582f6u, 0x0b0005d8u,
+	0x0b000486u, 0x0b00031eu, 0x0b00039eu, 0x0b00018du, 0x00000000u, 0x00000000u, 0x00000000u, 0x3c0b82d9u,
+	0x411542dau, 0x3c0b8309u, 0x4115430au, 0x0b0005deu, 0x1f0d83beu, 0x390e43bfu, 0x0b0005dcu, 0x3f0401e1u,
+	0x400481e2u, 0x3f0401cfu, 0x400481d0u, 0x3f04019fu, 0x400481a0u, 0x3f040199u, 0x4004819au, 0x3f0401abu,
+	0x400481acu, 0x3f0401c9u, 0x400481cau, 0x3f0401a5u, 0x400481a6u, 0x3f040193u, 0x40048194u, 0x3f0401edu,
+	0x400481eeu, 0x3f0401dbu, 0x400481dcu, 0x3f0401e7u, 0x400481e8u, 0x3f0401d5u, 0x400481d6u, 0x3f0401bdu,
+	0x400481beu, 0x3f0401b7u, 0x400481b8u, 0x3f0401c3u, 0x400481c4u, 0x3f0401b1u, 0x400481b2u, 0x3a034146u,
+	0x3b0d4148u, 0x3a034569u, 0x3e04456bu, 0x3a03416au, 0x3e04416cu, 0x3a034591u, 0x3e044593u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x1f0d867cu, 0x1f0d8678u, 0x1f0d8680u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x3f040264u,
+	0x40048267u, 0x3a03421cu, 0x3b0d421du, 0x3c0b830du, 0x00000000u, 0x3a03415eu, 0x3e044160u, 0x3c0b82e7u,
+	0x00000000u, 0x3c0b82edu, 0x00000000u, 0x3c0b838fu, 0x4b1d0391u, 0x3c0b838eu, 0x4c1cc390u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x17010145u, 0x17010169u, 0x1701015du, 0x17010151u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x460d0147u, 0x4503c16bu, 0x4503c15fu, 0x4503c153u, 0x3a034152u,
+	0x3e044154u, 0x3c0b8132u, 0x3d0bc133u, 0x3c0b8138u, 0x3d0bc139u, 0x3c0b8380u, 0x4b1d0383u, 0x3c0b837eu,
+	0x4c1cc381u, 0x00000000u, 0x1f0d8217u, 0x00000000u, 0x1f0d867au, 0x1f0d867eu, 0x1f0d8682u, 0x1f0d861cu,
+	0x1f0d861du, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x390e447fu,
+	0x390e4482u, 0x470c413cu, 0x030140adu, 0x040240b1u, 0x070200b0u, 0x080280b2u, 0x0a0080aau, 0x0b000435u,
+	0x0b000411u, 0x030143d1u, 0x040243d5u, 0x070203d4u, 0x080283d6u, 0x0a0083ceu, 0x0b000431u, 0x03014085u,
+	0x04024089u, 0x07020088u, 0x0802808au, 0x0a008082u, 0x0b000440u, 0x0b00041cu, 0x03014500u, 0x04024504u,
+	0x07020503u, 0x08028505u, 0x0a0084fdu, 0x0b000433u, 0x0b00040fu, 0x030140d5u, 0x040240d9u, 0x070200d8u,
+	0x080280dau, 0x0a0080d2u, 0x030145b7u, 0x040245bbu, 0x070205bau, 0x080285bcu, 0x0a0085b4u, 0x03014656u,
+	0x0402465au, 0x07020659u, 0x0802865bu, 0x0a008653u, 0x030141f2u, 0x0d0cc1f6u, 0x100b01f5u, 0x110b41f7u,
+	0x0a0081efu, 0x120c0274u, 0x120c022au, 0x131d4423u, 0x131d4404u, 0x0b00042fu, 0x0b00040du, 0x100b012cu,
+	0x00000000u, 0x0a008442u, 0x09004422u, 0x1a00c0abu, 0x1a00c3cfu, 0x1a00c083u, 0x1a00c4feu, 0x1a00c0d3u,
+	0x1a00c5b5u, 0x1a00c654u, 0x1a00c1f0u, 0x1b0180aeu, 0x1b0183d2u, 0x1b018086u, 0x1b018501u, 0x1b0180d6u,
+	0x1b0185b8u, 0x1b018657u, 0x1c0ec1f3u, 0x170100acu, 0x170103d0u, 0x17010084u, 0x170104ffu, 0x170100d4u,
+	0x170105b6u, 0x17010655u, 0x170101f1u, 0x1d01c0afu, 0x1d01c3d3u, 0x1d01c087u, 0x1d01c502u, 0x1d01c0d7u,
+	0x1d01c5b9u, 0x1d01c658u, 0x1e0c81f4u, 0x030145e6u, 0x0d0cc5e9u, 0x03014324u, 0x0d0cc32cu, 0x100b032bu,
+	0x110b432du, 0x100b02ddu, 0x00000000u, 0x1f0d8405u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x200dc406u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x120c0641u, 0x0b000180u, 0x0b000223u, 0x4d11c23du, 0x0b000437u,
+	0x0b000413u, 0x22174321u, 0x22174327u, 0x0a0085e3u, 0x2417c329u, 0x251dc492u, 0x251dc4aau, 0x251dc446u,
+	0x251dc45eu, 0x251dc54bu, 0x251dc573u, 0x170104c9u, 0x251dc4e2u, 0x271e0495u, 0x271e04adu, 0x271e0449u,
+	0x271e0461u, 0x271e054eu, 0x271e0576u, 0x1d01c4ccu, 0x271e04e5u, 0x0a00848bu, 0x0b00048eu, 0x100b02e3u,
+	0x00000000u, 0x100b02dbu, 0x00000000u, 0x1a00c323u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x1c0ec32au, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x0a008301u, 0x0b000304u, 0x0b00028fu, 0x1f0d8490u, 0x1f0d84a8u,
+	0x1f0d8444u, 0x1f0d845cu, 0x1f0d8549u, 0x1f0d8571u, 0x1f0d84c7u, 0x1f0d84e0u, 0x2c108493u, 0x2c1084abu,
+	0x2c108447u, 0x2c10845fu, 0x2c10854cu, 0x2c108574u, 0x2c1084cau, 0x2c1084e3u, 0x1f0d8491u, 0x1f0d84a9u,
+	0x1f0d8445u, 0x1f0d845du, 0x1f0d854au, 0x1f0d8572u, 0x1f0d84c8u, 0x1f0d84e1u, 0x2c108494u, 0x2c1084acu,
+	0x2c108448u, 0x2c108460u, 0x2c10854du, 0x2c108575u, 0x2c1084cbu, 0x2c1084e4u, 0x2a13c26cu, 0x2a13c3f2u,
+	0x4e0e817eu, 0x2e1502bcu, 0x4d11c242u, 0x0b00026du, 0x0b0003f3u, 0x1a00c5e4u, 0x1a00c5e5u, 0x1f0d83c6u,
+	0x1f0d839fu, 0x1f0d8392u, 0x1f0d8252u, 0x1f0d8232u, 0x1f0d824au, 0x1c0ec5e7u, 0x1c0ec5e8u, 0x2c1083c7u,
+	0x2c1083a0u, 0x200dc393u, 0x200dc253u, 0x200dc233u, 0x200dc24bu, 0x1f0d8272u, 0x1f0d8228u, 0x1f0d8171u,
+	0x1f0d823eu, 0x1f0d82afu, 0x1f0d8243u, 0x1f0d8424u, 0x00000000u, 0x2c108273u, 0x2c108229u, 0x200dc173u,
+	0x00000000u, 0x200dc2b1u, 0x00000000u, 0x200dc425u, 0x00000000u, 0x1f0d859du, 0x1f0d85b3u, 0x1f0d82f1u,
+	0x1f0d830eu, 0x1f0d8611u, 0x1f0d8613u, 0x00000000u, 0x00000000u, 0x200dc59eu, 0x200dc5b0u, 0x301582f2u,
+	0x3015830fu, 0x30158612u, 0x30158614u, 0x00000000u, 0x00000000u, 0x1f0d8546u, 0x1f0d8599u, 0x1f0d82e8u,
+	0x1f0d82eeu, 0x1f0d85a3u, 0x00000000u, 0x1f0d82f5u, 0x1f0d8288u, 0x00000000u, 0x0b000615u, 0x0b000618u,
+	0x0b000622u, 0x0b00062bu, 0x0b0003fbu, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b000183u,
+	0x0b0005a7u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b000651u, 0x0b000683u, 0x00000000u,
+	0x00000000u, 0x0b000617u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b000623u, 0x0b00061bu, 0x0b000619u,
+	0x0b000625u, 0x0b0005aau, 0x0b000188u, 0x0b00059cu, 0x0b000289u, 0x200dc5a4u, 0x200dc5a4u, 0x200dc5a4u,
+	0x200dc5a4u, 0x200dc5a4u, 0x200dc5a4u, 0x200dc5a4u, 0x200dc5a4u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x0b00047bu, 0x0b000634u, 0x301582f6u, 0x301582f6u, 0x301582f6u,
+	0x301582f6u, 0x301582f6u, 0x301582f6u, 0x301582f6u, 0x301582f6u, 0x0b0005d8u, 0x0b000486u, 0x0b00031eu,
+	0x0b00039eu, 0x0b00018du, 0x00000000u, 0x00000000u, 0x00000000u, 0x100b02d5u, 0x110b42d6u, 0x100b0305u,
+	0x110b4306u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x1f0d83a8u, 0x1f0d83a9u, 0x1f0d83aau,
+	0x1f0d83abu, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x200dc3acu, 0x200dc3adu, 0x200dc3aeu,
+	0x200dc3afu, 0x1f0d83c1u, 0x110b43b8u, 0x1f0d83c2u, 0x00000000u, 0x1f0d83c3u, 0x00000000u, 0x1f0d83c4u,
+	0x00000000u, 0x1f0d83c0u, 0x200dc3c5u, 0x070201ddu, 0x080281deu, 0x070201cbu, 0x080281ccu, 0x0702019bu,
+	0x0802819cu, 0x07020195u, 0x08028196u, 0x070201a7u, 0x080281a8u, 0x070201c5u, 0x080281c6u, 0x070201a1u,
+	0x080281a2u, 0x0702018fu, 0x08028190u, 0x070201e9u, 0x080281eau, 0x070201d7u, 0x080281d8u, 0x070201e3u,
+	0x080281e4u, 0x070201d1u, 0x080281d2u, 0x070201b9u, 0x080281bau, 0x070201b3u, 0x080281b4u, 0x070201bfu,
+	0x080281c0u, 0x070201adu, 0x080281aeu, 0x2e1502cbu, 0x2e1502c2u, 0x2e15029cu, 0x2e150293u, 0x2e1502a1u,
+	0x2e1502bfu, 0x2e150299u, 0x2e150296u, 0x2e1502d2u, 0x2e1502c8u, 0x2e1502ceu, 0x2e1502c5u, 0x2e1502adu,
+	0x2e1502a4u, 0x2e1502aau, 0x2e1502a7u, 0x0b00043au, 0x0b000416u, 0x0301413eu, 0x0d0cc140u, 0x03014561u,
+	0x04024563u, 0x0b00043du, 0x0b000419u, 0x03014162u, 0x04024164u, 0x03014589u, 0x0402458bu, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x1f0d818cu, 0x1f0d8187u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x4f1405ffu, 0x00000000u, 0x07020254u,
+	0x08028257u, 0x03014218u, 0x0d0cc219u, 0x100b030bu, 0x00000000u, 0x03014156u, 0x04024158u, 0x100b02e5u,
+	0x00000000u, 0x100b02ebu, 0x00000000u, 0x100b0385u, 0x351c4387u, 0x100b0384u, 0x110b4386u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x1701013du, 0x17010161u, 0x17010155u, 0x17010149u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x1e0c813fu, 0x1d01c163u, 0x1d01c157u, 0x1d01c14bu, 0x0301414au,
+	0x0402414cu, 0x100b012eu, 0x110b412fu, 0x100b0134u, 0x110b4135u, 0x100b0375u, 0x351c4377u, 0x100b0374u,
+	0x110b4376u, 0x00000000u, 0x1f0d821eu, 0x00000000u, 0x1f0d8679u, 0x1f0d867du, 0x1f0d8681u, 0x1f0d8616u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x200dc47du,
+	0x200dc480u, 0x120c013au, 0x22174355u, 0x22174331u, 0x2217435bu, 0x22174338u, 0x1614c29eu, 0x22174320u,
+	0x22174326u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x1f0d867bu, 0x1f0d8677u, 0x1f0d818cu,
+	0x1f0d8187u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x4f1405ffu,
+	0x00000000u, 0x00000000u, 0x1f0d821eu, 0x00000000u, 0x1f0d8679u, 0x1f0d867du, 0x1f0d8681u, 0x1f0d8616u,
+	0x1f0d861du, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x200dc47du,
+	0x200dc480u, 0x501bc689u, 0x5123068au, 0x22174322u, 0x22174328u, 0x1f0d8272u, 0x1f0d8228u, 0x1f0d8179u,
+	0x1f0d823eu, 0x1f0d82b7u, 0x1f0d8243u, 0x1f0d8424u, 0x00000000u, 0x2c108273u, 0x2c108229u, 0x390e417cu,
+	0x00000000u, 0x390e42b9u, 0x00000000u, 0x200dc425u, 0x00000000u, 0x1f0d8548u, 0x1f0d859bu, 0x1f0d82eau,
+	0x1f0d82f0u, 0x1f0d85a3u, 0x00000000u, 0x1f0d82f5u, 0x1f0d8288u, 0x00000000u, 0x0b000615u, 0x0b000618u,
+	0x0b000622u, 0x0b00062bu, 0x0b0003fbu, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b000183u,
+	0x0b0005a7u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b000651u, 0x0b000683u, 0x00000000u,
+	0x00000000u, 0x0b000617u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b000624u, 0x0b00061bu, 0x0b00061au,
+	0x0b000626u, 0x0b0005aau, 0x0b000188u, 0x0b00059cu, 0x0b00028au, 0x200dc5a4u, 0x200dc5a4u, 0x200dc5a4u,
+	0x200dc5a4u, 0x200dc5a4u, 0x200dc5a4u, 0x200dc5a4u, 0x200dc5a4u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x0b00047bu, 0x0b000634u, 0x301582f6u, 0x301582f6u, 0x301582f6u,
+	0x301582f6u, 0x301582f6u, 0x301582f6u, 0x301582f6u, 0x301582f6u, 0x0b0005d8u, 0x0b000486u, 0x0b00031eu,
+	0x0b00039eu, 0x0b00018du, 0x00000000u, 0x00000000u, 0x00000000u, 0x1f0d8278u, 0x1f0d822eu, 0x1f0d8179u,
+	0x1f0d8241u, 0x1f0d82b7u, 0x1f0d8246u, 0x1f0d8424u, 0x00000000u, 0x4a10c279u, 0x4a10c22fu, 0x390e417cu,
+	0x00000000u, 0x390e42b9u, 0x00000000u, 0x200dc425u, 0x00000000u, 0x00000000u, 0x1f0d8217u, 0x00000000u,
+	0x1f0d867au, 0x1f0d867eu, 0x1f0d8682u, 0x1f0d8616u, 0x1f0d861du, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x200dc47du, 0x200dc480u, 0x00000000u, 0x1f0d821eu, 0x00000000u,
 	0x1f0d8679u, 0x1f0d867du, 0x1f0d8681u, 0x1f0d861cu, 0x1f0d861du, 0x00000000u, 0x00000000u, 0x00000000u,
 	0x00000000u, 0x00000000u, 0x00000000u, 0x200dc47du, 0x200dc480u,
 };
@@ -1205,6 +1284,13 @@ enum {
 	X86_TERMINAL_32,
 	X86_TERMINAL_64,
 	X86_TERMINAL_64_REXW,
+	X86_TERMINAL_32_OPSIZE,
+	X86_TERMINAL_32_ADSIZE,
+	X86_TERMINAL_32_OPSIZE_ADSIZE,
+	X86_TERMINAL_64_OPSIZE,
+	X86_TERMINAL_64_ADSIZE,
+	X86_TERMINAL_64_OPSIZE_ADSIZE,
+	X86_TERMINAL_64_REXW_OPSIZE,
 	X86_TERMINAL_16,
 	X86_TERMINAL_16_OPSIZE,
 	X86_TERMINAL_16_ADSIZE,
@@ -1250,44 +1336,44 @@ static const uint64_t x86LegacyDecisions[X86_TERMINAL_ROW_COUNT][2][256] = {
 	UINT64_C(0x4607e2ff0104c5fb), UINT64_C(0x468662f8030145ed), 0, 0,
 	UINT64_C(0x4607e1b10104c359), UINT64_C(0x468661a003014337), UINT64_C(0x478801b20e0f8360), UINT64_C(0x4885a1a0900b033f),
 	0, UINT64_C(0x40000000100b02de), 0, UINT64_C(0x80000000000300c7),
-	0, UINT64_C(0x00000000120c0644), UINT64_C(0x00000000120c0644), UINT64_C(0x00000000120c0644),
+	UINT64_C(0x000000000b0003a7), UINT64_C(0x00000000120c0644), UINT64_C(0x00000000120c0644), UINT64_C(0x00000000120c0644),
 	UINT64_C(0x00000000120c0644), UINT64_C(0x00000000120c0644), UINT64_C(0x00000000120c0644), UINT64_C(0x00000000120c0644),
 	UINT64_C(0x000000000b000224), UINT64_C(0x000000000b000181), UINT64_C(0x000000002112023f), 0,
 	UINT64_C(0x000000000b000438), UINT64_C(0x000000000b000414), UINT64_C(0x000000000b0004c6), UINT64_C(0x000000000b0002d4),
-	0, 0, 0, 0,
+	UINT64_C(0x0000000022174356), UINT64_C(0x0000000022174332), UINT64_C(0x000000002217435c), UINT64_C(0x0000000022174339),
 	0, 0, 0, 0,
 	UINT64_C(0x00000000090045f8), UINT64_C(0x000000000a0085ea), 0, 0,
 	0, 0, 0, 0,
-	UINT64_C(0x00000000221b835e), UINT64_C(0x00000000221b835e), UINT64_C(0x00000000221b835e), UINT64_C(0x00000000221b835e),
-	UINT64_C(0x00000000221b835e), UINT64_C(0x00000000221b835e), UINT64_C(0x00000000221b835e), UINT64_C(0x00000000221b835e),
-	UINT64_C(0x000000002317c33d), UINT64_C(0x000000002317c33d), UINT64_C(0x000000002317c33d), UINT64_C(0x000000002317c33d),
-	UINT64_C(0x000000002317c33d), UINT64_C(0x000000002317c33d), UINT64_C(0x000000002317c33d), UINT64_C(0x000000002317c33d),
-	UINT64_C(0x80000000000300e3), UINT64_C(0x80000000000300f3), UINT64_C(0x0000000027160489), UINT64_C(0x000000000b00048c),
-	UINT64_C(0x40000000100b02e4), UINT64_C(0x40000000100b02dc), UINT64_C(0x8000000000030109), UINT64_C(0x8000000000030119),
-	UINT64_C(0x000000002811823c), UINT64_C(0x000000000b0002e1), UINT64_C(0x00000000271602ff), UINT64_C(0x000000000b000302),
-	UINT64_C(0x000000000b000283), UINT64_C(0x000000002913c281), UINT64_C(0x000000000b000284), UINT64_C(0x000000000b000290),
-	UINT64_C(0x8000000000030131), UINT64_C(0x8000000000030141), UINT64_C(0x8000000000030151), UINT64_C(0x8000000000030161),
+	UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e),
+	UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e),
+	UINT64_C(0x000000002417c33d), UINT64_C(0x000000002417c33d), UINT64_C(0x000000002417c33d), UINT64_C(0x000000002417c33d),
+	UINT64_C(0x000000002417c33d), UINT64_C(0x000000002417c33d), UINT64_C(0x000000002417c33d), UINT64_C(0x000000002417c33d),
+	UINT64_C(0x80000000000300e8), UINT64_C(0x80000000000300f8), UINT64_C(0x0000000028160489), UINT64_C(0x000000000b00048c),
+	UINT64_C(0x40000000100b02e4), UINT64_C(0x40000000100b02dc), UINT64_C(0x800000000003010e), UINT64_C(0x800000000003011e),
+	UINT64_C(0x000000002911823c), UINT64_C(0x000000000b0002e1), UINT64_C(0x00000000281602ff), UINT64_C(0x000000000b000302),
+	UINT64_C(0x000000000b000283), UINT64_C(0x000000002a13c281), UINT64_C(0x000000000b000284), UINT64_C(0x000000000b000290),
+	UINT64_C(0x8000000000030136), UINT64_C(0x8000000000030146), UINT64_C(0x8000000000030156), UINT64_C(0x8000000000030166),
 	UINT64_C(0x0000000009004080), UINT64_C(0x000000000900407f), UINT64_C(0x000000000b0004df), UINT64_C(0x000000000b000652),
-	0, 0, 0, UINT64_C(0x8000000000020175),
+	0, 0, 0, UINT64_C(0x800000000002017a),
 	0, 0, 0, 0,
 	UINT64_C(0x000000001614c2fe), UINT64_C(0x000000001614c2fd), UINT64_C(0x000000001614c2fc), UINT64_C(0x000000001614c29f),
-	UINT64_C(0x000000002913c270), UINT64_C(0x000000002913c26e), UINT64_C(0x000000002913c3f6), UINT64_C(0x000000002913c3f4),
-	UINT64_C(0x000000002c0e017f), UINT64_C(0x000000002d1502bd), UINT64_C(0x0000000021120244), UINT64_C(0x000000001614c2bb),
+	UINT64_C(0x000000002a13c270), UINT64_C(0x000000002a13c26e), UINT64_C(0x000000002a13c3f6), UINT64_C(0x000000002a13c3f4),
+	UINT64_C(0x000000002d0e017f), UINT64_C(0x000000002e1502bd), UINT64_C(0x0000000021120244), UINT64_C(0x000000001614c2bb),
 	UINT64_C(0x000000000b000271), UINT64_C(0x000000000b00026f), UINT64_C(0x000000000b0003f7), UINT64_C(0x000000000b0003f5),
 	UINT64_C(0x000000000b0002f7), UINT64_C(0x000000000b000282), UINT64_C(0x000000000b000487), UINT64_C(0x000000000b000488),
-	UINT64_C(0x000000000b000249), UINT64_C(0x000000000b00018e), UINT64_C(0x80000000000301d3), UINT64_C(0x80000000000301e3),
+	UINT64_C(0x000000000b000249), UINT64_C(0x000000000b00018e), UINT64_C(0x80000000000301d8), UINT64_C(0x80000000000301e8),
 	UINT64_C(0x000000000b000184), UINT64_C(0x000000000b0005a8), UINT64_C(0x000000000b000189), UINT64_C(0x000000000b0005ab),
-	UINT64_C(0x000000000b000185), UINT64_C(0x000000000b0005a9), UINT64_C(0x80000000000301f9), UINT64_C(0x8000000000030209),
+	UINT64_C(0x000000000b000185), UINT64_C(0x000000000b0005a9), UINT64_C(0x80000000000301fe), UINT64_C(0x800000000003020e),
 },
 {
-	UINT64_C(0x8000000000030219), UINT64_C(0x8000000000020229), UINT64_C(0x4885a16c100b02d7), UINT64_C(0x4885a184100b0307),
+	UINT64_C(0x800000000003021e), UINT64_C(0x800000000002022e), UINT64_C(0x4885a16c100b02d7), UINT64_C(0x4885a184100b0307),
 	0, UINT64_C(0x000000000b0005d9), UINT64_C(0x000000000b00018b), UINT64_C(0x000000000b0005dd),
 	UINT64_C(0x000000000b000285), UINT64_C(0x000000000b00062d), 0, UINT64_C(0x000000000b00060c),
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0,
-	UINT64_C(0x800000000003027b), UINT64_C(0x4885a1dc1f0d83ba), 0, 0,
-	UINT64_C(0x800000000003028d), UINT64_C(0x400000001f0d83bb), UINT64_C(0x400000001f0d83bc), UINT64_C(0x5006e1de9f0d83b9),
+	UINT64_C(0x8000000000030280), UINT64_C(0x4885a1dc1f0d83ba), 0, 0,
+	UINT64_C(0x8000000000030292), UINT64_C(0x400000001f0d83bb), UINT64_C(0x400000001f0d83bc), UINT64_C(0x5006e1de9f0d83b9),
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0,
@@ -1310,26 +1396,26 @@ static const uint64_t x86LegacyDecisions[X86_TERMINAL_ROW_COUNT][2][256] = {
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0,
-	UINT64_C(0x5890830fb01c061e), UINT64_C(0x5990a31432148627), 0, 0,
+	UINT64_C(0x5910830fb11c061e), UINT64_C(0x5a10a31433148627), 0, 0,
 	0, 0, 0, 0,
-	UINT64_C(0x000000002d1502cc), UINT64_C(0x000000002d1502c3), UINT64_C(0x000000002d15029d), UINT64_C(0x000000002d150294),
-	UINT64_C(0x000000002d1502a2), UINT64_C(0x000000002d1502c0), UINT64_C(0x000000002d15029a), UINT64_C(0x000000002d150297),
-	UINT64_C(0x000000002d1502d3), UINT64_C(0x000000002d1502c9), UINT64_C(0x000000002d1502cf), UINT64_C(0x000000002d1502c6),
-	UINT64_C(0x000000002d1502ae), UINT64_C(0x000000002d1502a5), UINT64_C(0x000000002d1502ab), UINT64_C(0x000000002d1502a8),
-	0, UINT64_C(0x5708a29d1f0d8539), UINT64_C(0x5708a2961f0d852b), UINT64_C(0x5708a2931f0d8525),
-	UINT64_C(0x5708a2971f0d852d), UINT64_C(0x5708a29c1f0d8537), UINT64_C(0x5708a2951f0d8529), UINT64_C(0x5708a2941f0d8527),
-	UINT64_C(0x5708a2a29f0d8544), UINT64_C(0x5708a29f1f0d853d), UINT64_C(0x5708a2a11f0d8541), UINT64_C(0x5708a29e1f0d853b),
-	UINT64_C(0x5708a29b1f0d8535), UINT64_C(0x5708a2981f0d852f), UINT64_C(0x5708a29a1f0d8533), UINT64_C(0x5708a2991f0d8531),
+	UINT64_C(0x000000002e1502cc), UINT64_C(0x000000002e1502c3), UINT64_C(0x000000002e15029d), UINT64_C(0x000000002e150294),
+	UINT64_C(0x000000002e1502a2), UINT64_C(0x000000002e1502c0), UINT64_C(0x000000002e15029a), UINT64_C(0x000000002e150297),
+	UINT64_C(0x000000002e1502d3), UINT64_C(0x000000002e1502c9), UINT64_C(0x000000002e1502cf), UINT64_C(0x000000002e1502c6),
+	UINT64_C(0x000000002e1502ae), UINT64_C(0x000000002e1502a5), UINT64_C(0x000000002e1502ab), UINT64_C(0x000000002e1502a8),
+	UINT64_C(0x5788a2a01f0d853f), UINT64_C(0x5788a29d1f0d8539), UINT64_C(0x5788a2961f0d852b), UINT64_C(0x5788a2931f0d8525),
+	UINT64_C(0x5788a2971f0d852d), UINT64_C(0x5788a29c1f0d8537), UINT64_C(0x5788a2951f0d8529), UINT64_C(0x5788a2941f0d8527),
+	UINT64_C(0x5788a2a29f0d8544), UINT64_C(0x5788a29f1f0d853d), UINT64_C(0x5788a2a11f0d8541), UINT64_C(0x5788a29e1f0d853b),
+	UINT64_C(0x5788a29b1f0d8535), UINT64_C(0x5788a2981f0d852f), UINT64_C(0x5788a29a1f0d8533), UINT64_C(0x5788a2991f0d8531),
 	UINT64_C(0x000000000b00043b), UINT64_C(0x000000000b000417), UINT64_C(0x000000000b000221), UINT64_C(0x468660a203014142),
-	0, UINT64_C(0x420122b383014565), UINT64_C(0x8000000000020303), UINT64_C(0x800000000002034b),
+	0, UINT64_C(0x420122b383014565), UINT64_C(0x800000000002030a), UINT64_C(0x8000000000020352),
 	UINT64_C(0x000000000b00043e), UINT64_C(0x000000000b00041a), UINT64_C(0x000000000b0004c4), UINT64_C(0x420120b403014166),
-	0, UINT64_C(0x420122c78301458d), UINT64_C(0x800000000003039a), UINT64_C(0x4401412f8702025c),
+	0, UINT64_C(0x420122c78301458d), UINT64_C(0x80000000000303a1), UINT64_C(0x4401412f8702025c),
 	UINT64_C(0x4607e1100104c21f), UINT64_C(0x4686610d8301421a), UINT64_C(0x40000000100b030c), UINT64_C(0x420120ae0301415a),
-	UINT64_C(0x40000000100b02e6), UINT64_C(0x40000000100b02ec), UINT64_C(0x5a0e21c6100b0389), UINT64_C(0x5a8e41c5900b0388),
-	0, 0, UINT64_C(0x80000000000303bc), UINT64_C(0x420120a80301414e),
-	UINT64_C(0x4885a098900b0130), UINT64_C(0x4885a09b900b0136), UINT64_C(0x5a0e21be100b0379), UINT64_C(0x5a8e41bd900b0378),
+	UINT64_C(0x40000000100b02e6), UINT64_C(0x40000000100b02ec), UINT64_C(0x5a8e21c6100b0389), UINT64_C(0x5b0e41c5900b0388),
+	0, 0, UINT64_C(0x80000000000303c3), UINT64_C(0x420120a80301414e),
+	UINT64_C(0x4885a098900b0130), UINT64_C(0x4885a09b900b0136), UINT64_C(0x5a8e21be100b0379), UINT64_C(0x5b0e41bd900b0378),
 	0, 0, 0, 0,
-	0, 0, 0, UINT64_C(0x80000000000303d6),
+	0, 0, 0, UINT64_C(0x80000000000303dd),
 	UINT64_C(0x00000000120c013b), UINT64_C(0x00000000120c013b), UINT64_C(0x00000000120c013b), UINT64_C(0x00000000120c013b),
 	UINT64_C(0x00000000120c013b), UINT64_C(0x00000000120c013b), UINT64_C(0x00000000120c013b), UINT64_C(0x00000000120c013b),
 	0, 0, 0, 0,
@@ -1368,13 +1454,13 @@ static const uint64_t x86LegacyDecisions[X86_TERMINAL_ROW_COUNT][2][256] = {
 	0, 0, 0, 0,
 	UINT64_C(0x000000000b00048f), 0, 0, 0,
 	0, 0, 0, 0,
-	UINT64_C(0x00000000361d842c), UINT64_C(0x00000000361d842c), UINT64_C(0x00000000361d842c), UINT64_C(0x00000000361d842c),
-	UINT64_C(0x00000000361d842c), UINT64_C(0x00000000361d842c), UINT64_C(0x00000000361d842c), UINT64_C(0x00000000361d842c),
-	UINT64_C(0x00000000361d840a), UINT64_C(0x00000000361d840a), UINT64_C(0x00000000361d840a), UINT64_C(0x00000000361d840a),
-	UINT64_C(0x00000000361d840a), UINT64_C(0x00000000361d840a), UINT64_C(0x00000000361d840a), UINT64_C(0x00000000361d840a),
-	0, 0, 0, UINT64_C(0x5990a34432148687),
+	UINT64_C(0x00000000371d842c), UINT64_C(0x00000000371d842c), UINT64_C(0x00000000371d842c), UINT64_C(0x00000000371d842c),
+	UINT64_C(0x00000000371d842c), UINT64_C(0x00000000371d842c), UINT64_C(0x00000000371d842c), UINT64_C(0x00000000371d842c),
+	UINT64_C(0x00000000371d840a), UINT64_C(0x00000000371d840a), UINT64_C(0x00000000371d840a), UINT64_C(0x00000000371d840a),
+	UINT64_C(0x00000000371d840a), UINT64_C(0x00000000371d840a), UINT64_C(0x00000000371d840a), UINT64_C(0x00000000371d840a),
+	0, 0, 0, UINT64_C(0x5a10a34433148687),
 	0, 0, UINT64_C(0x000000000b000227), 0,
-	UINT64_C(0x000000003702c42a), 0, UINT64_C(0x000000000900442b), 0,
+	UINT64_C(0x000000003802c42a), 0, UINT64_C(0x000000000900442b), 0,
 	0, 0, 0, 0,
 	UINT64_C(0x000000001614c2ca), UINT64_C(0x000000001614c2c1), UINT64_C(0x000000001614c29b), UINT64_C(0x000000001614c292),
 	UINT64_C(0x000000001614c2a0), UINT64_C(0x000000001614c2be), UINT64_C(0x000000001614c298), UINT64_C(0x000000001614c295),
@@ -1383,45 +1469,45 @@ static const uint64_t x86LegacyDecisions[X86_TERMINAL_ROW_COUNT][2][256] = {
 	UINT64_C(0x8000000000030079), UINT64_C(0x8000000000030089), 0, UINT64_C(0x80000000000300a9),
 	UINT64_C(0x4607e2ff0104c5fb), UINT64_C(0x468662f8030145ed), 0, 0,
 	UINT64_C(0x4607e1b10104c359), UINT64_C(0x468661a003014337), UINT64_C(0x478801b20e0f8360), UINT64_C(0x4885a1a0900b033f),
-	0, UINT64_C(0x40000000100b02df), 0, UINT64_C(0x80000000000303f1),
-	0, UINT64_C(0x00000000120c0644), UINT64_C(0x00000000120c0644), UINT64_C(0x00000000120c0644),
+	0, UINT64_C(0x40000000100b02df), 0, UINT64_C(0x80000000000303f8),
+	UINT64_C(0x000000000b0003a7), UINT64_C(0x00000000120c0644), UINT64_C(0x00000000120c0644), UINT64_C(0x00000000120c0644),
 	UINT64_C(0x00000000120c0644), UINT64_C(0x00000000120c0644), UINT64_C(0x00000000120c0644), UINT64_C(0x00000000120c0644),
 	UINT64_C(0x000000000b000224), UINT64_C(0x000000000b000181), 0, 0,
 	UINT64_C(0x000000000b000439), UINT64_C(0x000000000b000415), UINT64_C(0x000000000b0004c6), UINT64_C(0x000000000b0002d4),
-	0, 0, 0, 0,
+	UINT64_C(0x0000000022174357), UINT64_C(0x0000000022174333), UINT64_C(0x000000002217435d), UINT64_C(0x000000002217433a),
 	0, 0, 0, 0,
 	UINT64_C(0x00000000090045f8), UINT64_C(0x000000000a0085ea), 0, 0,
 	0, 0, 0, 0,
-	UINT64_C(0x00000000221b835e), UINT64_C(0x00000000221b835e), UINT64_C(0x00000000221b835e), UINT64_C(0x00000000221b835e),
-	UINT64_C(0x00000000221b835e), UINT64_C(0x00000000221b835e), UINT64_C(0x00000000221b835e), UINT64_C(0x00000000221b835e),
-	UINT64_C(0x000000002317c33d), UINT64_C(0x000000002317c33d), UINT64_C(0x000000002317c33d), UINT64_C(0x000000002317c33d),
-	UINT64_C(0x000000002317c33d), UINT64_C(0x000000002317c33d), UINT64_C(0x000000002317c33d), UINT64_C(0x000000002317c33d),
-	UINT64_C(0x80000000000300e3), UINT64_C(0x80000000000300f3), UINT64_C(0x000000002716048a), UINT64_C(0x000000000b00048d),
-	0, 0, UINT64_C(0x8000000000030109), UINT64_C(0x8000000000030119),
-	UINT64_C(0x000000002811823c), UINT64_C(0x000000000b0002e2), UINT64_C(0x00000000271602ff), UINT64_C(0x000000000b000302),
-	UINT64_C(0x000000000b000283), UINT64_C(0x000000002913c281), 0, UINT64_C(0x000000000b000290),
-	UINT64_C(0x8000000000030131), UINT64_C(0x8000000000030141), UINT64_C(0x8000000000030151), UINT64_C(0x8000000000030161),
+	UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e),
+	UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e),
+	UINT64_C(0x000000002417c33d), UINT64_C(0x000000002417c33d), UINT64_C(0x000000002417c33d), UINT64_C(0x000000002417c33d),
+	UINT64_C(0x000000002417c33d), UINT64_C(0x000000002417c33d), UINT64_C(0x000000002417c33d), UINT64_C(0x000000002417c33d),
+	UINT64_C(0x80000000000300e8), UINT64_C(0x80000000000300f8), UINT64_C(0x000000002816048a), UINT64_C(0x000000000b00048d),
+	0, 0, UINT64_C(0x800000000003010e), UINT64_C(0x800000000003011e),
+	UINT64_C(0x000000002911823c), UINT64_C(0x000000000b0002e2), UINT64_C(0x00000000281602ff), UINT64_C(0x000000000b000302),
+	UINT64_C(0x000000000b000283), UINT64_C(0x000000002a13c281), 0, UINT64_C(0x000000000b000290),
+	UINT64_C(0x8000000000030136), UINT64_C(0x8000000000030146), UINT64_C(0x8000000000030156), UINT64_C(0x8000000000030166),
 	0, 0, 0, UINT64_C(0x000000000b000652),
-	0, 0, 0, UINT64_C(0x8000000000020175),
+	0, 0, 0, UINT64_C(0x800000000002017a),
 	0, 0, 0, 0,
 	UINT64_C(0x000000001614c2fe), UINT64_C(0x000000001614c2fd), UINT64_C(0x000000001614c2fc), UINT64_C(0x000000001614c2d0),
-	UINT64_C(0x000000002913c270), UINT64_C(0x000000002913c26e), UINT64_C(0x000000002913c3f6), UINT64_C(0x000000002913c3f4),
-	UINT64_C(0x000000002c0e017b), UINT64_C(0x000000002d1502bd), 0, UINT64_C(0x000000001614c2bb),
+	UINT64_C(0x000000002a13c270), UINT64_C(0x000000002a13c26e), UINT64_C(0x000000002a13c3f6), UINT64_C(0x000000002a13c3f4),
+	UINT64_C(0x000000002d0e017b), UINT64_C(0x000000002e1502bd), 0, UINT64_C(0x000000001614c2bb),
 	UINT64_C(0x000000000b000271), UINT64_C(0x000000000b00026f), UINT64_C(0x000000000b0003f7), UINT64_C(0x000000000b0003f5),
 	UINT64_C(0x000000000b0002f7), UINT64_C(0x000000000b000282), UINT64_C(0x000000000b000487), UINT64_C(0x000000000b000488),
-	UINT64_C(0x000000000b000249), UINT64_C(0x000000000b00018e), UINT64_C(0x80000000000301d3), UINT64_C(0x80000000000301e3),
+	UINT64_C(0x000000000b000249), UINT64_C(0x000000000b00018e), UINT64_C(0x80000000000301d8), UINT64_C(0x80000000000301e8),
 	UINT64_C(0x000000000b000184), UINT64_C(0x000000000b0005a8), UINT64_C(0x000000000b000189), UINT64_C(0x000000000b0005ab),
-	UINT64_C(0x000000000b000185), UINT64_C(0x000000000b0005a9), UINT64_C(0x80000000000301f9), UINT64_C(0x8000000000030408),
+	UINT64_C(0x000000000b000185), UINT64_C(0x000000000b0005a9), UINT64_C(0x80000000000301fe), UINT64_C(0x8000000000030413),
 },
 {
-	UINT64_C(0x8000000000030219), UINT64_C(0x8000000000020418), UINT64_C(0x4885a16c100b02d7), UINT64_C(0x4885a184100b0307),
+	UINT64_C(0x800000000003021e), UINT64_C(0x8000000000020423), UINT64_C(0x4885a16c100b02d7), UINT64_C(0x4885a184100b0307),
 	0, UINT64_C(0x000000000b0005d9), UINT64_C(0x000000000b00018b), UINT64_C(0x000000000b0005dd),
 	UINT64_C(0x000000000b000285), UINT64_C(0x000000000b00062d), 0, UINT64_C(0x000000000b00060c),
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0,
-	UINT64_C(0x800000000003027b), UINT64_C(0x4885a1dc1f0d83ba), 0, 0,
-	UINT64_C(0x800000000003028d), UINT64_C(0x400000001f0d83bb), UINT64_C(0x400000001f0d83bc), UINT64_C(0x5006e1de9f0d83b9),
+	UINT64_C(0x8000000000030280), UINT64_C(0x4885a1dc1f0d83ba), 0, 0,
+	UINT64_C(0x8000000000030292), UINT64_C(0x400000001f0d83bb), UINT64_C(0x400000001f0d83bc), UINT64_C(0x5006e1de9f0d83b9),
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0,
@@ -1444,26 +1530,26 @@ static const uint64_t x86LegacyDecisions[X86_TERMINAL_ROW_COUNT][2][256] = {
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0,
-	UINT64_C(0x5d06a310b9034620), UINT64_C(0x5e05e3153b0b8629), 0, 0,
+	UINT64_C(0x5d86a310ba034620), UINT64_C(0x5e85e3153c0b8629), 0, 0,
 	0, 0, 0, 0,
-	UINT64_C(0x000000002d1502cc), UINT64_C(0x000000002d1502c3), UINT64_C(0x000000002d15029d), UINT64_C(0x000000002d150294),
-	UINT64_C(0x000000002d1502a2), UINT64_C(0x000000002d1502c0), UINT64_C(0x000000002d15029a), UINT64_C(0x000000002d150297),
-	UINT64_C(0x000000002d1502d3), UINT64_C(0x000000002d1502c9), UINT64_C(0x000000002d1502cf), UINT64_C(0x000000002d1502c6),
-	UINT64_C(0x000000002d1502ae), UINT64_C(0x000000002d1502a5), UINT64_C(0x000000002d1502ab), UINT64_C(0x000000002d1502a8),
-	0, UINT64_C(0x5708a29d1f0d8539), UINT64_C(0x5708a2961f0d852b), UINT64_C(0x5708a2931f0d8525),
-	UINT64_C(0x5708a2971f0d852d), UINT64_C(0x5708a29c1f0d8537), UINT64_C(0x5708a2951f0d8529), UINT64_C(0x5708a2941f0d8527),
-	UINT64_C(0x5708a2a29f0d8544), UINT64_C(0x5708a29f1f0d853d), UINT64_C(0x5708a2a11f0d8541), UINT64_C(0x5708a29e1f0d853b),
-	UINT64_C(0x5708a29b1f0d8535), UINT64_C(0x5708a2981f0d852f), UINT64_C(0x5708a29a1f0d8533), UINT64_C(0x5708a2991f0d8531),
+	UINT64_C(0x000000002e1502cc), UINT64_C(0x000000002e1502c3), UINT64_C(0x000000002e15029d), UINT64_C(0x000000002e150294),
+	UINT64_C(0x000000002e1502a2), UINT64_C(0x000000002e1502c0), UINT64_C(0x000000002e15029a), UINT64_C(0x000000002e150297),
+	UINT64_C(0x000000002e1502d3), UINT64_C(0x000000002e1502c9), UINT64_C(0x000000002e1502cf), UINT64_C(0x000000002e1502c6),
+	UINT64_C(0x000000002e1502ae), UINT64_C(0x000000002e1502a5), UINT64_C(0x000000002e1502ab), UINT64_C(0x000000002e1502a8),
+	UINT64_C(0x5788a2a01f0d853f), UINT64_C(0x5788a29d1f0d8539), UINT64_C(0x5788a2961f0d852b), UINT64_C(0x5788a2931f0d8525),
+	UINT64_C(0x5788a2971f0d852d), UINT64_C(0x5788a29c1f0d8537), UINT64_C(0x5788a2951f0d8529), UINT64_C(0x5788a2941f0d8527),
+	UINT64_C(0x5788a2a29f0d8544), UINT64_C(0x5788a29f1f0d853d), UINT64_C(0x5788a2a11f0d8541), UINT64_C(0x5788a29e1f0d853b),
+	UINT64_C(0x5788a29b1f0d8535), UINT64_C(0x5788a2981f0d852f), UINT64_C(0x5788a29a1f0d8533), UINT64_C(0x5788a2991f0d8531),
 	UINT64_C(0x000000000b00043c), UINT64_C(0x000000000b000418), UINT64_C(0x000000000b000221), UINT64_C(0x468660a203014142),
-	0, UINT64_C(0x420122b383014565), UINT64_C(0x8000000000020303), UINT64_C(0x800000000002034b),
+	0, UINT64_C(0x420122b383014565), UINT64_C(0x800000000002030a), UINT64_C(0x8000000000020352),
 	UINT64_C(0x000000000b00043f), UINT64_C(0x000000000b00041b), UINT64_C(0x000000000b0004c4), UINT64_C(0x420120b403014166),
-	0, UINT64_C(0x420122c78301458d), UINT64_C(0x800000000003039a), UINT64_C(0x4401412f8702025c),
+	0, UINT64_C(0x420122c78301458d), UINT64_C(0x80000000000303a1), UINT64_C(0x4401412f8702025c),
 	UINT64_C(0x4607e1100104c21f), UINT64_C(0x4686610d8301421a), UINT64_C(0x40000000100b030c), UINT64_C(0x420120ae0301415a),
-	UINT64_C(0x40000000100b02e6), UINT64_C(0x40000000100b02ec), UINT64_C(0x5a0e21c6100b0389), UINT64_C(0x5a8e41c5900b0388),
-	0, 0, UINT64_C(0x80000000000303bc), UINT64_C(0x420120a80301414e),
-	UINT64_C(0x4885a098900b0130), UINT64_C(0x4885a09b900b0136), UINT64_C(0x5a0e21be100b0379), UINT64_C(0x5a8e41bd900b0378),
+	UINT64_C(0x40000000100b02e6), UINT64_C(0x40000000100b02ec), UINT64_C(0x5a8e21c6100b0389), UINT64_C(0x5b0e41c5900b0388),
+	0, 0, UINT64_C(0x80000000000303c3), UINT64_C(0x420120a80301414e),
+	UINT64_C(0x4885a098900b0130), UINT64_C(0x4885a09b900b0136), UINT64_C(0x5a8e21be100b0379), UINT64_C(0x5b0e41bd900b0378),
 	0, 0, 0, 0,
-	0, 0, 0, UINT64_C(0x80000000000303d6),
+	0, 0, 0, UINT64_C(0x80000000000303dd),
 	UINT64_C(0x00000000120c013b), UINT64_C(0x00000000120c013b), UINT64_C(0x00000000120c013b), UINT64_C(0x00000000120c013b),
 	UINT64_C(0x00000000120c013b), UINT64_C(0x00000000120c013b), UINT64_C(0x00000000120c013b), UINT64_C(0x00000000120c013b),
 	0, 0, 0, 0,
@@ -1482,80 +1568,80 @@ static const uint64_t x86LegacyDecisions[X86_TERMINAL_ROW_COUNT][2][256] = {
 },
 {
 {
-	UINT64_C(0x4102c0660104c0c8), UINT64_C(0x5e822061b90340bf), UINT64_C(0x4302e066850540cb), UINT64_C(0x5f8240623e0400c2),
-	UINT64_C(0x00000000090040c5), UINT64_C(0x000000003702c0bc), 0, 0,
-	UINT64_C(0x4102c1f80104c3ec), UINT64_C(0x5e8221f3b90343e3), UINT64_C(0x4302e1f8850543ef), UINT64_C(0x5f8241f43e0403e6),
-	UINT64_C(0x00000000090043e9), UINT64_C(0x000000003702c3e0), 0, 0,
-	UINT64_C(0x4102c0520104c0a0), UINT64_C(0x5e82204db9034097), UINT64_C(0x4302e052850540a3), UINT64_C(0x5f82404e3e04009a),
-	UINT64_C(0x000000000900409d), UINT64_C(0x000000003702c094), 0, 0,
-	UINT64_C(0x4102c28f8104c51b), UINT64_C(0x5e82228b39034512), UINT64_C(0x4302e2900505451e), UINT64_C(0x5f82428bbe040515),
-	UINT64_C(0x0000000009004518), UINT64_C(0x000000003702c50f), 0, 0,
-	UINT64_C(0x4102c07a0104c0f0), UINT64_C(0x5e822075b90340e7), UINT64_C(0x4302e07a850540f3), UINT64_C(0x5f8240763e0400ea),
-	UINT64_C(0x00000000090040ed), UINT64_C(0x000000003702c0e4), 0, 0,
-	UINT64_C(0x4102c2eb0104c5d2), UINT64_C(0x5e8222e6b90345c9), UINT64_C(0x4302e2eb850545d5), UINT64_C(0x5f8242e73e0405cc),
-	UINT64_C(0x00000000090045cf), UINT64_C(0x000000003702c5c6), 0, 0,
-	UINT64_C(0x4102c33a8104c671), UINT64_C(0x5e82233639034668), UINT64_C(0x4302e33b05054674), UINT64_C(0x5f824336be04066b),
-	UINT64_C(0x000000000900466e), UINT64_C(0x000000003702c665), 0, 0,
-	UINT64_C(0x4607e1088104c20d), UINT64_C(0x5d06a10439034204), UINT64_C(0x478801090e0f8210), UINT64_C(0x5e05e104bb0b8207),
-	UINT64_C(0x000000000900420a), UINT64_C(0x000000003702c201), 0, 0,
+	UINT64_C(0x4102c0660104c0c8), UINT64_C(0x5f022061ba0340bf), UINT64_C(0x4302e066850540cb), UINT64_C(0x600240623f0400c2),
+	UINT64_C(0x00000000090040c5), UINT64_C(0x000000003802c0bc), 0, 0,
+	UINT64_C(0x4102c1f80104c3ec), UINT64_C(0x5f0221f3ba0343e3), UINT64_C(0x4302e1f8850543ef), UINT64_C(0x600241f43f0403e6),
+	UINT64_C(0x00000000090043e9), UINT64_C(0x000000003802c3e0), 0, 0,
+	UINT64_C(0x4102c0520104c0a0), UINT64_C(0x5f02204dba034097), UINT64_C(0x4302e052850540a3), UINT64_C(0x6002404e3f04009a),
+	UINT64_C(0x000000000900409d), UINT64_C(0x000000003802c094), 0, 0,
+	UINT64_C(0x4102c28f8104c51b), UINT64_C(0x5f02228b3a034512), UINT64_C(0x4302e2900505451e), UINT64_C(0x6002428bbf040515),
+	UINT64_C(0x0000000009004518), UINT64_C(0x000000003802c50f), 0, 0,
+	UINT64_C(0x4102c07a0104c0f0), UINT64_C(0x5f022075ba0340e7), UINT64_C(0x4302e07a850540f3), UINT64_C(0x600240763f0400ea),
+	UINT64_C(0x00000000090040ed), UINT64_C(0x000000003802c0e4), 0, 0,
+	UINT64_C(0x4102c2eb0104c5d2), UINT64_C(0x5f0222e6ba0345c9), UINT64_C(0x4302e2eb850545d5), UINT64_C(0x600242e73f0405cc),
+	UINT64_C(0x00000000090045cf), UINT64_C(0x000000003802c5c6), 0, 0,
+	UINT64_C(0x4102c33a8104c671), UINT64_C(0x5f0223363a034668), UINT64_C(0x4302e33b05054674), UINT64_C(0x60024336bf04066b),
+	UINT64_C(0x000000000900466e), UINT64_C(0x000000003802c665), 0, 0,
+	UINT64_C(0x4607e1088104c20d), UINT64_C(0x5d86a1043a034204), UINT64_C(0x478801090e0f8210), UINT64_C(0x5e85e104bc0b8207),
+	UINT64_C(0x000000000900420a), UINT64_C(0x000000003802c201), 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	UINT64_C(0x000000000b00048f), 0, 0, 0,
 	0, 0, 0, 0,
-	UINT64_C(0x00000000361d842c), UINT64_C(0x00000000361d842c), UINT64_C(0x00000000361d842c), UINT64_C(0x00000000361d842c),
-	UINT64_C(0x00000000361d842c), UINT64_C(0x00000000361d842c), UINT64_C(0x00000000361d842c), UINT64_C(0x00000000361d842c),
-	UINT64_C(0x00000000361d840a), UINT64_C(0x00000000361d840a), UINT64_C(0x00000000361d840a), UINT64_C(0x00000000361d840a),
-	UINT64_C(0x00000000361d840a), UINT64_C(0x00000000361d840a), UINT64_C(0x00000000361d840a), UINT64_C(0x00000000361d840a),
-	0, 0, 0, UINT64_C(0x600aa1c13b0b837f),
+	UINT64_C(0x00000000371d842c), UINT64_C(0x00000000371d842c), UINT64_C(0x00000000371d842c), UINT64_C(0x00000000371d842c),
+	UINT64_C(0x00000000371d842c), UINT64_C(0x00000000371d842c), UINT64_C(0x00000000371d842c), UINT64_C(0x00000000371d842c),
+	UINT64_C(0x00000000371d840a), UINT64_C(0x00000000371d840a), UINT64_C(0x00000000371d840a), UINT64_C(0x00000000371d840a),
+	UINT64_C(0x00000000371d840a), UINT64_C(0x00000000371d840a), UINT64_C(0x00000000371d840a), UINT64_C(0x00000000371d840a),
+	0, 0, 0, UINT64_C(0x608aa1c13c0b837f),
 	0, 0, UINT64_C(0x000000000b000227), 0,
-	UINT64_C(0x000000003702c42a), 0, UINT64_C(0x000000000900442b), 0,
+	UINT64_C(0x000000003802c42a), 0, UINT64_C(0x000000000900442b), 0,
 	0, 0, 0, 0,
 	UINT64_C(0x000000001614c2ca), UINT64_C(0x000000001614c2c1), UINT64_C(0x000000001614c29b), UINT64_C(0x000000001614c292),
 	UINT64_C(0x000000001614c2a0), UINT64_C(0x000000001614c2be), UINT64_C(0x000000001614c298), UINT64_C(0x000000001614c295),
 	UINT64_C(0x000000001614c2d1), UINT64_C(0x000000001614c2c7), UINT64_C(0x000000001614c2cd), UINT64_C(0x000000001614c2c4),
 	UINT64_C(0x000000001614c2ac), UINT64_C(0x000000001614c2a3), UINT64_C(0x000000001614c2a9), UINT64_C(0x000000001614c2a6),
-	UINT64_C(0x8000000000030079), UINT64_C(0x8000000000030492), 0, UINT64_C(0x80000000000304a2),
-	UINT64_C(0x4607e2ff0104c5fb), UINT64_C(0x5d06a2fbb90345f4), 0, 0,
-	UINT64_C(0x4607e1b10104c359), UINT64_C(0x5d06a1a8b9034349), UINT64_C(0x478801b20e0f8360), UINT64_C(0x5e05e1a93b0b8350),
-	0, UINT64_C(0x400000003b0b82e0), 0, UINT64_C(0x80000000000303f1),
-	0, UINT64_C(0x00000000460c4647), UINT64_C(0x00000000460c4647), UINT64_C(0x00000000460c4647),
-	UINT64_C(0x00000000460c4647), UINT64_C(0x00000000460c4647), UINT64_C(0x00000000460c4647), UINT64_C(0x00000000460c4647),
+	UINT64_C(0x8000000000030079), UINT64_C(0x800000000003049d), 0, UINT64_C(0x80000000000304ad),
+	UINT64_C(0x4607e2ff0104c5fb), UINT64_C(0x5d86a2fbba0345f4), 0, 0,
+	UINT64_C(0x4607e1b10104c359), UINT64_C(0x5d86a1a8ba034349), UINT64_C(0x478801b20e0f8360), UINT64_C(0x5e85e1a93c0b8350),
+	0, UINT64_C(0x400000003c0b82e0), 0, UINT64_C(0x80000000000303f8),
+	UINT64_C(0x000000000b0003a7), UINT64_C(0x00000000470c4647), UINT64_C(0x00000000470c4647), UINT64_C(0x00000000470c4647),
+	UINT64_C(0x00000000470c4647), UINT64_C(0x00000000470c4647), UINT64_C(0x00000000470c4647), UINT64_C(0x00000000470c4647),
 	UINT64_C(0x000000000b000182), UINT64_C(0x000000000b000222), 0, 0,
 	UINT64_C(0x000000000b000439), UINT64_C(0x000000000b000415), UINT64_C(0x000000000b0004c6), UINT64_C(0x000000000b0002d4),
+	UINT64_C(0x0000000022174357), UINT64_C(0x0000000022174345), UINT64_C(0x000000002217435d), UINT64_C(0x000000002217434b),
 	0, 0, 0, 0,
+	UINT64_C(0x00000000090045f8), UINT64_C(0x000000003802c5f1), 0, 0,
 	0, 0, 0, 0,
-	UINT64_C(0x00000000090045f8), UINT64_C(0x000000003702c5f1), 0, 0,
-	0, 0, 0, 0,
-	UINT64_C(0x00000000221b835e), UINT64_C(0x00000000221b835e), UINT64_C(0x00000000221b835e), UINT64_C(0x00000000221b835e),
-	UINT64_C(0x00000000221b835e), UINT64_C(0x00000000221b835e), UINT64_C(0x00000000221b835e), UINT64_C(0x00000000221b835e),
-	UINT64_C(0x00000000471ac34e), UINT64_C(0x00000000471ac34e), UINT64_C(0x00000000471ac34e), UINT64_C(0x00000000471ac34e),
-	UINT64_C(0x00000000471ac34e), UINT64_C(0x00000000471ac34e), UINT64_C(0x00000000471ac34e), UINT64_C(0x00000000471ac34e),
-	UINT64_C(0x80000000000300e3), UINT64_C(0x80000000000304bf), UINT64_C(0x000000002716048a), UINT64_C(0x000000000b00048d),
-	0, 0, UINT64_C(0x8000000000030109), UINT64_C(0x80000000000304cf),
-	UINT64_C(0x000000002811823c), UINT64_C(0x000000000b0002e2), UINT64_C(0x0000000027160300), UINT64_C(0x000000000b000303),
-	UINT64_C(0x000000000b000283), UINT64_C(0x000000002913c281), 0, UINT64_C(0x000000000b000291),
-	UINT64_C(0x8000000000030131), UINT64_C(0x80000000000304e2), UINT64_C(0x8000000000030151), UINT64_C(0x80000000000304f2),
+	UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e),
+	UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e),
+	UINT64_C(0x00000000481ac34e), UINT64_C(0x00000000481ac34e), UINT64_C(0x00000000481ac34e), UINT64_C(0x00000000481ac34e),
+	UINT64_C(0x00000000481ac34e), UINT64_C(0x00000000481ac34e), UINT64_C(0x00000000481ac34e), UINT64_C(0x00000000481ac34e),
+	UINT64_C(0x80000000000300e8), UINT64_C(0x80000000000304cc), UINT64_C(0x000000002816048a), UINT64_C(0x000000000b00048d),
+	0, 0, UINT64_C(0x800000000003010e), UINT64_C(0x80000000000304dc),
+	UINT64_C(0x000000002911823c), UINT64_C(0x000000000b0002e2), UINT64_C(0x0000000028160300), UINT64_C(0x000000000b000303),
+	UINT64_C(0x000000000b000283), UINT64_C(0x000000002a13c281), 0, UINT64_C(0x000000000b000291),
+	UINT64_C(0x8000000000030136), UINT64_C(0x80000000000304ef), UINT64_C(0x8000000000030156), UINT64_C(0x80000000000304ff),
 	0, 0, 0, UINT64_C(0x000000000b000652),
-	0, 0, 0, UINT64_C(0x8000000000020175),
+	0, 0, 0, UINT64_C(0x800000000002017a),
 	0, 0, 0, 0,
 	UINT64_C(0x000000001614c2fe), UINT64_C(0x000000001614c2fd), UINT64_C(0x000000001614c2fc), UINT64_C(0x000000001614c2d0),
-	UINT64_C(0x000000002913c270), UINT64_C(0x000000002913c26e), UINT64_C(0x000000002913c3f6), UINT64_C(0x000000002913c3f4),
-	UINT64_C(0x000000002c0e017b), UINT64_C(0x000000002d1502bd), 0, UINT64_C(0x000000001614c2bb),
+	UINT64_C(0x000000002a13c270), UINT64_C(0x000000002a13c26e), UINT64_C(0x000000002a13c3f6), UINT64_C(0x000000002a13c3f4),
+	UINT64_C(0x000000002d0e017b), UINT64_C(0x000000002e1502bd), 0, UINT64_C(0x000000001614c2bb),
 	UINT64_C(0x000000000b000271), UINT64_C(0x000000000b00026f), UINT64_C(0x000000000b0003f7), UINT64_C(0x000000000b0003f5),
 	UINT64_C(0x000000000b0002f7), UINT64_C(0x000000000b000282), UINT64_C(0x000000000b000487), UINT64_C(0x000000000b000488),
-	UINT64_C(0x000000000b000249), UINT64_C(0x000000000b00018e), UINT64_C(0x80000000000301d3), UINT64_C(0x8000000000030502),
+	UINT64_C(0x000000000b000249), UINT64_C(0x000000000b00018e), UINT64_C(0x80000000000301d8), UINT64_C(0x800000000003050f),
 	UINT64_C(0x000000000b000184), UINT64_C(0x000000000b0005a8), UINT64_C(0x000000000b000189), UINT64_C(0x000000000b0005ab),
-	UINT64_C(0x000000000b000185), UINT64_C(0x000000000b0005a9), UINT64_C(0x80000000000301f9), UINT64_C(0x8000000000030512),
+	UINT64_C(0x000000000b000185), UINT64_C(0x000000000b0005a9), UINT64_C(0x80000000000301fe), UINT64_C(0x800000000003051f),
 },
 {
-	UINT64_C(0x8000000000030522), UINT64_C(0x8000000000020532), UINT64_C(0x600aa16d3b0b82d9), UINT64_C(0x600aa1853b0b8309),
+	UINT64_C(0x800000000003052f), UINT64_C(0x800000000002053f), UINT64_C(0x608aa16d3c0b82d9), UINT64_C(0x608aa1853c0b8309),
 	0, UINT64_C(0x000000000b0005d9), UINT64_C(0x000000000b00018b), UINT64_C(0x000000000b0005de),
 	UINT64_C(0x000000000b000285), UINT64_C(0x000000000b00062d), 0, UINT64_C(0x000000000b00060c),
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0,
-	UINT64_C(0x800000000003027b), UINT64_C(0x4885a1dc1f0d83ba), 0, 0,
-	UINT64_C(0x800000000003028d), UINT64_C(0x400000001f0d83bb), UINT64_C(0x400000001f0d83bc), UINT64_C(0x5c0721df9f0d83be),
+	UINT64_C(0x8000000000030280), UINT64_C(0x4885a1dc1f0d83ba), 0, 0,
+	UINT64_C(0x8000000000030292), UINT64_C(0x400000001f0d83bb), UINT64_C(0x400000001f0d83bc), UINT64_C(0x5c8721df9f0d83be),
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0,
@@ -1564,10 +1650,10 @@ static const uint64_t x86LegacyDecisions[X86_TERMINAL_ROW_COUNT][2][256] = {
 	UINT64_C(0x000000000b0005da), UINT64_C(0x000000000b0005dc), 0, UINT64_C(0x000000000b000248),
 	0, 0, 0, 0,
 	0, 0, 0, 0,
-	UINT64_C(0x5f8240f13e0401e1), UINT64_C(0x5f8240e83e0401cf), UINT64_C(0x5f8240d03e04019f), UINT64_C(0x5f8240cd3e040199),
-	UINT64_C(0x5f8240d63e0401ab), UINT64_C(0x5f8240e53e0401c9), UINT64_C(0x5f8240d33e0401a5), UINT64_C(0x5f8240ca3e040193),
-	UINT64_C(0x5f8240f73e0401ed), UINT64_C(0x5f8240ee3e0401db), UINT64_C(0x5f8240f43e0401e7), UINT64_C(0x5f8240eb3e0401d5),
-	UINT64_C(0x5f8240df3e0401bd), UINT64_C(0x5f8240dc3e0401b7), UINT64_C(0x5f8240e23e0401c3), UINT64_C(0x5f8240d93e0401b1),
+	UINT64_C(0x600240f13f0401e1), UINT64_C(0x600240e83f0401cf), UINT64_C(0x600240d03f04019f), UINT64_C(0x600240cd3f040199),
+	UINT64_C(0x600240d63f0401ab), UINT64_C(0x600240e53f0401c9), UINT64_C(0x600240d33f0401a5), UINT64_C(0x600240ca3f040193),
+	UINT64_C(0x600240f73f0401ed), UINT64_C(0x600240ee3f0401db), UINT64_C(0x600240f43f0401e7), UINT64_C(0x600240eb3f0401d5),
+	UINT64_C(0x600240df3f0401bd), UINT64_C(0x600240dc3f0401b7), UINT64_C(0x600240e23f0401c3), UINT64_C(0x600240d93f0401b1),
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0,
@@ -1578,28 +1664,28 @@ static const uint64_t x86LegacyDecisions[X86_TERMINAL_ROW_COUNT][2][256] = {
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0,
-	UINT64_C(0x5d06a310b9034620), UINT64_C(0x5e05e3153b0b8629), 0, 0,
+	UINT64_C(0x5d86a310ba034620), UINT64_C(0x5e85e3153c0b8629), 0, 0,
 	0, 0, 0, 0,
-	UINT64_C(0x000000002d1502cc), UINT64_C(0x000000002d1502c3), UINT64_C(0x000000002d15029d), UINT64_C(0x000000002d150294),
-	UINT64_C(0x000000002d1502a2), UINT64_C(0x000000002d1502c0), UINT64_C(0x000000002d15029a), UINT64_C(0x000000002d150297),
-	UINT64_C(0x000000002d1502d3), UINT64_C(0x000000002d1502c9), UINT64_C(0x000000002d1502cf), UINT64_C(0x000000002d1502c6),
-	UINT64_C(0x000000002d1502ae), UINT64_C(0x000000002d1502a5), UINT64_C(0x000000002d1502ab), UINT64_C(0x000000002d1502a8),
-	0, UINT64_C(0x5708a29d1f0d8539), UINT64_C(0x5708a2961f0d852b), UINT64_C(0x5708a2931f0d8525),
-	UINT64_C(0x5708a2971f0d852d), UINT64_C(0x5708a29c1f0d8537), UINT64_C(0x5708a2951f0d8529), UINT64_C(0x5708a2941f0d8527),
-	UINT64_C(0x5708a2a29f0d8544), UINT64_C(0x5708a29f1f0d853d), UINT64_C(0x5708a2a11f0d8541), UINT64_C(0x5708a29e1f0d853b),
-	UINT64_C(0x5708a29b1f0d8535), UINT64_C(0x5708a2981f0d852f), UINT64_C(0x5708a29a1f0d8533), UINT64_C(0x5708a2991f0d8531),
-	UINT64_C(0x000000000b00043c), UINT64_C(0x000000000b000418), UINT64_C(0x000000000b000221), UINT64_C(0x5d06a0a439034146),
-	0, UINT64_C(0x5e8222b5b9034569), UINT64_C(0x8000000000020303), UINT64_C(0x800000000002034b),
-	UINT64_C(0x000000000b00043f), UINT64_C(0x000000000b00041b), UINT64_C(0x000000000b0004c4), UINT64_C(0x5e8220b63903416a),
-	0, UINT64_C(0x5e8222c9b9034591), UINT64_C(0x80000000000305aa), UINT64_C(0x5f824133be040264),
-	UINT64_C(0x4607e1100104c21f), UINT64_C(0x5d06a10eb903421c), UINT64_C(0x400000003b0b830d), UINT64_C(0x5e8220b03903415e),
-	UINT64_C(0x400000003b0b82e7), UINT64_C(0x400000003b0b82ed), UINT64_C(0x650e81c8bb0b838f), UINT64_C(0x658e61c83b0b838e),
-	0, 0, UINT64_C(0x80000000000305ca), UINT64_C(0x5e8220aa39034152),
-	UINT64_C(0x5e05e099bb0b8132), UINT64_C(0x5e05e09cbb0b8138), UINT64_C(0x650e81c1bb0b8380), UINT64_C(0x658e61c0bb0b837e),
+	UINT64_C(0x000000002e1502cc), UINT64_C(0x000000002e1502c3), UINT64_C(0x000000002e15029d), UINT64_C(0x000000002e150294),
+	UINT64_C(0x000000002e1502a2), UINT64_C(0x000000002e1502c0), UINT64_C(0x000000002e15029a), UINT64_C(0x000000002e150297),
+	UINT64_C(0x000000002e1502d3), UINT64_C(0x000000002e1502c9), UINT64_C(0x000000002e1502cf), UINT64_C(0x000000002e1502c6),
+	UINT64_C(0x000000002e1502ae), UINT64_C(0x000000002e1502a5), UINT64_C(0x000000002e1502ab), UINT64_C(0x000000002e1502a8),
+	UINT64_C(0x5788a2a01f0d853f), UINT64_C(0x5788a29d1f0d8539), UINT64_C(0x5788a2961f0d852b), UINT64_C(0x5788a2931f0d8525),
+	UINT64_C(0x5788a2971f0d852d), UINT64_C(0x5788a29c1f0d8537), UINT64_C(0x5788a2951f0d8529), UINT64_C(0x5788a2941f0d8527),
+	UINT64_C(0x5788a2a29f0d8544), UINT64_C(0x5788a29f1f0d853d), UINT64_C(0x5788a2a11f0d8541), UINT64_C(0x5788a29e1f0d853b),
+	UINT64_C(0x5788a29b1f0d8535), UINT64_C(0x5788a2981f0d852f), UINT64_C(0x5788a29a1f0d8533), UINT64_C(0x5788a2991f0d8531),
+	UINT64_C(0x000000000b00043c), UINT64_C(0x000000000b000418), UINT64_C(0x000000000b000221), UINT64_C(0x5d86a0a43a034146),
+	0, UINT64_C(0x5f0222b5ba034569), UINT64_C(0x800000000002030a), UINT64_C(0x8000000000020352),
+	UINT64_C(0x000000000b00043f), UINT64_C(0x000000000b00041b), UINT64_C(0x000000000b0004c4), UINT64_C(0x5f0220b63a03416a),
+	0, UINT64_C(0x5f0222c9ba034591), UINT64_C(0x80000000000305b7), UINT64_C(0x60024133bf040264),
+	UINT64_C(0x4607e1100104c21f), UINT64_C(0x5d86a10eba03421c), UINT64_C(0x400000003c0b830d), UINT64_C(0x5f0220b03a03415e),
+	UINT64_C(0x400000003c0b82e7), UINT64_C(0x400000003c0b82ed), UINT64_C(0x658e81c8bc0b838f), UINT64_C(0x660e61c83c0b838e),
+	0, 0, UINT64_C(0x80000000000305d7), UINT64_C(0x5f0220aa3a034152),
+	UINT64_C(0x5e85e099bc0b8132), UINT64_C(0x5e85e09cbc0b8138), UINT64_C(0x658e81c1bc0b8380), UINT64_C(0x660e61c0bc0b837e),
 	0, 0, 0, 0,
-	0, 0, 0, UINT64_C(0x80000000000305e4),
-	UINT64_C(0x00000000460c413c), UINT64_C(0x00000000460c413c), UINT64_C(0x00000000460c413c), UINT64_C(0x00000000460c413c),
-	UINT64_C(0x00000000460c413c), UINT64_C(0x00000000460c413c), UINT64_C(0x00000000460c413c), UINT64_C(0x00000000460c413c),
+	0, 0, 0, UINT64_C(0x80000000000305f1),
+	UINT64_C(0x00000000470c413c), UINT64_C(0x00000000470c413c), UINT64_C(0x00000000470c413c), UINT64_C(0x00000000470c413c),
+	UINT64_C(0x00000000470c413c), UINT64_C(0x00000000470c413c), UINT64_C(0x00000000470c413c), UINT64_C(0x00000000470c413c),
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0,
@@ -1648,47 +1734,985 @@ static const uint64_t x86LegacyDecisions[X86_TERMINAL_ROW_COUNT][2][256] = {
 	UINT64_C(0x000000001614c2a0), UINT64_C(0x000000001614c2be), UINT64_C(0x000000001614c298), UINT64_C(0x000000001614c295),
 	UINT64_C(0x000000001614c2d1), UINT64_C(0x000000001614c2c7), UINT64_C(0x000000001614c2cd), UINT64_C(0x000000001614c2c4),
 	UINT64_C(0x000000001614c2ac), UINT64_C(0x000000001614c2a3), UINT64_C(0x000000001614c2a9), UINT64_C(0x000000001614c2a6),
-	UINT64_C(0x8000000000030079), UINT64_C(0x800000000003062e), UINT64_C(0x8000000000030099), UINT64_C(0x800000000003063e),
+	UINT64_C(0x8000000000030079), UINT64_C(0x800000000003063b), UINT64_C(0x8000000000030099), UINT64_C(0x800000000003064b),
 	UINT64_C(0x4607e2ff0104c5fb), UINT64_C(0x468662f4830145e6), 0, 0,
 	UINT64_C(0x4607e1b10104c359), UINT64_C(0x4686619603014324), UINT64_C(0x478801b20e0f8360), UINT64_C(0x4885a196900b032b),
-	0, UINT64_C(0x40000000100b02dd), 0, UINT64_C(0x8000000000030656),
-	0, UINT64_C(0x00000000120c0641), UINT64_C(0x00000000120c0641), UINT64_C(0x00000000120c0641),
+	0, UINT64_C(0x40000000100b02dd), 0, UINT64_C(0x8000000000030663),
+	UINT64_C(0x000000000b0003a7), UINT64_C(0x00000000120c0641), UINT64_C(0x00000000120c0641), UINT64_C(0x00000000120c0641),
 	UINT64_C(0x00000000120c0641), UINT64_C(0x00000000120c0641), UINT64_C(0x00000000120c0641), UINT64_C(0x00000000120c0641),
-	UINT64_C(0x000000000b000224), UINT64_C(0x000000000b000181), UINT64_C(0x000000004c11c23d), 0,
+	UINT64_C(0x000000000b000180), UINT64_C(0x000000000b000223), UINT64_C(0x000000004d11c23d), 0,
 	UINT64_C(0x000000000b000437), UINT64_C(0x000000000b000413), UINT64_C(0x000000000b0004c6), UINT64_C(0x000000000b0002d4),
-	0, 0, 0, 0,
+	UINT64_C(0x0000000022174356), UINT64_C(0x0000000022174321), UINT64_C(0x000000002217435c), UINT64_C(0x0000000022174327),
 	0, 0, 0, 0,
 	UINT64_C(0x00000000090045f8), UINT64_C(0x000000000a0085e3), 0, 0,
 	0, 0, 0, 0,
-	UINT64_C(0x00000000221b835e), UINT64_C(0x00000000221b835e), UINT64_C(0x00000000221b835e), UINT64_C(0x00000000221b835e),
-	UINT64_C(0x00000000221b835e), UINT64_C(0x00000000221b835e), UINT64_C(0x00000000221b835e), UINT64_C(0x00000000221b835e),
-	UINT64_C(0x000000002317c329), UINT64_C(0x000000002317c329), UINT64_C(0x000000002317c329), UINT64_C(0x000000002317c329),
-	UINT64_C(0x000000002317c329), UINT64_C(0x000000002317c329), UINT64_C(0x000000002317c329), UINT64_C(0x000000002317c329),
-	UINT64_C(0x80000000000300e3), UINT64_C(0x800000000003066c), UINT64_C(0x000000000a00848b), UINT64_C(0x000000000b00048e),
-	UINT64_C(0x40000000100b02e3), UINT64_C(0x40000000100b02db), UINT64_C(0x8000000000030109), UINT64_C(0x8000000000030682),
-	UINT64_C(0x000000002811823c), UINT64_C(0x000000000b0002e1), UINT64_C(0x000000000a008301), UINT64_C(0x000000000b000304),
-	UINT64_C(0x000000000b000283), UINT64_C(0x000000002913c281), UINT64_C(0x000000000b000284), UINT64_C(0x000000000b00028f),
-	UINT64_C(0x8000000000030131), UINT64_C(0x8000000000030695), UINT64_C(0x8000000000030151), UINT64_C(0x80000000000306a5),
+	UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e),
+	UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e),
+	UINT64_C(0x000000002417c329), UINT64_C(0x000000002417c329), UINT64_C(0x000000002417c329), UINT64_C(0x000000002417c329),
+	UINT64_C(0x000000002417c329), UINT64_C(0x000000002417c329), UINT64_C(0x000000002417c329), UINT64_C(0x000000002417c329),
+	UINT64_C(0x80000000000300e8), UINT64_C(0x800000000003067d), UINT64_C(0x000000000a00848b), UINT64_C(0x000000000b00048e),
+	UINT64_C(0x40000000100b02e3), UINT64_C(0x40000000100b02db), UINT64_C(0x800000000003010e), UINT64_C(0x8000000000030693),
+	UINT64_C(0x000000002911823c), UINT64_C(0x000000000b0002e1), UINT64_C(0x000000000a008301), UINT64_C(0x000000000b000304),
+	UINT64_C(0x000000000b000283), UINT64_C(0x000000002a13c281), UINT64_C(0x000000000b000284), UINT64_C(0x000000000b00028f),
+	UINT64_C(0x8000000000030136), UINT64_C(0x80000000000306a6), UINT64_C(0x8000000000030156), UINT64_C(0x80000000000306b6),
 	UINT64_C(0x0000000009004080), UINT64_C(0x000000000900407f), UINT64_C(0x000000000b0004df), UINT64_C(0x000000000b000652),
-	0, 0, 0, UINT64_C(0x8000000000020175),
+	0, 0, 0, UINT64_C(0x800000000002017a),
 	0, 0, 0, 0,
-	UINT64_C(0x000000001614c2fe), UINT64_C(0x000000001614c2fd), UINT64_C(0x000000001614c2fc), 0,
-	UINT64_C(0x000000002913c270), UINT64_C(0x000000002913c26c), UINT64_C(0x000000002913c3f6), UINT64_C(0x000000002913c3f2),
-	UINT64_C(0x000000004d0e817e), UINT64_C(0x000000002d1502bd), UINT64_C(0x000000004c11c242), UINT64_C(0x000000001614c2bb),
+	UINT64_C(0x000000001614c2fe), UINT64_C(0x000000001614c2fd), UINT64_C(0x000000001614c2fc), UINT64_C(0x000000001614c29f),
+	UINT64_C(0x000000002a13c270), UINT64_C(0x000000002a13c26c), UINT64_C(0x000000002a13c3f6), UINT64_C(0x000000002a13c3f2),
+	UINT64_C(0x000000004e0e817e), UINT64_C(0x000000002e1502bc), UINT64_C(0x000000004d11c242), UINT64_C(0x000000001614c2bb),
 	UINT64_C(0x000000000b000271), UINT64_C(0x000000000b00026d), UINT64_C(0x000000000b0003f7), UINT64_C(0x000000000b0003f3),
 	UINT64_C(0x000000000b0002f7), UINT64_C(0x000000000b000282), UINT64_C(0x000000000b000487), UINT64_C(0x000000000b000488),
-	UINT64_C(0x000000000b000249), UINT64_C(0x000000000b00018e), UINT64_C(0x80000000000301d3), UINT64_C(0x80000000000306bb),
+	UINT64_C(0x000000000b000249), UINT64_C(0x000000000b00018e), UINT64_C(0x80000000000301d8), UINT64_C(0x80000000000306cd),
 	UINT64_C(0x000000000b000184), UINT64_C(0x000000000b0005a8), UINT64_C(0x000000000b000189), UINT64_C(0x000000000b0005ab),
-	UINT64_C(0x000000000b000185), UINT64_C(0x000000000b0005a9), UINT64_C(0x80000000000301f9), UINT64_C(0x80000000000306cb),
+	UINT64_C(0x000000000b000185), UINT64_C(0x000000000b0005a9), UINT64_C(0x80000000000301fe), UINT64_C(0x80000000000306dd),
 },
 {
-	UINT64_C(0x80000000000306db), UINT64_C(0x80000000000206eb), UINT64_C(0x4885a16b100b02d5), UINT64_C(0x4885a183100b0305),
+	UINT64_C(0x80000000000306ed), UINT64_C(0x80000000000206fd), UINT64_C(0x4885a16b100b02d5), UINT64_C(0x4885a183100b0305),
 	0, UINT64_C(0x000000000b0005d9), UINT64_C(0x000000000b00018b), UINT64_C(0x000000000b0005dd),
 	UINT64_C(0x000000000b000285), UINT64_C(0x000000000b00062d), 0, UINT64_C(0x000000000b00060c),
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0,
-	UINT64_C(0x800000000003027b), UINT64_C(0x4885a1dc1f0d83c1), 0, 0,
+	UINT64_C(0x8000000000030749), UINT64_C(0x4885a1dc1f0d83c1), 0, 0,
+	UINT64_C(0x400000001f0d83c2), UINT64_C(0x400000001f0d83c3), UINT64_C(0x400000001f0d83c4), UINT64_C(0x5006e1e29f0d83c0),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x000000000b000633), UINT64_C(0x000000000b000485), UINT64_C(0x000000000b000478), UINT64_C(0x000000000b00047c),
+	UINT64_C(0x000000000b0005da), UINT64_C(0x000000000b0005db), 0, UINT64_C(0x000000000b000248),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x440140ef070201dd), UINT64_C(0x440140e6070201cb), UINT64_C(0x440140ce0702019b), UINT64_C(0x440140cb07020195),
+	UINT64_C(0x440140d4070201a7), UINT64_C(0x440140e3070201c5), UINT64_C(0x440140d1070201a1), UINT64_C(0x440140c80702018f),
+	UINT64_C(0x440140f5070201e9), UINT64_C(0x440140ec070201d7), UINT64_C(0x440140f2070201e3), UINT64_C(0x440140e9070201d1),
+	UINT64_C(0x440140dd070201b9), UINT64_C(0x440140da070201b3), UINT64_C(0x440140e0070201bf), UINT64_C(0x440140d7070201ad),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x000000002e1502cb), UINT64_C(0x000000002e1502c2), UINT64_C(0x000000002e15029c), UINT64_C(0x000000002e150293),
+	UINT64_C(0x000000002e1502a1), UINT64_C(0x000000002e1502bf), UINT64_C(0x000000002e150299), UINT64_C(0x000000002e150296),
+	UINT64_C(0x000000002e1502d2), UINT64_C(0x000000002e1502c8), UINT64_C(0x000000002e1502ce), UINT64_C(0x000000002e1502c5),
+	UINT64_C(0x000000002e1502ad), UINT64_C(0x000000002e1502a4), UINT64_C(0x000000002e1502aa), UINT64_C(0x000000002e1502a7),
+	UINT64_C(0x5788a2a01f0d853f), UINT64_C(0x5788a29d1f0d8539), UINT64_C(0x5788a2961f0d852b), UINT64_C(0x5788a2931f0d8525),
+	UINT64_C(0x5788a2971f0d852d), UINT64_C(0x5788a29c1f0d8537), UINT64_C(0x5788a2951f0d8529), UINT64_C(0x5788a2941f0d8527),
+	UINT64_C(0x5788a2a29f0d8544), UINT64_C(0x5788a29f1f0d853d), UINT64_C(0x5788a2a11f0d8541), UINT64_C(0x5788a29e1f0d853b),
+	UINT64_C(0x5788a29b1f0d8535), UINT64_C(0x5788a2981f0d852f), UINT64_C(0x5788a29a1f0d8533), UINT64_C(0x5788a2991f0d8531),
+	UINT64_C(0x000000000b00043a), UINT64_C(0x000000000b000416), UINT64_C(0x000000000b000221), UINT64_C(0x468660a00301413e),
+	0, UINT64_C(0x420122b183014561), UINT64_C(0x800000000002030a), UINT64_C(0x8000000000020352),
+	UINT64_C(0x000000000b00043d), UINT64_C(0x000000000b000419), UINT64_C(0x000000000b0004c4), UINT64_C(0x420120b203014162),
+	0, UINT64_C(0x420122c583014589), UINT64_C(0x800000000003079f), UINT64_C(0x4401412b87020254),
+	UINT64_C(0x4607e1100104c21f), UINT64_C(0x4686610c83014218), UINT64_C(0x40000000100b030b), UINT64_C(0x420120ac03014156),
+	UINT64_C(0x40000000100b02e5), UINT64_C(0x40000000100b02eb), UINT64_C(0x5a8e21c3900b0385), UINT64_C(0x4885a1c3100b0384),
+	0, 0, UINT64_C(0x80000000000307bf), UINT64_C(0x420120a60301414a),
+	UINT64_C(0x4885a097900b012e), UINT64_C(0x4885a09a900b0134), UINT64_C(0x5a8e21bb900b0375), UINT64_C(0x4885a1bb100b0374),
+	0, 0, 0, 0,
+	0, 0, 0, UINT64_C(0x80000000000307d9),
+	UINT64_C(0x00000000120c013a), UINT64_C(0x00000000120c013a), UINT64_C(0x00000000120c013a), UINT64_C(0x00000000120c013a),
+	UINT64_C(0x00000000120c013a), UINT64_C(0x00000000120c013a), UINT64_C(0x00000000120c013a), UINT64_C(0x00000000120c013a),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, UINT64_C(0x000000000b00060a),
+},
+},
+{
+{
+	UINT64_C(0x4102c0660104c0c8), UINT64_C(0x4201205d030140b6), UINT64_C(0x4302e066850540cb), UINT64_C(0x4401405d870200b9),
+	UINT64_C(0x00000000090040c5), UINT64_C(0x000000000a0080b3), UINT64_C(0x000000000b000436), UINT64_C(0x000000000b000412),
+	UINT64_C(0x4102c1f80104c3ec), UINT64_C(0x420121ef030143da), UINT64_C(0x4302e1f8850543ef), UINT64_C(0x440141ef870203dd),
+	UINT64_C(0x00000000090043e9), UINT64_C(0x000000000a0083d7), UINT64_C(0x000000000b000432), 0,
+	UINT64_C(0x4102c0520104c0a0), UINT64_C(0x420120490301408e), UINT64_C(0x4302e052850540a3), UINT64_C(0x4401404987020091),
+	UINT64_C(0x000000000900409d), UINT64_C(0x000000000a00808b), UINT64_C(0x000000000b000441), UINT64_C(0x000000000b00041d),
+	UINT64_C(0x4102c28f8104c51b), UINT64_C(0x4201228683014509), UINT64_C(0x4302e2900505451e), UINT64_C(0x440142870702050c),
+	UINT64_C(0x0000000009004518), UINT64_C(0x000000000a008506), UINT64_C(0x000000000b000434), UINT64_C(0x000000000b000410),
+	UINT64_C(0x4102c07a0104c0f0), UINT64_C(0x42012071030140de), UINT64_C(0x4302e07a850540f3), UINT64_C(0x44014071870200e1),
+	UINT64_C(0x00000000090040ed), UINT64_C(0x000000000a0080db), 0, UINT64_C(0x000000000b000225),
+	UINT64_C(0x4102c2eb0104c5d2), UINT64_C(0x420122e2030145c0), UINT64_C(0x4302e2eb850545d5), UINT64_C(0x440142e2870205c3),
+	UINT64_C(0x00000000090045cf), UINT64_C(0x000000000a0085bd), 0, UINT64_C(0x000000000b000226),
+	UINT64_C(0x4102c33a8104c671), UINT64_C(0x420123318301465f), UINT64_C(0x4302e33b05054674), UINT64_C(0x4401433207020662),
+	UINT64_C(0x000000000900466e), UINT64_C(0x000000000a00865c), 0, UINT64_C(0x000000000b00007e),
+	UINT64_C(0x4607e1088104c20d), UINT64_C(0x468660ff830141fb), UINT64_C(0x478801090e0f8210), UINT64_C(0x4885a100100b01fe),
+	UINT64_C(0x000000000900420a), UINT64_C(0x000000000a0081f8), 0, UINT64_C(0x000000000b000081),
+	UINT64_C(0x00000000120c0277), UINT64_C(0x00000000120c0277), UINT64_C(0x00000000120c0277), UINT64_C(0x00000000120c0277),
+	UINT64_C(0x00000000120c0277), UINT64_C(0x00000000120c0277), UINT64_C(0x00000000120c0277), UINT64_C(0x00000000120c0277),
+	UINT64_C(0x00000000120c022d), UINT64_C(0x00000000120c022d), UINT64_C(0x00000000120c022d), UINT64_C(0x00000000120c022d),
+	UINT64_C(0x00000000120c022d), UINT64_C(0x00000000120c022d), UINT64_C(0x00000000120c022d), UINT64_C(0x00000000120c022d),
+	UINT64_C(0x00000000131d4427), UINT64_C(0x00000000131d4427), UINT64_C(0x00000000131d4427), UINT64_C(0x00000000131d4427),
+	UINT64_C(0x00000000131d4427), UINT64_C(0x00000000131d4427), UINT64_C(0x00000000131d4427), UINT64_C(0x00000000131d4427),
+	UINT64_C(0x00000000131d4407), UINT64_C(0x00000000131d4407), UINT64_C(0x00000000131d4407), UINT64_C(0x00000000131d4407),
+	UINT64_C(0x00000000131d4407), UINT64_C(0x00000000131d4407), UINT64_C(0x00000000131d4407), UINT64_C(0x00000000131d4407),
+	UINT64_C(0x000000000b000430), UINT64_C(0x000000000b00040e), UINT64_C(0x40000000100b012d), UINT64_C(0x4a83e07d940780fa),
+	0, 0, UINT64_C(0x000000000b000227), 0,
+	UINT64_C(0x000000000a008443), 0, UINT64_C(0x0000000009004426), 0,
+	0, 0, 0, 0,
+	UINT64_C(0x000000001614c2ca), UINT64_C(0x000000001614c2c1), UINT64_C(0x000000001614c29b), UINT64_C(0x000000001614c292),
+	UINT64_C(0x000000001614c2a0), UINT64_C(0x000000001614c2be), UINT64_C(0x000000001614c298), UINT64_C(0x000000001614c295),
+	UINT64_C(0x000000001614c2d1), UINT64_C(0x000000001614c2c7), UINT64_C(0x000000001614c2cd), UINT64_C(0x000000001614c2c4),
+	UINT64_C(0x000000001614c2ac), UINT64_C(0x000000001614c2a3), UINT64_C(0x000000001614c2a9), UINT64_C(0x000000001614c2a6),
+	UINT64_C(0x8000000000030079), UINT64_C(0x8000000000030089), UINT64_C(0x8000000000030099), UINT64_C(0x80000000000300a9),
+	UINT64_C(0x4607e2ff0104c5fb), UINT64_C(0x468662f8030145ed), 0, 0,
+	UINT64_C(0x4607e1b10104c359), UINT64_C(0x468661a003014337), UINT64_C(0x478801b20e0f8360), UINT64_C(0x4885a1a0900b033f),
+	0, UINT64_C(0x40000000100b02de), 0, UINT64_C(0x80000000000300c7),
+	UINT64_C(0x000000000b0003a7), UINT64_C(0x00000000120c0644), UINT64_C(0x00000000120c0644), UINT64_C(0x00000000120c0644),
+	UINT64_C(0x00000000120c0644), UINT64_C(0x00000000120c0644), UINT64_C(0x00000000120c0644), UINT64_C(0x00000000120c0644),
+	UINT64_C(0x000000000b000224), UINT64_C(0x000000000b000181), UINT64_C(0x000000002112023f), 0,
+	UINT64_C(0x000000000b000438), UINT64_C(0x000000000b000414), UINT64_C(0x000000000b0004c6), UINT64_C(0x000000000b0002d4),
+	UINT64_C(0x0000000022174355), UINT64_C(0x0000000022174331), UINT64_C(0x000000002217435b), UINT64_C(0x0000000022174338),
+	0, 0, 0, 0,
+	UINT64_C(0x00000000090045f8), UINT64_C(0x000000000a0085ea), 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e),
+	UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e),
+	UINT64_C(0x000000002417c33d), UINT64_C(0x000000002417c33d), UINT64_C(0x000000002417c33d), UINT64_C(0x000000002417c33d),
+	UINT64_C(0x000000002417c33d), UINT64_C(0x000000002417c33d), UINT64_C(0x000000002417c33d), UINT64_C(0x000000002417c33d),
+	UINT64_C(0x80000000000300e8), UINT64_C(0x80000000000300f8), UINT64_C(0x0000000028160489), UINT64_C(0x000000000b00048c),
+	UINT64_C(0x40000000100b02e4), UINT64_C(0x40000000100b02dc), UINT64_C(0x800000000003010e), UINT64_C(0x800000000003011e),
+	UINT64_C(0x000000002911823c), UINT64_C(0x000000000b0002e1), UINT64_C(0x00000000281602ff), UINT64_C(0x000000000b000302),
+	UINT64_C(0x000000000b000283), UINT64_C(0x000000002a13c281), UINT64_C(0x000000000b000284), UINT64_C(0x000000000b000290),
+	UINT64_C(0x8000000000030136), UINT64_C(0x8000000000030146), UINT64_C(0x8000000000030156), UINT64_C(0x8000000000030166),
+	UINT64_C(0x0000000009004080), UINT64_C(0x000000000900407f), UINT64_C(0x000000000b0004df), UINT64_C(0x000000000b000652),
+	0, 0, 0, UINT64_C(0x800000000002017a),
+	0, 0, 0, 0,
+	UINT64_C(0x000000001614c2fe), UINT64_C(0x000000001614c2fd), UINT64_C(0x000000001614c2fc), UINT64_C(0x000000001614c29e),
+	UINT64_C(0x000000002a13c270), UINT64_C(0x000000002a13c26e), UINT64_C(0x000000002a13c3f6), UINT64_C(0x000000002a13c3f4),
+	UINT64_C(0x000000002d0e017f), UINT64_C(0x000000002e1502bd), UINT64_C(0x0000000021120244), UINT64_C(0x000000001614c2bb),
+	UINT64_C(0x000000000b000271), UINT64_C(0x000000000b00026f), UINT64_C(0x000000000b0003f7), UINT64_C(0x000000000b0003f5),
+	UINT64_C(0x000000000b0002f7), UINT64_C(0x000000000b000282), UINT64_C(0x000000000b000487), UINT64_C(0x000000000b000488),
+	UINT64_C(0x000000000b000249), UINT64_C(0x000000000b00018e), UINT64_C(0x80000000000301d8), UINT64_C(0x80000000000301e8),
+	UINT64_C(0x000000000b000184), UINT64_C(0x000000000b0005a8), UINT64_C(0x000000000b000189), UINT64_C(0x000000000b0005ab),
+	UINT64_C(0x000000000b000185), UINT64_C(0x000000000b0005a9), UINT64_C(0x80000000000301fe), UINT64_C(0x800000000003020e),
+},
+{
+	UINT64_C(0x800000000003021e), UINT64_C(0x800000000002022e), UINT64_C(0x4885a16c100b02d7), UINT64_C(0x4885a184100b0307),
+	0, UINT64_C(0x000000000b0005d9), UINT64_C(0x000000000b00018b), UINT64_C(0x000000000b0005dd),
+	UINT64_C(0x000000000b000285), UINT64_C(0x000000000b00062d), 0, UINT64_C(0x000000000b00060c),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x8000000000030280), UINT64_C(0x4885a1dc1f0d83ba), 0, 0,
+	UINT64_C(0x8000000000030292), UINT64_C(0x400000001f0d83bb), UINT64_C(0x400000001f0d83bc), UINT64_C(0x5006e1de9f0d83b9),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x000000000b000633), UINT64_C(0x000000000b000485), UINT64_C(0x000000000b000478), UINT64_C(0x000000000b00047c),
+	UINT64_C(0x000000000b0005da), UINT64_C(0x000000000b0005db), 0, UINT64_C(0x000000000b000248),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x440140f0070201df), UINT64_C(0x440140e7070201cd), UINT64_C(0x440140cf0702019d), UINT64_C(0x440140cc07020197),
+	UINT64_C(0x440140d5070201a9), UINT64_C(0x440140e4070201c7), UINT64_C(0x440140d2070201a3), UINT64_C(0x440140c907020191),
+	UINT64_C(0x440140f6070201eb), UINT64_C(0x440140ed070201d9), UINT64_C(0x440140f3070201e5), UINT64_C(0x440140ea070201d3),
+	UINT64_C(0x440140de070201bb), UINT64_C(0x440140db070201b5), UINT64_C(0x440140e1070201c1), UINT64_C(0x440140d8070201af),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x5910830fb11c061e), UINT64_C(0x5a10a31433148627), 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x000000002e1502cc), UINT64_C(0x000000002e1502c3), UINT64_C(0x000000002e15029d), UINT64_C(0x000000002e150294),
+	UINT64_C(0x000000002e1502a2), UINT64_C(0x000000002e1502c0), UINT64_C(0x000000002e15029a), UINT64_C(0x000000002e150297),
+	UINT64_C(0x000000002e1502d3), UINT64_C(0x000000002e1502c9), UINT64_C(0x000000002e1502cf), UINT64_C(0x000000002e1502c6),
+	UINT64_C(0x000000002e1502ae), UINT64_C(0x000000002e1502a5), UINT64_C(0x000000002e1502ab), UINT64_C(0x000000002e1502a8),
+	UINT64_C(0x5788a2a01f0d853f), UINT64_C(0x5788a29d1f0d8539), UINT64_C(0x5788a2961f0d852b), UINT64_C(0x5788a2931f0d8525),
+	UINT64_C(0x5788a2971f0d852d), UINT64_C(0x5788a29c1f0d8537), UINT64_C(0x5788a2951f0d8529), UINT64_C(0x5788a2941f0d8527),
+	UINT64_C(0x5788a2a29f0d8544), UINT64_C(0x5788a29f1f0d853d), UINT64_C(0x5788a2a11f0d8541), UINT64_C(0x5788a29e1f0d853b),
+	UINT64_C(0x5788a29b1f0d8535), UINT64_C(0x5788a2981f0d852f), UINT64_C(0x5788a29a1f0d8533), UINT64_C(0x5788a2991f0d8531),
+	UINT64_C(0x000000000b00043b), UINT64_C(0x000000000b000417), UINT64_C(0x000000000b000221), UINT64_C(0x468660a203014142),
+	0, UINT64_C(0x420122b383014565), UINT64_C(0x800000000002030a), UINT64_C(0x8000000000020352),
+	UINT64_C(0x000000000b00043e), UINT64_C(0x000000000b00041a), UINT64_C(0x000000000b0004c4), UINT64_C(0x420120b403014166),
+	0, UINT64_C(0x420122c78301458d), UINT64_C(0x80000000000303a1), UINT64_C(0x4401412f8702025c),
+	UINT64_C(0x4607e1100104c21f), UINT64_C(0x4686610d8301421a), UINT64_C(0x40000000100b030c), UINT64_C(0x420120ae0301415a),
+	UINT64_C(0x40000000100b02e6), UINT64_C(0x40000000100b02ec), UINT64_C(0x5a8e21c6100b0389), UINT64_C(0x5b0e41c5900b0388),
+	0, 0, UINT64_C(0x80000000000303c3), UINT64_C(0x420120a80301414e),
+	UINT64_C(0x4885a098900b0130), UINT64_C(0x4885a09b900b0136), UINT64_C(0x5a8e21be100b0379), UINT64_C(0x5b0e41bd900b0378),
+	0, 0, 0, 0,
+	0, 0, 0, UINT64_C(0x80000000000303dd),
+	UINT64_C(0x00000000120c013b), UINT64_C(0x00000000120c013b), UINT64_C(0x00000000120c013b), UINT64_C(0x00000000120c013b),
+	UINT64_C(0x00000000120c013b), UINT64_C(0x00000000120c013b), UINT64_C(0x00000000120c013b), UINT64_C(0x00000000120c013b),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, UINT64_C(0x000000000b00060a),
+},
+},
+{
+{
+	UINT64_C(0x4102c0660104c0c8), UINT64_C(0x42012058830140ad), UINT64_C(0x4302e066850540cb), UINT64_C(0x44014059070200b0),
+	UINT64_C(0x00000000090040c5), UINT64_C(0x000000000a0080aa), UINT64_C(0x000000000b000435), UINT64_C(0x000000000b000411),
+	UINT64_C(0x4102c1f80104c3ec), UINT64_C(0x420121ea830143d1), UINT64_C(0x4302e1f8850543ef), UINT64_C(0x440141eb070203d4),
+	UINT64_C(0x00000000090043e9), UINT64_C(0x000000000a0083ce), UINT64_C(0x000000000b000431), 0,
+	UINT64_C(0x4102c0520104c0a0), UINT64_C(0x4201204483014085), UINT64_C(0x4302e052850540a3), UINT64_C(0x4401404507020088),
+	UINT64_C(0x000000000900409d), UINT64_C(0x000000000a008082), UINT64_C(0x000000000b000440), UINT64_C(0x000000000b00041c),
+	UINT64_C(0x4102c28f8104c51b), UINT64_C(0x4201228203014500), UINT64_C(0x4302e2900505451e), UINT64_C(0x4401428287020503),
+	UINT64_C(0x0000000009004518), UINT64_C(0x000000000a0084fd), UINT64_C(0x000000000b000433), UINT64_C(0x000000000b00040f),
+	UINT64_C(0x4102c07a0104c0f0), UINT64_C(0x4201206c830140d5), UINT64_C(0x4302e07a850540f3), UINT64_C(0x4401406d070200d8),
+	UINT64_C(0x00000000090040ed), UINT64_C(0x000000000a0080d2), 0, UINT64_C(0x000000000b000225),
+	UINT64_C(0x4102c2eb0104c5d2), UINT64_C(0x420122dd830145b7), UINT64_C(0x4302e2eb850545d5), UINT64_C(0x440142de070205ba),
+	UINT64_C(0x00000000090045cf), UINT64_C(0x000000000a0085b4), 0, UINT64_C(0x000000000b000226),
+	UINT64_C(0x4102c33a8104c671), UINT64_C(0x4201232d03014656), UINT64_C(0x4302e33b05054674), UINT64_C(0x4401432d87020659),
+	UINT64_C(0x000000000900466e), UINT64_C(0x000000000a008653), 0, UINT64_C(0x000000000b00007e),
+	UINT64_C(0x4607e1088104c20d), UINT64_C(0x468660fb030141f2), UINT64_C(0x478801090e0f8210), UINT64_C(0x4885a0fb900b01f5),
+	UINT64_C(0x000000000900420a), UINT64_C(0x000000000a0081ef), 0, UINT64_C(0x000000000b000081),
+	UINT64_C(0x00000000120c0274), UINT64_C(0x00000000120c0274), UINT64_C(0x00000000120c0274), UINT64_C(0x00000000120c0274),
+	UINT64_C(0x00000000120c0274), UINT64_C(0x00000000120c0274), UINT64_C(0x00000000120c0274), UINT64_C(0x00000000120c0274),
+	UINT64_C(0x00000000120c022a), UINT64_C(0x00000000120c022a), UINT64_C(0x00000000120c022a), UINT64_C(0x00000000120c022a),
+	UINT64_C(0x00000000120c022a), UINT64_C(0x00000000120c022a), UINT64_C(0x00000000120c022a), UINT64_C(0x00000000120c022a),
+	UINT64_C(0x00000000131d4423), UINT64_C(0x00000000131d4423), UINT64_C(0x00000000131d4423), UINT64_C(0x00000000131d4423),
+	UINT64_C(0x00000000131d4423), UINT64_C(0x00000000131d4423), UINT64_C(0x00000000131d4423), UINT64_C(0x00000000131d4423),
+	UINT64_C(0x00000000131d4404), UINT64_C(0x00000000131d4404), UINT64_C(0x00000000131d4404), UINT64_C(0x00000000131d4404),
+	UINT64_C(0x00000000131d4404), UINT64_C(0x00000000131d4404), UINT64_C(0x00000000131d4404), UINT64_C(0x00000000131d4404),
+	UINT64_C(0x000000000b00042f), UINT64_C(0x000000000b00040d), UINT64_C(0x40000000100b012c), UINT64_C(0x4a83e07d940780fa),
+	0, 0, UINT64_C(0x000000000b000227), 0,
+	UINT64_C(0x000000000a008442), 0, UINT64_C(0x0000000009004422), 0,
+	0, 0, 0, 0,
+	UINT64_C(0x000000001614c2ca), UINT64_C(0x000000001614c2c1), UINT64_C(0x000000001614c29b), UINT64_C(0x000000001614c292),
+	UINT64_C(0x000000001614c2a0), UINT64_C(0x000000001614c2be), UINT64_C(0x000000001614c298), UINT64_C(0x000000001614c295),
+	UINT64_C(0x000000001614c2d1), UINT64_C(0x000000001614c2c7), UINT64_C(0x000000001614c2cd), UINT64_C(0x000000001614c2c4),
+	UINT64_C(0x000000001614c2ac), UINT64_C(0x000000001614c2a3), UINT64_C(0x000000001614c2a9), UINT64_C(0x000000001614c2a6),
+	UINT64_C(0x8000000000030079), UINT64_C(0x800000000003063b), UINT64_C(0x8000000000030099), UINT64_C(0x800000000003064b),
+	UINT64_C(0x4607e2ff0104c5fb), UINT64_C(0x468662f4830145e6), 0, 0,
+	UINT64_C(0x4607e1b10104c359), UINT64_C(0x4686619603014324), UINT64_C(0x478801b20e0f8360), UINT64_C(0x4885a196900b032b),
+	0, UINT64_C(0x40000000100b02dd), 0, UINT64_C(0x8000000000030663),
+	UINT64_C(0x000000000b0003a7), UINT64_C(0x00000000120c0641), UINT64_C(0x00000000120c0641), UINT64_C(0x00000000120c0641),
+	UINT64_C(0x00000000120c0641), UINT64_C(0x00000000120c0641), UINT64_C(0x00000000120c0641), UINT64_C(0x00000000120c0641),
+	UINT64_C(0x000000000b000180), UINT64_C(0x000000000b000223), UINT64_C(0x000000004d11c23d), 0,
+	UINT64_C(0x000000000b000437), UINT64_C(0x000000000b000413), UINT64_C(0x000000000b0004c6), UINT64_C(0x000000000b0002d4),
+	UINT64_C(0x0000000022174355), UINT64_C(0x0000000022174320), UINT64_C(0x000000002217435b), UINT64_C(0x0000000022174326),
+	0, 0, 0, 0,
+	UINT64_C(0x00000000090045f8), UINT64_C(0x000000000a0085e3), 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e),
+	UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e),
+	UINT64_C(0x000000002417c329), UINT64_C(0x000000002417c329), UINT64_C(0x000000002417c329), UINT64_C(0x000000002417c329),
+	UINT64_C(0x000000002417c329), UINT64_C(0x000000002417c329), UINT64_C(0x000000002417c329), UINT64_C(0x000000002417c329),
+	UINT64_C(0x80000000000300e8), UINT64_C(0x800000000003067d), UINT64_C(0x000000000a00848b), UINT64_C(0x000000000b00048e),
+	UINT64_C(0x40000000100b02e3), UINT64_C(0x40000000100b02db), UINT64_C(0x800000000003010e), UINT64_C(0x8000000000030693),
+	UINT64_C(0x000000002911823c), UINT64_C(0x000000000b0002e1), UINT64_C(0x000000000a008301), UINT64_C(0x000000000b000304),
+	UINT64_C(0x000000000b000283), UINT64_C(0x000000002a13c281), UINT64_C(0x000000000b000284), UINT64_C(0x000000000b00028f),
+	UINT64_C(0x8000000000030136), UINT64_C(0x80000000000306a6), UINT64_C(0x8000000000030156), UINT64_C(0x80000000000306b6),
+	UINT64_C(0x0000000009004080), UINT64_C(0x000000000900407f), UINT64_C(0x000000000b0004df), UINT64_C(0x000000000b000652),
+	0, 0, 0, UINT64_C(0x800000000002017a),
+	0, 0, 0, 0,
+	UINT64_C(0x000000001614c2fe), UINT64_C(0x000000001614c2fd), UINT64_C(0x000000001614c2fc), UINT64_C(0x000000001614c29e),
+	UINT64_C(0x000000002a13c270), UINT64_C(0x000000002a13c26c), UINT64_C(0x000000002a13c3f6), UINT64_C(0x000000002a13c3f2),
+	UINT64_C(0x000000004e0e817e), UINT64_C(0x000000002e1502bc), UINT64_C(0x000000004d11c242), UINT64_C(0x000000001614c2bb),
+	UINT64_C(0x000000000b000271), UINT64_C(0x000000000b00026d), UINT64_C(0x000000000b0003f7), UINT64_C(0x000000000b0003f3),
+	UINT64_C(0x000000000b0002f7), UINT64_C(0x000000000b000282), UINT64_C(0x000000000b000487), UINT64_C(0x000000000b000488),
+	UINT64_C(0x000000000b000249), UINT64_C(0x000000000b00018e), UINT64_C(0x80000000000301d8), UINT64_C(0x80000000000306cd),
+	UINT64_C(0x000000000b000184), UINT64_C(0x000000000b0005a8), UINT64_C(0x000000000b000189), UINT64_C(0x000000000b0005ab),
+	UINT64_C(0x000000000b000185), UINT64_C(0x000000000b0005a9), UINT64_C(0x80000000000301fe), UINT64_C(0x80000000000306dd),
+},
+{
+	UINT64_C(0x80000000000306ed), UINT64_C(0x80000000000206fd), UINT64_C(0x4885a16b100b02d5), UINT64_C(0x4885a183100b0305),
+	0, UINT64_C(0x000000000b0005d9), UINT64_C(0x000000000b00018b), UINT64_C(0x000000000b0005dd),
+	UINT64_C(0x000000000b000285), UINT64_C(0x000000000b00062d), 0, UINT64_C(0x000000000b00060c),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x8000000000030749), UINT64_C(0x4885a1dc1f0d83c1), 0, 0,
+	UINT64_C(0x400000001f0d83c2), UINT64_C(0x400000001f0d83c3), UINT64_C(0x400000001f0d83c4), UINT64_C(0x5006e1e29f0d83c0),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x000000000b000633), UINT64_C(0x000000000b000485), UINT64_C(0x000000000b000478), UINT64_C(0x000000000b00047c),
+	UINT64_C(0x000000000b0005da), UINT64_C(0x000000000b0005db), 0, UINT64_C(0x000000000b000248),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x440140ef070201dd), UINT64_C(0x440140e6070201cb), UINT64_C(0x440140ce0702019b), UINT64_C(0x440140cb07020195),
+	UINT64_C(0x440140d4070201a7), UINT64_C(0x440140e3070201c5), UINT64_C(0x440140d1070201a1), UINT64_C(0x440140c80702018f),
+	UINT64_C(0x440140f5070201e9), UINT64_C(0x440140ec070201d7), UINT64_C(0x440140f2070201e3), UINT64_C(0x440140e9070201d1),
+	UINT64_C(0x440140dd070201b9), UINT64_C(0x440140da070201b3), UINT64_C(0x440140e0070201bf), UINT64_C(0x440140d7070201ad),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x5910830fb11c061e), UINT64_C(0x5a10a31433148627), 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x000000002e1502cb), UINT64_C(0x000000002e1502c2), UINT64_C(0x000000002e15029c), UINT64_C(0x000000002e150293),
+	UINT64_C(0x000000002e1502a1), UINT64_C(0x000000002e1502bf), UINT64_C(0x000000002e150299), UINT64_C(0x000000002e150296),
+	UINT64_C(0x000000002e1502d2), UINT64_C(0x000000002e1502c8), UINT64_C(0x000000002e1502ce), UINT64_C(0x000000002e1502c5),
+	UINT64_C(0x000000002e1502ad), UINT64_C(0x000000002e1502a4), UINT64_C(0x000000002e1502aa), UINT64_C(0x000000002e1502a7),
+	UINT64_C(0x5788a2a01f0d853f), UINT64_C(0x5788a29d1f0d8539), UINT64_C(0x5788a2961f0d852b), UINT64_C(0x5788a2931f0d8525),
+	UINT64_C(0x5788a2971f0d852d), UINT64_C(0x5788a29c1f0d8537), UINT64_C(0x5788a2951f0d8529), UINT64_C(0x5788a2941f0d8527),
+	UINT64_C(0x5788a2a29f0d8544), UINT64_C(0x5788a29f1f0d853d), UINT64_C(0x5788a2a11f0d8541), UINT64_C(0x5788a29e1f0d853b),
+	UINT64_C(0x5788a29b1f0d8535), UINT64_C(0x5788a2981f0d852f), UINT64_C(0x5788a29a1f0d8533), UINT64_C(0x5788a2991f0d8531),
+	UINT64_C(0x000000000b00043a), UINT64_C(0x000000000b000416), UINT64_C(0x000000000b000221), UINT64_C(0x468660a00301413e),
+	0, UINT64_C(0x420122b183014561), UINT64_C(0x800000000002030a), UINT64_C(0x8000000000020352),
+	UINT64_C(0x000000000b00043d), UINT64_C(0x000000000b000419), UINT64_C(0x000000000b0004c4), UINT64_C(0x420120b203014162),
+	0, UINT64_C(0x420122c583014589), UINT64_C(0x80000000000307f1), UINT64_C(0x4401412b87020254),
+	UINT64_C(0x4607e1100104c21f), UINT64_C(0x4686610c83014218), UINT64_C(0x40000000100b030b), UINT64_C(0x420120ac03014156),
+	UINT64_C(0x40000000100b02e5), UINT64_C(0x40000000100b02eb), UINT64_C(0x5a8e21c3900b0385), UINT64_C(0x4885a1c3100b0384),
+	0, 0, UINT64_C(0x80000000000307bf), UINT64_C(0x420120a60301414a),
+	UINT64_C(0x4885a097900b012e), UINT64_C(0x4885a09a900b0134), UINT64_C(0x5a8e21bb900b0375), UINT64_C(0x4885a1bb100b0374),
+	0, 0, 0, 0,
+	0, 0, 0, UINT64_C(0x8000000000030801),
+	UINT64_C(0x00000000120c013a), UINT64_C(0x00000000120c013a), UINT64_C(0x00000000120c013a), UINT64_C(0x00000000120c013a),
+	UINT64_C(0x00000000120c013a), UINT64_C(0x00000000120c013a), UINT64_C(0x00000000120c013a), UINT64_C(0x00000000120c013a),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, UINT64_C(0x000000000b00060a),
+},
+},
+{
+{
+	UINT64_C(0x4102c0660104c0c8), UINT64_C(0x42012058830140ad), UINT64_C(0x4302e066850540cb), UINT64_C(0x44014059070200b0),
+	UINT64_C(0x00000000090040c5), UINT64_C(0x000000000a0080aa), 0, 0,
+	UINT64_C(0x4102c1f80104c3ec), UINT64_C(0x420121ea830143d1), UINT64_C(0x4302e1f8850543ef), UINT64_C(0x440141eb070203d4),
+	UINT64_C(0x00000000090043e9), UINT64_C(0x000000000a0083ce), 0, 0,
+	UINT64_C(0x4102c0520104c0a0), UINT64_C(0x4201204483014085), UINT64_C(0x4302e052850540a3), UINT64_C(0x4401404507020088),
+	UINT64_C(0x000000000900409d), UINT64_C(0x000000000a008082), 0, 0,
+	UINT64_C(0x4102c28f8104c51b), UINT64_C(0x4201228203014500), UINT64_C(0x4302e2900505451e), UINT64_C(0x4401428287020503),
+	UINT64_C(0x0000000009004518), UINT64_C(0x000000000a0084fd), 0, 0,
+	UINT64_C(0x4102c07a0104c0f0), UINT64_C(0x4201206c830140d5), UINT64_C(0x4302e07a850540f3), UINT64_C(0x4401406d070200d8),
+	UINT64_C(0x00000000090040ed), UINT64_C(0x000000000a0080d2), 0, 0,
+	UINT64_C(0x4102c2eb0104c5d2), UINT64_C(0x420122dd830145b7), UINT64_C(0x4302e2eb850545d5), UINT64_C(0x440142de070205ba),
+	UINT64_C(0x00000000090045cf), UINT64_C(0x000000000a0085b4), 0, 0,
+	UINT64_C(0x4102c33a8104c671), UINT64_C(0x4201232d03014656), UINT64_C(0x4302e33b05054674), UINT64_C(0x4401432d87020659),
+	UINT64_C(0x000000000900466e), UINT64_C(0x000000000a008653), 0, 0,
+	UINT64_C(0x4607e1088104c20d), UINT64_C(0x468660fb030141f2), UINT64_C(0x478801090e0f8210), UINT64_C(0x4885a0fb900b01f5),
+	UINT64_C(0x000000000900420a), UINT64_C(0x000000000a0081ef), 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x000000000b00048f), 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x00000000131d4423), UINT64_C(0x00000000131d4423), UINT64_C(0x00000000131d4423), UINT64_C(0x00000000131d4423),
+	UINT64_C(0x00000000131d4423), UINT64_C(0x00000000131d4423), UINT64_C(0x00000000131d4423), UINT64_C(0x00000000131d4423),
+	UINT64_C(0x00000000131d4404), UINT64_C(0x00000000131d4404), UINT64_C(0x00000000131d4404), UINT64_C(0x00000000131d4404),
+	UINT64_C(0x00000000131d4404), UINT64_C(0x00000000131d4404), UINT64_C(0x00000000131d4404), UINT64_C(0x00000000131d4404),
+	0, 0, 0, UINT64_C(0x68918345501bc689),
+	0, 0, UINT64_C(0x000000000b000227), 0,
+	UINT64_C(0x000000000a008442), 0, UINT64_C(0x0000000009004422), 0,
+	0, 0, 0, 0,
+	UINT64_C(0x000000001614c2ca), UINT64_C(0x000000001614c2c1), UINT64_C(0x000000001614c29b), UINT64_C(0x000000001614c292),
+	UINT64_C(0x000000001614c2a0), UINT64_C(0x000000001614c2be), UINT64_C(0x000000001614c298), UINT64_C(0x000000001614c295),
+	UINT64_C(0x000000001614c2d1), UINT64_C(0x000000001614c2c7), UINT64_C(0x000000001614c2cd), UINT64_C(0x000000001614c2c4),
+	UINT64_C(0x000000001614c2ac), UINT64_C(0x000000001614c2a3), UINT64_C(0x000000001614c2a9), UINT64_C(0x000000001614c2a6),
+	UINT64_C(0x8000000000030079), UINT64_C(0x800000000003063b), 0, UINT64_C(0x800000000003064b),
+	UINT64_C(0x4607e2ff0104c5fb), UINT64_C(0x468662f4830145e6), 0, 0,
+	UINT64_C(0x4607e1b10104c359), UINT64_C(0x4686619603014324), UINT64_C(0x478801b20e0f8360), UINT64_C(0x4885a196900b032b),
+	0, UINT64_C(0x40000000100b02dd), 0, UINT64_C(0x8000000000030663),
+	UINT64_C(0x000000000b0003a7), UINT64_C(0x00000000120c0641), UINT64_C(0x00000000120c0641), UINT64_C(0x00000000120c0641),
+	UINT64_C(0x00000000120c0641), UINT64_C(0x00000000120c0641), UINT64_C(0x00000000120c0641), UINT64_C(0x00000000120c0641),
+	UINT64_C(0x000000000b000180), UINT64_C(0x000000000b000223), 0, 0,
+	UINT64_C(0x000000000b000437), UINT64_C(0x000000000b000413), UINT64_C(0x000000000b0004c6), UINT64_C(0x000000000b0002d4),
+	UINT64_C(0x0000000022174357), UINT64_C(0x0000000022174322), UINT64_C(0x000000002217435d), UINT64_C(0x0000000022174328),
+	0, 0, 0, 0,
+	UINT64_C(0x00000000090045f8), UINT64_C(0x000000000a0085e3), 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e),
+	UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e),
+	UINT64_C(0x000000002417c329), UINT64_C(0x000000002417c329), UINT64_C(0x000000002417c329), UINT64_C(0x000000002417c329),
+	UINT64_C(0x000000002417c329), UINT64_C(0x000000002417c329), UINT64_C(0x000000002417c329), UINT64_C(0x000000002417c329),
+	UINT64_C(0x80000000000300e8), UINT64_C(0x800000000003067d), UINT64_C(0x000000000a00848b), UINT64_C(0x000000000b00048e),
+	0, 0, UINT64_C(0x800000000003010e), UINT64_C(0x8000000000030693),
+	UINT64_C(0x000000002911823c), UINT64_C(0x000000000b0002e2), UINT64_C(0x000000000a008301), UINT64_C(0x000000000b000304),
+	UINT64_C(0x000000000b000283), UINT64_C(0x000000002a13c281), 0, UINT64_C(0x000000000b00028f),
+	UINT64_C(0x8000000000030136), UINT64_C(0x80000000000306a6), UINT64_C(0x8000000000030156), UINT64_C(0x80000000000306b6),
+	0, 0, 0, UINT64_C(0x000000000b000652),
+	0, 0, 0, UINT64_C(0x800000000002017a),
+	0, 0, 0, 0,
+	UINT64_C(0x000000001614c2fe), UINT64_C(0x000000001614c2fd), UINT64_C(0x000000001614c2fc), UINT64_C(0x000000001614c2d0),
+	UINT64_C(0x000000002a13c270), UINT64_C(0x000000002a13c26c), UINT64_C(0x000000002a13c3f6), UINT64_C(0x000000002a13c3f2),
+	UINT64_C(0x000000004e0e817e), UINT64_C(0x000000002e1502bc), 0, UINT64_C(0x000000001614c2bb),
+	UINT64_C(0x000000000b000271), UINT64_C(0x000000000b00026d), UINT64_C(0x000000000b0003f7), UINT64_C(0x000000000b0003f3),
+	UINT64_C(0x000000000b0002f7), UINT64_C(0x000000000b000282), UINT64_C(0x000000000b000487), UINT64_C(0x000000000b000488),
+	UINT64_C(0x000000000b000249), UINT64_C(0x000000000b00018e), UINT64_C(0x80000000000301d8), UINT64_C(0x80000000000306cd),
+	UINT64_C(0x000000000b000184), UINT64_C(0x000000000b0005a8), UINT64_C(0x000000000b000189), UINT64_C(0x000000000b0005ab),
+	UINT64_C(0x000000000b000185), UINT64_C(0x000000000b0005a9), UINT64_C(0x80000000000301fe), UINT64_C(0x8000000000030815),
+},
+{
+	UINT64_C(0x80000000000306ed), UINT64_C(0x8000000000020825), UINT64_C(0x4885a16b100b02d5), UINT64_C(0x4885a183100b0305),
+	0, UINT64_C(0x000000000b0005d9), UINT64_C(0x000000000b00018b), UINT64_C(0x000000000b0005dd),
+	UINT64_C(0x000000000b000285), UINT64_C(0x000000000b00062d), 0, UINT64_C(0x000000000b00060c),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x8000000000030749), UINT64_C(0x4885a1dc1f0d83c1), 0, 0,
+	UINT64_C(0x400000001f0d83c2), UINT64_C(0x400000001f0d83c3), UINT64_C(0x400000001f0d83c4), UINT64_C(0x5006e1e29f0d83c0),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x000000000b000633), UINT64_C(0x000000000b000485), UINT64_C(0x000000000b000478), UINT64_C(0x000000000b00047c),
+	UINT64_C(0x000000000b0005da), UINT64_C(0x000000000b0005db), 0, UINT64_C(0x000000000b000248),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x440140ef070201dd), UINT64_C(0x440140e6070201cb), UINT64_C(0x440140ce0702019b), UINT64_C(0x440140cb07020195),
+	UINT64_C(0x440140d4070201a7), UINT64_C(0x440140e3070201c5), UINT64_C(0x440140d1070201a1), UINT64_C(0x440140c80702018f),
+	UINT64_C(0x440140f5070201e9), UINT64_C(0x440140ec070201d7), UINT64_C(0x440140f2070201e3), UINT64_C(0x440140e9070201d1),
+	UINT64_C(0x440140dd070201b9), UINT64_C(0x440140da070201b3), UINT64_C(0x440140e0070201bf), UINT64_C(0x440140d7070201ad),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x000000002e1502cb), UINT64_C(0x000000002e1502c2), UINT64_C(0x000000002e15029c), UINT64_C(0x000000002e150293),
+	UINT64_C(0x000000002e1502a1), UINT64_C(0x000000002e1502bf), UINT64_C(0x000000002e150299), UINT64_C(0x000000002e150296),
+	UINT64_C(0x000000002e1502d2), UINT64_C(0x000000002e1502c8), UINT64_C(0x000000002e1502ce), UINT64_C(0x000000002e1502c5),
+	UINT64_C(0x000000002e1502ad), UINT64_C(0x000000002e1502a4), UINT64_C(0x000000002e1502aa), UINT64_C(0x000000002e1502a7),
+	UINT64_C(0x5788a2a01f0d853f), UINT64_C(0x5788a29d1f0d8539), UINT64_C(0x5788a2961f0d852b), UINT64_C(0x5788a2931f0d8525),
+	UINT64_C(0x5788a2971f0d852d), UINT64_C(0x5788a29c1f0d8537), UINT64_C(0x5788a2951f0d8529), UINT64_C(0x5788a2941f0d8527),
+	UINT64_C(0x5788a2a29f0d8544), UINT64_C(0x5788a29f1f0d853d), UINT64_C(0x5788a2a11f0d8541), UINT64_C(0x5788a29e1f0d853b),
+	UINT64_C(0x5788a29b1f0d8535), UINT64_C(0x5788a2981f0d852f), UINT64_C(0x5788a29a1f0d8533), UINT64_C(0x5788a2991f0d8531),
+	UINT64_C(0x000000000b00043a), UINT64_C(0x000000000b000416), UINT64_C(0x000000000b000221), UINT64_C(0x468660a00301413e),
+	0, UINT64_C(0x420122b183014561), UINT64_C(0x800000000002030a), UINT64_C(0x8000000000020352),
+	UINT64_C(0x000000000b00043d), UINT64_C(0x000000000b000419), UINT64_C(0x000000000b0004c4), UINT64_C(0x420120b203014162),
+	0, UINT64_C(0x420122c583014589), UINT64_C(0x800000000003079f), UINT64_C(0x4401412b87020254),
+	UINT64_C(0x4607e1100104c21f), UINT64_C(0x4686610c83014218), UINT64_C(0x40000000100b030b), UINT64_C(0x420120ac03014156),
+	UINT64_C(0x40000000100b02e5), UINT64_C(0x40000000100b02eb), UINT64_C(0x5a8e21c3900b0385), UINT64_C(0x4885a1c3100b0384),
+	0, 0, UINT64_C(0x80000000000307bf), UINT64_C(0x420120a60301414a),
+	UINT64_C(0x4885a097900b012e), UINT64_C(0x4885a09a900b0134), UINT64_C(0x5a8e21bb900b0375), UINT64_C(0x4885a1bb100b0374),
+	0, 0, 0, 0,
+	0, 0, 0, UINT64_C(0x80000000000307d9),
+	UINT64_C(0x00000000120c013a), UINT64_C(0x00000000120c013a), UINT64_C(0x00000000120c013a), UINT64_C(0x00000000120c013a),
+	UINT64_C(0x00000000120c013a), UINT64_C(0x00000000120c013a), UINT64_C(0x00000000120c013a), UINT64_C(0x00000000120c013a),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, UINT64_C(0x000000000b00060a),
+},
+},
+{
+{
+	UINT64_C(0x4102c0660104c0c8), UINT64_C(0x4201205d030140b6), UINT64_C(0x4302e066850540cb), UINT64_C(0x4401405d870200b9),
+	UINT64_C(0x00000000090040c5), UINT64_C(0x000000000a0080b3), 0, 0,
+	UINT64_C(0x4102c1f80104c3ec), UINT64_C(0x420121ef030143da), UINT64_C(0x4302e1f8850543ef), UINT64_C(0x440141ef870203dd),
+	UINT64_C(0x00000000090043e9), UINT64_C(0x000000000a0083d7), 0, 0,
+	UINT64_C(0x4102c0520104c0a0), UINT64_C(0x420120490301408e), UINT64_C(0x4302e052850540a3), UINT64_C(0x4401404987020091),
+	UINT64_C(0x000000000900409d), UINT64_C(0x000000000a00808b), 0, 0,
+	UINT64_C(0x4102c28f8104c51b), UINT64_C(0x4201228683014509), UINT64_C(0x4302e2900505451e), UINT64_C(0x440142870702050c),
+	UINT64_C(0x0000000009004518), UINT64_C(0x000000000a008506), 0, 0,
+	UINT64_C(0x4102c07a0104c0f0), UINT64_C(0x42012071030140de), UINT64_C(0x4302e07a850540f3), UINT64_C(0x44014071870200e1),
+	UINT64_C(0x00000000090040ed), UINT64_C(0x000000000a0080db), 0, 0,
+	UINT64_C(0x4102c2eb0104c5d2), UINT64_C(0x420122e2030145c0), UINT64_C(0x4302e2eb850545d5), UINT64_C(0x440142e2870205c3),
+	UINT64_C(0x00000000090045cf), UINT64_C(0x000000000a0085bd), 0, 0,
+	UINT64_C(0x4102c33a8104c671), UINT64_C(0x420123318301465f), UINT64_C(0x4302e33b05054674), UINT64_C(0x4401433207020662),
+	UINT64_C(0x000000000900466e), UINT64_C(0x000000000a00865c), 0, 0,
+	UINT64_C(0x4607e1088104c20d), UINT64_C(0x468660ff830141fb), UINT64_C(0x478801090e0f8210), UINT64_C(0x4885a100100b01fe),
+	UINT64_C(0x000000000900420a), UINT64_C(0x000000000a0081f8), 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x000000000b00048f), 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x00000000371d842c), UINT64_C(0x00000000371d842c), UINT64_C(0x00000000371d842c), UINT64_C(0x00000000371d842c),
+	UINT64_C(0x00000000371d842c), UINT64_C(0x00000000371d842c), UINT64_C(0x00000000371d842c), UINT64_C(0x00000000371d842c),
+	UINT64_C(0x00000000371d840a), UINT64_C(0x00000000371d840a), UINT64_C(0x00000000371d840a), UINT64_C(0x00000000371d840a),
+	UINT64_C(0x00000000371d840a), UINT64_C(0x00000000371d840a), UINT64_C(0x00000000371d840a), UINT64_C(0x00000000371d840a),
+	0, 0, 0, 0,
+	0, 0, UINT64_C(0x000000000b000227), 0,
+	UINT64_C(0x000000003802c42a), 0, UINT64_C(0x000000000900442b), 0,
+	0, 0, 0, 0,
+	UINT64_C(0x000000001614c2ca), UINT64_C(0x000000001614c2c1), UINT64_C(0x000000001614c29b), UINT64_C(0x000000001614c292),
+	UINT64_C(0x000000001614c2a0), UINT64_C(0x000000001614c2be), UINT64_C(0x000000001614c298), UINT64_C(0x000000001614c295),
+	UINT64_C(0x000000001614c2d1), UINT64_C(0x000000001614c2c7), UINT64_C(0x000000001614c2cd), UINT64_C(0x000000001614c2c4),
+	UINT64_C(0x000000001614c2ac), UINT64_C(0x000000001614c2a3), UINT64_C(0x000000001614c2a9), UINT64_C(0x000000001614c2a6),
+	UINT64_C(0x8000000000030079), UINT64_C(0x8000000000030089), 0, UINT64_C(0x80000000000300a9),
+	UINT64_C(0x4607e2ff0104c5fb), UINT64_C(0x468662f8030145ed), 0, 0,
+	UINT64_C(0x4607e1b10104c359), UINT64_C(0x468661a003014337), UINT64_C(0x478801b20e0f8360), UINT64_C(0x4885a1a0900b033f),
+	0, UINT64_C(0x40000000100b02df), 0, UINT64_C(0x80000000000303f8),
+	UINT64_C(0x000000000b0003a7), UINT64_C(0x00000000120c0644), UINT64_C(0x00000000120c0644), UINT64_C(0x00000000120c0644),
+	UINT64_C(0x00000000120c0644), UINT64_C(0x00000000120c0644), UINT64_C(0x00000000120c0644), UINT64_C(0x00000000120c0644),
+	UINT64_C(0x000000000b000224), UINT64_C(0x000000000b000181), 0, 0,
+	UINT64_C(0x000000000b000439), UINT64_C(0x000000000b000415), UINT64_C(0x000000000b0004c6), UINT64_C(0x000000000b0002d4),
+	UINT64_C(0x0000000022174356), UINT64_C(0x0000000022174332), UINT64_C(0x000000002217435c), UINT64_C(0x0000000022174339),
+	0, 0, 0, 0,
+	UINT64_C(0x00000000090045f8), UINT64_C(0x000000000a0085ea), 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e),
+	UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e),
+	UINT64_C(0x000000002417c33d), UINT64_C(0x000000002417c33d), UINT64_C(0x000000002417c33d), UINT64_C(0x000000002417c33d),
+	UINT64_C(0x000000002417c33d), UINT64_C(0x000000002417c33d), UINT64_C(0x000000002417c33d), UINT64_C(0x000000002417c33d),
+	UINT64_C(0x80000000000300e8), UINT64_C(0x80000000000300f8), UINT64_C(0x000000002816048a), UINT64_C(0x000000000b00048d),
+	0, 0, UINT64_C(0x800000000003010e), UINT64_C(0x800000000003011e),
+	UINT64_C(0x000000002911823c), UINT64_C(0x000000000b0002e2), UINT64_C(0x00000000281602ff), UINT64_C(0x000000000b000302),
+	UINT64_C(0x000000000b000283), UINT64_C(0x000000002a13c281), 0, UINT64_C(0x000000000b000290),
+	UINT64_C(0x8000000000030136), UINT64_C(0x8000000000030146), UINT64_C(0x8000000000030156), UINT64_C(0x8000000000030166),
+	0, 0, 0, UINT64_C(0x000000000b000652),
+	0, 0, 0, UINT64_C(0x800000000002017a),
+	0, 0, 0, 0,
+	UINT64_C(0x000000001614c2fe), UINT64_C(0x000000001614c2fd), UINT64_C(0x000000001614c2fc), UINT64_C(0x000000001614c29f),
+	UINT64_C(0x000000002a13c270), UINT64_C(0x000000002a13c26e), UINT64_C(0x000000002a13c3f6), UINT64_C(0x000000002a13c3f4),
+	UINT64_C(0x000000002d0e017b), UINT64_C(0x000000002e1502bd), 0, UINT64_C(0x000000001614c2bb),
+	UINT64_C(0x000000000b000271), UINT64_C(0x000000000b00026f), UINT64_C(0x000000000b0003f7), UINT64_C(0x000000000b0003f5),
+	UINT64_C(0x000000000b0002f7), UINT64_C(0x000000000b000282), UINT64_C(0x000000000b000487), UINT64_C(0x000000000b000488),
+	UINT64_C(0x000000000b000249), UINT64_C(0x000000000b00018e), UINT64_C(0x80000000000301d8), UINT64_C(0x80000000000301e8),
+	UINT64_C(0x000000000b000184), UINT64_C(0x000000000b0005a8), UINT64_C(0x000000000b000189), UINT64_C(0x000000000b0005ab),
+	UINT64_C(0x000000000b000185), UINT64_C(0x000000000b0005a9), UINT64_C(0x80000000000301fe), UINT64_C(0x8000000000030413),
+},
+{
+	UINT64_C(0x800000000003021e), UINT64_C(0x8000000000020423), UINT64_C(0x4885a16c100b02d7), UINT64_C(0x4885a184100b0307),
+	0, UINT64_C(0x000000000b0005d9), UINT64_C(0x000000000b00018b), UINT64_C(0x000000000b0005dd),
+	UINT64_C(0x000000000b000285), UINT64_C(0x000000000b00062d), 0, UINT64_C(0x000000000b00060c),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x8000000000030280), UINT64_C(0x4885a1dc1f0d83ba), 0, 0,
+	UINT64_C(0x8000000000030292), UINT64_C(0x400000001f0d83bb), UINT64_C(0x400000001f0d83bc), UINT64_C(0x5006e1de9f0d83b9),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x000000000b000633), UINT64_C(0x000000000b000485), UINT64_C(0x000000000b000478), UINT64_C(0x000000000b00047c),
+	UINT64_C(0x000000000b0005da), UINT64_C(0x000000000b0005db), 0, UINT64_C(0x000000000b000248),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x440140f0070201df), UINT64_C(0x440140e7070201cd), UINT64_C(0x440140cf0702019d), UINT64_C(0x440140cc07020197),
+	UINT64_C(0x440140d5070201a9), UINT64_C(0x440140e4070201c7), UINT64_C(0x440140d2070201a3), UINT64_C(0x440140c907020191),
+	UINT64_C(0x440140f6070201eb), UINT64_C(0x440140ed070201d9), UINT64_C(0x440140f3070201e5), UINT64_C(0x440140ea070201d3),
+	UINT64_C(0x440140de070201bb), UINT64_C(0x440140db070201b5), UINT64_C(0x440140e1070201c1), UINT64_C(0x440140d8070201af),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x5d86a310ba034620), UINT64_C(0x5e85e3153c0b8629), 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x000000002e1502cc), UINT64_C(0x000000002e1502c3), UINT64_C(0x000000002e15029d), UINT64_C(0x000000002e150294),
+	UINT64_C(0x000000002e1502a2), UINT64_C(0x000000002e1502c0), UINT64_C(0x000000002e15029a), UINT64_C(0x000000002e150297),
+	UINT64_C(0x000000002e1502d3), UINT64_C(0x000000002e1502c9), UINT64_C(0x000000002e1502cf), UINT64_C(0x000000002e1502c6),
+	UINT64_C(0x000000002e1502ae), UINT64_C(0x000000002e1502a5), UINT64_C(0x000000002e1502ab), UINT64_C(0x000000002e1502a8),
+	UINT64_C(0x5788a2a01f0d853f), UINT64_C(0x5788a29d1f0d8539), UINT64_C(0x5788a2961f0d852b), UINT64_C(0x5788a2931f0d8525),
+	UINT64_C(0x5788a2971f0d852d), UINT64_C(0x5788a29c1f0d8537), UINT64_C(0x5788a2951f0d8529), UINT64_C(0x5788a2941f0d8527),
+	UINT64_C(0x5788a2a29f0d8544), UINT64_C(0x5788a29f1f0d853d), UINT64_C(0x5788a2a11f0d8541), UINT64_C(0x5788a29e1f0d853b),
+	UINT64_C(0x5788a29b1f0d8535), UINT64_C(0x5788a2981f0d852f), UINT64_C(0x5788a29a1f0d8533), UINT64_C(0x5788a2991f0d8531),
+	UINT64_C(0x000000000b00043c), UINT64_C(0x000000000b000418), UINT64_C(0x000000000b000221), UINT64_C(0x468660a203014142),
+	0, UINT64_C(0x420122b383014565), UINT64_C(0x800000000002030a), UINT64_C(0x8000000000020352),
+	UINT64_C(0x000000000b00043f), UINT64_C(0x000000000b00041b), UINT64_C(0x000000000b0004c4), UINT64_C(0x420120b403014166),
+	0, UINT64_C(0x420122c78301458d), UINT64_C(0x80000000000303a1), UINT64_C(0x4401412f8702025c),
+	UINT64_C(0x4607e1100104c21f), UINT64_C(0x4686610d8301421a), UINT64_C(0x40000000100b030c), UINT64_C(0x420120ae0301415a),
+	UINT64_C(0x40000000100b02e6), UINT64_C(0x40000000100b02ec), UINT64_C(0x5a8e21c6100b0389), UINT64_C(0x5b0e41c5900b0388),
+	0, 0, UINT64_C(0x80000000000303c3), UINT64_C(0x420120a80301414e),
+	UINT64_C(0x4885a098900b0130), UINT64_C(0x4885a09b900b0136), UINT64_C(0x5a8e21be100b0379), UINT64_C(0x5b0e41bd900b0378),
+	0, 0, 0, 0,
+	0, 0, 0, UINT64_C(0x80000000000303dd),
+	UINT64_C(0x00000000120c013b), UINT64_C(0x00000000120c013b), UINT64_C(0x00000000120c013b), UINT64_C(0x00000000120c013b),
+	UINT64_C(0x00000000120c013b), UINT64_C(0x00000000120c013b), UINT64_C(0x00000000120c013b), UINT64_C(0x00000000120c013b),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, UINT64_C(0x000000000b00060a),
+},
+},
+{
+{
+	UINT64_C(0x4102c0660104c0c8), UINT64_C(0x42012058830140ad), UINT64_C(0x4302e066850540cb), UINT64_C(0x44014059070200b0),
+	UINT64_C(0x00000000090040c5), UINT64_C(0x000000000a0080aa), 0, 0,
+	UINT64_C(0x4102c1f80104c3ec), UINT64_C(0x420121ea830143d1), UINT64_C(0x4302e1f8850543ef), UINT64_C(0x440141eb070203d4),
+	UINT64_C(0x00000000090043e9), UINT64_C(0x000000000a0083ce), 0, 0,
+	UINT64_C(0x4102c0520104c0a0), UINT64_C(0x4201204483014085), UINT64_C(0x4302e052850540a3), UINT64_C(0x4401404507020088),
+	UINT64_C(0x000000000900409d), UINT64_C(0x000000000a008082), 0, 0,
+	UINT64_C(0x4102c28f8104c51b), UINT64_C(0x4201228203014500), UINT64_C(0x4302e2900505451e), UINT64_C(0x4401428287020503),
+	UINT64_C(0x0000000009004518), UINT64_C(0x000000000a0084fd), 0, 0,
+	UINT64_C(0x4102c07a0104c0f0), UINT64_C(0x4201206c830140d5), UINT64_C(0x4302e07a850540f3), UINT64_C(0x4401406d070200d8),
+	UINT64_C(0x00000000090040ed), UINT64_C(0x000000000a0080d2), 0, 0,
+	UINT64_C(0x4102c2eb0104c5d2), UINT64_C(0x420122dd830145b7), UINT64_C(0x4302e2eb850545d5), UINT64_C(0x440142de070205ba),
+	UINT64_C(0x00000000090045cf), UINT64_C(0x000000000a0085b4), 0, 0,
+	UINT64_C(0x4102c33a8104c671), UINT64_C(0x4201232d03014656), UINT64_C(0x4302e33b05054674), UINT64_C(0x4401432d87020659),
+	UINT64_C(0x000000000900466e), UINT64_C(0x000000000a008653), 0, 0,
+	UINT64_C(0x4607e1088104c20d), UINT64_C(0x468660fb030141f2), UINT64_C(0x478801090e0f8210), UINT64_C(0x4885a0fb900b01f5),
+	UINT64_C(0x000000000900420a), UINT64_C(0x000000000a0081ef), 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x000000000b00048f), 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x00000000131d4423), UINT64_C(0x00000000131d4423), UINT64_C(0x00000000131d4423), UINT64_C(0x00000000131d4423),
+	UINT64_C(0x00000000131d4423), UINT64_C(0x00000000131d4423), UINT64_C(0x00000000131d4423), UINT64_C(0x00000000131d4423),
+	UINT64_C(0x00000000131d4404), UINT64_C(0x00000000131d4404), UINT64_C(0x00000000131d4404), UINT64_C(0x00000000131d4404),
+	UINT64_C(0x00000000131d4404), UINT64_C(0x00000000131d4404), UINT64_C(0x00000000131d4404), UINT64_C(0x00000000131d4404),
+	0, 0, 0, 0,
+	0, 0, UINT64_C(0x000000000b000227), 0,
+	UINT64_C(0x000000000a008442), 0, UINT64_C(0x0000000009004422), 0,
+	0, 0, 0, 0,
+	UINT64_C(0x000000001614c2ca), UINT64_C(0x000000001614c2c1), UINT64_C(0x000000001614c29b), UINT64_C(0x000000001614c292),
+	UINT64_C(0x000000001614c2a0), UINT64_C(0x000000001614c2be), UINT64_C(0x000000001614c298), UINT64_C(0x000000001614c295),
+	UINT64_C(0x000000001614c2d1), UINT64_C(0x000000001614c2c7), UINT64_C(0x000000001614c2cd), UINT64_C(0x000000001614c2c4),
+	UINT64_C(0x000000001614c2ac), UINT64_C(0x000000001614c2a3), UINT64_C(0x000000001614c2a9), UINT64_C(0x000000001614c2a6),
+	UINT64_C(0x8000000000030079), UINT64_C(0x800000000003063b), 0, UINT64_C(0x800000000003064b),
+	UINT64_C(0x4607e2ff0104c5fb), UINT64_C(0x468662f4830145e6), 0, 0,
+	UINT64_C(0x4607e1b10104c359), UINT64_C(0x4686619603014324), UINT64_C(0x478801b20e0f8360), UINT64_C(0x4885a196900b032b),
+	0, UINT64_C(0x40000000100b02dd), 0, UINT64_C(0x8000000000030663),
+	UINT64_C(0x000000000b0003a7), UINT64_C(0x00000000120c0641), UINT64_C(0x00000000120c0641), UINT64_C(0x00000000120c0641),
+	UINT64_C(0x00000000120c0641), UINT64_C(0x00000000120c0641), UINT64_C(0x00000000120c0641), UINT64_C(0x00000000120c0641),
+	UINT64_C(0x000000000b000180), UINT64_C(0x000000000b000223), 0, 0,
+	UINT64_C(0x000000000b000437), UINT64_C(0x000000000b000413), UINT64_C(0x000000000b0004c6), UINT64_C(0x000000000b0002d4),
+	UINT64_C(0x0000000022174357), UINT64_C(0x0000000022174321), UINT64_C(0x000000002217435d), UINT64_C(0x0000000022174327),
+	0, 0, 0, 0,
+	UINT64_C(0x00000000090045f8), UINT64_C(0x000000000a0085e3), 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e),
+	UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e),
+	UINT64_C(0x000000002417c329), UINT64_C(0x000000002417c329), UINT64_C(0x000000002417c329), UINT64_C(0x000000002417c329),
+	UINT64_C(0x000000002417c329), UINT64_C(0x000000002417c329), UINT64_C(0x000000002417c329), UINT64_C(0x000000002417c329),
+	UINT64_C(0x80000000000300e8), UINT64_C(0x800000000003067d), UINT64_C(0x000000000a00848b), UINT64_C(0x000000000b00048e),
+	0, 0, UINT64_C(0x800000000003010e), UINT64_C(0x8000000000030693),
+	UINT64_C(0x000000002911823c), UINT64_C(0x000000000b0002e2), UINT64_C(0x000000000a008301), UINT64_C(0x000000000b000304),
+	UINT64_C(0x000000000b000283), UINT64_C(0x000000002a13c281), 0, UINT64_C(0x000000000b00028f),
+	UINT64_C(0x8000000000030136), UINT64_C(0x80000000000306a6), UINT64_C(0x8000000000030156), UINT64_C(0x80000000000306b6),
+	0, 0, 0, UINT64_C(0x000000000b000652),
+	0, 0, 0, UINT64_C(0x800000000002017a),
+	0, 0, 0, 0,
+	UINT64_C(0x000000001614c2fe), UINT64_C(0x000000001614c2fd), UINT64_C(0x000000001614c2fc), UINT64_C(0x000000001614c2d0),
+	UINT64_C(0x000000002a13c270), UINT64_C(0x000000002a13c26c), UINT64_C(0x000000002a13c3f6), UINT64_C(0x000000002a13c3f2),
+	UINT64_C(0x000000004e0e817e), UINT64_C(0x000000002e1502bc), 0, UINT64_C(0x000000001614c2bb),
+	UINT64_C(0x000000000b000271), UINT64_C(0x000000000b00026d), UINT64_C(0x000000000b0003f7), UINT64_C(0x000000000b0003f3),
+	UINT64_C(0x000000000b0002f7), UINT64_C(0x000000000b000282), UINT64_C(0x000000000b000487), UINT64_C(0x000000000b000488),
+	UINT64_C(0x000000000b000249), UINT64_C(0x000000000b00018e), UINT64_C(0x80000000000301d8), UINT64_C(0x80000000000306cd),
+	UINT64_C(0x000000000b000184), UINT64_C(0x000000000b0005a8), UINT64_C(0x000000000b000189), UINT64_C(0x000000000b0005ab),
+	UINT64_C(0x000000000b000185), UINT64_C(0x000000000b0005a9), UINT64_C(0x80000000000301fe), UINT64_C(0x8000000000030815),
+},
+{
+	UINT64_C(0x80000000000306ed), UINT64_C(0x8000000000020825), UINT64_C(0x4885a16b100b02d5), UINT64_C(0x4885a183100b0305),
+	0, UINT64_C(0x000000000b0005d9), UINT64_C(0x000000000b00018b), UINT64_C(0x000000000b0005dd),
+	UINT64_C(0x000000000b000285), UINT64_C(0x000000000b00062d), 0, UINT64_C(0x000000000b00060c),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x8000000000030749), UINT64_C(0x4885a1dc1f0d83c1), 0, 0,
+	UINT64_C(0x400000001f0d83c2), UINT64_C(0x400000001f0d83c3), UINT64_C(0x400000001f0d83c4), UINT64_C(0x5006e1e29f0d83c0),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x000000000b000633), UINT64_C(0x000000000b000485), UINT64_C(0x000000000b000478), UINT64_C(0x000000000b00047c),
+	UINT64_C(0x000000000b0005da), UINT64_C(0x000000000b0005db), 0, UINT64_C(0x000000000b000248),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x440140ef070201dd), UINT64_C(0x440140e6070201cb), UINT64_C(0x440140ce0702019b), UINT64_C(0x440140cb07020195),
+	UINT64_C(0x440140d4070201a7), UINT64_C(0x440140e3070201c5), UINT64_C(0x440140d1070201a1), UINT64_C(0x440140c80702018f),
+	UINT64_C(0x440140f5070201e9), UINT64_C(0x440140ec070201d7), UINT64_C(0x440140f2070201e3), UINT64_C(0x440140e9070201d1),
+	UINT64_C(0x440140dd070201b9), UINT64_C(0x440140da070201b3), UINT64_C(0x440140e0070201bf), UINT64_C(0x440140d7070201ad),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x5d86a310ba034620), UINT64_C(0x5e85e3153c0b8629), 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x000000002e1502cb), UINT64_C(0x000000002e1502c2), UINT64_C(0x000000002e15029c), UINT64_C(0x000000002e150293),
+	UINT64_C(0x000000002e1502a1), UINT64_C(0x000000002e1502bf), UINT64_C(0x000000002e150299), UINT64_C(0x000000002e150296),
+	UINT64_C(0x000000002e1502d2), UINT64_C(0x000000002e1502c8), UINT64_C(0x000000002e1502ce), UINT64_C(0x000000002e1502c5),
+	UINT64_C(0x000000002e1502ad), UINT64_C(0x000000002e1502a4), UINT64_C(0x000000002e1502aa), UINT64_C(0x000000002e1502a7),
+	UINT64_C(0x5788a2a01f0d853f), UINT64_C(0x5788a29d1f0d8539), UINT64_C(0x5788a2961f0d852b), UINT64_C(0x5788a2931f0d8525),
+	UINT64_C(0x5788a2971f0d852d), UINT64_C(0x5788a29c1f0d8537), UINT64_C(0x5788a2951f0d8529), UINT64_C(0x5788a2941f0d8527),
+	UINT64_C(0x5788a2a29f0d8544), UINT64_C(0x5788a29f1f0d853d), UINT64_C(0x5788a2a11f0d8541), UINT64_C(0x5788a29e1f0d853b),
+	UINT64_C(0x5788a29b1f0d8535), UINT64_C(0x5788a2981f0d852f), UINT64_C(0x5788a29a1f0d8533), UINT64_C(0x5788a2991f0d8531),
+	UINT64_C(0x000000000b00043a), UINT64_C(0x000000000b000416), UINT64_C(0x000000000b000221), UINT64_C(0x468660a00301413e),
+	0, UINT64_C(0x420122b183014561), UINT64_C(0x800000000002030a), UINT64_C(0x8000000000020352),
+	UINT64_C(0x000000000b00043d), UINT64_C(0x000000000b000419), UINT64_C(0x000000000b0004c4), UINT64_C(0x420120b203014162),
+	0, UINT64_C(0x420122c583014589), UINT64_C(0x80000000000307f1), UINT64_C(0x4401412b87020254),
+	UINT64_C(0x4607e1100104c21f), UINT64_C(0x4686610c83014218), UINT64_C(0x40000000100b030b), UINT64_C(0x420120ac03014156),
+	UINT64_C(0x40000000100b02e5), UINT64_C(0x40000000100b02eb), UINT64_C(0x5a8e21c3900b0385), UINT64_C(0x4885a1c3100b0384),
+	0, 0, UINT64_C(0x80000000000307bf), UINT64_C(0x420120a60301414a),
+	UINT64_C(0x4885a097900b012e), UINT64_C(0x4885a09a900b0134), UINT64_C(0x5a8e21bb900b0375), UINT64_C(0x4885a1bb100b0374),
+	0, 0, 0, 0,
+	0, 0, 0, UINT64_C(0x8000000000030801),
+	UINT64_C(0x00000000120c013a), UINT64_C(0x00000000120c013a), UINT64_C(0x00000000120c013a), UINT64_C(0x00000000120c013a),
+	UINT64_C(0x00000000120c013a), UINT64_C(0x00000000120c013a), UINT64_C(0x00000000120c013a), UINT64_C(0x00000000120c013a),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, UINT64_C(0x000000000b00060a),
+},
+},
+{
+{
+	UINT64_C(0x4102c0660104c0c8), UINT64_C(0x5f022061ba0340bf), UINT64_C(0x4302e066850540cb), UINT64_C(0x600240623f0400c2),
+	UINT64_C(0x00000000090040c5), UINT64_C(0x000000003802c0bc), 0, 0,
+	UINT64_C(0x4102c1f80104c3ec), UINT64_C(0x5f0221f3ba0343e3), UINT64_C(0x4302e1f8850543ef), UINT64_C(0x600241f43f0403e6),
+	UINT64_C(0x00000000090043e9), UINT64_C(0x000000003802c3e0), 0, 0,
+	UINT64_C(0x4102c0520104c0a0), UINT64_C(0x5f02204dba034097), UINT64_C(0x4302e052850540a3), UINT64_C(0x6002404e3f04009a),
+	UINT64_C(0x000000000900409d), UINT64_C(0x000000003802c094), 0, 0,
+	UINT64_C(0x4102c28f8104c51b), UINT64_C(0x5f02228b3a034512), UINT64_C(0x4302e2900505451e), UINT64_C(0x6002428bbf040515),
+	UINT64_C(0x0000000009004518), UINT64_C(0x000000003802c50f), 0, 0,
+	UINT64_C(0x4102c07a0104c0f0), UINT64_C(0x5f022075ba0340e7), UINT64_C(0x4302e07a850540f3), UINT64_C(0x600240763f0400ea),
+	UINT64_C(0x00000000090040ed), UINT64_C(0x000000003802c0e4), 0, 0,
+	UINT64_C(0x4102c2eb0104c5d2), UINT64_C(0x5f0222e6ba0345c9), UINT64_C(0x4302e2eb850545d5), UINT64_C(0x600242e73f0405cc),
+	UINT64_C(0x00000000090045cf), UINT64_C(0x000000003802c5c6), 0, 0,
+	UINT64_C(0x4102c33a8104c671), UINT64_C(0x5f0223363a034668), UINT64_C(0x4302e33b05054674), UINT64_C(0x60024336bf04066b),
+	UINT64_C(0x000000000900466e), UINT64_C(0x000000003802c665), 0, 0,
+	UINT64_C(0x4607e1088104c20d), UINT64_C(0x5d86a1043a034204), UINT64_C(0x478801090e0f8210), UINT64_C(0x5e85e104bc0b8207),
+	UINT64_C(0x000000000900420a), UINT64_C(0x000000003802c201), 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x000000000b00048f), 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x00000000131d4423), UINT64_C(0x00000000131d4423), UINT64_C(0x00000000131d4423), UINT64_C(0x00000000131d4423),
+	UINT64_C(0x00000000131d4423), UINT64_C(0x00000000131d4423), UINT64_C(0x00000000131d4423), UINT64_C(0x00000000131d4423),
+	UINT64_C(0x00000000131d4404), UINT64_C(0x00000000131d4404), UINT64_C(0x00000000131d4404), UINT64_C(0x00000000131d4404),
+	UINT64_C(0x00000000131d4404), UINT64_C(0x00000000131d4404), UINT64_C(0x00000000131d4404), UINT64_C(0x00000000131d4404),
+	0, 0, 0, UINT64_C(0x608aa1c13c0b837f),
+	0, 0, UINT64_C(0x000000000b000227), 0,
+	UINT64_C(0x000000000a008442), 0, UINT64_C(0x0000000009004422), 0,
+	0, 0, 0, 0,
+	UINT64_C(0x000000001614c2ca), UINT64_C(0x000000001614c2c1), UINT64_C(0x000000001614c29b), UINT64_C(0x000000001614c292),
+	UINT64_C(0x000000001614c2a0), UINT64_C(0x000000001614c2be), UINT64_C(0x000000001614c298), UINT64_C(0x000000001614c295),
+	UINT64_C(0x000000001614c2d1), UINT64_C(0x000000001614c2c7), UINT64_C(0x000000001614c2cd), UINT64_C(0x000000001614c2c4),
+	UINT64_C(0x000000001614c2ac), UINT64_C(0x000000001614c2a3), UINT64_C(0x000000001614c2a9), UINT64_C(0x000000001614c2a6),
+	UINT64_C(0x8000000000030079), UINT64_C(0x800000000003049d), 0, UINT64_C(0x80000000000304ad),
+	UINT64_C(0x4607e2ff0104c5fb), UINT64_C(0x5d86a2fbba0345f4), 0, 0,
+	UINT64_C(0x4607e1b10104c359), UINT64_C(0x5d86a1a8ba034349), UINT64_C(0x478801b20e0f8360), UINT64_C(0x5e85e1a93c0b8350),
+	0, UINT64_C(0x400000003c0b82e0), 0, UINT64_C(0x8000000000030663),
+	UINT64_C(0x000000000b0003a7), UINT64_C(0x00000000470c4647), UINT64_C(0x00000000470c4647), UINT64_C(0x00000000470c4647),
+	UINT64_C(0x00000000470c4647), UINT64_C(0x00000000470c4647), UINT64_C(0x00000000470c4647), UINT64_C(0x00000000470c4647),
+	UINT64_C(0x000000000b000182), UINT64_C(0x000000000b000222), 0, 0,
+	UINT64_C(0x000000000b000437), UINT64_C(0x000000000b000413), UINT64_C(0x000000000b0004c6), UINT64_C(0x000000000b0002d4),
+	UINT64_C(0x0000000022174357), UINT64_C(0x0000000022174345), UINT64_C(0x000000002217435d), UINT64_C(0x000000002217434b),
+	0, 0, 0, 0,
+	UINT64_C(0x00000000090045f8), UINT64_C(0x000000003802c5f1), 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e),
+	UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e),
+	UINT64_C(0x00000000481ac34e), UINT64_C(0x00000000481ac34e), UINT64_C(0x00000000481ac34e), UINT64_C(0x00000000481ac34e),
+	UINT64_C(0x00000000481ac34e), UINT64_C(0x00000000481ac34e), UINT64_C(0x00000000481ac34e), UINT64_C(0x00000000481ac34e),
+	UINT64_C(0x80000000000300e8), UINT64_C(0x80000000000304cc), UINT64_C(0x000000000a00848b), UINT64_C(0x000000000b00048e),
+	0, 0, UINT64_C(0x800000000003010e), UINT64_C(0x80000000000304dc),
+	UINT64_C(0x000000002911823c), UINT64_C(0x000000000b0002e2), UINT64_C(0x0000000028160300), UINT64_C(0x000000000b000303),
+	UINT64_C(0x000000000b000283), UINT64_C(0x000000002a13c281), 0, UINT64_C(0x000000000b000291),
+	UINT64_C(0x8000000000030136), UINT64_C(0x80000000000304ef), UINT64_C(0x8000000000030156), UINT64_C(0x80000000000304ff),
+	0, 0, 0, UINT64_C(0x000000000b000652),
+	0, 0, 0, UINT64_C(0x800000000002017a),
+	0, 0, 0, 0,
+	UINT64_C(0x000000001614c2fe), UINT64_C(0x000000001614c2fd), UINT64_C(0x000000001614c2fc), UINT64_C(0x000000001614c2d0),
+	UINT64_C(0x000000002a13c270), UINT64_C(0x000000002a13c26c), UINT64_C(0x000000002a13c3f6), UINT64_C(0x000000002a13c3f2),
+	UINT64_C(0x000000004e0e817e), UINT64_C(0x000000002e1502bc), 0, UINT64_C(0x000000001614c2bb),
+	UINT64_C(0x000000000b000271), UINT64_C(0x000000000b00026d), UINT64_C(0x000000000b0003f7), UINT64_C(0x000000000b0003f3),
+	UINT64_C(0x000000000b0002f7), UINT64_C(0x000000000b000282), UINT64_C(0x000000000b000487), UINT64_C(0x000000000b000488),
+	UINT64_C(0x000000000b000249), UINT64_C(0x000000000b00018e), UINT64_C(0x80000000000301d8), UINT64_C(0x800000000003050f),
+	UINT64_C(0x000000000b000184), UINT64_C(0x000000000b0005a8), UINT64_C(0x000000000b000189), UINT64_C(0x000000000b0005ab),
+	UINT64_C(0x000000000b000185), UINT64_C(0x000000000b0005a9), UINT64_C(0x80000000000301fe), UINT64_C(0x800000000003086d),
+},
+{
+	UINT64_C(0x800000000003052f), UINT64_C(0x800000000002053f), UINT64_C(0x608aa16d3c0b82d9), UINT64_C(0x608aa1853c0b8309),
+	0, UINT64_C(0x000000000b0005d9), UINT64_C(0x000000000b00018b), UINT64_C(0x000000000b0005de),
+	UINT64_C(0x000000000b000285), UINT64_C(0x000000000b00062d), 0, UINT64_C(0x000000000b00060c),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x8000000000030749), UINT64_C(0x4885a1dc1f0d83c1), 0, 0,
+	UINT64_C(0x400000001f0d83c2), UINT64_C(0x400000001f0d83c3), UINT64_C(0x400000001f0d83c4), UINT64_C(0x5c8721df9f0d83be),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x000000000b000633), UINT64_C(0x000000000b000485), UINT64_C(0x000000000b000478), UINT64_C(0x000000000b00047c),
+	UINT64_C(0x000000000b0005da), UINT64_C(0x000000000b0005dc), 0, UINT64_C(0x000000000b000248),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x600240f13f0401e1), UINT64_C(0x600240e83f0401cf), UINT64_C(0x600240d03f04019f), UINT64_C(0x600240cd3f040199),
+	UINT64_C(0x600240d63f0401ab), UINT64_C(0x600240e53f0401c9), UINT64_C(0x600240d33f0401a5), UINT64_C(0x600240ca3f040193),
+	UINT64_C(0x600240f73f0401ed), UINT64_C(0x600240ee3f0401db), UINT64_C(0x600240f43f0401e7), UINT64_C(0x600240eb3f0401d5),
+	UINT64_C(0x600240df3f0401bd), UINT64_C(0x600240dc3f0401b7), UINT64_C(0x600240e23f0401c3), UINT64_C(0x600240d93f0401b1),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x5d86a310ba034620), UINT64_C(0x5e85e3153c0b8629), 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x000000002e1502cb), UINT64_C(0x000000002e1502c2), UINT64_C(0x000000002e15029c), UINT64_C(0x000000002e150293),
+	UINT64_C(0x000000002e1502a1), UINT64_C(0x000000002e1502bf), UINT64_C(0x000000002e150299), UINT64_C(0x000000002e150296),
+	UINT64_C(0x000000002e1502d2), UINT64_C(0x000000002e1502c8), UINT64_C(0x000000002e1502ce), UINT64_C(0x000000002e1502c5),
+	UINT64_C(0x000000002e1502ad), UINT64_C(0x000000002e1502a4), UINT64_C(0x000000002e1502aa), UINT64_C(0x000000002e1502a7),
+	UINT64_C(0x5788a2a01f0d853f), UINT64_C(0x5788a29d1f0d8539), UINT64_C(0x5788a2961f0d852b), UINT64_C(0x5788a2931f0d8525),
+	UINT64_C(0x5788a2971f0d852d), UINT64_C(0x5788a29c1f0d8537), UINT64_C(0x5788a2951f0d8529), UINT64_C(0x5788a2941f0d8527),
+	UINT64_C(0x5788a2a29f0d8544), UINT64_C(0x5788a29f1f0d853d), UINT64_C(0x5788a2a11f0d8541), UINT64_C(0x5788a29e1f0d853b),
+	UINT64_C(0x5788a29b1f0d8535), UINT64_C(0x5788a2981f0d852f), UINT64_C(0x5788a29a1f0d8533), UINT64_C(0x5788a2991f0d8531),
+	UINT64_C(0x000000000b00043a), UINT64_C(0x000000000b000416), UINT64_C(0x000000000b000221), UINT64_C(0x5d86a0a43a034146),
+	0, UINT64_C(0x5f0222b5ba034569), UINT64_C(0x800000000002030a), UINT64_C(0x8000000000020352),
+	UINT64_C(0x000000000b00043d), UINT64_C(0x000000000b000419), UINT64_C(0x000000000b0004c4), UINT64_C(0x5f0220b63a03416a),
+	0, UINT64_C(0x5f0222c9ba034591), UINT64_C(0x80000000000307f1), UINT64_C(0x60024133bf040264),
+	UINT64_C(0x4607e1100104c21f), UINT64_C(0x5d86a10eba03421c), UINT64_C(0x400000003c0b830d), UINT64_C(0x5f0220b03a03415e),
+	UINT64_C(0x400000003c0b82e7), UINT64_C(0x400000003c0b82ed), UINT64_C(0x658e81c8bc0b838f), UINT64_C(0x660e61c83c0b838e),
+	0, 0, UINT64_C(0x80000000000305d7), UINT64_C(0x5f0220aa3a034152),
+	UINT64_C(0x4885a097900b012e), UINT64_C(0x4885a09a900b0134), UINT64_C(0x658e81c1bc0b8380), UINT64_C(0x660e61c0bc0b837e),
+	0, 0, 0, 0,
+	0, 0, 0, UINT64_C(0x800000000003087d),
+	UINT64_C(0x00000000470c413c), UINT64_C(0x00000000470c413c), UINT64_C(0x00000000470c413c), UINT64_C(0x00000000470c413c),
+	UINT64_C(0x00000000470c413c), UINT64_C(0x00000000470c413c), UINT64_C(0x00000000470c413c), UINT64_C(0x00000000470c413c),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, UINT64_C(0x000000000b00060a),
+},
+},
+{
+{
+	UINT64_C(0x4102c0660104c0c8), UINT64_C(0x42012058830140ad), UINT64_C(0x4302e066850540cb), UINT64_C(0x44014059070200b0),
+	UINT64_C(0x00000000090040c5), UINT64_C(0x000000000a0080aa), UINT64_C(0x000000000b000435), UINT64_C(0x000000000b000411),
+	UINT64_C(0x4102c1f80104c3ec), UINT64_C(0x420121ea830143d1), UINT64_C(0x4302e1f8850543ef), UINT64_C(0x440141eb070203d4),
+	UINT64_C(0x00000000090043e9), UINT64_C(0x000000000a0083ce), UINT64_C(0x000000000b000431), 0,
+	UINT64_C(0x4102c0520104c0a0), UINT64_C(0x4201204483014085), UINT64_C(0x4302e052850540a3), UINT64_C(0x4401404507020088),
+	UINT64_C(0x000000000900409d), UINT64_C(0x000000000a008082), UINT64_C(0x000000000b000440), UINT64_C(0x000000000b00041c),
+	UINT64_C(0x4102c28f8104c51b), UINT64_C(0x4201228203014500), UINT64_C(0x4302e2900505451e), UINT64_C(0x4401428287020503),
+	UINT64_C(0x0000000009004518), UINT64_C(0x000000000a0084fd), UINT64_C(0x000000000b000433), UINT64_C(0x000000000b00040f),
+	UINT64_C(0x4102c07a0104c0f0), UINT64_C(0x4201206c830140d5), UINT64_C(0x4302e07a850540f3), UINT64_C(0x4401406d070200d8),
+	UINT64_C(0x00000000090040ed), UINT64_C(0x000000000a0080d2), 0, UINT64_C(0x000000000b000225),
+	UINT64_C(0x4102c2eb0104c5d2), UINT64_C(0x420122dd830145b7), UINT64_C(0x4302e2eb850545d5), UINT64_C(0x440142de070205ba),
+	UINT64_C(0x00000000090045cf), UINT64_C(0x000000000a0085b4), 0, UINT64_C(0x000000000b000226),
+	UINT64_C(0x4102c33a8104c671), UINT64_C(0x4201232d03014656), UINT64_C(0x4302e33b05054674), UINT64_C(0x4401432d87020659),
+	UINT64_C(0x000000000900466e), UINT64_C(0x000000000a008653), 0, UINT64_C(0x000000000b00007e),
+	UINT64_C(0x4607e1088104c20d), UINT64_C(0x468660fb030141f2), UINT64_C(0x478801090e0f8210), UINT64_C(0x4885a0fb900b01f5),
+	UINT64_C(0x000000000900420a), UINT64_C(0x000000000a0081ef), 0, UINT64_C(0x000000000b000081),
+	UINT64_C(0x00000000120c0274), UINT64_C(0x00000000120c0274), UINT64_C(0x00000000120c0274), UINT64_C(0x00000000120c0274),
+	UINT64_C(0x00000000120c0274), UINT64_C(0x00000000120c0274), UINT64_C(0x00000000120c0274), UINT64_C(0x00000000120c0274),
+	UINT64_C(0x00000000120c022a), UINT64_C(0x00000000120c022a), UINT64_C(0x00000000120c022a), UINT64_C(0x00000000120c022a),
+	UINT64_C(0x00000000120c022a), UINT64_C(0x00000000120c022a), UINT64_C(0x00000000120c022a), UINT64_C(0x00000000120c022a),
+	UINT64_C(0x00000000131d4423), UINT64_C(0x00000000131d4423), UINT64_C(0x00000000131d4423), UINT64_C(0x00000000131d4423),
+	UINT64_C(0x00000000131d4423), UINT64_C(0x00000000131d4423), UINT64_C(0x00000000131d4423), UINT64_C(0x00000000131d4423),
+	UINT64_C(0x00000000131d4404), UINT64_C(0x00000000131d4404), UINT64_C(0x00000000131d4404), UINT64_C(0x00000000131d4404),
+	UINT64_C(0x00000000131d4404), UINT64_C(0x00000000131d4404), UINT64_C(0x00000000131d4404), UINT64_C(0x00000000131d4404),
+	UINT64_C(0x000000000b00042f), UINT64_C(0x000000000b00040d), UINT64_C(0x40000000100b012c), UINT64_C(0x4a83e07d940780fa),
+	0, 0, UINT64_C(0x000000000b000227), 0,
+	UINT64_C(0x000000000a008442), 0, UINT64_C(0x0000000009004422), 0,
+	0, 0, 0, 0,
+	UINT64_C(0x000000001614c2ca), UINT64_C(0x000000001614c2c1), UINT64_C(0x000000001614c29b), UINT64_C(0x000000001614c292),
+	UINT64_C(0x000000001614c2a0), UINT64_C(0x000000001614c2be), UINT64_C(0x000000001614c298), UINT64_C(0x000000001614c295),
+	UINT64_C(0x000000001614c2d1), UINT64_C(0x000000001614c2c7), UINT64_C(0x000000001614c2cd), UINT64_C(0x000000001614c2c4),
+	UINT64_C(0x000000001614c2ac), UINT64_C(0x000000001614c2a3), UINT64_C(0x000000001614c2a9), UINT64_C(0x000000001614c2a6),
+	UINT64_C(0x8000000000030079), UINT64_C(0x800000000003063b), UINT64_C(0x8000000000030099), UINT64_C(0x800000000003064b),
+	UINT64_C(0x4607e2ff0104c5fb), UINT64_C(0x468662f4830145e6), 0, 0,
+	UINT64_C(0x4607e1b10104c359), UINT64_C(0x4686619603014324), UINT64_C(0x478801b20e0f8360), UINT64_C(0x4885a196900b032b),
+	0, UINT64_C(0x40000000100b02dd), 0, UINT64_C(0x8000000000030663),
+	UINT64_C(0x000000000b0003a7), UINT64_C(0x00000000120c0641), UINT64_C(0x00000000120c0641), UINT64_C(0x00000000120c0641),
+	UINT64_C(0x00000000120c0641), UINT64_C(0x00000000120c0641), UINT64_C(0x00000000120c0641), UINT64_C(0x00000000120c0641),
+	UINT64_C(0x000000000b000224), UINT64_C(0x000000000b000181), UINT64_C(0x000000004d11c23d), 0,
+	UINT64_C(0x000000000b000437), UINT64_C(0x000000000b000413), UINT64_C(0x000000000b0004c6), UINT64_C(0x000000000b0002d4),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x00000000090045f8), UINT64_C(0x000000000a0085e3), 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e),
+	UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e),
+	UINT64_C(0x000000002417c329), UINT64_C(0x000000002417c329), UINT64_C(0x000000002417c329), UINT64_C(0x000000002417c329),
+	UINT64_C(0x000000002417c329), UINT64_C(0x000000002417c329), UINT64_C(0x000000002417c329), UINT64_C(0x000000002417c329),
+	UINT64_C(0x80000000000300e8), UINT64_C(0x800000000003067d), UINT64_C(0x000000000a00848b), UINT64_C(0x000000000b00048e),
+	UINT64_C(0x40000000100b02e3), UINT64_C(0x40000000100b02db), UINT64_C(0x800000000003010e), UINT64_C(0x8000000000030693),
+	UINT64_C(0x000000002911823c), UINT64_C(0x000000000b0002e1), UINT64_C(0x000000000a008301), UINT64_C(0x000000000b000304),
+	UINT64_C(0x000000000b000283), UINT64_C(0x000000002a13c281), UINT64_C(0x000000000b000284), UINT64_C(0x000000000b00028f),
+	UINT64_C(0x8000000000030136), UINT64_C(0x80000000000306a6), UINT64_C(0x8000000000030156), UINT64_C(0x80000000000306b6),
+	UINT64_C(0x0000000009004080), UINT64_C(0x000000000900407f), UINT64_C(0x000000000b0004df), UINT64_C(0x000000000b000652),
+	0, 0, 0, UINT64_C(0x800000000002017a),
+	0, 0, 0, 0,
+	UINT64_C(0x000000001614c2fe), UINT64_C(0x000000001614c2fd), UINT64_C(0x000000001614c2fc), 0,
+	UINT64_C(0x000000002a13c270), UINT64_C(0x000000002a13c26c), UINT64_C(0x000000002a13c3f6), UINT64_C(0x000000002a13c3f2),
+	UINT64_C(0x000000004e0e817e), UINT64_C(0x000000002e1502bd), UINT64_C(0x000000004d11c242), UINT64_C(0x000000001614c2bb),
+	UINT64_C(0x000000000b000271), UINT64_C(0x000000000b00026d), UINT64_C(0x000000000b0003f7), UINT64_C(0x000000000b0003f3),
+	UINT64_C(0x000000000b0002f7), UINT64_C(0x000000000b000282), UINT64_C(0x000000000b000487), UINT64_C(0x000000000b000488),
+	UINT64_C(0x000000000b000249), UINT64_C(0x000000000b00018e), UINT64_C(0x80000000000301d8), UINT64_C(0x80000000000306cd),
+	UINT64_C(0x000000000b000184), UINT64_C(0x000000000b0005a8), UINT64_C(0x000000000b000189), UINT64_C(0x000000000b0005ab),
+	UINT64_C(0x000000000b000185), UINT64_C(0x000000000b0005a9), UINT64_C(0x80000000000301fe), UINT64_C(0x80000000000306dd),
+},
+{
+	UINT64_C(0x80000000000306ed), UINT64_C(0x80000000000206fd), UINT64_C(0x4885a16b100b02d5), UINT64_C(0x4885a183100b0305),
+	0, UINT64_C(0x000000000b0005d9), UINT64_C(0x000000000b00018b), UINT64_C(0x000000000b0005dd),
+	UINT64_C(0x000000000b000285), UINT64_C(0x000000000b00062d), 0, UINT64_C(0x000000000b00060c),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x8000000000030280), UINT64_C(0x4885a1dc1f0d83c1), 0, 0,
 	0, UINT64_C(0x400000001f0d83c3), UINT64_C(0x400000001f0d83c4), UINT64_C(0x5006e1e29f0d83c0),
 	0, 0, 0, 0,
 	0, 0, 0, 0,
@@ -1714,24 +2738,24 @@ static const uint64_t x86LegacyDecisions[X86_TERMINAL_ROW_COUNT][2][256] = {
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0,
-	UINT64_C(0x000000002d1502cc), UINT64_C(0x000000002d1502c3), UINT64_C(0x000000002d15029d), UINT64_C(0x000000002d150294),
-	UINT64_C(0x000000002d1502a2), UINT64_C(0x000000002d1502c0), UINT64_C(0x000000002d15029a), UINT64_C(0x000000002d150297),
-	UINT64_C(0x000000002d1502d3), UINT64_C(0x000000002d1502c9), UINT64_C(0x000000002d1502cf), UINT64_C(0x000000002d1502c6),
-	UINT64_C(0x000000002d1502ae), UINT64_C(0x000000002d1502a5), UINT64_C(0x000000002d1502ab), UINT64_C(0x000000002d1502a8),
-	0, UINT64_C(0x5708a29d1f0d8539), UINT64_C(0x5708a2961f0d852b), UINT64_C(0x5708a2931f0d8525),
-	UINT64_C(0x5708a2971f0d852d), UINT64_C(0x5708a29c1f0d8537), UINT64_C(0x5708a2951f0d8529), UINT64_C(0x5708a2941f0d8527),
-	UINT64_C(0x5708a2a29f0d8544), UINT64_C(0x5708a29f1f0d853d), UINT64_C(0x5708a2a11f0d8541), UINT64_C(0x5708a29e1f0d853b),
-	UINT64_C(0x5708a29b1f0d8535), UINT64_C(0x5708a2981f0d852f), UINT64_C(0x5708a29a1f0d8533), UINT64_C(0x5708a2991f0d8531),
+	UINT64_C(0x000000002e1502cc), UINT64_C(0x000000002e1502c3), UINT64_C(0x000000002e15029d), UINT64_C(0x000000002e150294),
+	UINT64_C(0x000000002e1502a2), UINT64_C(0x000000002e1502c0), UINT64_C(0x000000002e15029a), UINT64_C(0x000000002e150297),
+	UINT64_C(0x000000002e1502d3), UINT64_C(0x000000002e1502c9), UINT64_C(0x000000002e1502cf), UINT64_C(0x000000002e1502c6),
+	UINT64_C(0x000000002e1502ae), UINT64_C(0x000000002e1502a5), UINT64_C(0x000000002e1502ab), UINT64_C(0x000000002e1502a8),
+	UINT64_C(0x5788a2a01f0d853f), UINT64_C(0x5788a29d1f0d8539), UINT64_C(0x5788a2961f0d852b), UINT64_C(0x5788a2931f0d8525),
+	UINT64_C(0x5788a2971f0d852d), UINT64_C(0x5788a29c1f0d8537), UINT64_C(0x5788a2951f0d8529), UINT64_C(0x5788a2941f0d8527),
+	UINT64_C(0x5788a2a29f0d8544), UINT64_C(0x5788a29f1f0d853d), UINT64_C(0x5788a2a11f0d8541), UINT64_C(0x5788a29e1f0d853b),
+	UINT64_C(0x5788a29b1f0d8535), UINT64_C(0x5788a2981f0d852f), UINT64_C(0x5788a29a1f0d8533), UINT64_C(0x5788a2991f0d8531),
 	UINT64_C(0x000000000b00043a), UINT64_C(0x000000000b000416), UINT64_C(0x000000000b000221), UINT64_C(0x468660a00301413e),
-	0, UINT64_C(0x420122b183014561), UINT64_C(0x8000000000020303), UINT64_C(0x800000000002034b),
+	0, UINT64_C(0x420122b183014561), UINT64_C(0x800000000002030a), UINT64_C(0x8000000000020352),
 	UINT64_C(0x000000000b00043d), UINT64_C(0x000000000b000419), UINT64_C(0x000000000b0004c4), UINT64_C(0x420120b203014162),
 	0, UINT64_C(0x420122c583014589), 0, UINT64_C(0x4401412b87020254),
 	UINT64_C(0x4607e1100104c21f), UINT64_C(0x4686610c83014218), UINT64_C(0x40000000100b030b), UINT64_C(0x420120ac03014156),
-	UINT64_C(0x40000000100b02e5), UINT64_C(0x40000000100b02eb), UINT64_C(0x5a0e21c3900b0385), UINT64_C(0x4885a1c3100b0384),
-	0, 0, UINT64_C(0x800000000003077b), UINT64_C(0x420120a60301414a),
-	UINT64_C(0x4885a097900b012e), UINT64_C(0x4885a09a900b0134), UINT64_C(0x5a0e21bb900b0375), UINT64_C(0x4885a1bb100b0374),
+	UINT64_C(0x40000000100b02e5), UINT64_C(0x40000000100b02eb), UINT64_C(0x5a8e21c3900b0385), UINT64_C(0x4885a1c3100b0384),
+	0, 0, UINT64_C(0x80000000000307bf), UINT64_C(0x420120a60301414a),
+	UINT64_C(0x4885a097900b012e), UINT64_C(0x4885a09a900b0134), UINT64_C(0x5a8e21bb900b0375), UINT64_C(0x4885a1bb100b0374),
 	0, 0, 0, 0,
-	0, 0, 0, UINT64_C(0x8000000000030795),
+	0, 0, 0, UINT64_C(0x800000000003088d),
 	UINT64_C(0x00000000120c013b), UINT64_C(0x00000000120c013b), UINT64_C(0x00000000120c013b), UINT64_C(0x00000000120c013b),
 	UINT64_C(0x00000000120c013b), UINT64_C(0x00000000120c013b), UINT64_C(0x00000000120c013b), UINT64_C(0x00000000120c013b),
 	0, 0, 0, 0,
@@ -1786,7 +2810,7 @@ static const uint64_t x86LegacyDecisions[X86_TERMINAL_ROW_COUNT][2][256] = {
 	UINT64_C(0x4607e2ff0104c5fb), UINT64_C(0x468662f8030145ed), 0, 0,
 	UINT64_C(0x4607e1b10104c359), UINT64_C(0x468661a003014337), UINT64_C(0x478801b20e0f8360), UINT64_C(0x4885a1a0900b033f),
 	0, UINT64_C(0x40000000100b02de), 0, UINT64_C(0x80000000000300c7),
-	0, UINT64_C(0x00000000120c0644), UINT64_C(0x00000000120c0644), UINT64_C(0x00000000120c0644),
+	UINT64_C(0x000000000b0003a7), UINT64_C(0x00000000120c0644), UINT64_C(0x00000000120c0644), UINT64_C(0x00000000120c0644),
 	UINT64_C(0x00000000120c0644), UINT64_C(0x00000000120c0644), UINT64_C(0x00000000120c0644), UINT64_C(0x00000000120c0644),
 	UINT64_C(0x000000000b000224), UINT64_C(0x000000000b000181), UINT64_C(0x000000002112023f), 0,
 	UINT64_C(0x000000000b000438), UINT64_C(0x000000000b000414), UINT64_C(0x000000000b0004c6), UINT64_C(0x000000000b0002d4),
@@ -1794,35 +2818,35 @@ static const uint64_t x86LegacyDecisions[X86_TERMINAL_ROW_COUNT][2][256] = {
 	0, 0, 0, 0,
 	UINT64_C(0x00000000090045f8), UINT64_C(0x000000000a0085ea), 0, 0,
 	0, 0, 0, 0,
-	UINT64_C(0x00000000221b835e), UINT64_C(0x00000000221b835e), UINT64_C(0x00000000221b835e), UINT64_C(0x00000000221b835e),
-	UINT64_C(0x00000000221b835e), UINT64_C(0x00000000221b835e), UINT64_C(0x00000000221b835e), UINT64_C(0x00000000221b835e),
-	UINT64_C(0x000000002317c33d), UINT64_C(0x000000002317c33d), UINT64_C(0x000000002317c33d), UINT64_C(0x000000002317c33d),
-	UINT64_C(0x000000002317c33d), UINT64_C(0x000000002317c33d), UINT64_C(0x000000002317c33d), UINT64_C(0x000000002317c33d),
-	UINT64_C(0x80000000000300e3), UINT64_C(0x80000000000300f3), UINT64_C(0x0000000027160489), UINT64_C(0x000000000b00048c),
-	UINT64_C(0x40000000100b02e4), UINT64_C(0x40000000100b02dc), UINT64_C(0x8000000000030109), UINT64_C(0x8000000000030119),
-	UINT64_C(0x000000002811823c), UINT64_C(0x000000000b0002e1), UINT64_C(0x00000000271602ff), UINT64_C(0x000000000b000302),
-	UINT64_C(0x000000000b000283), UINT64_C(0x000000002913c281), UINT64_C(0x000000000b000284), UINT64_C(0x000000000b000290),
-	UINT64_C(0x8000000000030131), UINT64_C(0x8000000000030141), UINT64_C(0x8000000000030151), UINT64_C(0x8000000000030161),
+	UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e),
+	UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e),
+	UINT64_C(0x000000002417c33d), UINT64_C(0x000000002417c33d), UINT64_C(0x000000002417c33d), UINT64_C(0x000000002417c33d),
+	UINT64_C(0x000000002417c33d), UINT64_C(0x000000002417c33d), UINT64_C(0x000000002417c33d), UINT64_C(0x000000002417c33d),
+	UINT64_C(0x80000000000300e8), UINT64_C(0x80000000000300f8), UINT64_C(0x0000000028160489), UINT64_C(0x000000000b00048c),
+	UINT64_C(0x40000000100b02e4), UINT64_C(0x40000000100b02dc), UINT64_C(0x800000000003010e), UINT64_C(0x800000000003011e),
+	UINT64_C(0x000000002911823c), UINT64_C(0x000000000b0002e1), UINT64_C(0x00000000281602ff), UINT64_C(0x000000000b000302),
+	UINT64_C(0x000000000b000283), UINT64_C(0x000000002a13c281), UINT64_C(0x000000000b000284), UINT64_C(0x000000000b000290),
+	UINT64_C(0x8000000000030136), UINT64_C(0x8000000000030146), UINT64_C(0x8000000000030156), UINT64_C(0x8000000000030166),
 	UINT64_C(0x0000000009004080), UINT64_C(0x000000000900407f), UINT64_C(0x000000000b0004df), UINT64_C(0x000000000b000652),
-	0, 0, 0, UINT64_C(0x8000000000020175),
+	0, 0, 0, UINT64_C(0x800000000002017a),
 	0, 0, 0, 0,
 	UINT64_C(0x000000001614c2fe), UINT64_C(0x000000001614c2fd), UINT64_C(0x000000001614c2fc), 0,
-	UINT64_C(0x000000002913c270), UINT64_C(0x000000002913c26e), UINT64_C(0x000000002913c3f6), UINT64_C(0x000000002913c3f4),
-	UINT64_C(0x000000002c0e017f), UINT64_C(0x000000002d1502bd), UINT64_C(0x0000000021120244), UINT64_C(0x000000001614c2bb),
+	UINT64_C(0x000000002a13c270), UINT64_C(0x000000002a13c26e), UINT64_C(0x000000002a13c3f6), UINT64_C(0x000000002a13c3f4),
+	UINT64_C(0x000000002d0e017f), UINT64_C(0x000000002e1502bd), UINT64_C(0x0000000021120244), UINT64_C(0x000000001614c2bb),
 	UINT64_C(0x000000000b000271), UINT64_C(0x000000000b00026f), UINT64_C(0x000000000b0003f7), UINT64_C(0x000000000b0003f5),
 	UINT64_C(0x000000000b0002f7), UINT64_C(0x000000000b000282), UINT64_C(0x000000000b000487), UINT64_C(0x000000000b000488),
-	UINT64_C(0x000000000b000249), UINT64_C(0x000000000b00018e), UINT64_C(0x80000000000301d3), UINT64_C(0x80000000000301e3),
+	UINT64_C(0x000000000b000249), UINT64_C(0x000000000b00018e), UINT64_C(0x80000000000301d8), UINT64_C(0x80000000000301e8),
 	UINT64_C(0x000000000b000184), UINT64_C(0x000000000b0005a8), UINT64_C(0x000000000b000189), UINT64_C(0x000000000b0005ab),
-	UINT64_C(0x000000000b000185), UINT64_C(0x000000000b0005a9), UINT64_C(0x80000000000301f9), UINT64_C(0x8000000000030209),
+	UINT64_C(0x000000000b000185), UINT64_C(0x000000000b0005a9), UINT64_C(0x80000000000301fe), UINT64_C(0x800000000003020e),
 },
 {
-	UINT64_C(0x8000000000030219), UINT64_C(0x8000000000020229), UINT64_C(0x4885a16c100b02d7), UINT64_C(0x4885a184100b0307),
+	UINT64_C(0x800000000003021e), UINT64_C(0x800000000002022e), UINT64_C(0x4885a16c100b02d7), UINT64_C(0x4885a184100b0307),
 	0, UINT64_C(0x000000000b0005d9), UINT64_C(0x000000000b00018b), UINT64_C(0x000000000b0005dd),
 	UINT64_C(0x000000000b000285), UINT64_C(0x000000000b00062d), 0, UINT64_C(0x000000000b00060c),
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0,
-	UINT64_C(0x800000000003027b), UINT64_C(0x4885a1dc1f0d83ba), 0, 0,
+	UINT64_C(0x8000000000030280), UINT64_C(0x4885a1dc1f0d83ba), 0, 0,
 	0, UINT64_C(0x400000001f0d83bb), UINT64_C(0x400000001f0d83bc), UINT64_C(0x5006e1de9f0d83b9),
 	0, 0, 0, 0,
 	0, 0, 0, 0,
@@ -1848,24 +2872,24 @@ static const uint64_t x86LegacyDecisions[X86_TERMINAL_ROW_COUNT][2][256] = {
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0,
-	UINT64_C(0x000000002d1502cc), UINT64_C(0x000000002d1502c3), UINT64_C(0x000000002d15029d), UINT64_C(0x000000002d150294),
-	UINT64_C(0x000000002d1502a2), UINT64_C(0x000000002d1502c0), UINT64_C(0x000000002d15029a), UINT64_C(0x000000002d150297),
-	UINT64_C(0x000000002d1502d3), UINT64_C(0x000000002d1502c9), UINT64_C(0x000000002d1502cf), UINT64_C(0x000000002d1502c6),
-	UINT64_C(0x000000002d1502ae), UINT64_C(0x000000002d1502a5), UINT64_C(0x000000002d1502ab), UINT64_C(0x000000002d1502a8),
-	0, UINT64_C(0x5708a29d1f0d8539), UINT64_C(0x5708a2961f0d852b), UINT64_C(0x5708a2931f0d8525),
-	UINT64_C(0x5708a2971f0d852d), UINT64_C(0x5708a29c1f0d8537), UINT64_C(0x5708a2951f0d8529), UINT64_C(0x5708a2941f0d8527),
-	UINT64_C(0x5708a2a29f0d8544), UINT64_C(0x5708a29f1f0d853d), UINT64_C(0x5708a2a11f0d8541), UINT64_C(0x5708a29e1f0d853b),
-	UINT64_C(0x5708a29b1f0d8535), UINT64_C(0x5708a2981f0d852f), UINT64_C(0x5708a29a1f0d8533), UINT64_C(0x5708a2991f0d8531),
+	UINT64_C(0x000000002e1502cc), UINT64_C(0x000000002e1502c3), UINT64_C(0x000000002e15029d), UINT64_C(0x000000002e150294),
+	UINT64_C(0x000000002e1502a2), UINT64_C(0x000000002e1502c0), UINT64_C(0x000000002e15029a), UINT64_C(0x000000002e150297),
+	UINT64_C(0x000000002e1502d3), UINT64_C(0x000000002e1502c9), UINT64_C(0x000000002e1502cf), UINT64_C(0x000000002e1502c6),
+	UINT64_C(0x000000002e1502ae), UINT64_C(0x000000002e1502a5), UINT64_C(0x000000002e1502ab), UINT64_C(0x000000002e1502a8),
+	UINT64_C(0x5788a2a01f0d853f), UINT64_C(0x5788a29d1f0d8539), UINT64_C(0x5788a2961f0d852b), UINT64_C(0x5788a2931f0d8525),
+	UINT64_C(0x5788a2971f0d852d), UINT64_C(0x5788a29c1f0d8537), UINT64_C(0x5788a2951f0d8529), UINT64_C(0x5788a2941f0d8527),
+	UINT64_C(0x5788a2a29f0d8544), UINT64_C(0x5788a29f1f0d853d), UINT64_C(0x5788a2a11f0d8541), UINT64_C(0x5788a29e1f0d853b),
+	UINT64_C(0x5788a29b1f0d8535), UINT64_C(0x5788a2981f0d852f), UINT64_C(0x5788a29a1f0d8533), UINT64_C(0x5788a2991f0d8531),
 	UINT64_C(0x000000000b00043b), UINT64_C(0x000000000b000417), UINT64_C(0x000000000b000221), UINT64_C(0x468660a203014142),
-	0, UINT64_C(0x420122b383014565), UINT64_C(0x8000000000020303), UINT64_C(0x800000000002034b),
+	0, UINT64_C(0x420122b383014565), UINT64_C(0x800000000002030a), UINT64_C(0x8000000000020352),
 	UINT64_C(0x000000000b00043e), UINT64_C(0x000000000b00041a), UINT64_C(0x000000000b0004c4), UINT64_C(0x420120b403014166),
 	0, UINT64_C(0x420122c78301458d), 0, UINT64_C(0x4401412f8702025c),
 	UINT64_C(0x4607e1100104c21f), UINT64_C(0x4686610d8301421a), UINT64_C(0x40000000100b030c), UINT64_C(0x420120ae0301415a),
-	UINT64_C(0x40000000100b02e6), UINT64_C(0x40000000100b02ec), UINT64_C(0x5a0e21c6100b0389), UINT64_C(0x5a8e41c5900b0388),
-	0, 0, UINT64_C(0x80000000000303bc), UINT64_C(0x420120a80301414e),
-	UINT64_C(0x4885a098900b0130), UINT64_C(0x4885a09b900b0136), UINT64_C(0x5a0e21be100b0379), UINT64_C(0x5a8e41bd900b0378),
+	UINT64_C(0x40000000100b02e6), UINT64_C(0x40000000100b02ec), UINT64_C(0x5a8e21c6100b0389), UINT64_C(0x5b0e41c5900b0388),
+	0, 0, UINT64_C(0x80000000000303c3), UINT64_C(0x420120a80301414e),
+	UINT64_C(0x4885a098900b0130), UINT64_C(0x4885a09b900b0136), UINT64_C(0x5a8e21be100b0379), UINT64_C(0x5b0e41bd900b0378),
 	0, 0, 0, 0,
-	0, 0, 0, UINT64_C(0x80000000000303d6),
+	0, 0, 0, UINT64_C(0x80000000000303dd),
 	UINT64_C(0x00000000120c013b), UINT64_C(0x00000000120c013b), UINT64_C(0x00000000120c013b), UINT64_C(0x00000000120c013b),
 	UINT64_C(0x00000000120c013b), UINT64_C(0x00000000120c013b), UINT64_C(0x00000000120c013b), UINT64_C(0x00000000120c013b),
 	0, 0, 0, 0,
@@ -1916,47 +2940,47 @@ static const uint64_t x86LegacyDecisions[X86_TERMINAL_ROW_COUNT][2][256] = {
 	UINT64_C(0x000000001614c2a0), UINT64_C(0x000000001614c2be), UINT64_C(0x000000001614c298), UINT64_C(0x000000001614c295),
 	UINT64_C(0x000000001614c2d1), UINT64_C(0x000000001614c2c7), UINT64_C(0x000000001614c2cd), UINT64_C(0x000000001614c2c4),
 	UINT64_C(0x000000001614c2ac), UINT64_C(0x000000001614c2a3), UINT64_C(0x000000001614c2a9), UINT64_C(0x000000001614c2a6),
-	UINT64_C(0x8000000000030079), UINT64_C(0x800000000003062e), UINT64_C(0x8000000000030099), UINT64_C(0x800000000003063e),
+	UINT64_C(0x8000000000030079), UINT64_C(0x800000000003063b), UINT64_C(0x8000000000030099), UINT64_C(0x800000000003064b),
 	UINT64_C(0x4607e2ff0104c5fb), UINT64_C(0x468662f4830145e6), 0, 0,
 	UINT64_C(0x4607e1b10104c359), UINT64_C(0x4686619603014324), UINT64_C(0x478801b20e0f8360), UINT64_C(0x4885a196900b032b),
-	0, UINT64_C(0x40000000100b02dd), 0, UINT64_C(0x8000000000030656),
-	0, UINT64_C(0x00000000120c0641), UINT64_C(0x00000000120c0641), UINT64_C(0x00000000120c0641),
+	0, UINT64_C(0x40000000100b02dd), 0, UINT64_C(0x8000000000030663),
+	UINT64_C(0x000000000b0003a7), UINT64_C(0x00000000120c0641), UINT64_C(0x00000000120c0641), UINT64_C(0x00000000120c0641),
 	UINT64_C(0x00000000120c0641), UINT64_C(0x00000000120c0641), UINT64_C(0x00000000120c0641), UINT64_C(0x00000000120c0641),
-	UINT64_C(0x000000000b000224), UINT64_C(0x000000000b000181), UINT64_C(0x000000004c11c23d), 0,
+	UINT64_C(0x000000000b000224), UINT64_C(0x000000000b000181), UINT64_C(0x000000004d11c23d), 0,
 	UINT64_C(0x000000000b000437), UINT64_C(0x000000000b000413), UINT64_C(0x000000000b0004c6), UINT64_C(0x000000000b0002d4),
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	UINT64_C(0x00000000090045f8), UINT64_C(0x000000000a0085e3), 0, 0,
 	0, 0, 0, 0,
-	UINT64_C(0x00000000221b835e), UINT64_C(0x00000000221b835e), UINT64_C(0x00000000221b835e), UINT64_C(0x00000000221b835e),
-	UINT64_C(0x00000000221b835e), UINT64_C(0x00000000221b835e), UINT64_C(0x00000000221b835e), UINT64_C(0x00000000221b835e),
-	UINT64_C(0x000000002317c329), UINT64_C(0x000000002317c329), UINT64_C(0x000000002317c329), UINT64_C(0x000000002317c329),
-	UINT64_C(0x000000002317c329), UINT64_C(0x000000002317c329), UINT64_C(0x000000002317c329), UINT64_C(0x000000002317c329),
-	UINT64_C(0x80000000000300e3), UINT64_C(0x800000000003066c), UINT64_C(0x000000000a00848b), UINT64_C(0x000000000b00048e),
-	UINT64_C(0x40000000100b02e3), UINT64_C(0x40000000100b02db), UINT64_C(0x8000000000030109), UINT64_C(0x8000000000030682),
-	UINT64_C(0x000000002811823c), UINT64_C(0x000000000b0002e1), UINT64_C(0x000000000a008301), UINT64_C(0x000000000b000304),
-	UINT64_C(0x000000000b000283), UINT64_C(0x000000002913c281), UINT64_C(0x000000000b000284), UINT64_C(0x000000000b00028f),
-	UINT64_C(0x8000000000030131), UINT64_C(0x8000000000030695), UINT64_C(0x8000000000030151), UINT64_C(0x80000000000306a5),
+	UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e),
+	UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e),
+	UINT64_C(0x000000002417c329), UINT64_C(0x000000002417c329), UINT64_C(0x000000002417c329), UINT64_C(0x000000002417c329),
+	UINT64_C(0x000000002417c329), UINT64_C(0x000000002417c329), UINT64_C(0x000000002417c329), UINT64_C(0x000000002417c329),
+	UINT64_C(0x80000000000300e8), UINT64_C(0x800000000003067d), UINT64_C(0x000000000a00848b), UINT64_C(0x000000000b00048e),
+	UINT64_C(0x40000000100b02e3), UINT64_C(0x40000000100b02db), UINT64_C(0x800000000003010e), UINT64_C(0x8000000000030693),
+	UINT64_C(0x000000002911823c), UINT64_C(0x000000000b0002e1), UINT64_C(0x000000000a008301), UINT64_C(0x000000000b000304),
+	UINT64_C(0x000000000b000283), UINT64_C(0x000000002a13c281), UINT64_C(0x000000000b000284), UINT64_C(0x000000000b00028f),
+	UINT64_C(0x8000000000030136), UINT64_C(0x80000000000306a6), UINT64_C(0x8000000000030156), UINT64_C(0x80000000000306b6),
 	UINT64_C(0x0000000009004080), UINT64_C(0x000000000900407f), UINT64_C(0x000000000b0004df), UINT64_C(0x000000000b000652),
-	0, 0, 0, UINT64_C(0x8000000000020175),
+	0, 0, 0, UINT64_C(0x800000000002017a),
 	0, 0, 0, 0,
 	UINT64_C(0x000000001614c2fe), UINT64_C(0x000000001614c2fd), UINT64_C(0x000000001614c2fc), 0,
-	UINT64_C(0x000000002913c270), UINT64_C(0x000000002913c26c), UINT64_C(0x000000002913c3f6), UINT64_C(0x000000002913c3f2),
-	UINT64_C(0x000000004d0e817e), UINT64_C(0x000000002d1502bd), UINT64_C(0x000000004c11c242), UINT64_C(0x000000001614c2bb),
+	UINT64_C(0x000000002a13c270), UINT64_C(0x000000002a13c26c), UINT64_C(0x000000002a13c3f6), UINT64_C(0x000000002a13c3f2),
+	UINT64_C(0x000000004e0e817e), UINT64_C(0x000000002e1502bd), UINT64_C(0x000000004d11c242), UINT64_C(0x000000001614c2bb),
 	UINT64_C(0x000000000b000271), UINT64_C(0x000000000b00026d), UINT64_C(0x000000000b0003f7), UINT64_C(0x000000000b0003f3),
 	UINT64_C(0x000000000b0002f7), UINT64_C(0x000000000b000282), UINT64_C(0x000000000b000487), UINT64_C(0x000000000b000488),
-	UINT64_C(0x000000000b000249), UINT64_C(0x000000000b00018e), UINT64_C(0x80000000000301d3), UINT64_C(0x80000000000306bb),
+	UINT64_C(0x000000000b000249), UINT64_C(0x000000000b00018e), UINT64_C(0x80000000000301d8), UINT64_C(0x80000000000306cd),
 	UINT64_C(0x000000000b000184), UINT64_C(0x000000000b0005a8), UINT64_C(0x000000000b000189), UINT64_C(0x000000000b0005ab),
-	UINT64_C(0x000000000b000185), UINT64_C(0x000000000b0005a9), UINT64_C(0x80000000000301f9), UINT64_C(0x80000000000306cb),
+	UINT64_C(0x000000000b000185), UINT64_C(0x000000000b0005a9), UINT64_C(0x80000000000301fe), UINT64_C(0x80000000000306dd),
 },
 {
-	UINT64_C(0x80000000000306db), UINT64_C(0x80000000000206eb), UINT64_C(0x4885a16b100b02d5), UINT64_C(0x4885a183100b0305),
+	UINT64_C(0x80000000000306ed), UINT64_C(0x80000000000206fd), UINT64_C(0x4885a16b100b02d5), UINT64_C(0x4885a183100b0305),
 	0, UINT64_C(0x000000000b0005d9), UINT64_C(0x000000000b00018b), UINT64_C(0x000000000b0005dd),
 	UINT64_C(0x000000000b000285), UINT64_C(0x000000000b00062d), 0, UINT64_C(0x000000000b00060c),
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0,
-	UINT64_C(0x800000000003027b), UINT64_C(0x4885a1dc1f0d83c1), 0, 0,
+	UINT64_C(0x8000000000030280), UINT64_C(0x4885a1dc1f0d83c1), 0, 0,
 	0, UINT64_C(0x400000001f0d83c3), UINT64_C(0x400000001f0d83c4), UINT64_C(0x5006e1e29f0d83c0),
 	0, 0, 0, 0,
 	0, 0, 0, 0,
@@ -1980,26 +3004,26 @@ static const uint64_t x86LegacyDecisions[X86_TERMINAL_ROW_COUNT][2][256] = {
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0,
-	UINT64_C(0x5890830fb01c061e), UINT64_C(0x5990a31432148627), 0, 0,
+	UINT64_C(0x5910830fb11c061e), UINT64_C(0x5a10a31433148627), 0, 0,
 	0, 0, 0, 0,
-	UINT64_C(0x000000002d1502cc), UINT64_C(0x000000002d1502c3), UINT64_C(0x000000002d15029d), UINT64_C(0x000000002d150294),
-	UINT64_C(0x000000002d1502a2), UINT64_C(0x000000002d1502c0), UINT64_C(0x000000002d15029a), UINT64_C(0x000000002d150297),
-	UINT64_C(0x000000002d1502d3), UINT64_C(0x000000002d1502c9), UINT64_C(0x000000002d1502cf), UINT64_C(0x000000002d1502c6),
-	UINT64_C(0x000000002d1502ae), UINT64_C(0x000000002d1502a5), UINT64_C(0x000000002d1502ab), UINT64_C(0x000000002d1502a8),
-	0, UINT64_C(0x5708a29d1f0d8539), UINT64_C(0x5708a2961f0d852b), UINT64_C(0x5708a2931f0d8525),
-	UINT64_C(0x5708a2971f0d852d), UINT64_C(0x5708a29c1f0d8537), UINT64_C(0x5708a2951f0d8529), UINT64_C(0x5708a2941f0d8527),
-	UINT64_C(0x5708a2a29f0d8544), UINT64_C(0x5708a29f1f0d853d), UINT64_C(0x5708a2a11f0d8541), UINT64_C(0x5708a29e1f0d853b),
-	UINT64_C(0x5708a29b1f0d8535), UINT64_C(0x5708a2981f0d852f), UINT64_C(0x5708a29a1f0d8533), UINT64_C(0x5708a2991f0d8531),
+	UINT64_C(0x000000002e1502cc), UINT64_C(0x000000002e1502c3), UINT64_C(0x000000002e15029d), UINT64_C(0x000000002e150294),
+	UINT64_C(0x000000002e1502a2), UINT64_C(0x000000002e1502c0), UINT64_C(0x000000002e15029a), UINT64_C(0x000000002e150297),
+	UINT64_C(0x000000002e1502d3), UINT64_C(0x000000002e1502c9), UINT64_C(0x000000002e1502cf), UINT64_C(0x000000002e1502c6),
+	UINT64_C(0x000000002e1502ae), UINT64_C(0x000000002e1502a5), UINT64_C(0x000000002e1502ab), UINT64_C(0x000000002e1502a8),
+	UINT64_C(0x5788a2a01f0d853f), UINT64_C(0x5788a29d1f0d8539), UINT64_C(0x5788a2961f0d852b), UINT64_C(0x5788a2931f0d8525),
+	UINT64_C(0x5788a2971f0d852d), UINT64_C(0x5788a29c1f0d8537), UINT64_C(0x5788a2951f0d8529), UINT64_C(0x5788a2941f0d8527),
+	UINT64_C(0x5788a2a29f0d8544), UINT64_C(0x5788a29f1f0d853d), UINT64_C(0x5788a2a11f0d8541), UINT64_C(0x5788a29e1f0d853b),
+	UINT64_C(0x5788a29b1f0d8535), UINT64_C(0x5788a2981f0d852f), UINT64_C(0x5788a29a1f0d8533), UINT64_C(0x5788a2991f0d8531),
 	UINT64_C(0x000000000b00043a), UINT64_C(0x000000000b000416), UINT64_C(0x000000000b000221), UINT64_C(0x468660a00301413e),
-	0, UINT64_C(0x420122b183014561), UINT64_C(0x8000000000020303), UINT64_C(0x800000000002034b),
+	0, UINT64_C(0x420122b183014561), UINT64_C(0x800000000002030a), UINT64_C(0x8000000000020352),
 	UINT64_C(0x000000000b00043d), UINT64_C(0x000000000b000419), UINT64_C(0x000000000b0004c4), UINT64_C(0x420120b203014162),
 	0, UINT64_C(0x420122c583014589), 0, UINT64_C(0x4401412b87020254),
 	UINT64_C(0x4607e1100104c21f), UINT64_C(0x4686610c83014218), UINT64_C(0x40000000100b030b), UINT64_C(0x420120ac03014156),
-	UINT64_C(0x40000000100b02e5), UINT64_C(0x40000000100b02eb), UINT64_C(0x5a0e21c3900b0385), UINT64_C(0x4885a1c3100b0384),
-	0, 0, UINT64_C(0x800000000003077b), UINT64_C(0x420120a60301414a),
-	UINT64_C(0x4885a097900b012e), UINT64_C(0x4885a09a900b0134), UINT64_C(0x5a0e21bb900b0375), UINT64_C(0x4885a1bb100b0374),
+	UINT64_C(0x40000000100b02e5), UINT64_C(0x40000000100b02eb), UINT64_C(0x5a8e21c3900b0385), UINT64_C(0x4885a1c3100b0384),
+	0, 0, UINT64_C(0x80000000000307bf), UINT64_C(0x420120a60301414a),
+	UINT64_C(0x4885a097900b012e), UINT64_C(0x4885a09a900b0134), UINT64_C(0x5a8e21bb900b0375), UINT64_C(0x4885a1bb100b0374),
 	0, 0, 0, 0,
-	0, 0, 0, UINT64_C(0x8000000000030795),
+	0, 0, 0, UINT64_C(0x800000000003088d),
 	UINT64_C(0x00000000120c013b), UINT64_C(0x00000000120c013b), UINT64_C(0x00000000120c013b), UINT64_C(0x00000000120c013b),
 	UINT64_C(0x00000000120c013b), UINT64_C(0x00000000120c013b), UINT64_C(0x00000000120c013b), UINT64_C(0x00000000120c013b),
 	0, 0, 0, 0,
@@ -2054,7 +3078,7 @@ static const uint64_t x86LegacyDecisions[X86_TERMINAL_ROW_COUNT][2][256] = {
 	UINT64_C(0x4607e2ff0104c5fb), UINT64_C(0x468662f8030145ed), 0, 0,
 	UINT64_C(0x4607e1b10104c359), UINT64_C(0x468661a003014337), UINT64_C(0x478801b20e0f8360), UINT64_C(0x4885a1a0900b033f),
 	0, UINT64_C(0x40000000100b02de), 0, UINT64_C(0x80000000000300c7),
-	0, UINT64_C(0x00000000120c0644), UINT64_C(0x00000000120c0644), UINT64_C(0x00000000120c0644),
+	UINT64_C(0x000000000b0003a7), UINT64_C(0x00000000120c0644), UINT64_C(0x00000000120c0644), UINT64_C(0x00000000120c0644),
 	UINT64_C(0x00000000120c0644), UINT64_C(0x00000000120c0644), UINT64_C(0x00000000120c0644), UINT64_C(0x00000000120c0644),
 	UINT64_C(0x000000000b000224), UINT64_C(0x000000000b000181), UINT64_C(0x000000002112023f), 0,
 	UINT64_C(0x000000000b000438), UINT64_C(0x000000000b000414), UINT64_C(0x000000000b0004c6), UINT64_C(0x000000000b0002d4),
@@ -2062,35 +3086,35 @@ static const uint64_t x86LegacyDecisions[X86_TERMINAL_ROW_COUNT][2][256] = {
 	0, 0, 0, 0,
 	UINT64_C(0x00000000090045f8), UINT64_C(0x000000000a0085ea), 0, 0,
 	0, 0, 0, 0,
-	UINT64_C(0x00000000221b835e), UINT64_C(0x00000000221b835e), UINT64_C(0x00000000221b835e), UINT64_C(0x00000000221b835e),
-	UINT64_C(0x00000000221b835e), UINT64_C(0x00000000221b835e), UINT64_C(0x00000000221b835e), UINT64_C(0x00000000221b835e),
-	UINT64_C(0x000000002317c33d), UINT64_C(0x000000002317c33d), UINT64_C(0x000000002317c33d), UINT64_C(0x000000002317c33d),
-	UINT64_C(0x000000002317c33d), UINT64_C(0x000000002317c33d), UINT64_C(0x000000002317c33d), UINT64_C(0x000000002317c33d),
-	UINT64_C(0x80000000000300e3), UINT64_C(0x80000000000300f3), UINT64_C(0x0000000027160489), UINT64_C(0x000000000b00048c),
-	UINT64_C(0x40000000100b02e4), UINT64_C(0x40000000100b02dc), UINT64_C(0x8000000000030109), UINT64_C(0x8000000000030119),
-	UINT64_C(0x000000002811823c), UINT64_C(0x000000000b0002e1), UINT64_C(0x00000000271602ff), UINT64_C(0x000000000b000302),
-	UINT64_C(0x000000000b000283), UINT64_C(0x000000002913c281), UINT64_C(0x000000000b000284), UINT64_C(0x000000000b000290),
-	UINT64_C(0x8000000000030131), UINT64_C(0x8000000000030141), UINT64_C(0x8000000000030151), UINT64_C(0x8000000000030161),
+	UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e),
+	UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e), UINT64_C(0x00000000231b835e),
+	UINT64_C(0x000000002417c33d), UINT64_C(0x000000002417c33d), UINT64_C(0x000000002417c33d), UINT64_C(0x000000002417c33d),
+	UINT64_C(0x000000002417c33d), UINT64_C(0x000000002417c33d), UINT64_C(0x000000002417c33d), UINT64_C(0x000000002417c33d),
+	UINT64_C(0x80000000000300e8), UINT64_C(0x80000000000300f8), UINT64_C(0x0000000028160489), UINT64_C(0x000000000b00048c),
+	UINT64_C(0x40000000100b02e4), UINT64_C(0x40000000100b02dc), UINT64_C(0x800000000003010e), UINT64_C(0x800000000003011e),
+	UINT64_C(0x000000002911823c), UINT64_C(0x000000000b0002e1), UINT64_C(0x00000000281602ff), UINT64_C(0x000000000b000302),
+	UINT64_C(0x000000000b000283), UINT64_C(0x000000002a13c281), UINT64_C(0x000000000b000284), UINT64_C(0x000000000b000290),
+	UINT64_C(0x8000000000030136), UINT64_C(0x8000000000030146), UINT64_C(0x8000000000030156), UINT64_C(0x8000000000030166),
 	UINT64_C(0x0000000009004080), UINT64_C(0x000000000900407f), UINT64_C(0x000000000b0004df), UINT64_C(0x000000000b000652),
-	0, 0, 0, UINT64_C(0x8000000000020175),
+	0, 0, 0, UINT64_C(0x800000000002017a),
 	0, 0, 0, 0,
 	UINT64_C(0x000000001614c2fe), UINT64_C(0x000000001614c2fd), UINT64_C(0x000000001614c2fc), 0,
-	UINT64_C(0x000000002913c270), UINT64_C(0x000000002913c26e), UINT64_C(0x000000002913c3f6), UINT64_C(0x000000002913c3f4),
-	UINT64_C(0x000000002c0e017f), UINT64_C(0x000000002d1502bd), UINT64_C(0x0000000021120244), UINT64_C(0x000000001614c2bb),
+	UINT64_C(0x000000002a13c270), UINT64_C(0x000000002a13c26e), UINT64_C(0x000000002a13c3f6), UINT64_C(0x000000002a13c3f4),
+	UINT64_C(0x000000002d0e017f), UINT64_C(0x000000002e1502bd), UINT64_C(0x0000000021120244), UINT64_C(0x000000001614c2bb),
 	UINT64_C(0x000000000b000271), UINT64_C(0x000000000b00026f), UINT64_C(0x000000000b0003f7), UINT64_C(0x000000000b0003f5),
 	UINT64_C(0x000000000b0002f7), UINT64_C(0x000000000b000282), UINT64_C(0x000000000b000487), UINT64_C(0x000000000b000488),
-	UINT64_C(0x000000000b000249), UINT64_C(0x000000000b00018e), UINT64_C(0x80000000000301d3), UINT64_C(0x80000000000301e3),
+	UINT64_C(0x000000000b000249), UINT64_C(0x000000000b00018e), UINT64_C(0x80000000000301d8), UINT64_C(0x80000000000301e8),
 	UINT64_C(0x000000000b000184), UINT64_C(0x000000000b0005a8), UINT64_C(0x000000000b000189), UINT64_C(0x000000000b0005ab),
-	UINT64_C(0x000000000b000185), UINT64_C(0x000000000b0005a9), UINT64_C(0x80000000000301f9), UINT64_C(0x8000000000030209),
+	UINT64_C(0x000000000b000185), UINT64_C(0x000000000b0005a9), UINT64_C(0x80000000000301fe), UINT64_C(0x800000000003020e),
 },
 {
-	UINT64_C(0x8000000000030219), UINT64_C(0x8000000000020229), UINT64_C(0x4885a16c100b02d7), UINT64_C(0x4885a184100b0307),
+	UINT64_C(0x800000000003021e), UINT64_C(0x800000000002022e), UINT64_C(0x4885a16c100b02d7), UINT64_C(0x4885a184100b0307),
 	0, UINT64_C(0x000000000b0005d9), UINT64_C(0x000000000b00018b), UINT64_C(0x000000000b0005dd),
 	UINT64_C(0x000000000b000285), UINT64_C(0x000000000b00062d), 0, UINT64_C(0x000000000b00060c),
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0,
-	UINT64_C(0x800000000003027b), UINT64_C(0x4885a1dc1f0d83ba), 0, 0,
+	UINT64_C(0x8000000000030280), UINT64_C(0x4885a1dc1f0d83ba), 0, 0,
 	0, UINT64_C(0x400000001f0d83bb), UINT64_C(0x400000001f0d83bc), UINT64_C(0x5006e1de9f0d83b9),
 	0, 0, 0, 0,
 	0, 0, 0, 0,
@@ -2114,26 +3138,26 @@ static const uint64_t x86LegacyDecisions[X86_TERMINAL_ROW_COUNT][2][256] = {
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0,
-	UINT64_C(0x5890830fb01c061e), UINT64_C(0x5990a31432148627), 0, 0,
+	UINT64_C(0x5910830fb11c061e), UINT64_C(0x5a10a31433148627), 0, 0,
 	0, 0, 0, 0,
-	UINT64_C(0x000000002d1502cc), UINT64_C(0x000000002d1502c3), UINT64_C(0x000000002d15029d), UINT64_C(0x000000002d150294),
-	UINT64_C(0x000000002d1502a2), UINT64_C(0x000000002d1502c0), UINT64_C(0x000000002d15029a), UINT64_C(0x000000002d150297),
-	UINT64_C(0x000000002d1502d3), UINT64_C(0x000000002d1502c9), UINT64_C(0x000000002d1502cf), UINT64_C(0x000000002d1502c6),
-	UINT64_C(0x000000002d1502ae), UINT64_C(0x000000002d1502a5), UINT64_C(0x000000002d1502ab), UINT64_C(0x000000002d1502a8),
-	0, UINT64_C(0x5708a29d1f0d8539), UINT64_C(0x5708a2961f0d852b), UINT64_C(0x5708a2931f0d8525),
-	UINT64_C(0x5708a2971f0d852d), UINT64_C(0x5708a29c1f0d8537), UINT64_C(0x5708a2951f0d8529), UINT64_C(0x5708a2941f0d8527),
-	UINT64_C(0x5708a2a29f0d8544), UINT64_C(0x5708a29f1f0d853d), UINT64_C(0x5708a2a11f0d8541), UINT64_C(0x5708a29e1f0d853b),
-	UINT64_C(0x5708a29b1f0d8535), UINT64_C(0x5708a2981f0d852f), UINT64_C(0x5708a29a1f0d8533), UINT64_C(0x5708a2991f0d8531),
+	UINT64_C(0x000000002e1502cc), UINT64_C(0x000000002e1502c3), UINT64_C(0x000000002e15029d), UINT64_C(0x000000002e150294),
+	UINT64_C(0x000000002e1502a2), UINT64_C(0x000000002e1502c0), UINT64_C(0x000000002e15029a), UINT64_C(0x000000002e150297),
+	UINT64_C(0x000000002e1502d3), UINT64_C(0x000000002e1502c9), UINT64_C(0x000000002e1502cf), UINT64_C(0x000000002e1502c6),
+	UINT64_C(0x000000002e1502ae), UINT64_C(0x000000002e1502a5), UINT64_C(0x000000002e1502ab), UINT64_C(0x000000002e1502a8),
+	UINT64_C(0x5788a2a01f0d853f), UINT64_C(0x5788a29d1f0d8539), UINT64_C(0x5788a2961f0d852b), UINT64_C(0x5788a2931f0d8525),
+	UINT64_C(0x5788a2971f0d852d), UINT64_C(0x5788a29c1f0d8537), UINT64_C(0x5788a2951f0d8529), UINT64_C(0x5788a2941f0d8527),
+	UINT64_C(0x5788a2a29f0d8544), UINT64_C(0x5788a29f1f0d853d), UINT64_C(0x5788a2a11f0d8541), UINT64_C(0x5788a29e1f0d853b),
+	UINT64_C(0x5788a29b1f0d8535), UINT64_C(0x5788a2981f0d852f), UINT64_C(0x5788a29a1f0d8533), UINT64_C(0x5788a2991f0d8531),
 	UINT64_C(0x000000000b00043b), UINT64_C(0x000000000b000417), UINT64_C(0x000000000b000221), UINT64_C(0x468660a203014142),
-	0, UINT64_C(0x420122b383014565), UINT64_C(0x8000000000020303), UINT64_C(0x800000000002034b),
+	0, UINT64_C(0x420122b383014565), UINT64_C(0x800000000002030a), UINT64_C(0x8000000000020352),
 	UINT64_C(0x000000000b00043e), UINT64_C(0x000000000b00041a), UINT64_C(0x000000000b0004c4), UINT64_C(0x420120b403014166),
 	0, UINT64_C(0x420122c78301458d), 0, UINT64_C(0x4401412f8702025c),
 	UINT64_C(0x4607e1100104c21f), UINT64_C(0x4686610d8301421a), UINT64_C(0x40000000100b030c), UINT64_C(0x420120ae0301415a),
-	UINT64_C(0x40000000100b02e6), UINT64_C(0x40000000100b02ec), UINT64_C(0x5a0e21c6100b0389), UINT64_C(0x5a8e41c5900b0388),
-	0, 0, UINT64_C(0x80000000000303bc), UINT64_C(0x420120a80301414e),
-	UINT64_C(0x4885a098900b0130), UINT64_C(0x4885a09b900b0136), UINT64_C(0x5a0e21be100b0379), UINT64_C(0x5a8e41bd900b0378),
+	UINT64_C(0x40000000100b02e6), UINT64_C(0x40000000100b02ec), UINT64_C(0x5a8e21c6100b0389), UINT64_C(0x5b0e41c5900b0388),
+	0, 0, UINT64_C(0x80000000000303c3), UINT64_C(0x420120a80301414e),
+	UINT64_C(0x4885a098900b0130), UINT64_C(0x4885a09b900b0136), UINT64_C(0x5a8e21be100b0379), UINT64_C(0x5b0e41bd900b0378),
 	0, 0, 0, 0,
-	0, 0, 0, UINT64_C(0x80000000000303d6),
+	0, 0, 0, UINT64_C(0x80000000000303dd),
 	UINT64_C(0x00000000120c013b), UINT64_C(0x00000000120c013b), UINT64_C(0x00000000120c013b), UINT64_C(0x00000000120c013b),
 	UINT64_C(0x00000000120c013b), UINT64_C(0x00000000120c013b), UINT64_C(0x00000000120c013b), UINT64_C(0x00000000120c013b),
 	0, 0, 0, 0,
@@ -2504,6 +3528,14 @@ static int readLegacyShape33(struct InternalInstruction *insn)
 }
 static int readLegacyShape34(struct InternalInstruction *insn)
 {
+	if (readMemoryOffset(insn, true))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	return X86_SCAN_RAW_READY;
+}
+static int readLegacyShape35(struct InternalInstruction *insn)
+{
 	if (readOpcodeRegister(insn, 1) ||
 	    readImmediate(insn, 1))
 		return X86_SCAN_INVALID;
@@ -2511,7 +3543,7 @@ static int readLegacyShape34(struct InternalInstruction *insn)
 		return X86_SCAN_INVALID;
 	return X86_SCAN_RAW_READY;
 }
-static int readLegacyShape35(struct InternalInstruction *insn)
+static int readLegacyShape36(struct InternalInstruction *insn)
 {
 	if (readOpcodeRegister(insn, 0) ||
 	    readImmediate(insn, insn->immediateSize))
@@ -2520,20 +3552,10 @@ static int readLegacyShape35(struct InternalInstruction *insn)
 		return X86_SCAN_INVALID;
 	return X86_SCAN_RAW_READY;
 }
-static int readLegacyShape36(struct InternalInstruction *insn)
-{
-	if ((!insn->consumedModRM && readModRM(insn)) ||
-	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
-	    readImmediate(insn, 1))
-		return X86_SCAN_INVALID;
-	if (finishDecodedInstruction(insn, false))
-		return X86_SCAN_INVALID;
-	return X86_SCAN_RAW_READY;
-}
 static int readLegacyShape37(struct InternalInstruction *insn)
 {
 	if ((!insn->consumedModRM && readModRM(insn)) ||
-	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM) ||
+	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
 	    readImmediate(insn, 1))
 		return X86_SCAN_INVALID;
 	if (finishDecodedInstruction(insn, false))
@@ -2543,7 +3565,7 @@ static int readLegacyShape37(struct InternalInstruction *insn)
 static int readLegacyShape38(struct InternalInstruction *insn)
 {
 	if ((!insn->consumedModRM && readModRM(insn)) ||
-	    fixupRMOperand(insn, TYPE_Rv, ENCODING_RM) ||
+	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM) ||
 	    readImmediate(insn, 1))
 		return X86_SCAN_INVALID;
 	if (finishDecodedInstruction(insn, false))
@@ -2552,7 +3574,9 @@ static int readLegacyShape38(struct InternalInstruction *insn)
 }
 static int readLegacyShape39(struct InternalInstruction *insn)
 {
-	if (readImmediate(insn, 2))
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_Rv, ENCODING_RM) ||
+	    readImmediate(insn, 1))
 		return X86_SCAN_INVALID;
 	if (finishDecodedInstruction(insn, false))
 		return X86_SCAN_INVALID;
@@ -2560,13 +3584,21 @@ static int readLegacyShape39(struct InternalInstruction *insn)
 }
 static int readLegacyShape40(struct InternalInstruction *insn)
 {
-	if (readImmediate(insn, insn->immediateSize))
+	if (readImmediate(insn, 2))
 		return X86_SCAN_INVALID;
 	if (finishDecodedInstruction(insn, false))
 		return X86_SCAN_INVALID;
 	return X86_SCAN_RAW_READY;
 }
 static int readLegacyShape41(struct InternalInstruction *insn)
+{
+	if (readImmediate(insn, insn->immediateSize))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	return X86_SCAN_RAW_READY;
+}
+static int readLegacyShape42(struct InternalInstruction *insn)
 {
 	if (readImmediate(insn, 2) ||
 	    readImmediate(insn, 1))
@@ -2575,18 +3607,9 @@ static int readLegacyShape41(struct InternalInstruction *insn)
 		return X86_SCAN_INVALID;
 	return X86_SCAN_RAW_READY;
 }
-static int readLegacyShape42(struct InternalInstruction *insn)
-{
-	if (readImmediate(insn, 1))
-		return X86_SCAN_INVALID;
-	if (finishDecodedInstruction(insn, false))
-		return X86_SCAN_INVALID;
-	return X86_SCAN_RAW_READY;
-}
 static int readLegacyShape43(struct InternalInstruction *insn)
 {
-	if ((!insn->consumedModRM && readModRM(insn)) ||
-	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM))
+	if (readImmediate(insn, 1))
 		return X86_SCAN_INVALID;
 	if (finishDecodedInstruction(insn, false))
 		return X86_SCAN_INVALID;
@@ -2595,7 +3618,7 @@ static int readLegacyShape43(struct InternalInstruction *insn)
 static int readLegacyShape44(struct InternalInstruction *insn)
 {
 	if ((!insn->consumedModRM && readModRM(insn)) ||
-	    fixupRMOperand(insn, TYPE_Rv, ENCODING_RM))
+	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM))
 		return X86_SCAN_INVALID;
 	if (finishDecodedInstruction(insn, false))
 		return X86_SCAN_INVALID;
@@ -2603,7 +3626,8 @@ static int readLegacyShape44(struct InternalInstruction *insn)
 }
 static int readLegacyShape45(struct InternalInstruction *insn)
 {
-	if (readImmediate(insn, 4))
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_Rv, ENCODING_RM))
 		return X86_SCAN_INVALID;
 	if (finishDecodedInstruction(insn, false))
 		return X86_SCAN_INVALID;
@@ -2611,8 +3635,7 @@ static int readLegacyShape45(struct InternalInstruction *insn)
 }
 static int readLegacyShape46(struct InternalInstruction *insn)
 {
-	if ((!insn->consumedModRM && readModRM(insn)) ||
-	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM))
+	if (readImmediate(insn, 4))
 		return X86_SCAN_INVALID;
 	if (finishDecodedInstruction(insn, false))
 		return X86_SCAN_INVALID;
@@ -2621,7 +3644,7 @@ static int readLegacyShape46(struct InternalInstruction *insn)
 static int readLegacyShape47(struct InternalInstruction *insn)
 {
 	if ((!insn->consumedModRM && readModRM(insn)) ||
-	    fixupRMOperand(insn, TYPE_R16, ENCODING_RM))
+	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM))
 		return X86_SCAN_INVALID;
 	if (finishDecodedInstruction(insn, false))
 		return X86_SCAN_INVALID;
@@ -2630,8 +3653,7 @@ static int readLegacyShape47(struct InternalInstruction *insn)
 static int readLegacyShape48(struct InternalInstruction *insn)
 {
 	if ((!insn->consumedModRM && readModRM(insn)) ||
-	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
-	    fixupRegisterOperand(insn, TYPE_R32))
+	    fixupRMOperand(insn, TYPE_R16, ENCODING_RM))
 		return X86_SCAN_INVALID;
 	if (finishDecodedInstruction(insn, false))
 		return X86_SCAN_INVALID;
@@ -2640,7 +3662,7 @@ static int readLegacyShape48(struct InternalInstruction *insn)
 static int readLegacyShape49(struct InternalInstruction *insn)
 {
 	if ((!insn->consumedModRM && readModRM(insn)) ||
-	    fixupRMOperand(insn, TYPE_R32, ENCODING_RM) ||
+	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
 	    fixupRegisterOperand(insn, TYPE_R32))
 		return X86_SCAN_INVALID;
 	if (finishDecodedInstruction(insn, false))
@@ -2650,8 +3672,8 @@ static int readLegacyShape49(struct InternalInstruction *insn)
 static int readLegacyShape50(struct InternalInstruction *insn)
 {
 	if ((!insn->consumedModRM && readModRM(insn)) ||
-	    fixupRegisterOperand(insn, TYPE_R32) ||
-	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
+	    fixupRMOperand(insn, TYPE_R32, ENCODING_RM) ||
+	    fixupRegisterOperand(insn, TYPE_R32))
 		return X86_SCAN_INVALID;
 	if (finishDecodedInstruction(insn, false))
 		return X86_SCAN_INVALID;
@@ -2661,7 +3683,7 @@ static int readLegacyShape51(struct InternalInstruction *insn)
 {
 	if ((!insn->consumedModRM && readModRM(insn)) ||
 	    fixupRegisterOperand(insn, TYPE_R32) ||
-	    fixupRMOperand(insn, TYPE_R32, ENCODING_RM))
+	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
 		return X86_SCAN_INVALID;
 	if (finishDecodedInstruction(insn, false))
 		return X86_SCAN_INVALID;
@@ -2670,8 +3692,8 @@ static int readLegacyShape51(struct InternalInstruction *insn)
 static int readLegacyShape52(struct InternalInstruction *insn)
 {
 	if ((!insn->consumedModRM && readModRM(insn)) ||
-	    fixupRegisterOperand(insn, TYPE_Rv) ||
-	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM))
+	    fixupRegisterOperand(insn, TYPE_R32) ||
+	    fixupRMOperand(insn, TYPE_R32, ENCODING_RM))
 		return X86_SCAN_INVALID;
 	if (finishDecodedInstruction(insn, false))
 		return X86_SCAN_INVALID;
@@ -2681,7 +3703,7 @@ static int readLegacyShape53(struct InternalInstruction *insn)
 {
 	if ((!insn->consumedModRM && readModRM(insn)) ||
 	    fixupRegisterOperand(insn, TYPE_Rv) ||
-	    fixupRMOperand(insn, TYPE_R16, ENCODING_RM))
+	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM))
 		return X86_SCAN_INVALID;
 	if (finishDecodedInstruction(insn, false))
 		return X86_SCAN_INVALID;
@@ -2689,7 +3711,9 @@ static int readLegacyShape53(struct InternalInstruction *insn)
 }
 static int readLegacyShape54(struct InternalInstruction *insn)
 {
-	if (readOpcodeRegister(insn, 8))
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRegisterOperand(insn, TYPE_Rv) ||
+	    fixupRMOperand(insn, TYPE_R16, ENCODING_RM))
 		return X86_SCAN_INVALID;
 	if (finishDecodedInstruction(insn, false))
 		return X86_SCAN_INVALID;
@@ -2697,7 +3721,7 @@ static int readLegacyShape54(struct InternalInstruction *insn)
 }
 static int readLegacyShape55(struct InternalInstruction *insn)
 {
-	if (readImmediate(insn, 4))
+	if (readOpcodeRegister(insn, 8))
 		return X86_SCAN_INVALID;
 	if (finishDecodedInstruction(insn, false))
 		return X86_SCAN_INVALID;
@@ -2705,8 +3729,7 @@ static int readLegacyShape55(struct InternalInstruction *insn)
 }
 static int readLegacyShape56(struct InternalInstruction *insn)
 {
-	if ((!insn->consumedModRM && readModRM(insn)) ||
-	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM))
+	if (readImmediate(insn, 4))
 		return X86_SCAN_INVALID;
 	if (finishDecodedInstruction(insn, false))
 		return X86_SCAN_INVALID;
@@ -2715,8 +3738,7 @@ static int readLegacyShape56(struct InternalInstruction *insn)
 static int readLegacyShape57(struct InternalInstruction *insn)
 {
 	if ((!insn->consumedModRM && readModRM(insn)) ||
-	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
-	    fixupRegisterOperand(insn, TYPE_R64))
+	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM))
 		return X86_SCAN_INVALID;
 	if (finishDecodedInstruction(insn, false))
 		return X86_SCAN_INVALID;
@@ -2725,7 +3747,7 @@ static int readLegacyShape57(struct InternalInstruction *insn)
 static int readLegacyShape58(struct InternalInstruction *insn)
 {
 	if ((!insn->consumedModRM && readModRM(insn)) ||
-	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM) ||
+	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
 	    fixupRegisterOperand(insn, TYPE_R64))
 		return X86_SCAN_INVALID;
 	if (finishDecodedInstruction(insn, false))
@@ -2735,8 +3757,8 @@ static int readLegacyShape58(struct InternalInstruction *insn)
 static int readLegacyShape59(struct InternalInstruction *insn)
 {
 	if ((!insn->consumedModRM && readModRM(insn)) ||
-	    fixupRegisterOperand(insn, TYPE_R64) ||
-	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
+	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM) ||
+	    fixupRegisterOperand(insn, TYPE_R64))
 		return X86_SCAN_INVALID;
 	if (finishDecodedInstruction(insn, false))
 		return X86_SCAN_INVALID;
@@ -2746,13 +3768,23 @@ static int readLegacyShape60(struct InternalInstruction *insn)
 {
 	if ((!insn->consumedModRM && readModRM(insn)) ||
 	    fixupRegisterOperand(insn, TYPE_R64) ||
-	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM))
+	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
 		return X86_SCAN_INVALID;
 	if (finishDecodedInstruction(insn, false))
 		return X86_SCAN_INVALID;
 	return X86_SCAN_RAW_READY;
 }
 static int readLegacyShape61(struct InternalInstruction *insn)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRegisterOperand(insn, TYPE_R64) ||
+	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	return X86_SCAN_RAW_READY;
+}
+static int readLegacyShape62(struct InternalInstruction *insn)
 {
 	if ((!insn->consumedModRM && readModRM(insn)) ||
 	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM) ||
@@ -2762,7 +3794,7 @@ static int readLegacyShape61(struct InternalInstruction *insn)
 		return X86_SCAN_INVALID;
 	return X86_SCAN_RAW_READY;
 }
-static int readLegacyShape62(struct InternalInstruction *insn)
+static int readLegacyShape63(struct InternalInstruction *insn)
 {
 	if ((!insn->consumedModRM && readModRM(insn)) ||
 	    fixupRegisterOperand(insn, TYPE_R64) ||
@@ -2772,7 +3804,7 @@ static int readLegacyShape62(struct InternalInstruction *insn)
 		return X86_SCAN_INVALID;
 	return X86_SCAN_RAW_READY;
 }
-static int readLegacyShape63(struct InternalInstruction *insn)
+static int readLegacyShape64(struct InternalInstruction *insn)
 {
 	if ((!insn->consumedModRM && readModRM(insn)) ||
 	    fixupRegisterOperand(insn, TYPE_R64) ||
@@ -2782,7 +3814,7 @@ static int readLegacyShape63(struct InternalInstruction *insn)
 		return X86_SCAN_INVALID;
 	return X86_SCAN_RAW_READY;
 }
-static int readLegacyShape64(struct InternalInstruction *insn)
+static int readLegacyShape65(struct InternalInstruction *insn)
 {
 	if ((!insn->consumedModRM && readModRM(insn)) ||
 	    fixupRegisterOperand(insn, TYPE_R64) ||
@@ -2792,20 +3824,10 @@ static int readLegacyShape64(struct InternalInstruction *insn)
 		return X86_SCAN_INVALID;
 	return X86_SCAN_RAW_READY;
 }
-static int readLegacyShape65(struct InternalInstruction *insn)
-{
-	if ((!insn->consumedModRM && readModRM(insn)) ||
-	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
-	    readImmediate(insn, 4))
-		return X86_SCAN_INVALID;
-	if (finishDecodedInstruction(insn, false))
-		return X86_SCAN_INVALID;
-	return X86_SCAN_RAW_READY;
-}
 static int readLegacyShape66(struct InternalInstruction *insn)
 {
 	if ((!insn->consumedModRM && readModRM(insn)) ||
-	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM) ||
+	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
 	    readImmediate(insn, 4))
 		return X86_SCAN_INVALID;
 	if (finishDecodedInstruction(insn, false))
@@ -2826,7 +3848,7 @@ static int readLegacyShape68(struct InternalInstruction *insn)
 {
 	if ((!insn->consumedModRM && readModRM(insn)) ||
 	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM) ||
-	    readImmediate(insn, 1))
+	    readImmediate(insn, 4))
 		return X86_SCAN_INVALID;
 	if (finishDecodedInstruction(insn, false))
 		return X86_SCAN_INVALID;
@@ -2844,13 +3866,23 @@ static int readLegacyShape69(struct InternalInstruction *insn)
 }
 static int readLegacyShape70(struct InternalInstruction *insn)
 {
-	if (readOpcodeRegister(insn, 8))
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM) ||
+	    readImmediate(insn, 1))
 		return X86_SCAN_INVALID;
 	if (finishDecodedInstruction(insn, false))
 		return X86_SCAN_INVALID;
 	return X86_SCAN_RAW_READY;
 }
 static int readLegacyShape71(struct InternalInstruction *insn)
+{
+	if (readOpcodeRegister(insn, 8))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	return X86_SCAN_RAW_READY;
+}
+static int readLegacyShape72(struct InternalInstruction *insn)
 {
 	if (readOpcodeRegister(insn, 8) ||
 	    readImmediate(insn, 8))
@@ -2859,7 +3891,7 @@ static int readLegacyShape71(struct InternalInstruction *insn)
 		return X86_SCAN_INVALID;
 	return X86_SCAN_RAW_READY;
 }
-static int readLegacyShape72(struct InternalInstruction *insn)
+static int readLegacyShape73(struct InternalInstruction *insn)
 {
 	if ((!insn->consumedModRM && readModRM(insn)) ||
 	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM) ||
@@ -2869,20 +3901,10 @@ static int readLegacyShape72(struct InternalInstruction *insn)
 		return X86_SCAN_INVALID;
 	return X86_SCAN_RAW_READY;
 }
-static int readLegacyShape73(struct InternalInstruction *insn)
-{
-	if ((!insn->consumedModRM && readModRM(insn)) ||
-	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM))
-		return X86_SCAN_INVALID;
-	if (finishDecodedInstruction(insn, false))
-		return X86_SCAN_INVALID;
-	return X86_SCAN_RAW_READY;
-}
 static int readLegacyShape74(struct InternalInstruction *insn)
 {
 	if ((!insn->consumedModRM && readModRM(insn)) ||
-	    fixupRegisterOperand(insn, TYPE_R64) ||
-	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM))
+	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM))
 		return X86_SCAN_INVALID;
 	if (finishDecodedInstruction(insn, false))
 		return X86_SCAN_INVALID;
@@ -2892,13 +3914,23 @@ static int readLegacyShape75(struct InternalInstruction *insn)
 {
 	if ((!insn->consumedModRM && readModRM(insn)) ||
 	    fixupRegisterOperand(insn, TYPE_R64) ||
-	    fixupRMOperand(insn, TYPE_R16, ENCODING_RM))
+	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM))
 		return X86_SCAN_INVALID;
 	if (finishDecodedInstruction(insn, false))
 		return X86_SCAN_INVALID;
 	return X86_SCAN_RAW_READY;
 }
 static int readLegacyShape76(struct InternalInstruction *insn)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRegisterOperand(insn, TYPE_R64) ||
+	    fixupRMOperand(insn, TYPE_R16, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	return X86_SCAN_RAW_READY;
+}
+static int readLegacyShape77(struct InternalInstruction *insn)
 {
 	if (readImmediate(insn, insn->immediateSize) ||
 	    readImmediate(insn, insn->immediateSize))
@@ -2907,9 +3939,38 @@ static int readLegacyShape76(struct InternalInstruction *insn)
 		return X86_SCAN_INVALID;
 	return X86_SCAN_RAW_READY;
 }
-static int readLegacyShape77(struct InternalInstruction *insn)
+static int readLegacyShape78(struct InternalInstruction *insn)
 {
 	if (readImmediate(insn, 2))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	return X86_SCAN_RAW_READY;
+}
+static int readLegacyShape79(struct InternalInstruction *insn)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_R32, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	return X86_SCAN_RAW_READY;
+}
+static int readLegacyShape80(struct InternalInstruction *insn)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRegisterOperand(insn, TYPE_R16) ||
+	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	return X86_SCAN_RAW_READY;
+}
+static int readLegacyShape81(struct InternalInstruction *insn)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRegisterOperand(insn, TYPE_R16) ||
+	    fixupRMOperand(insn, TYPE_R32, ENCODING_RM))
 		return X86_SCAN_INVALID;
 	if (finishDecodedInstruction(insn, false))
 		return X86_SCAN_INVALID;
@@ -2937,9 +3998,8 @@ X86_DECODE_INLINE int scanLegacyOperands(struct InternalInstruction *insn,
 	case 21:
 	case 31:
 	case 32:
-	case 43:
 	case 44:
-	case 46:
+	case 45:
 	case 47:
 	case 48:
 	case 49:
@@ -2947,7 +4007,7 @@ X86_DECODE_INLINE int scanLegacyOperands(struct InternalInstruction *insn,
 	case 51:
 	case 52:
 	case 53:
-	case 56:
+	case 54:
 	case 57:
 	case 58:
 	case 59:
@@ -2956,42 +4016,46 @@ X86_DECODE_INLINE int scanLegacyOperands(struct InternalInstruction *insn,
 	case 62:
 	case 63:
 	case 64:
-	case 73:
+	case 65:
 	case 74:
 	case 75:
+	case 76:
+	case 79:
+	case 80:
+	case 81:
 		if ((!insn->consumedModRM && readModRMScan(insn)))
 			return X86_SCAN_INVALID;
 		break;
 	case 9:
 	case 22:
-	case 34:
-	case 42:
+	case 35:
+	case 43:
 		if (readImmediateImpl(insn, 1, false))
 			return X86_SCAN_INVALID;
 		break;
 	case 10:
-	case 35:
-	case 40:
+	case 36:
+	case 41:
 		if (readImmediateImpl(insn, insn->immediateSize, false))
 			return X86_SCAN_INVALID;
 		break;
 	case 11:
 	case 18:
 	case 19:
-	case 54:
-	case 70:
+	case 55:
+	case 71:
 		break;
 	case 23:
 	case 24:
 	case 25:
 	case 29:
 	case 30:
-	case 36:
 	case 37:
 	case 38:
-	case 68:
+	case 39:
 	case 69:
-	case 72:
+	case 70:
+	case 73:
 		if ((!insn->consumedModRM && readModRMScan(insn)) ||
 		    readImmediateImpl(insn, 1, false))
 			return X86_SCAN_INVALID;
@@ -3008,33 +4072,37 @@ X86_DECODE_INLINE int scanLegacyOperands(struct InternalInstruction *insn,
 		    readImmediateImpl(insn, 2, false))
 			return X86_SCAN_INVALID;
 		break;
-	case 39:
-	case 77:
+	case 34:
+		if (readMemoryOffset(insn, false))
+			return X86_SCAN_INVALID;
+		break;
+	case 40:
+	case 78:
 		if (readImmediateImpl(insn, 2, false))
 			return X86_SCAN_INVALID;
 		break;
-	case 41:
+	case 42:
 		if (readImmediateImpl(insn, 2, false) ||
 		    readImmediateImpl(insn, 1, false))
 			return X86_SCAN_INVALID;
 		break;
-	case 45:
-	case 55:
+	case 46:
+	case 56:
 		if (readImmediateImpl(insn, 4, false))
 			return X86_SCAN_INVALID;
 		break;
-	case 65:
 	case 66:
 	case 67:
+	case 68:
 		if ((!insn->consumedModRM && readModRMScan(insn)) ||
 		    readImmediateImpl(insn, 4, false))
 			return X86_SCAN_INVALID;
 		break;
-	case 71:
+	case 72:
 		if (readImmediateImpl(insn, 8, false))
 			return X86_SCAN_INVALID;
 		break;
-	case 76:
+	case 77:
 		if (readImmediateImpl(insn, insn->immediateSize, false) ||
 		    readImmediateImpl(insn, insn->immediateSize, false))
 			return X86_SCAN_INVALID;
@@ -3129,9 +4197,13 @@ static int (*const x86LegacyHandlers[])(struct InternalInstruction *) = {
 	readLegacyShape75,
 	readLegacyShape76,
 	readLegacyShape77,
+	readLegacyShape78,
+	readLegacyShape79,
+	readLegacyShape80,
+	readLegacyShape81,
 };
 
-/* 2244 terminals, 77 operand handlers; selected opcodes [215, 114, 177, 114, 177, 114, 214, 111, 214, 111, 214, 112, 214, 112]. */
+/* 2764 terminals, 81 operand handlers; selected opcodes [220, 115, 182, 115, 182, 115, 220, 111, 220, 115, 220, 113, 182, 111, 181, 115, 181, 113, 182, 113, 215, 112, 215, 112, 215, 113, 215, 113]. */
 #define X86_TERMINAL_INDEXED UINT64_C(0x8000000000000000)
 #define X86_TERMINAL_SPLIT UINT64_C(0x4000000000000000)
 #define X86_TERMINAL_MASK UINT64_C(0x7fffffff)
@@ -3167,259 +4239,324 @@ static const uint32_t x86LegacyTerminals[] = {
 	0x1e108291u, 0x0104cb17u, 0x0c138b1au, 0x03014b09u, 0x0d10cb0cu, 0x0104c648u, 0x0c138651u, 0x03014622u,
 	0x0d10c62bu, 0x0e13464fu, 0x0f13c653u, 0x100f062au, 0x110f462cu, 0x100f04e0u, 0x00000000u, 0x1f070840u,
 	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x20118841u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x12103b6au,
-	0x0b000326u, 0x0b0001f0u, 0x21190380u, 0x0b003b4eu, 0x0b0008cdu, 0x0b000852u, 0x0b000975u, 0x0b0004c2u,
-	0x09004b14u, 0x0a008b06u, 0x222a064du, 0x23264628u, 0x242ec941u, 0x242ec959u, 0x242ec8efu, 0x242ec90du,
-	0x242eca1bu, 0x242eca43u, 0x1701098au, 0x242ec9a3u, 0x252f8944u, 0x252f895cu, 0x252f88f2u, 0x252f8910u,
-	0x252f8a1eu, 0x252f8a46u, 0x1805098du, 0x252f89a6u, 0x242ec935u, 0x242ec94du, 0x242ec8e3u, 0x242ec901u,
-	0x242eca0fu, 0x242eca37u, 0x1701097eu, 0x242ec997u, 0x262f0938u, 0x262f0950u, 0x262f08e6u, 0x262f0904u,
-	0x262f0a12u, 0x262f0a3au, 0x1d01c981u, 0x262f099au, 0x271f4926u, 0x0b000929u, 0x100f04e6u, 0x00000000u,
-	0x100f04ccu, 0x00000000u, 0x17010647u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x1913064eu, 0x1913064eu, 0x1913064eu, 0x1913064eu, 0x1913064eu, 0x1913064eu,
-	0x1913064eu, 0x1913064eu, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b000704u,
+	0x12103b6au, 0x0b000326u, 0x0b0001f0u, 0x21190380u, 0x0b003b4eu, 0x0b0008cdu, 0x0b000852u, 0x0b000975u,
+	0x0b0004c2u, 0x2225c645u, 0x2225c61du, 0x2225c64bu, 0x2225c624u, 0x09004b14u, 0x0a008b06u, 0x232a064du,
+	0x24264628u, 0x252ec941u, 0x252ec959u, 0x252ec8efu, 0x252ec90du, 0x252eca1bu, 0x252eca43u, 0x1701098au,
+	0x252ec9a3u, 0x262f8944u, 0x262f895cu, 0x262f88f2u, 0x262f8910u, 0x262f8a1eu, 0x262f8a46u, 0x1805098du,
+	0x262f89a6u, 0x252ec935u, 0x252ec94du, 0x252ec8e3u, 0x252ec901u, 0x252eca0fu, 0x252eca37u, 0x1701097eu,
+	0x252ec997u, 0x272f0938u, 0x272f0950u, 0x272f08e6u, 0x272f0904u, 0x272f0a12u, 0x272f0a3au, 0x1d01c981u,
+	0x272f099au, 0x281f4926u, 0x0b000929u, 0x100f04e6u, 0x00000000u, 0x100f04ccu, 0x00000000u, 0x17010647u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x1913064eu,
+	0x1913064eu, 0x1913064eu, 0x1913064eu, 0x1913064eu, 0x1913064eu, 0x1913064eu, 0x1913064eu, 0x00000000u,
 	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
 	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
 	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
 	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
 	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x09007b5bu, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x1a00c621u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x1c128629u, 0x1c128629u, 0x1c128629u, 0x1c128629u, 0x1c128629u, 0x1c128629u,
-	0x1c128629u, 0x1c128629u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x09007b5bu,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x1a00c621u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x1c128629u,
+	0x1c128629u, 0x1c128629u, 0x1c128629u, 0x1c128629u, 0x1c128629u, 0x1c128629u, 0x1c128629u, 0x00000000u,
 	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
 	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
 	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
 	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
 	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x281c3b66u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x2917c378u, 0x0b0004e3u, 0x271f4502u, 0x0b000505u, 0x0b000414u, 0x2a1ac412u,
-	0x0b000415u, 0x0b000421u, 0x1f07093fu, 0x1f070957u, 0x1f0708edu, 0x1f07090bu, 0x1f070a19u, 0x1f070a41u,
-	0x1f070988u, 0x1f0709a1u, 0x2b174942u, 0x2b17495au, 0x2b1748f0u, 0x2b17490eu, 0x2b174a1cu, 0x2b174a44u,
-	0x2b17498bu, 0x2b1749a4u, 0x1f070933u, 0x1f07094bu, 0x1f0708e1u, 0x1f0708ffu, 0x1f070a0du, 0x1f070a35u,
-	0x1f07097cu, 0x1f070995u, 0x2c16c936u, 0x2c16c94eu, 0x2c16c8e4u, 0x2c16c902u, 0x2c16ca10u, 0x2c16ca38u,
-	0x2c16c97fu, 0x2c16c998u, 0x1f070940u, 0x1f070958u, 0x1f0708eeu, 0x1f07090cu, 0x1f070a1au, 0x1f070a42u,
-	0x1f070989u, 0x1f0709a2u, 0x2b174943u, 0x2b17495bu, 0x2b1748f1u, 0x2b17490fu, 0x2b174a1du, 0x2b174a45u,
-	0x2b17498cu, 0x2b1749a5u, 0x1f070934u, 0x1f07094cu, 0x1f0708e2u, 0x1f070900u, 0x1f070a0eu, 0x1f070a36u,
-	0x1f07097du, 0x1f070996u, 0x2c16c937u, 0x2c16c94fu, 0x2c16c8e5u, 0x2c16c903u, 0x2c16ca11u, 0x2c16ca39u,
-	0x2c16c980u, 0x2c16c999u, 0x09004094u, 0x09004093u, 0x0b00098eu, 0x0b003b7au, 0x161bc501u, 0x161bc500u,
-	0x161bc4ffu, 0x161bc44au, 0x2a1ac3fdu, 0x2a1ac3fbu, 0x2a1ac757u, 0x2a1ac755u, 0x2d11c1eeu, 0x281c0468u,
-	0x21190385u, 0x161bc466u, 0x0b0003feu, 0x0b0003fcu, 0x0b000758u, 0x0b000756u, 0x0b0004fau, 0x0b000413u,
-	0x0b000924u, 0x0b000925u, 0x0b0003c6u, 0x0b000202u, 0x17010b15u, 0x17010b16u, 0x1f070729u, 0x1f070702u,
-	0x1f0706d3u, 0x1f0703f7u, 0x1f07033au, 0x1f0703d1u, 0x19130b18u, 0x19130b19u, 0x2b17472au, 0x2b174703u,
-	0x2e1786d4u, 0x2e1783f8u, 0x2e17833bu, 0x2e1783d2u, 0x1a00cb07u, 0x1a00cb08u, 0x1f070725u, 0x1f0706feu,
-	0x1f0706cfu, 0x1f0703e7u, 0x1f070336u, 0x1f0703cdu, 0x1c128b0au, 0x1c128b0bu, 0x2c16c726u, 0x2c16c6ffu,
-	0x201186d0u, 0x201183e8u, 0x20118337u, 0x201183ceu, 0x0b0001f7u, 0x0b000a7eu, 0x0b0001fdu, 0x0b000a81u,
-	0x0b0001f8u, 0x0b000a7fu, 0x1f070407u, 0x1f070332u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x2b174408u, 0x2b174333u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x1f070402u, 0x1f07032du, 0x1f0701e4u, 0x1f070381u, 0x1f07045eu, 0x1f070386u,
-	0x1f0708bdu, 0x00000000u, 0x2c16c403u, 0x2c16c32eu, 0x201181e6u, 0x00000000u, 0x20118460u, 0x00000000u,
-	0x201188beu, 0x00000000u, 0x1f070a63u, 0x1f070a8au, 0x1f0704f4u, 0x1f070511u, 0x1f071282u, 0x1f071284u,
-	0x00000000u, 0x00000000u, 0x20118a65u, 0x20118a88u, 0x2f1ec4f5u, 0x2f1ec512u, 0x2f1ed283u, 0x2f1ed285u,
-	0x00000000u, 0x00000000u, 0x1f0709f7u, 0x1f070a5cu, 0x1f0704ecu, 0x1f0704f2u, 0x1f070a69u, 0x00000000u,
-	0x1f0704f8u, 0x1f070419u, 0x0b000375u, 0x0b001c95u, 0x0b001d40u, 0x0b001f7cu, 0x0b001fe7u, 0x0b0007a5u,
-	0x00000000u, 0x00000000u, 0x0b000609u, 0x0b0006fbu, 0x0b0001f6u, 0x0b000a7du, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x0b000373u, 0x0b003b79u, 0x0b003bb0u, 0x00000000u, 0x00000000u, 0x0b001c97u, 0x0b003b78u,
-	0x0b003bb4u, 0x0b000374u, 0x0b001f7du, 0x0b001d43u, 0x0b001d41u, 0x0b001f7fu, 0x0b000a80u, 0x0b0001fcu,
-	0x0b000a62u, 0x0b00041au, 0x20118a6bu, 0x20118a6bu, 0x20118a6bu, 0x20118a6bu, 0x20118a6bu, 0x20118a6bu,
-	0x20118a6bu, 0x20118a6bu, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x0b000918u, 0x0b003b56u, 0x2f1ec4f9u, 0x2f1ec4f9u, 0x2f1ec4f9u, 0x2f1ec4f9u, 0x2f1ec4f9u, 0x2f1ec4f9u,
-	0x2f1ec4f9u, 0x2f1ec4f9u, 0x0b000af4u, 0x0b000923u, 0x0b000608u, 0x0b0006fau, 0x0b000201u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x100f04c5u, 0x110f44c6u, 0x100f050au, 0x110f450bu, 0x0b000af5u, 0x0b0001ffu,
-	0x0b000af9u, 0x0b000416u, 0x0b003b4fu, 0x0b000b3fu, 0x1f07085eu, 0x1f070863u, 0x1f070864u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b000391u, 0x1f07085fu, 0x1f070860u, 0x1f070861u,
-	0x1f070862u, 0x1f07070du, 0x1f07070eu, 0x1f07070fu, 0x1f070710u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x20118711u, 0x20118712u, 0x20118713u, 0x20118714u, 0x1f070717u, 0x110f4715u, 0x1f0701f9u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x1f070718u,
-	0x00000000u, 0x1f070719u, 0x00000000u, 0x1f070716u, 0x2011871au, 0x0b003b55u, 0x0b000922u, 0x0b000915u,
-	0x0b000919u, 0x0b000af6u, 0x0b000af7u, 0x0b0003bbu, 0x0702026fu, 0x08028270u, 0x07020259u, 0x0802825au,
-	0x07020211u, 0x08028212u, 0x0702020bu, 0x0802820cu, 0x07020225u, 0x08028226u, 0x0702024fu, 0x08028250u,
-	0x07020217u, 0x08028218u, 0x07020205u, 0x08028206u, 0x0702027fu, 0x08028280u, 0x07020269u, 0x0802826au,
-	0x07020275u, 0x08028276u, 0x0702025fu, 0x08028260u, 0x0702023bu, 0x0802823cu, 0x07020235u, 0x08028236u,
-	0x07020241u, 0x08028242u, 0x0702022fu, 0x08028230u, 0x0b000558u, 0x302b1f78u, 0x31ab9f79u, 0x3215dfe3u,
-	0x33abdfe4u, 0x281c0477u, 0x281c046eu, 0x281c0448u, 0x281c043fu, 0x281c044du, 0x281c046bu, 0x281c0445u,
-	0x281c0442u, 0x281c047eu, 0x281c0474u, 0x281c047au, 0x281c0471u, 0x281c0459u, 0x281c0450u, 0x281c0456u,
-	0x281c0453u, 0x1f0709e8u, 0x2e1789e9u, 0x1f0709dau, 0x2e1789dbu, 0x1f0709d4u, 0x2e1789d5u, 0x1f0709dcu,
-	0x2e1789ddu, 0x1f0709e6u, 0x2e1789e7u, 0x1f0709d8u, 0x2e1789d9u, 0x1f0709d6u, 0x2e1789d7u, 0x1f0709f3u,
-	0x2e1789f4u, 0x1f0709ecu, 0x2e1789edu, 0x1f0709f0u, 0x2e1789f1u, 0x1f0709eau, 0x2e1789ebu, 0x1f0709e4u,
-	0x2e1789e5u, 0x1f0709deu, 0x2e1789dfu, 0x1f0709e2u, 0x2e1789e3u, 0x1f0709e0u, 0x2e1789e1u, 0x0b0008d0u,
-	0x0b000855u, 0x0b0002d9u, 0x030141b1u, 0x0d10c1b3u, 0x03014a23u, 0x04024a25u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b00060au, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b003bb1u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b003bb2u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b003bb3u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b003b76u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b003b73u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b003b75u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b003b74u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b003b77u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b0008d3u, 0x0b000858u,
-	0x0b00096du, 0x030141d5u, 0x040241d7u, 0x03014a4bu, 0x04024a4du, 0x1f0703b6u, 0x1f0703b4u, 0x1f0704cau,
-	0x1f070a82u, 0x1f073ba8u, 0x1f073ba4u, 0x1f073bacu, 0x1f0701fau, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b0004e7u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b000537u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b0009f5u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x070203e9u, 0x080283ecu, 0x0104c2c7u,
-	0x0c1382c8u, 0x030142c2u, 0x0d10c2c3u, 0x100f050fu, 0x00000000u, 0x030141c9u, 0x040241cbu, 0x100f04e9u,
-	0x00000000u, 0x100f04efu, 0x00000000u, 0x100f06c2u, 0x342c06c5u, 0x100f06c1u, 0x352c46c4u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x170101b0u, 0x170101d4u, 0x170101c8u, 0x170101bcu, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x1e1081b2u, 0x1d01c1d6u, 0x1d01c1cau, 0x1d01c1beu, 0x030141bdu,
-	0x040241bfu, 0x100f019fu, 0x110f41a0u, 0x100f01a5u, 0x110f41a6u, 0x100f06a9u, 0x342c06acu, 0x100f06a8u,
-	0x352c46abu, 0x302b0684u, 0x00000000u, 0x00000000u, 0x1f0702c6u, 0x00000000u, 0x1f073ba6u, 0x1f073baau,
-	0x1f073baeu, 0x1f071f76u, 0x1f071f77u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x2011891bu, 0x2011891eu, 0x121001aau, 0x0b000b3du, 0x0b00092cu, 0x362e48c1u, 0x362e4842u,
-	0x3215fbb5u, 0x33abfbb6u, 0x3702c8bfu, 0x090048c0u, 0x100f04e1u, 0x00000000u, 0x1f070843u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x38120844u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b0008ceu, 0x0b000853u,
-	0x271f4927u, 0x0b00092au, 0x0b0004e4u, 0x161bc47bu, 0x2d11c1eau, 0x1f070402u, 0x1f07032du, 0x1f0701e8u,
-	0x1f070381u, 0x1f070462u, 0x1f070386u, 0x1f0708c2u, 0x00000000u, 0x2c16c403u, 0x2c16c32eu, 0x381201ebu,
-	0x00000000u, 0x38120464u, 0x00000000u, 0x381208c3u, 0x00000000u, 0x1f0709f8u, 0x1f070a5du, 0x1f0704edu,
-	0x1f0704f3u, 0x1f070a69u, 0x00000000u, 0x1f0704f8u, 0x1f070419u, 0x0b000375u, 0x0b001c95u, 0x0b001d40u,
-	0x0b001f7cu, 0x0b001fe7u, 0x0b0007a5u, 0x00000000u, 0x00000000u, 0x0b000609u, 0x0b0006fbu, 0x0b0001f6u,
-	0x0b000a7du, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b000373u, 0x0b003b79u, 0x0b003bb0u, 0x00000000u,
-	0x00000000u, 0x0b001c97u, 0x0b003b78u, 0x0b003bb4u, 0x0b000374u, 0x0b001f7eu, 0x0b001d43u, 0x0b001d42u,
-	0x0b001f80u, 0x0b000a80u, 0x0b0001fcu, 0x0b000a62u, 0x0b00041bu, 0x20118a6bu, 0x20118a6bu, 0x20118a6bu,
-	0x20118a6bu, 0x20118a6bu, 0x20118a6bu, 0x20118a6bu, 0x20118a6bu, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x0b000918u, 0x0b003b56u, 0x2f1ec4f9u, 0x2f1ec4f9u, 0x2f1ec4f9u,
-	0x2f1ec4f9u, 0x2f1ec4f9u, 0x2f1ec4f9u, 0x2f1ec4f9u, 0x2f1ec4f9u, 0x0b000af4u, 0x0b000923u, 0x0b000608u,
-	0x0b0006fau, 0x0b000201u, 0x00000000u, 0x00000000u, 0x00000000u, 0x39035f7au, 0x3a115f7bu, 0x3b0f9fe5u,
-	0x3c0fdfe6u, 0x0b0008d1u, 0x0b000856u, 0x0b0008d4u, 0x0b000859u, 0x390340d7u, 0x3d0440dbu, 0x3e0400dau,
-	0x3f0480dcu, 0x3702c0d4u, 0x39034740u, 0x3d044744u, 0x3e040743u, 0x3f048745u, 0x3702c73du, 0x390340afu,
-	0x3d0440b3u, 0x3e0400b2u, 0x3f0480b4u, 0x3702c0acu, 0x390349c1u, 0x3d0449c5u, 0x3e0409c4u, 0x3f0489c6u,
-	0x3702c9beu, 0x39034130u, 0x3d044134u, 0x3e040133u, 0x3f048135u, 0x3702c12du, 0x39034ab2u, 0x3d044ab6u,
-	0x3e040ab5u, 0x3f048ab7u, 0x3702caafu, 0x39037b90u, 0x3d047b94u, 0x3e043b93u, 0x3f04bb95u, 0x3702fb8du,
-	0x39034298u, 0x3a11429cu, 0x3b0f829bu, 0x3c0fc29du, 0x3702c295u, 0x3b0f86afu, 0x401e86b2u, 0x410300d5u,
-	0x4103073eu, 0x410300adu, 0x410309bfu, 0x4103012eu, 0x41030ab0u, 0x41033b8eu, 0x41030296u, 0x420380d8u,
-	0x42038741u, 0x420380b0u, 0x420389c2u, 0x42038131u, 0x42038ab3u, 0x4203bb91u, 0x4312c299u, 0x170100d6u,
-	0x1701073fu, 0x170100aeu, 0x170109c0u, 0x1701012fu, 0x17010ab1u, 0x17013b8fu, 0x17010297u, 0x4403c0d9u,
-	0x4403c742u, 0x4403c0b1u, 0x4403c9c3u, 0x4403c132u, 0x4403cab4u, 0x4403fb92u, 0x4511029au, 0x39034b10u,
-	0x3a114b13u, 0x39034634u, 0x3a11463cu, 0x3b0f863bu, 0x3c0fc63du, 0x3b0f84e2u, 0x00000000u, 0x46107b6du,
-	0x0b0001f1u, 0x0b0002dau, 0x3702cb0du, 0x47294639u, 0x242ec93bu, 0x242ec953u, 0x242ec8e9u, 0x242ec907u,
-	0x242eca15u, 0x242eca3du, 0x17010984u, 0x242ec99du, 0x482f493eu, 0x482f4956u, 0x482f48ecu, 0x482f490au,
-	0x482f4a18u, 0x482f4a40u, 0x4403c987u, 0x482f49a0u, 0x41030633u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x4312c63au, 0x4312c63au, 0x4312c63au, 0x4312c63au,
-	0x4312c63au, 0x4312c63au, 0x4312c63au, 0x4312c63au, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x281c3b66u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x271f4503u, 0x0b000506u, 0x0b000422u, 0x1f070939u,
-	0x1f070951u, 0x1f0708e7u, 0x1f070905u, 0x1f070a13u, 0x1f070a3bu, 0x1f070982u, 0x1f07099bu, 0x4917093cu,
-	0x49170954u, 0x491708eau, 0x49170908u, 0x49170a16u, 0x49170a3eu, 0x49170985u, 0x4917099eu, 0x1f07093au,
-	0x1f070952u, 0x1f0708e8u, 0x1f070906u, 0x1f070a14u, 0x1f070a3cu, 0x1f070983u, 0x1f07099cu, 0x4917093du,
-	0x49170955u, 0x491708ebu, 0x49170909u, 0x49170a17u, 0x49170a3fu, 0x49170986u, 0x4917099fu, 0x41030b0eu,
-	0x41030b0fu, 0x1f070727u, 0x1f070700u, 0x1f0706d1u, 0x1f0703efu, 0x1f070338u, 0x1f0703cfu, 0x4312cb11u,
-	0x4312cb12u, 0x49170728u, 0x49170701u, 0x381206d2u, 0x381203f0u, 0x38120339u, 0x381203d0u, 0x1f070405u,
-	0x1f070330u, 0x1f0701e8u, 0x1f070382u, 0x1f070462u, 0x1f070387u, 0x1f0708c2u, 0x00000000u, 0x49170406u,
-	0x49170331u, 0x381201ebu, 0x00000000u, 0x38120464u, 0x00000000u, 0x381208c3u, 0x00000000u, 0x1f070a63u,
-	0x1f070a8au, 0x1f0704f4u, 0x1f070511u, 0x1f071282u, 0x1f071284u, 0x00000000u, 0x00000000u, 0x38120a66u,
-	0x38120a89u, 0x2f1ec4f5u, 0x2f1ec512u, 0x2f1ed283u, 0x2f1ed285u, 0x00000000u, 0x00000000u, 0x1f0709f8u,
-	0x1f070a5du, 0x1f0704edu, 0x1f0704f3u, 0x1f070a69u, 0x00000000u, 0x1f0704f8u, 0x1f070419u, 0x0b000375u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x291c3b66u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x2a17c378u,
+	0x0b0004e3u, 0x281f4502u, 0x0b000505u, 0x0b000414u, 0x2b1ac412u, 0x0b000415u, 0x0b000421u, 0x1f07093fu,
+	0x1f070957u, 0x1f0708edu, 0x1f07090bu, 0x1f070a19u, 0x1f070a41u, 0x1f070988u, 0x1f0709a1u, 0x2c174942u,
+	0x2c17495au, 0x2c1748f0u, 0x2c17490eu, 0x2c174a1cu, 0x2c174a44u, 0x2c17498bu, 0x2c1749a4u, 0x1f070933u,
+	0x1f07094bu, 0x1f0708e1u, 0x1f0708ffu, 0x1f070a0du, 0x1f070a35u, 0x1f07097cu, 0x1f070995u, 0x2d16c936u,
+	0x2d16c94eu, 0x2d16c8e4u, 0x2d16c902u, 0x2d16ca10u, 0x2d16ca38u, 0x2d16c97fu, 0x2d16c998u, 0x1f070940u,
+	0x1f070958u, 0x1f0708eeu, 0x1f07090cu, 0x1f070a1au, 0x1f070a42u, 0x1f070989u, 0x1f0709a2u, 0x2c174943u,
+	0x2c17495bu, 0x2c1748f1u, 0x2c17490fu, 0x2c174a1du, 0x2c174a45u, 0x2c17498cu, 0x2c1749a5u, 0x1f070934u,
+	0x1f07094cu, 0x1f0708e2u, 0x1f070900u, 0x1f070a0eu, 0x1f070a36u, 0x1f07097du, 0x1f070996u, 0x2d16c937u,
+	0x2d16c94fu, 0x2d16c8e5u, 0x2d16c903u, 0x2d16ca11u, 0x2d16ca39u, 0x2d16c980u, 0x2d16c999u, 0x09004094u,
+	0x09004093u, 0x0b00098eu, 0x0b003b7au, 0x161bc501u, 0x161bc500u, 0x161bc4ffu, 0x161bc44au, 0x2b1ac3fdu,
+	0x2b1ac3fbu, 0x2b1ac757u, 0x2b1ac755u, 0x2e11c1eeu, 0x291c0468u, 0x21190385u, 0x161bc466u, 0x0b0003feu,
+	0x0b0003fcu, 0x0b000758u, 0x0b000756u, 0x0b0004fau, 0x0b000413u, 0x0b000924u, 0x0b000925u, 0x0b0003c6u,
+	0x0b000202u, 0x17010b15u, 0x17010b16u, 0x1f070729u, 0x1f070702u, 0x1f0706d3u, 0x1f0703f7u, 0x1f07033au,
+	0x1f0703d1u, 0x19130b18u, 0x19130b19u, 0x2c17472au, 0x2c174703u, 0x2f1786d4u, 0x2f1783f8u, 0x2f17833bu,
+	0x2f1783d2u, 0x1a00cb07u, 0x1a00cb08u, 0x1f070725u, 0x1f0706feu, 0x1f0706cfu, 0x1f0703e7u, 0x1f070336u,
+	0x1f0703cdu, 0x1c128b0au, 0x1c128b0bu, 0x2d16c726u, 0x2d16c6ffu, 0x201186d0u, 0x201183e8u, 0x20118337u,
+	0x201183ceu, 0x0b0001f7u, 0x0b000a7eu, 0x0b0001fdu, 0x0b000a81u, 0x0b0001f8u, 0x0b000a7fu, 0x1f070407u,
+	0x1f070332u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x2c174408u,
+	0x2c174333u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x1f070402u,
+	0x1f07032du, 0x1f0701e4u, 0x1f070381u, 0x1f07045eu, 0x1f070386u, 0x1f0708bdu, 0x00000000u, 0x2d16c403u,
+	0x2d16c32eu, 0x201181e6u, 0x00000000u, 0x20118460u, 0x00000000u, 0x201188beu, 0x00000000u, 0x1f070a63u,
+	0x1f070a8au, 0x1f0704f4u, 0x1f070511u, 0x1f071282u, 0x1f071284u, 0x00000000u, 0x00000000u, 0x20118a65u,
+	0x20118a88u, 0x301ec4f5u, 0x301ec512u, 0x301ed283u, 0x301ed285u, 0x00000000u, 0x00000000u, 0x1f0709f7u,
+	0x1f070a5cu, 0x1f0704ecu, 0x1f0704f2u, 0x1f070a69u, 0x00000000u, 0x1f0704f8u, 0x1f070419u, 0x0b000375u,
 	0x0b001c95u, 0x0b001d40u, 0x0b001f7cu, 0x0b001fe7u, 0x0b0007a5u, 0x00000000u, 0x00000000u, 0x0b000609u,
 	0x0b0006fbu, 0x0b0001f6u, 0x0b000a7du, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b000373u, 0x0b003b79u,
-	0x0b003bb0u, 0x00000000u, 0x00000000u, 0x0b001c97u, 0x0b003b78u, 0x0b003bb4u, 0x0b000374u, 0x0b001f7eu,
-	0x0b001d43u, 0x0b001d42u, 0x0b001f80u, 0x0b000a80u, 0x0b0001fcu, 0x0b000a62u, 0x0b00041bu, 0x38120a6cu,
-	0x38120a6cu, 0x38120a6cu, 0x38120a6cu, 0x38120a6cu, 0x38120a6cu, 0x38120a6cu, 0x38120a6cu, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b000918u, 0x0b003b56u, 0x2f1ec4f9u,
-	0x2f1ec4f9u, 0x2f1ec4f9u, 0x2f1ec4f9u, 0x2f1ec4f9u, 0x2f1ec4f9u, 0x2f1ec4f9u, 0x2f1ec4f9u, 0x0b000af4u,
-	0x0b000923u, 0x0b000608u, 0x0b0006fau, 0x0b000201u, 0x00000000u, 0x00000000u, 0x00000000u, 0x3b0f84c7u,
-	0x401e84c8u, 0x3b0f850cu, 0x401e850du, 0x0b000afau, 0x1f07071bu, 0x3812071cu, 0x0b000af8u, 0x3e040271u,
-	0x3f048272u, 0x3e04025bu, 0x3f04825cu, 0x3e040213u, 0x3f048214u, 0x3e04020du, 0x3f04820eu, 0x3e040227u,
-	0x3f048228u, 0x3e040251u, 0x3f048252u, 0x3e040219u, 0x3f04821au, 0x3e040207u, 0x3f048208u, 0x3e040281u,
-	0x3f048282u, 0x3e04026bu, 0x3f04826cu, 0x3e040277u, 0x3f048278u, 0x3e040261u, 0x3f048262u, 0x3e04023du,
-	0x3f04823eu, 0x3e040237u, 0x3f048238u, 0x3e040243u, 0x3f048244u, 0x3e040231u, 0x3f048232u, 0x390341b5u,
-	0x3a1141b7u, 0x39034a27u, 0x3d044a29u, 0x390341d9u, 0x3d0441dbu, 0x39034a4fu, 0x3d044a51u, 0x1f0703b7u,
-	0x1f0703b5u, 0x1f0704cau, 0x1f070a82u, 0x1f073ba9u, 0x1f073ba5u, 0x1f073badu, 0x1f0701fau, 0x00000000u,
+	0x0b003bb0u, 0x00000000u, 0x00000000u, 0x0b001c97u, 0x0b003b78u, 0x0b003bb4u, 0x0b000374u, 0x0b001f7du,
+	0x0b001d43u, 0x0b001d41u, 0x0b001f7fu, 0x0b000a80u, 0x0b0001fcu, 0x0b000a62u, 0x0b00041au, 0x20118a6bu,
+	0x20118a6bu, 0x20118a6bu, 0x20118a6bu, 0x20118a6bu, 0x20118a6bu, 0x20118a6bu, 0x20118a6bu, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b000918u, 0x0b003b56u, 0x301ec4f9u,
+	0x301ec4f9u, 0x301ec4f9u, 0x301ec4f9u, 0x301ec4f9u, 0x301ec4f9u, 0x301ec4f9u, 0x301ec4f9u, 0x0b000af4u,
+	0x0b000923u, 0x0b000608u, 0x0b0006fau, 0x0b000201u, 0x00000000u, 0x00000000u, 0x00000000u, 0x100f04c5u,
+	0x110f44c6u, 0x100f050au, 0x110f450bu, 0x0b000af5u, 0x0b0001ffu, 0x0b000af9u, 0x0b000416u, 0x0b003b4fu,
+	0x0b000b3fu, 0x1f07085eu, 0x1f070863u, 0x1f070864u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
 	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x0b000391u, 0x1f07085fu, 0x1f070860u, 0x1f070861u, 0x1f070862u, 0x1f07070du, 0x1f07070eu,
+	0x1f07070fu, 0x1f070710u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x20118711u, 0x20118712u,
+	0x20118713u, 0x20118714u, 0x1f070717u, 0x110f4715u, 0x1f0701f9u, 0x00000000u, 0x00000000u, 0x00000000u,
 	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b0004e7u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b000537u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b0009f5u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x3e0403f1u,
-	0x3f0483f4u, 0x390342c4u, 0x3a1142c5u, 0x3b0f8510u, 0x00000000u, 0x390341cdu, 0x3d0441cfu, 0x3b0f84eau,
-	0x00000000u, 0x3b0f84f0u, 0x00000000u, 0x3b0f86c8u, 0x4a2cc6cau, 0x3b0f86c7u, 0x4b2c86c9u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x170101b4u, 0x170101d8u, 0x170101ccu, 0x170101c0u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x451101b6u, 0x4403c1dau, 0x4403c1ceu, 0x4403c1c2u, 0x390341c1u,
-	0x3d0441c3u, 0x3b0f81a1u, 0x3c0fc1a2u, 0x3b0f81a7u, 0x3c0fc1a8u, 0x3b0f86b0u, 0x4a2cc6b3u, 0x3b0f86aeu,
-	0x4b2c86b1u, 0x39034683u, 0x00000000u, 0x00000000u, 0x1f0702bfu, 0x00000000u, 0x1f073ba7u, 0x1f073babu,
-	0x1f073bafu, 0x1f071f76u, 0x1f071f77u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x3812091cu, 0x3812091fu, 0x461041abu, 0x030140c5u, 0x040240c9u, 0x070200c8u, 0x080280cau,
-	0x0a0080c2u, 0x0b0008cau, 0x0b00084fu, 0x0301472eu, 0x04024732u, 0x07020731u, 0x08028733u, 0x0a00872bu,
-	0x0b0008c6u, 0x0301409du, 0x040240a1u, 0x070200a0u, 0x080280a2u, 0x0a00809au, 0x0b0008d5u, 0x0b00085au,
-	0x030149afu, 0x040249b3u, 0x070209b2u, 0x080289b4u, 0x0a0089acu, 0x0b0008c8u, 0x0b00084du, 0x0301411eu,
-	0x04024122u, 0x07020121u, 0x08028123u, 0x0a00811bu, 0x03014aa0u, 0x04024aa4u, 0x07020aa3u, 0x08028aa5u,
-	0x0a008a9du, 0x03017b7eu, 0x04027b82u, 0x07023b81u, 0x0802bb83u, 0x0a00bb7bu, 0x03014286u, 0x0d10c28au,
-	0x100f0289u, 0x110f428bu, 0x0a008283u, 0x12100401u, 0x1210032cu, 0x132e08b8u, 0x132e083cu, 0x0b0008c4u,
-	0x0b000845u, 0x100f019bu, 0x00000000u, 0x0a0088d7u, 0x090048b7u, 0x1a00c0c3u, 0x1a00c72cu, 0x1a00c09bu,
-	0x1a00c9adu, 0x1a00c11cu, 0x1a00ca9eu, 0x1a00fb7cu, 0x1a00c284u, 0x1b0180c6u, 0x1b01872fu, 0x1b01809eu,
-	0x1b0189b0u, 0x1b01811fu, 0x1b018aa1u, 0x1b01bb7fu, 0x1c128287u, 0x170100c4u, 0x1701072du, 0x1701009cu,
-	0x170109aeu, 0x1701011du, 0x17010a9fu, 0x17013b7du, 0x17010285u, 0x1d01c0c7u, 0x1d01c730u, 0x1d01c09fu,
-	0x1d01c9b1u, 0x1d01c120u, 0x1d01caa2u, 0x1d01fb80u, 0x1e108288u, 0x03014b02u, 0x0d10cb05u, 0x0301460fu,
-	0x0d10c617u, 0x100f0616u, 0x110f4618u, 0x100f04dfu, 0x00000000u, 0x1f07083du, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x2011883eu, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x12103b67u, 0x4c18c37eu, 0x0b0008ccu,
-	0x0b000851u, 0x0a008affu, 0x23264614u, 0x242ec92fu, 0x242ec947u, 0x242ec8ddu, 0x242ec8fbu, 0x242eca09u,
-	0x242eca31u, 0x17010978u, 0x242ec991u, 0x262f0932u, 0x262f094au, 0x262f08e0u, 0x262f08feu, 0x262f0a0cu,
-	0x262f0a34u, 0x1d01c97bu, 0x262f0994u, 0x0a008928u, 0x0b00092bu, 0x100f04e5u, 0x00000000u, 0x100f04cbu,
-	0x00000000u, 0x1a00c60eu, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x1c128615u, 0x1c128615u, 0x1c128615u, 0x1c128615u, 0x1c128615u, 0x1c128615u, 0x1c128615u,
-	0x1c128615u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x1f070718u, 0x00000000u, 0x1f070719u, 0x00000000u,
+	0x1f070716u, 0x2011871au, 0x0b003b55u, 0x0b000922u, 0x0b000915u, 0x0b000919u, 0x0b000af6u, 0x0b000af7u,
+	0x0b0003bbu, 0x0702026fu, 0x08028270u, 0x07020259u, 0x0802825au, 0x07020211u, 0x08028212u, 0x0702020bu,
+	0x0802820cu, 0x07020225u, 0x08028226u, 0x0702024fu, 0x08028250u, 0x07020217u, 0x08028218u, 0x07020205u,
+	0x08028206u, 0x0702027fu, 0x08028280u, 0x07020269u, 0x0802826au, 0x07020275u, 0x08028276u, 0x0702025fu,
+	0x08028260u, 0x0702023bu, 0x0802823cu, 0x07020235u, 0x08028236u, 0x07020241u, 0x08028242u, 0x0702022fu,
+	0x08028230u, 0x0b000558u, 0x312b1f78u, 0x32ab9f79u, 0x3315dfe3u, 0x34abdfe4u, 0x291c0477u, 0x291c046eu,
+	0x291c0448u, 0x291c043fu, 0x291c044du, 0x291c046bu, 0x291c0445u, 0x291c0442u, 0x291c047eu, 0x291c0474u,
+	0x291c047au, 0x291c0471u, 0x291c0459u, 0x291c0450u, 0x291c0456u, 0x291c0453u, 0x1f0709eeu, 0x2f1789efu,
+	0x1f0709e8u, 0x2f1789e9u, 0x1f0709dau, 0x2f1789dbu, 0x1f0709d4u, 0x2f1789d5u, 0x1f0709dcu, 0x2f1789ddu,
+	0x1f0709e6u, 0x2f1789e7u, 0x1f0709d8u, 0x2f1789d9u, 0x1f0709d6u, 0x2f1789d7u, 0x1f0709f3u, 0x2f1789f4u,
+	0x1f0709ecu, 0x2f1789edu, 0x1f0709f0u, 0x2f1789f1u, 0x1f0709eau, 0x2f1789ebu, 0x1f0709e4u, 0x2f1789e5u,
+	0x1f0709deu, 0x2f1789dfu, 0x1f0709e2u, 0x2f1789e3u, 0x1f0709e0u, 0x2f1789e1u, 0x0b0008d0u, 0x0b000855u,
+	0x0b0002d9u, 0x030141b1u, 0x0d10c1b3u, 0x03014a23u, 0x04024a25u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b00060au, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b003bb1u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b003bb2u, 0x00000000u, 0x00000000u,
 	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
 	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
 	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
 	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
 	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x281c3b66u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x0a008504u, 0x0b000507u, 0x0b000420u, 0x1f07092du, 0x1f070945u, 0x1f0708dbu, 0x1f0708f9u,
-	0x1f070a07u, 0x1f070a2fu, 0x1f070976u, 0x1f07098fu, 0x2c16c930u, 0x2c16c948u, 0x2c16c8deu, 0x2c16c8fcu,
-	0x2c16ca0au, 0x2c16ca32u, 0x2c16c979u, 0x2c16c992u, 0x1f07092eu, 0x1f070946u, 0x1f0708dcu, 0x1f0708fau,
-	0x1f070a08u, 0x1f070a30u, 0x1f070977u, 0x1f070990u, 0x2c16c931u, 0x2c16c949u, 0x2c16c8dfu, 0x2c16c8fdu,
-	0x2c16ca0bu, 0x2c16ca33u, 0x2c16c97au, 0x2c16c993u, 0x2a1ac3f9u, 0x2a1ac753u, 0x4d1241edu, 0x4c18c383u,
-	0x0b0003fau, 0x0b000754u, 0x1a00cb00u, 0x1a00cb01u, 0x1f070723u, 0x1f0706fcu, 0x1f0706cdu, 0x1f0703dfu,
-	0x1f070334u, 0x1f0703cbu, 0x1c128b03u, 0x1c128b04u, 0x2c16c724u, 0x2c16c6fdu, 0x201186ceu, 0x201183e0u,
-	0x20118335u, 0x201183ccu, 0x1f0703ffu, 0x1f07032au, 0x1f0701e0u, 0x1f07037fu, 0x1f07045au, 0x1f070384u,
-	0x1f0708b9u, 0x00000000u, 0x2c16c400u, 0x2c16c32bu, 0x201181e2u, 0x00000000u, 0x2011845cu, 0x00000000u,
-	0x201188bau, 0x00000000u, 0x1f070a63u, 0x1f070a8au, 0x1f0704f4u, 0x1f070511u, 0x1f071282u, 0x1f071284u,
-	0x00000000u, 0x00000000u, 0x20118a64u, 0x20118a87u, 0x2f1ec4f5u, 0x2f1ec512u, 0x2f1ed283u, 0x2f1ed285u,
-	0x00000000u, 0x00000000u, 0x1f0709f6u, 0x1f070a5bu, 0x1f0704ebu, 0x1f0704f1u, 0x1f070a69u, 0x00000000u,
-	0x1f0704f8u, 0x1f070419u, 0x0b000375u, 0x0b001c95u, 0x0b001d40u, 0x0b001f7cu, 0x0b001fe7u, 0x0b0007a5u,
-	0x00000000u, 0x00000000u, 0x0b000609u, 0x0b0006fbu, 0x0b0001f6u, 0x0b000a7du, 0x00000000u, 0x00000000u,
-	0x00000000u, 0x0b000373u, 0x0b003b79u, 0x0b003bb0u, 0x00000000u, 0x00000000u, 0x0b001c97u, 0x0b003b78u,
-	0x0b003bb4u, 0x0b000374u, 0x0b001f7du, 0x0b001d43u, 0x0b001d41u, 0x0b001f7fu, 0x0b000a80u, 0x0b0001fcu,
-	0x0b000a62u, 0x0b00041au, 0x20118a6au, 0x20118a6au, 0x20118a6au, 0x20118a6au, 0x20118a6au, 0x20118a6au,
-	0x20118a6au, 0x20118a6au, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-	0x0b000918u, 0x0b003b56u, 0x2f1ec4f9u, 0x2f1ec4f9u, 0x2f1ec4f9u, 0x2f1ec4f9u, 0x2f1ec4f9u, 0x2f1ec4f9u,
-	0x2f1ec4f9u, 0x2f1ec4f9u, 0x0b000af4u, 0x0b000923u, 0x0b000608u, 0x0b0006fau, 0x0b000201u, 0x00000000u,
-	0x00000000u, 0x00000000u, 0x100f04c3u, 0x110f44c4u, 0x100f0508u, 0x110f4509u, 0x1f07071eu, 0x110f4715u,
-	0x1f070720u, 0x00000000u, 0x1f070721u, 0x00000000u, 0x1f07071du, 0x20118722u, 0x0702026du, 0x0802826eu,
-	0x07020257u, 0x08028258u, 0x0702020fu, 0x08028210u, 0x07020209u, 0x0802820au, 0x07020223u, 0x08028224u,
-	0x0702024du, 0x0802824eu, 0x07020215u, 0x08028216u, 0x07020203u, 0x08028204u, 0x0702027du, 0x0802827eu,
-	0x07020267u, 0x08028268u, 0x07020273u, 0x08028274u, 0x0702025du, 0x0802825eu, 0x07020239u, 0x0802823au,
-	0x07020233u, 0x08028234u, 0x0702023fu, 0x08028240u, 0x0702022du, 0x0802822eu, 0x0b0008cfu, 0x0b000854u,
-	0x030141adu, 0x0d10c1afu, 0x03014a1fu, 0x04024a21u, 0x0b0008d2u, 0x0b000857u, 0x030141d1u, 0x040241d3u,
-	0x03014a47u, 0x04024a49u, 0x070203e1u, 0x080283e4u, 0x030142c0u, 0x0d10c2c1u, 0x100f050eu, 0x00000000u,
-	0x030141c5u, 0x040241c7u, 0x100f04e8u, 0x00000000u, 0x100f04eeu, 0x00000000u, 0x100f06beu, 0x342c06c0u,
-	0x100f06bdu, 0x110f46bfu, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x170101acu, 0x170101d0u,
-	0x170101c4u, 0x170101b8u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x1e1081aeu, 0x1d01c1d2u,
-	0x1d01c1c6u, 0x1d01c1bau, 0x030141b9u, 0x040241bbu, 0x100f019du, 0x110f419eu, 0x100f01a3u, 0x110f41a4u,
-	0x100f06a5u, 0x342c06a7u, 0x100f06a4u, 0x110f46a6u, 0x00000000u, 0x1f0702c6u, 0x00000000u, 0x1f073ba6u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b003bb3u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b003b76u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b003b73u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b003b75u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b003b74u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b003b77u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b0008d3u, 0x0b000858u, 0x0b00096du,
+	0x030141d5u, 0x040241d7u, 0x03014a4bu, 0x04024a4du, 0x1f0703b6u, 0x1f0703b4u, 0x1f0704cau, 0x1f070a82u,
+	0x1f073ba8u, 0x1f073ba4u, 0x1f073bacu, 0x1f0701fau, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b0004e7u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b000537u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b0009f5u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x070203e9u, 0x080283ecu, 0x0104c2c7u, 0x0c1382c8u,
+	0x030142c2u, 0x0d10c2c3u, 0x100f050fu, 0x00000000u, 0x030141c9u, 0x040241cbu, 0x100f04e9u, 0x00000000u,
+	0x100f04efu, 0x00000000u, 0x100f06c2u, 0x352c06c5u, 0x100f06c1u, 0x362c46c4u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x170101b0u, 0x170101d4u, 0x170101c8u, 0x170101bcu, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x1e1081b2u, 0x1d01c1d6u, 0x1d01c1cau, 0x1d01c1beu, 0x030141bdu, 0x040241bfu,
+	0x100f019fu, 0x110f41a0u, 0x100f01a5u, 0x110f41a6u, 0x100f06a9u, 0x352c06acu, 0x100f06a8u, 0x362c46abu,
+	0x312b0684u, 0x00000000u, 0x00000000u, 0x1f0702c6u, 0x00000000u, 0x1f073ba6u, 0x1f073baau, 0x1f073baeu,
+	0x1f071f76u, 0x1f071f77u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x2011891bu, 0x2011891eu, 0x121001aau, 0x0b000b3du, 0x0b00092cu, 0x372e48c1u, 0x372e4842u, 0x3315fbb5u,
+	0x34abfbb6u, 0x3802c8bfu, 0x090048c0u, 0x100f04e1u, 0x00000000u, 0x1f070843u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x39120844u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b0008ceu, 0x0b000853u, 0x2225c646u,
+	0x2225c61eu, 0x2225c64cu, 0x2225c625u, 0x281f4927u, 0x0b00092au, 0x0b0004e4u, 0x161bc47bu, 0x2e11c1eau,
+	0x1f070402u, 0x1f07032du, 0x1f0701e8u, 0x1f070381u, 0x1f070462u, 0x1f070386u, 0x1f0708c2u, 0x00000000u,
+	0x2d16c403u, 0x2d16c32eu, 0x391201ebu, 0x00000000u, 0x39120464u, 0x00000000u, 0x391208c3u, 0x00000000u,
+	0x1f0709f8u, 0x1f070a5du, 0x1f0704edu, 0x1f0704f3u, 0x1f070a69u, 0x00000000u, 0x1f0704f8u, 0x1f070419u,
+	0x0b000375u, 0x0b001c95u, 0x0b001d40u, 0x0b001f7cu, 0x0b001fe7u, 0x0b0007a5u, 0x00000000u, 0x00000000u,
+	0x0b000609u, 0x0b0006fbu, 0x0b0001f6u, 0x0b000a7du, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b000373u,
+	0x0b003b79u, 0x0b003bb0u, 0x00000000u, 0x00000000u, 0x0b001c97u, 0x0b003b78u, 0x0b003bb4u, 0x0b000374u,
+	0x0b001f7eu, 0x0b001d43u, 0x0b001d42u, 0x0b001f80u, 0x0b000a80u, 0x0b0001fcu, 0x0b000a62u, 0x0b00041bu,
+	0x20118a6bu, 0x20118a6bu, 0x20118a6bu, 0x20118a6bu, 0x20118a6bu, 0x20118a6bu, 0x20118a6bu, 0x20118a6bu,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b000918u, 0x0b003b56u,
+	0x301ec4f9u, 0x301ec4f9u, 0x301ec4f9u, 0x301ec4f9u, 0x301ec4f9u, 0x301ec4f9u, 0x301ec4f9u, 0x301ec4f9u,
+	0x0b000af4u, 0x0b000923u, 0x0b000608u, 0x0b0006fau, 0x0b000201u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x3a035f7au, 0x3b115f7bu, 0x3c0f9fe5u, 0x3d0fdfe6u, 0x0b0008d1u, 0x0b000856u, 0x0b0008d4u, 0x0b000859u,
+	0x3a0340d7u, 0x3e0440dbu, 0x3f0400dau, 0x400480dcu, 0x3802c0d4u, 0x3a034740u, 0x3e044744u, 0x3f040743u,
+	0x40048745u, 0x3802c73du, 0x3a0340afu, 0x3e0440b3u, 0x3f0400b2u, 0x400480b4u, 0x3802c0acu, 0x3a0349c1u,
+	0x3e0449c5u, 0x3f0409c4u, 0x400489c6u, 0x3802c9beu, 0x3a034130u, 0x3e044134u, 0x3f040133u, 0x40048135u,
+	0x3802c12du, 0x3a034ab2u, 0x3e044ab6u, 0x3f040ab5u, 0x40048ab7u, 0x3802caafu, 0x3a037b90u, 0x3e047b94u,
+	0x3f043b93u, 0x4004bb95u, 0x3802fb8du, 0x3a034298u, 0x3b11429cu, 0x3c0f829bu, 0x3d0fc29du, 0x3802c295u,
+	0x3c0f86afu, 0x411e86b2u, 0x420300d5u, 0x4203073eu, 0x420300adu, 0x420309bfu, 0x4203012eu, 0x42030ab0u,
+	0x42033b8eu, 0x42030296u, 0x430380d8u, 0x43038741u, 0x430380b0u, 0x430389c2u, 0x43038131u, 0x43038ab3u,
+	0x4303bb91u, 0x4412c299u, 0x170100d6u, 0x1701073fu, 0x170100aeu, 0x170109c0u, 0x1701012fu, 0x17010ab1u,
+	0x17013b8fu, 0x17010297u, 0x4503c0d9u, 0x4503c742u, 0x4503c0b1u, 0x4503c9c3u, 0x4503c132u, 0x4503cab4u,
+	0x4503fb92u, 0x4611029au, 0x3a034b10u, 0x3b114b13u, 0x3a034634u, 0x3b11463cu, 0x3c0f863bu, 0x3d0fc63du,
+	0x3c0f84e2u, 0x00000000u, 0x47107b6du, 0x0b0001f1u, 0x0b0002dau, 0x2225c630u, 0x2225c636u, 0x3802cb0du,
+	0x48294639u, 0x252ec93bu, 0x252ec953u, 0x252ec8e9u, 0x252ec907u, 0x252eca15u, 0x252eca3du, 0x17010984u,
+	0x252ec99du, 0x492f493eu, 0x492f4956u, 0x492f48ecu, 0x492f490au, 0x492f4a18u, 0x492f4a40u, 0x4503c987u,
+	0x492f49a0u, 0x42030633u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x4412c63au, 0x4412c63au, 0x4412c63au, 0x4412c63au, 0x4412c63au, 0x4412c63au, 0x4412c63au,
+	0x4412c63au, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x291c3b66u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x281f4503u, 0x0b000506u, 0x0b000422u, 0x1f070939u, 0x1f070951u, 0x1f0708e7u, 0x1f070905u,
+	0x1f070a13u, 0x1f070a3bu, 0x1f070982u, 0x1f07099bu, 0x4a17093cu, 0x4a170954u, 0x4a1708eau, 0x4a170908u,
+	0x4a170a16u, 0x4a170a3eu, 0x4a170985u, 0x4a17099eu, 0x1f07093au, 0x1f070952u, 0x1f0708e8u, 0x1f070906u,
+	0x1f070a14u, 0x1f070a3cu, 0x1f070983u, 0x1f07099cu, 0x4a17093du, 0x4a170955u, 0x4a1708ebu, 0x4a170909u,
+	0x4a170a17u, 0x4a170a3fu, 0x4a170986u, 0x4a17099fu, 0x42030b0eu, 0x42030b0fu, 0x1f070727u, 0x1f070700u,
+	0x1f0706d1u, 0x1f0703efu, 0x1f070338u, 0x1f0703cfu, 0x4412cb11u, 0x4412cb12u, 0x4a170728u, 0x4a170701u,
+	0x391206d2u, 0x391203f0u, 0x39120339u, 0x391203d0u, 0x1f070405u, 0x1f070330u, 0x1f0701e8u, 0x1f070382u,
+	0x1f070462u, 0x1f070387u, 0x1f0708c2u, 0x00000000u, 0x4a170406u, 0x4a170331u, 0x391201ebu, 0x00000000u,
+	0x39120464u, 0x00000000u, 0x391208c3u, 0x00000000u, 0x1f070a63u, 0x1f070a8au, 0x1f0704f4u, 0x1f070511u,
+	0x1f071282u, 0x1f071284u, 0x00000000u, 0x00000000u, 0x39120a66u, 0x39120a89u, 0x301ec4f5u, 0x301ec512u,
+	0x301ed283u, 0x301ed285u, 0x00000000u, 0x00000000u, 0x1f0709f8u, 0x1f070a5du, 0x1f0704edu, 0x1f0704f3u,
+	0x1f070a69u, 0x00000000u, 0x1f0704f8u, 0x1f070419u, 0x0b000375u, 0x0b001c95u, 0x0b001d40u, 0x0b001f7cu,
+	0x0b001fe7u, 0x0b0007a5u, 0x00000000u, 0x00000000u, 0x0b000609u, 0x0b0006fbu, 0x0b0001f6u, 0x0b000a7du,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x0b000373u, 0x0b003b79u, 0x0b003bb0u, 0x00000000u, 0x00000000u,
+	0x0b001c97u, 0x0b003b78u, 0x0b003bb4u, 0x0b000374u, 0x0b001f7eu, 0x0b001d43u, 0x0b001d42u, 0x0b001f80u,
+	0x0b000a80u, 0x0b0001fcu, 0x0b000a62u, 0x0b00041bu, 0x39120a6cu, 0x39120a6cu, 0x39120a6cu, 0x39120a6cu,
+	0x39120a6cu, 0x39120a6cu, 0x39120a6cu, 0x39120a6cu, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x0b000918u, 0x0b003b56u, 0x301ec4f9u, 0x301ec4f9u, 0x301ec4f9u, 0x301ec4f9u,
+	0x301ec4f9u, 0x301ec4f9u, 0x301ec4f9u, 0x301ec4f9u, 0x0b000af4u, 0x0b000923u, 0x0b000608u, 0x0b0006fau,
+	0x0b000201u, 0x00000000u, 0x00000000u, 0x00000000u, 0x3c0f84c7u, 0x411e84c8u, 0x3c0f850cu, 0x411e850du,
+	0x0b000afau, 0x1f07071bu, 0x3912071cu, 0x0b000af8u, 0x3f040271u, 0x40048272u, 0x3f04025bu, 0x4004825cu,
+	0x3f040213u, 0x40048214u, 0x3f04020du, 0x4004820eu, 0x3f040227u, 0x40048228u, 0x3f040251u, 0x40048252u,
+	0x3f040219u, 0x4004821au, 0x3f040207u, 0x40048208u, 0x3f040281u, 0x40048282u, 0x3f04026bu, 0x4004826cu,
+	0x3f040277u, 0x40048278u, 0x3f040261u, 0x40048262u, 0x3f04023du, 0x4004823eu, 0x3f040237u, 0x40048238u,
+	0x3f040243u, 0x40048244u, 0x3f040231u, 0x40048232u, 0x3a0341b5u, 0x3b1141b7u, 0x3a034a27u, 0x3e044a29u,
+	0x3a0341d9u, 0x3e0441dbu, 0x3a034a4fu, 0x3e044a51u, 0x1f0703b7u, 0x1f0703b5u, 0x1f0704cau, 0x1f070a82u,
+	0x1f073ba9u, 0x1f073ba5u, 0x1f073badu, 0x1f0701fau, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b0004e7u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b000537u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b0009f5u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x3f0403f1u, 0x400483f4u, 0x3a0342c4u, 0x3b1142c5u,
+	0x3c0f8510u, 0x00000000u, 0x3a0341cdu, 0x3e0441cfu, 0x3c0f84eau, 0x00000000u, 0x3c0f84f0u, 0x00000000u,
+	0x3c0f86c8u, 0x4b2cc6cau, 0x3c0f86c7u, 0x4c2c86c9u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x170101b4u, 0x170101d8u, 0x170101ccu, 0x170101c0u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x461101b6u, 0x4503c1dau, 0x4503c1ceu, 0x4503c1c2u, 0x3a0341c1u, 0x3e0441c3u, 0x3c0f81a1u, 0x3d0fc1a2u,
+	0x3c0f81a7u, 0x3d0fc1a8u, 0x3c0f86b0u, 0x4b2cc6b3u, 0x3c0f86aeu, 0x4c2c86b1u, 0x3a034683u, 0x00000000u,
+	0x00000000u, 0x1f0702bfu, 0x00000000u, 0x1f073ba7u, 0x1f073babu, 0x1f073bafu, 0x1f071f76u, 0x1f071f77u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x3912091cu, 0x3912091fu,
+	0x471041abu, 0x030140c5u, 0x040240c9u, 0x070200c8u, 0x080280cau, 0x0a0080c2u, 0x0b0008cau, 0x0b00084fu,
+	0x0301472eu, 0x04024732u, 0x07020731u, 0x08028733u, 0x0a00872bu, 0x0b0008c6u, 0x0301409du, 0x040240a1u,
+	0x070200a0u, 0x080280a2u, 0x0a00809au, 0x0b0008d5u, 0x0b00085au, 0x030149afu, 0x040249b3u, 0x070209b2u,
+	0x080289b4u, 0x0a0089acu, 0x0b0008c8u, 0x0b00084du, 0x0301411eu, 0x04024122u, 0x07020121u, 0x08028123u,
+	0x0a00811bu, 0x03014aa0u, 0x04024aa4u, 0x07020aa3u, 0x08028aa5u, 0x0a008a9du, 0x03017b7eu, 0x04027b82u,
+	0x07023b81u, 0x0802bb83u, 0x0a00bb7bu, 0x03014286u, 0x0d10c28au, 0x100f0289u, 0x110f428bu, 0x0a008283u,
+	0x12100401u, 0x1210032cu, 0x132e08b8u, 0x132e083cu, 0x0b0008c4u, 0x0b000845u, 0x100f019bu, 0x00000000u,
+	0x0a0088d7u, 0x090048b7u, 0x1a00c0c3u, 0x1a00c72cu, 0x1a00c09bu, 0x1a00c9adu, 0x1a00c11cu, 0x1a00ca9eu,
+	0x1a00fb7cu, 0x1a00c284u, 0x1b0180c6u, 0x1b01872fu, 0x1b01809eu, 0x1b0189b0u, 0x1b01811fu, 0x1b018aa1u,
+	0x1b01bb7fu, 0x1c128287u, 0x170100c4u, 0x1701072du, 0x1701009cu, 0x170109aeu, 0x1701011du, 0x17010a9fu,
+	0x17013b7du, 0x17010285u, 0x1d01c0c7u, 0x1d01c730u, 0x1d01c09fu, 0x1d01c9b1u, 0x1d01c120u, 0x1d01caa2u,
+	0x1d01fb80u, 0x1e108288u, 0x03014b02u, 0x0d10cb05u, 0x0301460fu, 0x0d10c617u, 0x100f0616u, 0x110f4618u,
+	0x100f04dfu, 0x00000000u, 0x1f07083du, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x2011883eu, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x12103b67u, 0x0b0001efu, 0x0b000325u, 0x4d18c37eu, 0x0b0008ccu, 0x0b000851u,
+	0x2225c60cu, 0x2225c612u, 0x0a008affu, 0x24264614u, 0x252ec92fu, 0x252ec947u, 0x252ec8ddu, 0x252ec8fbu,
+	0x252eca09u, 0x252eca31u, 0x17010978u, 0x252ec991u, 0x272f0932u, 0x272f094au, 0x272f08e0u, 0x272f08feu,
+	0x272f0a0cu, 0x272f0a34u, 0x1d01c97bu, 0x272f0994u, 0x0a008928u, 0x0b00092bu, 0x100f04e5u, 0x00000000u,
+	0x100f04cbu, 0x00000000u, 0x1a00c60eu, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x1c128615u, 0x1c128615u, 0x1c128615u, 0x1c128615u, 0x1c128615u, 0x1c128615u,
+	0x1c128615u, 0x1c128615u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x291c3b65u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x0a008504u, 0x0b000507u, 0x0b000420u, 0x1f07092du, 0x1f070945u, 0x1f0708dbu,
+	0x1f0708f9u, 0x1f070a07u, 0x1f070a2fu, 0x1f070976u, 0x1f07098fu, 0x2d16c930u, 0x2d16c948u, 0x2d16c8deu,
+	0x2d16c8fcu, 0x2d16ca0au, 0x2d16ca32u, 0x2d16c979u, 0x2d16c992u, 0x1f07092eu, 0x1f070946u, 0x1f0708dcu,
+	0x1f0708fau, 0x1f070a08u, 0x1f070a30u, 0x1f070977u, 0x1f070990u, 0x2d16c931u, 0x2d16c949u, 0x2d16c8dfu,
+	0x2d16c8fdu, 0x2d16ca0bu, 0x2d16ca33u, 0x2d16c97au, 0x2d16c993u, 0x2b1ac3f9u, 0x2b1ac753u, 0x4e1241edu,
+	0x291c0467u, 0x4d18c383u, 0x0b0003fau, 0x0b000754u, 0x1a00cb00u, 0x1a00cb01u, 0x1f070723u, 0x1f0706fcu,
+	0x1f0706cdu, 0x1f0703dfu, 0x1f070334u, 0x1f0703cbu, 0x1c128b03u, 0x1c128b04u, 0x2d16c724u, 0x2d16c6fdu,
+	0x201186ceu, 0x201183e0u, 0x20118335u, 0x201183ccu, 0x1f0703ffu, 0x1f07032au, 0x1f0701e0u, 0x1f07037fu,
+	0x1f07045au, 0x1f070384u, 0x1f0708b9u, 0x00000000u, 0x2d16c400u, 0x2d16c32bu, 0x201181e2u, 0x00000000u,
+	0x2011845cu, 0x00000000u, 0x201188bau, 0x00000000u, 0x1f070a63u, 0x1f070a8au, 0x1f0704f4u, 0x1f070511u,
+	0x1f071282u, 0x1f071284u, 0x00000000u, 0x00000000u, 0x20118a64u, 0x20118a87u, 0x301ec4f5u, 0x301ec512u,
+	0x301ed283u, 0x301ed285u, 0x00000000u, 0x00000000u, 0x1f0709f6u, 0x1f070a5bu, 0x1f0704ebu, 0x1f0704f1u,
+	0x1f070a69u, 0x00000000u, 0x1f0704f8u, 0x1f070419u, 0x0b000375u, 0x0b001c95u, 0x0b001d40u, 0x0b001f7cu,
+	0x0b001fe7u, 0x0b0007a5u, 0x00000000u, 0x00000000u, 0x0b000609u, 0x0b0006fbu, 0x0b0001f6u, 0x0b000a7du,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x0b000373u, 0x0b003b79u, 0x0b003bb0u, 0x00000000u, 0x00000000u,
+	0x0b001c97u, 0x0b003b78u, 0x0b003bb4u, 0x0b000374u, 0x0b001f7du, 0x0b001d43u, 0x0b001d41u, 0x0b001f7fu,
+	0x0b000a80u, 0x0b0001fcu, 0x0b000a62u, 0x0b00041au, 0x20118a6au, 0x20118a6au, 0x20118a6au, 0x20118a6au,
+	0x20118a6au, 0x20118a6au, 0x20118a6au, 0x20118a6au, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x0b000918u, 0x0b003b56u, 0x301ec4f9u, 0x301ec4f9u, 0x301ec4f9u, 0x301ec4f9u,
+	0x301ec4f9u, 0x301ec4f9u, 0x301ec4f9u, 0x301ec4f9u, 0x0b000af4u, 0x0b000923u, 0x0b000608u, 0x0b0006fau,
+	0x0b000201u, 0x00000000u, 0x00000000u, 0x00000000u, 0x100f04c3u, 0x110f44c4u, 0x100f0508u, 0x110f4509u,
+	0x1f07085fu, 0x1f070860u, 0x1f070861u, 0x1f070862u, 0x1f070705u, 0x1f070706u, 0x1f070707u, 0x1f070708u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x20118709u, 0x2011870au, 0x2011870bu, 0x2011870cu,
+	0x1f07071eu, 0x110f4715u, 0x1f07071fu, 0x00000000u, 0x1f070720u, 0x00000000u, 0x1f070721u, 0x00000000u,
+	0x1f07071du, 0x20118722u, 0x0702026du, 0x0802826eu, 0x07020257u, 0x08028258u, 0x0702020fu, 0x08028210u,
+	0x07020209u, 0x0802820au, 0x07020223u, 0x08028224u, 0x0702024du, 0x0802824eu, 0x07020215u, 0x08028216u,
+	0x07020203u, 0x08028204u, 0x0702027du, 0x0802827eu, 0x07020267u, 0x08028268u, 0x07020273u, 0x08028274u,
+	0x0702025du, 0x0802825eu, 0x07020239u, 0x0802823au, 0x07020233u, 0x08028234u, 0x0702023fu, 0x08028240u,
+	0x0702022du, 0x0802822eu, 0x291c0476u, 0x291c046du, 0x291c0447u, 0x291c043eu, 0x291c044cu, 0x291c046au,
+	0x291c0444u, 0x291c0441u, 0x291c047du, 0x291c0473u, 0x291c0479u, 0x291c0470u, 0x291c0458u, 0x291c044fu,
+	0x291c0455u, 0x291c0452u, 0x0b0008cfu, 0x0b000854u, 0x030141adu, 0x0d10c1afu, 0x03014a1fu, 0x04024a21u,
+	0x0b0008d2u, 0x0b000857u, 0x030141d1u, 0x040241d3u, 0x03014a47u, 0x04024a49u, 0x1f0703b6u, 0x1f0703b4u,
+	0x1f0704cau, 0x1f070a82u, 0x00000000u, 0x00000000u, 0x1f070200u, 0x1f0701fbu, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x4f1b0b1bu, 0x00000000u, 0x070203e1u, 0x080283e4u,
+	0x030142c0u, 0x0d10c2c1u, 0x100f050eu, 0x00000000u, 0x030141c5u, 0x040241c7u, 0x100f04e8u, 0x00000000u,
+	0x100f04eeu, 0x00000000u, 0x100f06beu, 0x352c06c0u, 0x100f06bdu, 0x110f46bfu, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x170101acu, 0x170101d0u, 0x170101c4u, 0x170101b8u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x1e1081aeu, 0x1d01c1d2u, 0x1d01c1c6u, 0x1d01c1bau, 0x030141b9u, 0x040241bbu,
+	0x100f019du, 0x110f419eu, 0x100f01a3u, 0x110f41a4u, 0x100f06a5u, 0x352c06a7u, 0x100f06a4u, 0x110f46a6u,
+	0x00000000u, 0x1f0702c6u, 0x00000000u, 0x1f073ba6u, 0x1f073baau, 0x1f073baeu, 0x1f071c96u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x2011891au, 0x2011891du,
+	0x121001a9u, 0x2225c644u, 0x2225c61cu, 0x2225c64au, 0x2225c623u, 0x161bc449u, 0x2225c60bu, 0x2225c611u,
+	0x1f0703b6u, 0x1f0703b4u, 0x1f0704cau, 0x1f070a82u, 0x1f073ba8u, 0x1f073ba4u, 0x1f070200u, 0x1f0701fbu,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x0b0004e7u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x4f1b0b1bu, 0x4f1b0b1bu, 0x4f1b0b1bu, 0x4f1b0b1bu, 0x4f1b0b1bu, 0x4f1b0b1bu, 0x4f1b0b1bu, 0x4f1b0b1bu,
+	0x0b0009f5u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x1f0702c6u, 0x00000000u, 0x1f073ba6u, 0x1f073baau, 0x1f073baeu, 0x1f071c96u, 0x1f071f77u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x2011891au, 0x2011891du,
+	0x502afbb7u, 0x51e7bbb8u, 0x2225c60du, 0x2225c613u, 0x1f0703ffu, 0x1f07032au, 0x1f0701e8u, 0x1f07037fu,
+	0x1f070462u, 0x1f070384u, 0x1f0708b9u, 0x00000000u, 0x2d16c400u, 0x2d16c32bu, 0x391201ebu, 0x00000000u,
+	0x39120464u, 0x00000000u, 0x201188bau, 0x00000000u, 0x1f0709f8u, 0x1f070a5du, 0x1f0704edu, 0x1f0704f3u,
+	0x1f070a69u, 0x00000000u, 0x1f0704f8u, 0x1f070419u, 0x0b000375u, 0x0b001c95u, 0x0b001d40u, 0x0b001f7cu,
+	0x0b001fe7u, 0x0b0007a5u, 0x00000000u, 0x00000000u, 0x0b000609u, 0x0b0006fbu, 0x0b0001f6u, 0x0b000a7du,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x0b000373u, 0x0b003b79u, 0x0b003bb0u, 0x00000000u, 0x00000000u,
+	0x0b001c97u, 0x0b003b78u, 0x0b003bb4u, 0x0b000374u, 0x0b001f7eu, 0x0b001d43u, 0x0b001d42u, 0x0b001f80u,
+	0x0b000a80u, 0x0b0001fcu, 0x0b000a62u, 0x0b00041bu, 0x20118a6au, 0x20118a6au, 0x20118a6au, 0x20118a6au,
+	0x20118a6au, 0x20118a6au, 0x20118a6au, 0x20118a6au, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x0b000918u, 0x0b003b56u, 0x301ec4f9u, 0x301ec4f9u, 0x301ec4f9u, 0x301ec4f9u,
+	0x301ec4f9u, 0x301ec4f9u, 0x301ec4f9u, 0x301ec4f9u, 0x0b000af4u, 0x0b000923u, 0x0b000608u, 0x0b0006fau,
+	0x0b000201u, 0x00000000u, 0x00000000u, 0x00000000u, 0x42030633u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x4412c63au, 0x4412c63au, 0x4412c63au, 0x4412c63au,
+	0x4412c63au, 0x4412c63au, 0x4412c63au, 0x4412c63au, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x291c3b65u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x1f070405u, 0x1f070330u, 0x1f0701e8u, 0x1f070382u,
+	0x1f070462u, 0x1f070387u, 0x1f0708b9u, 0x00000000u, 0x4a170406u, 0x4a170331u, 0x391201ebu, 0x00000000u,
+	0x39120464u, 0x00000000u, 0x201188bau, 0x00000000u, 0x1f0703b7u, 0x1f0703b5u, 0x1f0704cau, 0x1f070a82u,
+	0x1f073ba8u, 0x1f073ba4u, 0x1f070200u, 0x1f0701fbu, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0b0004e7u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x4f1b0b1bu, 0x4f1b0b1bu, 0x4f1b0b1bu, 0x4f1b0b1bu,
+	0x4f1b0b1bu, 0x4f1b0b1bu, 0x4f1b0b1bu, 0x4f1b0b1bu, 0x0b0009f5u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x1f0702bfu, 0x00000000u, 0x1f073ba7u,
+	0x1f073babu, 0x1f073bafu, 0x1f071c96u, 0x1f071f77u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x2011891au, 0x2011891du, 0x1a00c60eu, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x1c128615u, 0x1c128615u, 0x1c128615u, 0x1c128615u,
+	0x1c128615u, 0x1c128615u, 0x1c128615u, 0x1c128615u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x291c3b66u, 0x00000000u, 0x00000000u, 0x00000000u,
+	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x1f0702c6u, 0x00000000u, 0x1f073ba6u,
 	0x1f073baau, 0x1f073baeu, 0x1f071f76u, 0x1f071f77u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
 	0x00000000u, 0x00000000u, 0x2011891au, 0x2011891du,
 };
@@ -3427,6 +4564,13 @@ enum {
 	X86_TERMINAL_32,
 	X86_TERMINAL_64,
 	X86_TERMINAL_64_REXW,
+	X86_TERMINAL_32_OPSIZE,
+	X86_TERMINAL_32_ADSIZE,
+	X86_TERMINAL_32_OPSIZE_ADSIZE,
+	X86_TERMINAL_64_OPSIZE,
+	X86_TERMINAL_64_ADSIZE,
+	X86_TERMINAL_64_OPSIZE_ADSIZE,
+	X86_TERMINAL_64_REXW_OPSIZE,
 	X86_TERMINAL_16,
 	X86_TERMINAL_16_OPSIZE,
 	X86_TERMINAL_16_ADSIZE,
@@ -3472,44 +4616,44 @@ static const uint64_t x86LegacyDecisions[X86_TERMINAL_ROW_COUNT][2][256] = {
 	UINT64_C(0x4609c58d0104cb17), UINT64_C(0x4688658603014b09), 0, 0,
 	UINT64_C(0x4609c3288104c648), UINT64_C(0x4688631583014622), UINT64_C(0x4789e3298e13464f), UINT64_C(0x4887a316100f062a),
 	0, UINT64_C(0x40000000100f04e0), 0, UINT64_C(0x80000000000300c7),
-	0, UINT64_C(0x0000000012103b6a), UINT64_C(0x0000000012103b6a), UINT64_C(0x0000000012103b6a),
+	UINT64_C(0x000000000b000704), UINT64_C(0x0000000012103b6a), UINT64_C(0x0000000012103b6a), UINT64_C(0x0000000012103b6a),
 	UINT64_C(0x0000000012103b6a), UINT64_C(0x0000000012103b6a), UINT64_C(0x0000000012103b6a), UINT64_C(0x0000000012103b6a),
 	UINT64_C(0x000000000b000326), UINT64_C(0x000000000b0001f0), UINT64_C(0x0000000021190380), UINT64_C(0x000000000b003b4e),
 	UINT64_C(0x000000000b0008cd), UINT64_C(0x000000000b000852), UINT64_C(0x000000000b000975), UINT64_C(0x000000000b0004c2),
-	0, 0, 0, 0,
+	UINT64_C(0x000000002225c645), UINT64_C(0x000000002225c61d), UINT64_C(0x000000002225c64b), UINT64_C(0x000000002225c624),
 	0, 0, 0, 0,
 	UINT64_C(0x0000000009004b14), UINT64_C(0x000000000a008b06), 0, 0,
 	0, 0, 0, 0,
-	UINT64_C(0x00000000222a064d), UINT64_C(0x00000000222a064d), UINT64_C(0x00000000222a064d), UINT64_C(0x00000000222a064d),
-	UINT64_C(0x00000000222a064d), UINT64_C(0x00000000222a064d), UINT64_C(0x00000000222a064d), UINT64_C(0x00000000222a064d),
-	UINT64_C(0x0000000023264628), UINT64_C(0x0000000023264628), UINT64_C(0x0000000023264628), UINT64_C(0x0000000023264628),
-	UINT64_C(0x0000000023264628), UINT64_C(0x0000000023264628), UINT64_C(0x0000000023264628), UINT64_C(0x0000000023264628),
-	UINT64_C(0x80000000000300e4), UINT64_C(0x80000000000300f4), UINT64_C(0x00000000271f4926), UINT64_C(0x000000000b000929),
-	UINT64_C(0x40000000100f04e6), UINT64_C(0x40000000100f04cc), UINT64_C(0x800000000002010a), UINT64_C(0x8000000000020152),
-	UINT64_C(0x000000002917c378), UINT64_C(0x000000000b0004e3), UINT64_C(0x00000000271f4502), UINT64_C(0x000000000b000505),
-	UINT64_C(0x000000000b000414), UINT64_C(0x000000002a1ac412), UINT64_C(0x000000000b000415), UINT64_C(0x000000000b000421),
-	UINT64_C(0x80000000000301a2), UINT64_C(0x80000000000301b2), UINT64_C(0x80000000000301c2), UINT64_C(0x80000000000301d2),
+	UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d),
+	UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d),
+	UINT64_C(0x0000000024264628), UINT64_C(0x0000000024264628), UINT64_C(0x0000000024264628), UINT64_C(0x0000000024264628),
+	UINT64_C(0x0000000024264628), UINT64_C(0x0000000024264628), UINT64_C(0x0000000024264628), UINT64_C(0x0000000024264628),
+	UINT64_C(0x80000000000300e9), UINT64_C(0x80000000000300f9), UINT64_C(0x00000000281f4926), UINT64_C(0x000000000b000929),
+	UINT64_C(0x40000000100f04e6), UINT64_C(0x40000000100f04cc), UINT64_C(0x800000000002010f), UINT64_C(0x8000000000020157),
+	UINT64_C(0x000000002a17c378), UINT64_C(0x000000000b0004e3), UINT64_C(0x00000000281f4502), UINT64_C(0x000000000b000505),
+	UINT64_C(0x000000000b000414), UINT64_C(0x000000002b1ac412), UINT64_C(0x000000000b000415), UINT64_C(0x000000000b000421),
+	UINT64_C(0x80000000000301a7), UINT64_C(0x80000000000301b7), UINT64_C(0x80000000000301c7), UINT64_C(0x80000000000301d7),
 	UINT64_C(0x0000000009004094), UINT64_C(0x0000000009004093), UINT64_C(0x000000000b00098e), UINT64_C(0x000000000b003b7a),
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	UINT64_C(0x00000000161bc501), UINT64_C(0x00000000161bc500), UINT64_C(0x00000000161bc4ff), UINT64_C(0x00000000161bc44a),
-	UINT64_C(0x000000002a1ac3fd), UINT64_C(0x000000002a1ac3fb), UINT64_C(0x000000002a1ac757), UINT64_C(0x000000002a1ac755),
-	UINT64_C(0x000000002d11c1ee), UINT64_C(0x00000000281c0468), UINT64_C(0x0000000021190385), UINT64_C(0x00000000161bc466),
+	UINT64_C(0x000000002b1ac3fd), UINT64_C(0x000000002b1ac3fb), UINT64_C(0x000000002b1ac757), UINT64_C(0x000000002b1ac755),
+	UINT64_C(0x000000002e11c1ee), UINT64_C(0x00000000291c0468), UINT64_C(0x0000000021190385), UINT64_C(0x00000000161bc466),
 	UINT64_C(0x000000000b0003fe), UINT64_C(0x000000000b0003fc), UINT64_C(0x000000000b000758), UINT64_C(0x000000000b000756),
 	UINT64_C(0x000000000b0004fa), UINT64_C(0x000000000b000413), UINT64_C(0x000000000b000924), UINT64_C(0x000000000b000925),
-	UINT64_C(0x000000000b0003c6), UINT64_C(0x000000000b000202), UINT64_C(0x80000000000301fc), UINT64_C(0x800000000003020c),
+	UINT64_C(0x000000000b0003c6), UINT64_C(0x000000000b000202), UINT64_C(0x8000000000030201), UINT64_C(0x8000000000030211),
 	UINT64_C(0x000000000b0001f7), UINT64_C(0x000000000b000a7e), UINT64_C(0x000000000b0001fd), UINT64_C(0x000000000b000a81),
-	UINT64_C(0x000000000b0001f8), UINT64_C(0x000000000b000a7f), UINT64_C(0x8000000000030222), UINT64_C(0x8000000000030232),
+	UINT64_C(0x000000000b0001f8), UINT64_C(0x000000000b000a7f), UINT64_C(0x8000000000030227), UINT64_C(0x8000000000030237),
 },
 {
-	UINT64_C(0x8000000000030242), UINT64_C(0x8000000000020252), UINT64_C(0x4887a263100f04c5), UINT64_C(0x4887a285900f050a),
+	UINT64_C(0x8000000000030247), UINT64_C(0x8000000000020257), UINT64_C(0x4887a263100f04c5), UINT64_C(0x4887a285900f050a),
 	0, UINT64_C(0x000000000b000af5), UINT64_C(0x000000000b0001ff), UINT64_C(0x000000000b000af9),
 	UINT64_C(0x000000000b000416), UINT64_C(0x000000000b003b4f), 0, UINT64_C(0x000000000b000b3f),
-	0, UINT64_C(0x80000000000302a4), UINT64_C(0x000000000b000391), 0,
+	0, UINT64_C(0x80000000000302a9), UINT64_C(0x000000000b000391), 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0,
-	UINT64_C(0x80000000000302b5), UINT64_C(0x4887a38a9f070717), 0, 0,
-	UINT64_C(0x80000000000302c7), UINT64_C(0x400000001f070718), UINT64_C(0x400000001f070719), UINT64_C(0x5008c38d1f070716),
+	UINT64_C(0x80000000000302ba), UINT64_C(0x4887a38a9f070717), 0, 0,
+	UINT64_C(0x80000000000302cc), UINT64_C(0x400000001f070718), UINT64_C(0x400000001f070719), UINT64_C(0x5008c38d1f070716),
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0,
@@ -3532,26 +4676,26 @@ static const uint64_t x86LegacyDecisions[X86_TERMINAL_ROW_COUNT][2][256] = {
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, UINT64_C(0x000000000b000558),
-	UINT64_C(0x58d5cfbcb02b1f78), UINT64_C(0x59d5eff23215dfe3), 0, 0,
+	UINT64_C(0x5955cfbcb12b1f78), UINT64_C(0x5a55eff23315dfe3), 0, 0,
 	0, 0, 0, 0,
-	UINT64_C(0x00000000281c0477), UINT64_C(0x00000000281c046e), UINT64_C(0x00000000281c0448), UINT64_C(0x00000000281c043f),
-	UINT64_C(0x00000000281c044d), UINT64_C(0x00000000281c046b), UINT64_C(0x00000000281c0445), UINT64_C(0x00000000281c0442),
-	UINT64_C(0x00000000281c047e), UINT64_C(0x00000000281c0474), UINT64_C(0x00000000281c047a), UINT64_C(0x00000000281c0471),
-	UINT64_C(0x00000000281c0459), UINT64_C(0x00000000281c0450), UINT64_C(0x00000000281c0456), UINT64_C(0x00000000281c0453),
-	0, UINT64_C(0x570bc4f49f0709e8), UINT64_C(0x570bc4ed9f0709da), UINT64_C(0x570bc4ea9f0709d4),
-	UINT64_C(0x570bc4ee9f0709dc), UINT64_C(0x570bc4f39f0709e6), UINT64_C(0x570bc4ec9f0709d8), UINT64_C(0x570bc4eb9f0709d6),
-	UINT64_C(0x570bc4fa1f0709f3), UINT64_C(0x570bc4f69f0709ec), UINT64_C(0x570bc4f89f0709f0), UINT64_C(0x570bc4f59f0709ea),
-	UINT64_C(0x570bc4f29f0709e4), UINT64_C(0x570bc4ef9f0709de), UINT64_C(0x570bc4f19f0709e2), UINT64_C(0x570bc4f09f0709e0),
+	UINT64_C(0x00000000291c0477), UINT64_C(0x00000000291c046e), UINT64_C(0x00000000291c0448), UINT64_C(0x00000000291c043f),
+	UINT64_C(0x00000000291c044d), UINT64_C(0x00000000291c046b), UINT64_C(0x00000000291c0445), UINT64_C(0x00000000291c0442),
+	UINT64_C(0x00000000291c047e), UINT64_C(0x00000000291c0474), UINT64_C(0x00000000291c047a), UINT64_C(0x00000000291c0471),
+	UINT64_C(0x00000000291c0459), UINT64_C(0x00000000291c0450), UINT64_C(0x00000000291c0456), UINT64_C(0x00000000291c0453),
+	UINT64_C(0x578bc4f79f0709ee), UINT64_C(0x578bc4f49f0709e8), UINT64_C(0x578bc4ed9f0709da), UINT64_C(0x578bc4ea9f0709d4),
+	UINT64_C(0x578bc4ee9f0709dc), UINT64_C(0x578bc4f39f0709e6), UINT64_C(0x578bc4ec9f0709d8), UINT64_C(0x578bc4eb9f0709d6),
+	UINT64_C(0x578bc4fa1f0709f3), UINT64_C(0x578bc4f69f0709ec), UINT64_C(0x578bc4f89f0709f0), UINT64_C(0x578bc4f59f0709ea),
+	UINT64_C(0x578bc4f29f0709e4), UINT64_C(0x578bc4ef9f0709de), UINT64_C(0x578bc4f19f0709e2), UINT64_C(0x578bc4f09f0709e0),
 	UINT64_C(0x000000000b0008d0), UINT64_C(0x000000000b000855), UINT64_C(0x000000000b0002d9), UINT64_C(0x468860d9830141b1),
-	0, UINT64_C(0x4201251283014a23), UINT64_C(0x800000000002033e), UINT64_C(0x8000000000020386),
+	0, UINT64_C(0x4201251283014a23), UINT64_C(0x8000000000020345), UINT64_C(0x800000000002038d),
 	UINT64_C(0x000000000b0008d3), UINT64_C(0x000000000b000858), UINT64_C(0x000000000b00096d), UINT64_C(0x420120eb830141d5),
-	0, UINT64_C(0x4201252683014a4b), UINT64_C(0x80000000000203d5), UINT64_C(0x440141f6070203e9),
+	0, UINT64_C(0x4201252683014a4b), UINT64_C(0x80000000000203dc), UINT64_C(0x440141f6070203e9),
 	UINT64_C(0x4609c1640104c2c7), UINT64_C(0x46886161830142c2), UINT64_C(0x40000000100f050f), UINT64_C(0x420120e5830141c9),
-	UINT64_C(0x40000000100f04e9), UINT64_C(0x40000000100f04ef), UINT64_C(0x5a160362900f06c2), UINT64_C(0x5a962362100f06c1),
-	0, 0, UINT64_C(0x800000000003042f), UINT64_C(0x420120df830141bd),
-	UINT64_C(0x4887a0d0100f019f), UINT64_C(0x4887a0d3100f01a5), UINT64_C(0x5a160356100f06a9), UINT64_C(0x5a962355900f06a8),
-	0, 0, 0, UINT64_C(0x40000000302b0684),
-	0, 0, 0, UINT64_C(0x800000000003044b),
+	UINT64_C(0x40000000100f04e9), UINT64_C(0x40000000100f04ef), UINT64_C(0x5a960362900f06c2), UINT64_C(0x5b162362100f06c1),
+	0, 0, UINT64_C(0x8000000000030436), UINT64_C(0x420120df830141bd),
+	UINT64_C(0x4887a0d0100f019f), UINT64_C(0x4887a0d3100f01a5), UINT64_C(0x5a960356100f06a9), UINT64_C(0x5b162355900f06a8),
+	0, 0, 0, UINT64_C(0x40000000312b0684),
+	0, 0, 0, UINT64_C(0x8000000000030452),
 	UINT64_C(0x00000000121001aa), UINT64_C(0x00000000121001aa), UINT64_C(0x00000000121001aa), UINT64_C(0x00000000121001aa),
 	UINT64_C(0x00000000121001aa), UINT64_C(0x00000000121001aa), UINT64_C(0x00000000121001aa), UINT64_C(0x00000000121001aa),
 	0, 0, 0, 0,
@@ -3590,13 +4734,13 @@ static const uint64_t x86LegacyDecisions[X86_TERMINAL_ROW_COUNT][2][256] = {
 	0, 0, 0, 0,
 	UINT64_C(0x000000000b00092c), 0, 0, 0,
 	0, 0, 0, 0,
-	UINT64_C(0x00000000362e48c1), UINT64_C(0x00000000362e48c1), UINT64_C(0x00000000362e48c1), UINT64_C(0x00000000362e48c1),
-	UINT64_C(0x00000000362e48c1), UINT64_C(0x00000000362e48c1), UINT64_C(0x00000000362e48c1), UINT64_C(0x00000000362e48c1),
-	UINT64_C(0x00000000362e4842), UINT64_C(0x00000000362e4842), UINT64_C(0x00000000362e4842), UINT64_C(0x00000000362e4842),
-	UINT64_C(0x00000000362e4842), UINT64_C(0x00000000362e4842), UINT64_C(0x00000000362e4842), UINT64_C(0x00000000362e4842),
-	0, 0, 0, UINT64_C(0x59d5fddb3215fbb5),
+	UINT64_C(0x00000000372e48c1), UINT64_C(0x00000000372e48c1), UINT64_C(0x00000000372e48c1), UINT64_C(0x00000000372e48c1),
+	UINT64_C(0x00000000372e48c1), UINT64_C(0x00000000372e48c1), UINT64_C(0x00000000372e48c1), UINT64_C(0x00000000372e48c1),
+	UINT64_C(0x00000000372e4842), UINT64_C(0x00000000372e4842), UINT64_C(0x00000000372e4842), UINT64_C(0x00000000372e4842),
+	UINT64_C(0x00000000372e4842), UINT64_C(0x00000000372e4842), UINT64_C(0x00000000372e4842), UINT64_C(0x00000000372e4842),
+	0, 0, 0, UINT64_C(0x5a55fddb3315fbb5),
 	0, 0, UINT64_C(0x000000000b000329), 0,
-	UINT64_C(0x000000003702c8bf), 0, UINT64_C(0x00000000090048c0), 0,
+	UINT64_C(0x000000003802c8bf), 0, UINT64_C(0x00000000090048c0), 0,
 	0, 0, 0, 0,
 	UINT64_C(0x00000000161bc475), UINT64_C(0x00000000161bc46c), UINT64_C(0x00000000161bc446), UINT64_C(0x00000000161bc43d),
 	UINT64_C(0x00000000161bc44b), UINT64_C(0x00000000161bc469), UINT64_C(0x00000000161bc443), UINT64_C(0x00000000161bc440),
@@ -3605,45 +4749,45 @@ static const uint64_t x86LegacyDecisions[X86_TERMINAL_ROW_COUNT][2][256] = {
 	UINT64_C(0x8000000000030079), UINT64_C(0x8000000000030089), 0, UINT64_C(0x80000000000300a9),
 	UINT64_C(0x4609c58d0104cb17), UINT64_C(0x4688658603014b09), 0, 0,
 	UINT64_C(0x4609c3288104c648), UINT64_C(0x4688631583014622), UINT64_C(0x4789e3298e13464f), UINT64_C(0x4887a316100f062a),
-	0, UINT64_C(0x40000000100f04e1), 0, UINT64_C(0x8000000000030466),
-	0, UINT64_C(0x0000000012103b6a), UINT64_C(0x0000000012103b6a), UINT64_C(0x0000000012103b6a),
+	0, UINT64_C(0x40000000100f04e1), 0, UINT64_C(0x800000000003046d),
+	UINT64_C(0x000000000b000704), UINT64_C(0x0000000012103b6a), UINT64_C(0x0000000012103b6a), UINT64_C(0x0000000012103b6a),
 	UINT64_C(0x0000000012103b6a), UINT64_C(0x0000000012103b6a), UINT64_C(0x0000000012103b6a), UINT64_C(0x0000000012103b6a),
 	UINT64_C(0x000000000b000326), UINT64_C(0x000000000b0001f0), 0, UINT64_C(0x000000000b003b4e),
 	UINT64_C(0x000000000b0008ce), UINT64_C(0x000000000b000853), UINT64_C(0x000000000b000975), UINT64_C(0x000000000b0004c2),
-	0, 0, 0, 0,
+	UINT64_C(0x000000002225c646), UINT64_C(0x000000002225c61e), UINT64_C(0x000000002225c64c), UINT64_C(0x000000002225c625),
 	0, 0, 0, 0,
 	UINT64_C(0x0000000009004b14), UINT64_C(0x000000000a008b06), 0, 0,
 	0, 0, 0, 0,
-	UINT64_C(0x00000000222a064d), UINT64_C(0x00000000222a064d), UINT64_C(0x00000000222a064d), UINT64_C(0x00000000222a064d),
-	UINT64_C(0x00000000222a064d), UINT64_C(0x00000000222a064d), UINT64_C(0x00000000222a064d), UINT64_C(0x00000000222a064d),
-	UINT64_C(0x0000000023264628), UINT64_C(0x0000000023264628), UINT64_C(0x0000000023264628), UINT64_C(0x0000000023264628),
-	UINT64_C(0x0000000023264628), UINT64_C(0x0000000023264628), UINT64_C(0x0000000023264628), UINT64_C(0x0000000023264628),
-	UINT64_C(0x80000000000300e4), UINT64_C(0x80000000000300f4), UINT64_C(0x00000000271f4927), UINT64_C(0x000000000b00092a),
-	0, 0, UINT64_C(0x800000000002010a), UINT64_C(0x8000000000020152),
-	UINT64_C(0x000000002917c378), UINT64_C(0x000000000b0004e4), UINT64_C(0x00000000271f4502), UINT64_C(0x000000000b000505),
-	UINT64_C(0x000000000b000414), UINT64_C(0x000000002a1ac412), 0, UINT64_C(0x000000000b000421),
-	UINT64_C(0x80000000000301a2), UINT64_C(0x80000000000301b2), UINT64_C(0x80000000000301c2), UINT64_C(0x80000000000301d2),
+	UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d),
+	UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d),
+	UINT64_C(0x0000000024264628), UINT64_C(0x0000000024264628), UINT64_C(0x0000000024264628), UINT64_C(0x0000000024264628),
+	UINT64_C(0x0000000024264628), UINT64_C(0x0000000024264628), UINT64_C(0x0000000024264628), UINT64_C(0x0000000024264628),
+	UINT64_C(0x80000000000300e9), UINT64_C(0x80000000000300f9), UINT64_C(0x00000000281f4927), UINT64_C(0x000000000b00092a),
+	0, 0, UINT64_C(0x800000000002010f), UINT64_C(0x8000000000020157),
+	UINT64_C(0x000000002a17c378), UINT64_C(0x000000000b0004e4), UINT64_C(0x00000000281f4502), UINT64_C(0x000000000b000505),
+	UINT64_C(0x000000000b000414), UINT64_C(0x000000002b1ac412), 0, UINT64_C(0x000000000b000421),
+	UINT64_C(0x80000000000301a7), UINT64_C(0x80000000000301b7), UINT64_C(0x80000000000301c7), UINT64_C(0x80000000000301d7),
 	0, 0, 0, UINT64_C(0x000000000b003b7a),
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	UINT64_C(0x00000000161bc501), UINT64_C(0x00000000161bc500), UINT64_C(0x00000000161bc4ff), UINT64_C(0x00000000161bc47b),
-	UINT64_C(0x000000002a1ac3fd), UINT64_C(0x000000002a1ac3fb), UINT64_C(0x000000002a1ac757), UINT64_C(0x000000002a1ac755),
-	UINT64_C(0x000000002d11c1ea), UINT64_C(0x00000000281c0468), 0, UINT64_C(0x00000000161bc466),
+	UINT64_C(0x000000002b1ac3fd), UINT64_C(0x000000002b1ac3fb), UINT64_C(0x000000002b1ac757), UINT64_C(0x000000002b1ac755),
+	UINT64_C(0x000000002e11c1ea), UINT64_C(0x00000000291c0468), 0, UINT64_C(0x00000000161bc466),
 	UINT64_C(0x000000000b0003fe), UINT64_C(0x000000000b0003fc), UINT64_C(0x000000000b000758), UINT64_C(0x000000000b000756),
 	UINT64_C(0x000000000b0004fa), UINT64_C(0x000000000b000413), UINT64_C(0x000000000b000924), UINT64_C(0x000000000b000925),
-	UINT64_C(0x000000000b0003c6), UINT64_C(0x000000000b000202), UINT64_C(0x80000000000301fc), UINT64_C(0x800000000003020c),
+	UINT64_C(0x000000000b0003c6), UINT64_C(0x000000000b000202), UINT64_C(0x8000000000030201), UINT64_C(0x8000000000030211),
 	UINT64_C(0x000000000b0001f7), UINT64_C(0x000000000b000a7e), UINT64_C(0x000000000b0001fd), UINT64_C(0x000000000b000a81),
-	UINT64_C(0x000000000b0001f8), UINT64_C(0x000000000b000a7f), UINT64_C(0x8000000000030222), UINT64_C(0x800000000003047d),
+	UINT64_C(0x000000000b0001f8), UINT64_C(0x000000000b000a7f), UINT64_C(0x8000000000030227), UINT64_C(0x8000000000030488),
 },
 {
-	UINT64_C(0x8000000000030242), UINT64_C(0x800000000002048d), UINT64_C(0x4887a263100f04c5), UINT64_C(0x4887a285900f050a),
+	UINT64_C(0x8000000000030247), UINT64_C(0x8000000000020498), UINT64_C(0x4887a263100f04c5), UINT64_C(0x4887a285900f050a),
 	0, UINT64_C(0x000000000b000af5), UINT64_C(0x000000000b0001ff), UINT64_C(0x000000000b000af9),
 	UINT64_C(0x000000000b000416), UINT64_C(0x000000000b003b4f), 0, UINT64_C(0x000000000b000b3f),
-	0, UINT64_C(0x80000000000302a4), UINT64_C(0x000000000b000391), 0,
+	0, UINT64_C(0x80000000000302a9), UINT64_C(0x000000000b000391), 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0,
-	UINT64_C(0x80000000000302b5), UINT64_C(0x4887a38a9f070717), 0, 0,
-	UINT64_C(0x80000000000302c7), UINT64_C(0x400000001f070718), UINT64_C(0x400000001f070719), UINT64_C(0x5008c38d1f070716),
+	UINT64_C(0x80000000000302ba), UINT64_C(0x4887a38a9f070717), 0, 0,
+	UINT64_C(0x80000000000302cc), UINT64_C(0x400000001f070718), UINT64_C(0x400000001f070719), UINT64_C(0x5008c38d1f070716),
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0,
@@ -3666,26 +4810,26 @@ static const uint64_t x86LegacyDecisions[X86_TERMINAL_ROW_COUNT][2][256] = {
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, UINT64_C(0x000000000b000558),
-	UINT64_C(0x5d08afbdb9035f7a), UINT64_C(0x5e07eff33b0f9fe5), 0, 0,
+	UINT64_C(0x5d88afbdba035f7a), UINT64_C(0x5e87eff33c0f9fe5), 0, 0,
 	0, 0, 0, 0,
-	UINT64_C(0x00000000281c0477), UINT64_C(0x00000000281c046e), UINT64_C(0x00000000281c0448), UINT64_C(0x00000000281c043f),
-	UINT64_C(0x00000000281c044d), UINT64_C(0x00000000281c046b), UINT64_C(0x00000000281c0445), UINT64_C(0x00000000281c0442),
-	UINT64_C(0x00000000281c047e), UINT64_C(0x00000000281c0474), UINT64_C(0x00000000281c047a), UINT64_C(0x00000000281c0471),
-	UINT64_C(0x00000000281c0459), UINT64_C(0x00000000281c0450), UINT64_C(0x00000000281c0456), UINT64_C(0x00000000281c0453),
-	0, UINT64_C(0x570bc4f49f0709e8), UINT64_C(0x570bc4ed9f0709da), UINT64_C(0x570bc4ea9f0709d4),
-	UINT64_C(0x570bc4ee9f0709dc), UINT64_C(0x570bc4f39f0709e6), UINT64_C(0x570bc4ec9f0709d8), UINT64_C(0x570bc4eb9f0709d6),
-	UINT64_C(0x570bc4fa1f0709f3), UINT64_C(0x570bc4f69f0709ec), UINT64_C(0x570bc4f89f0709f0), UINT64_C(0x570bc4f59f0709ea),
-	UINT64_C(0x570bc4f29f0709e4), UINT64_C(0x570bc4ef9f0709de), UINT64_C(0x570bc4f19f0709e2), UINT64_C(0x570bc4f09f0709e0),
+	UINT64_C(0x00000000291c0477), UINT64_C(0x00000000291c046e), UINT64_C(0x00000000291c0448), UINT64_C(0x00000000291c043f),
+	UINT64_C(0x00000000291c044d), UINT64_C(0x00000000291c046b), UINT64_C(0x00000000291c0445), UINT64_C(0x00000000291c0442),
+	UINT64_C(0x00000000291c047e), UINT64_C(0x00000000291c0474), UINT64_C(0x00000000291c047a), UINT64_C(0x00000000291c0471),
+	UINT64_C(0x00000000291c0459), UINT64_C(0x00000000291c0450), UINT64_C(0x00000000291c0456), UINT64_C(0x00000000291c0453),
+	UINT64_C(0x578bc4f79f0709ee), UINT64_C(0x578bc4f49f0709e8), UINT64_C(0x578bc4ed9f0709da), UINT64_C(0x578bc4ea9f0709d4),
+	UINT64_C(0x578bc4ee9f0709dc), UINT64_C(0x578bc4f39f0709e6), UINT64_C(0x578bc4ec9f0709d8), UINT64_C(0x578bc4eb9f0709d6),
+	UINT64_C(0x578bc4fa1f0709f3), UINT64_C(0x578bc4f69f0709ec), UINT64_C(0x578bc4f89f0709f0), UINT64_C(0x578bc4f59f0709ea),
+	UINT64_C(0x578bc4f29f0709e4), UINT64_C(0x578bc4ef9f0709de), UINT64_C(0x578bc4f19f0709e2), UINT64_C(0x578bc4f09f0709e0),
 	UINT64_C(0x000000000b0008d1), UINT64_C(0x000000000b000856), UINT64_C(0x000000000b0002d9), UINT64_C(0x468860d9830141b1),
-	0, UINT64_C(0x4201251283014a23), UINT64_C(0x800000000002033e), UINT64_C(0x8000000000020386),
+	0, UINT64_C(0x4201251283014a23), UINT64_C(0x8000000000020345), UINT64_C(0x800000000002038d),
 	UINT64_C(0x000000000b0008d4), UINT64_C(0x000000000b000859), UINT64_C(0x000000000b00096d), UINT64_C(0x420120eb830141d5),
-	0, UINT64_C(0x4201252683014a4b), UINT64_C(0x80000000000203d5), UINT64_C(0x440141f6070203e9),
+	0, UINT64_C(0x4201252683014a4b), UINT64_C(0x80000000000203dc), UINT64_C(0x440141f6070203e9),
 	UINT64_C(0x4609c1640104c2c7), UINT64_C(0x46886161830142c2), UINT64_C(0x40000000100f050f), UINT64_C(0x420120e5830141c9),
-	UINT64_C(0x40000000100f04e9), UINT64_C(0x40000000100f04ef), UINT64_C(0x5a160362900f06c2), UINT64_C(0x5a962362100f06c1),
-	0, 0, UINT64_C(0x800000000003042f), UINT64_C(0x420120df830141bd),
-	UINT64_C(0x4887a0d0100f019f), UINT64_C(0x4887a0d3100f01a5), UINT64_C(0x5a160356100f06a9), UINT64_C(0x5a962355900f06a8),
-	0, 0, 0, UINT64_C(0x40000000302b0684),
-	0, 0, 0, UINT64_C(0x800000000003044b),
+	UINT64_C(0x40000000100f04e9), UINT64_C(0x40000000100f04ef), UINT64_C(0x5a960362900f06c2), UINT64_C(0x5b162362100f06c1),
+	0, 0, UINT64_C(0x8000000000030436), UINT64_C(0x420120df830141bd),
+	UINT64_C(0x4887a0d0100f019f), UINT64_C(0x4887a0d3100f01a5), UINT64_C(0x5a960356100f06a9), UINT64_C(0x5b162355900f06a8),
+	0, 0, 0, UINT64_C(0x40000000312b0684),
+	0, 0, 0, UINT64_C(0x8000000000030452),
 	UINT64_C(0x00000000121001aa), UINT64_C(0x00000000121001aa), UINT64_C(0x00000000121001aa), UINT64_C(0x00000000121001aa),
 	UINT64_C(0x00000000121001aa), UINT64_C(0x00000000121001aa), UINT64_C(0x00000000121001aa), UINT64_C(0x00000000121001aa),
 	0, 0, 0, 0,
@@ -3704,80 +4848,80 @@ static const uint64_t x86LegacyDecisions[X86_TERMINAL_ROW_COUNT][2][256] = {
 },
 {
 {
-	UINT64_C(0x4102c0720104c0e0), UINT64_C(0x5e82206db90340d7), UINT64_C(0x4302e072850540e3), UINT64_C(0x5f82406e3e0400da),
-	UINT64_C(0x00000000090040dd), UINT64_C(0x000000003702c0d4), 0, 0,
-	UINT64_C(0x4102c3a68104c749), UINT64_C(0x5e8223a239034740), UINT64_C(0x4302e3a70505474c), UINT64_C(0x5f8243a2be040743),
-	UINT64_C(0x0000000009004746), UINT64_C(0x000000003702c73d), 0, 0,
-	UINT64_C(0x4102c05e0104c0b8), UINT64_C(0x5e822059b90340af), UINT64_C(0x4302e05e850540bb), UINT64_C(0x5f82405a3e0400b2),
-	UINT64_C(0x00000000090040b5), UINT64_C(0x000000003702c0ac), 0, 0,
-	UINT64_C(0x4102c4e70104c9ca), UINT64_C(0x5e8224e2b90349c1), UINT64_C(0x4302e4e7850549cd), UINT64_C(0x5f8244e33e0409c4),
-	UINT64_C(0x00000000090049c7), UINT64_C(0x000000003702c9be), 0, 0,
-	UINT64_C(0x4102c09e8104c139), UINT64_C(0x5e82209a39034130), UINT64_C(0x4302e09f0505413c), UINT64_C(0x5f82409abe040133),
-	UINT64_C(0x0000000009004136), UINT64_C(0x000000003702c12d), 0, 0,
-	UINT64_C(0x4102c55f8104cabb), UINT64_C(0x5e82255b39034ab2), UINT64_C(0x4302e56005054abe), UINT64_C(0x5f82455bbe040ab5),
-	UINT64_C(0x0000000009004ab8), UINT64_C(0x000000003702caaf), 0, 0,
-	UINT64_C(0x4102ddce8104fb99), UINT64_C(0x5e823dca39037b90), UINT64_C(0x4302fdcf05057b9c), UINT64_C(0x5f825dcabe043b93),
-	UINT64_C(0x0000000009007b96), UINT64_C(0x000000003702fb8d), 0, 0,
-	UINT64_C(0x4609c1528104c2a1), UINT64_C(0x5d08a14e39034298), UINT64_C(0x4789e1530e1342a4), UINT64_C(0x5e07e14ebb0f829b),
-	UINT64_C(0x000000000900429e), UINT64_C(0x000000003702c295), 0, 0,
+	UINT64_C(0x4102c0720104c0e0), UINT64_C(0x5f02206dba0340d7), UINT64_C(0x4302e072850540e3), UINT64_C(0x6002406e3f0400da),
+	UINT64_C(0x00000000090040dd), UINT64_C(0x000000003802c0d4), 0, 0,
+	UINT64_C(0x4102c3a68104c749), UINT64_C(0x5f0223a23a034740), UINT64_C(0x4302e3a70505474c), UINT64_C(0x600243a2bf040743),
+	UINT64_C(0x0000000009004746), UINT64_C(0x000000003802c73d), 0, 0,
+	UINT64_C(0x4102c05e0104c0b8), UINT64_C(0x5f022059ba0340af), UINT64_C(0x4302e05e850540bb), UINT64_C(0x6002405a3f0400b2),
+	UINT64_C(0x00000000090040b5), UINT64_C(0x000000003802c0ac), 0, 0,
+	UINT64_C(0x4102c4e70104c9ca), UINT64_C(0x5f0224e2ba0349c1), UINT64_C(0x4302e4e7850549cd), UINT64_C(0x600244e33f0409c4),
+	UINT64_C(0x00000000090049c7), UINT64_C(0x000000003802c9be), 0, 0,
+	UINT64_C(0x4102c09e8104c139), UINT64_C(0x5f02209a3a034130), UINT64_C(0x4302e09f0505413c), UINT64_C(0x6002409abf040133),
+	UINT64_C(0x0000000009004136), UINT64_C(0x000000003802c12d), 0, 0,
+	UINT64_C(0x4102c55f8104cabb), UINT64_C(0x5f02255b3a034ab2), UINT64_C(0x4302e56005054abe), UINT64_C(0x6002455bbf040ab5),
+	UINT64_C(0x0000000009004ab8), UINT64_C(0x000000003802caaf), 0, 0,
+	UINT64_C(0x4102ddce8104fb99), UINT64_C(0x5f023dca3a037b90), UINT64_C(0x4302fdcf05057b9c), UINT64_C(0x60025dcabf043b93),
+	UINT64_C(0x0000000009007b96), UINT64_C(0x000000003802fb8d), 0, 0,
+	UINT64_C(0x4609c1528104c2a1), UINT64_C(0x5d88a14e3a034298), UINT64_C(0x4789e1530e1342a4), UINT64_C(0x5e87e14ebc0f829b),
+	UINT64_C(0x000000000900429e), UINT64_C(0x000000003802c295), 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	UINT64_C(0x000000000b00092c), 0, 0, 0,
 	0, 0, 0, 0,
-	UINT64_C(0x00000000362e48c1), UINT64_C(0x00000000362e48c1), UINT64_C(0x00000000362e48c1), UINT64_C(0x00000000362e48c1),
-	UINT64_C(0x00000000362e48c1), UINT64_C(0x00000000362e48c1), UINT64_C(0x00000000362e48c1), UINT64_C(0x00000000362e48c1),
-	UINT64_C(0x00000000362e4842), UINT64_C(0x00000000362e4842), UINT64_C(0x00000000362e4842), UINT64_C(0x00000000362e4842),
-	UINT64_C(0x00000000362e4842), UINT64_C(0x00000000362e4842), UINT64_C(0x00000000362e4842), UINT64_C(0x00000000362e4842),
-	0, 0, 0, UINT64_C(0x600f43593b0f86af),
+	UINT64_C(0x00000000372e48c1), UINT64_C(0x00000000372e48c1), UINT64_C(0x00000000372e48c1), UINT64_C(0x00000000372e48c1),
+	UINT64_C(0x00000000372e48c1), UINT64_C(0x00000000372e48c1), UINT64_C(0x00000000372e48c1), UINT64_C(0x00000000372e48c1),
+	UINT64_C(0x00000000372e4842), UINT64_C(0x00000000372e4842), UINT64_C(0x00000000372e4842), UINT64_C(0x00000000372e4842),
+	UINT64_C(0x00000000372e4842), UINT64_C(0x00000000372e4842), UINT64_C(0x00000000372e4842), UINT64_C(0x00000000372e4842),
+	0, 0, 0, UINT64_C(0x608f43593c0f86af),
 	0, 0, UINT64_C(0x000000000b000329), 0,
-	UINT64_C(0x000000003702c8bf), 0, UINT64_C(0x00000000090048c0), 0,
+	UINT64_C(0x000000003802c8bf), 0, UINT64_C(0x00000000090048c0), 0,
 	0, 0, 0, 0,
 	UINT64_C(0x00000000161bc475), UINT64_C(0x00000000161bc46c), UINT64_C(0x00000000161bc446), UINT64_C(0x00000000161bc43d),
 	UINT64_C(0x00000000161bc44b), UINT64_C(0x00000000161bc469), UINT64_C(0x00000000161bc443), UINT64_C(0x00000000161bc440),
 	UINT64_C(0x00000000161bc47c), UINT64_C(0x00000000161bc472), UINT64_C(0x00000000161bc478), UINT64_C(0x00000000161bc46f),
 	UINT64_C(0x00000000161bc457), UINT64_C(0x00000000161bc44e), UINT64_C(0x00000000161bc454), UINT64_C(0x00000000161bc451),
-	UINT64_C(0x8000000000030079), UINT64_C(0x8000000000030507), 0, UINT64_C(0x8000000000030517),
-	UINT64_C(0x4609c58d0104cb17), UINT64_C(0x5d08a589b9034b10), 0, 0,
-	UINT64_C(0x4609c3288104c648), UINT64_C(0x5d08a31e39034634), UINT64_C(0x4789e3298e13464f), UINT64_C(0x5e07e31ebb0f863b),
-	0, UINT64_C(0x400000003b0f84e2), 0, UINT64_C(0x8000000000030466),
-	0, UINT64_C(0x0000000046107b6d), UINT64_C(0x0000000046107b6d), UINT64_C(0x0000000046107b6d),
-	UINT64_C(0x0000000046107b6d), UINT64_C(0x0000000046107b6d), UINT64_C(0x0000000046107b6d), UINT64_C(0x0000000046107b6d),
+	UINT64_C(0x8000000000030079), UINT64_C(0x8000000000030512), 0, UINT64_C(0x8000000000030522),
+	UINT64_C(0x4609c58d0104cb17), UINT64_C(0x5d88a589ba034b10), 0, 0,
+	UINT64_C(0x4609c3288104c648), UINT64_C(0x5d88a31e3a034634), UINT64_C(0x4789e3298e13464f), UINT64_C(0x5e87e31ebc0f863b),
+	0, UINT64_C(0x400000003c0f84e2), 0, UINT64_C(0x800000000003046d),
+	UINT64_C(0x000000000b000704), UINT64_C(0x0000000047107b6d), UINT64_C(0x0000000047107b6d), UINT64_C(0x0000000047107b6d),
+	UINT64_C(0x0000000047107b6d), UINT64_C(0x0000000047107b6d), UINT64_C(0x0000000047107b6d), UINT64_C(0x0000000047107b6d),
 	UINT64_C(0x000000000b0001f1), UINT64_C(0x000000000b0002da), 0, UINT64_C(0x000000000b003b4e),
 	UINT64_C(0x000000000b0008ce), UINT64_C(0x000000000b000853), UINT64_C(0x000000000b000975), UINT64_C(0x000000000b0004c2),
+	UINT64_C(0x000000002225c646), UINT64_C(0x000000002225c630), UINT64_C(0x000000002225c64c), UINT64_C(0x000000002225c636),
 	0, 0, 0, 0,
+	UINT64_C(0x0000000009004b14), UINT64_C(0x000000003802cb0d), 0, 0,
 	0, 0, 0, 0,
-	UINT64_C(0x0000000009004b14), UINT64_C(0x000000003702cb0d), 0, 0,
-	0, 0, 0, 0,
-	UINT64_C(0x00000000222a064d), UINT64_C(0x00000000222a064d), UINT64_C(0x00000000222a064d), UINT64_C(0x00000000222a064d),
-	UINT64_C(0x00000000222a064d), UINT64_C(0x00000000222a064d), UINT64_C(0x00000000222a064d), UINT64_C(0x00000000222a064d),
-	UINT64_C(0x0000000047294639), UINT64_C(0x0000000047294639), UINT64_C(0x0000000047294639), UINT64_C(0x0000000047294639),
-	UINT64_C(0x0000000047294639), UINT64_C(0x0000000047294639), UINT64_C(0x0000000047294639), UINT64_C(0x0000000047294639),
-	UINT64_C(0x80000000000300e4), UINT64_C(0x8000000000030534), UINT64_C(0x00000000271f4927), UINT64_C(0x000000000b00092a),
-	0, 0, UINT64_C(0x800000000002010a), UINT64_C(0x8000000000020544),
-	UINT64_C(0x000000002917c378), UINT64_C(0x000000000b0004e4), UINT64_C(0x00000000271f4503), UINT64_C(0x000000000b000506),
-	UINT64_C(0x000000000b000414), UINT64_C(0x000000002a1ac412), 0, UINT64_C(0x000000000b000422),
-	UINT64_C(0x80000000000301a2), UINT64_C(0x800000000003058f), UINT64_C(0x80000000000301c2), UINT64_C(0x800000000003059f),
+	UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d),
+	UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d),
+	UINT64_C(0x0000000048294639), UINT64_C(0x0000000048294639), UINT64_C(0x0000000048294639), UINT64_C(0x0000000048294639),
+	UINT64_C(0x0000000048294639), UINT64_C(0x0000000048294639), UINT64_C(0x0000000048294639), UINT64_C(0x0000000048294639),
+	UINT64_C(0x80000000000300e9), UINT64_C(0x8000000000030541), UINT64_C(0x00000000281f4927), UINT64_C(0x000000000b00092a),
+	0, 0, UINT64_C(0x800000000002010f), UINT64_C(0x8000000000020551),
+	UINT64_C(0x000000002a17c378), UINT64_C(0x000000000b0004e4), UINT64_C(0x00000000281f4503), UINT64_C(0x000000000b000506),
+	UINT64_C(0x000000000b000414), UINT64_C(0x000000002b1ac412), 0, UINT64_C(0x000000000b000422),
+	UINT64_C(0x80000000000301a7), UINT64_C(0x800000000003059c), UINT64_C(0x80000000000301c7), UINT64_C(0x80000000000305ac),
 	0, 0, 0, UINT64_C(0x000000000b003b7a),
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	UINT64_C(0x00000000161bc501), UINT64_C(0x00000000161bc500), UINT64_C(0x00000000161bc4ff), UINT64_C(0x00000000161bc47b),
-	UINT64_C(0x000000002a1ac3fd), UINT64_C(0x000000002a1ac3fb), UINT64_C(0x000000002a1ac757), UINT64_C(0x000000002a1ac755),
-	UINT64_C(0x000000002d11c1ea), UINT64_C(0x00000000281c0468), 0, UINT64_C(0x00000000161bc466),
+	UINT64_C(0x000000002b1ac3fd), UINT64_C(0x000000002b1ac3fb), UINT64_C(0x000000002b1ac757), UINT64_C(0x000000002b1ac755),
+	UINT64_C(0x000000002e11c1ea), UINT64_C(0x00000000291c0468), 0, UINT64_C(0x00000000161bc466),
 	UINT64_C(0x000000000b0003fe), UINT64_C(0x000000000b0003fc), UINT64_C(0x000000000b000758), UINT64_C(0x000000000b000756),
 	UINT64_C(0x000000000b0004fa), UINT64_C(0x000000000b000413), UINT64_C(0x000000000b000924), UINT64_C(0x000000000b000925),
-	UINT64_C(0x000000000b0003c6), UINT64_C(0x000000000b000202), UINT64_C(0x80000000000301fc), UINT64_C(0x80000000000305af),
+	UINT64_C(0x000000000b0003c6), UINT64_C(0x000000000b000202), UINT64_C(0x8000000000030201), UINT64_C(0x80000000000305bc),
 	UINT64_C(0x000000000b0001f7), UINT64_C(0x000000000b000a7e), UINT64_C(0x000000000b0001fd), UINT64_C(0x000000000b000a81),
-	UINT64_C(0x000000000b0001f8), UINT64_C(0x000000000b000a7f), UINT64_C(0x8000000000030222), UINT64_C(0x80000000000305bf),
+	UINT64_C(0x000000000b0001f8), UINT64_C(0x000000000b000a7f), UINT64_C(0x8000000000030227), UINT64_C(0x80000000000305cc),
 },
 {
-	UINT64_C(0x80000000000305cf), UINT64_C(0x80000000000205df), UINT64_C(0x600f42643b0f84c7), UINT64_C(0x600f4286bb0f850c),
+	UINT64_C(0x80000000000305dc), UINT64_C(0x80000000000205ec), UINT64_C(0x608f42643c0f84c7), UINT64_C(0x608f4286bc0f850c),
 	0, UINT64_C(0x000000000b000af5), UINT64_C(0x000000000b0001ff), UINT64_C(0x000000000b000afa),
 	UINT64_C(0x000000000b000416), UINT64_C(0x000000000b003b4f), 0, UINT64_C(0x000000000b000b3f),
-	0, UINT64_C(0x80000000000302a4), UINT64_C(0x000000000b000391), 0,
+	0, UINT64_C(0x80000000000302a9), UINT64_C(0x000000000b000391), 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0,
-	UINT64_C(0x80000000000302b5), UINT64_C(0x4887a38a9f070717), 0, 0,
-	UINT64_C(0x80000000000302c7), UINT64_C(0x400000001f070718), UINT64_C(0x400000001f070719), UINT64_C(0x5c09038e1f07071b),
+	UINT64_C(0x80000000000302ba), UINT64_C(0x4887a38a9f070717), 0, 0,
+	UINT64_C(0x80000000000302cc), UINT64_C(0x400000001f070718), UINT64_C(0x400000001f070719), UINT64_C(0x5c89038e1f07071b),
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0,
@@ -3786,10 +4930,10 @@ static const uint64_t x86LegacyDecisions[X86_TERMINAL_ROW_COUNT][2][256] = {
 	UINT64_C(0x000000000b000af6), UINT64_C(0x000000000b000af8), 0, UINT64_C(0x000000000b0003bb),
 	0, 0, 0, 0,
 	0, 0, 0, 0,
-	UINT64_C(0x5f8241393e040271), UINT64_C(0x5f82412e3e04025b), UINT64_C(0x5f82410a3e040213), UINT64_C(0x5f8241073e04020d),
-	UINT64_C(0x5f8241143e040227), UINT64_C(0x5f8241293e040251), UINT64_C(0x5f82410d3e040219), UINT64_C(0x5f8241043e040207),
-	UINT64_C(0x5f8241413e040281), UINT64_C(0x5f8241363e04026b), UINT64_C(0x5f82413c3e040277), UINT64_C(0x5f8241313e040261),
-	UINT64_C(0x5f82411f3e04023d), UINT64_C(0x5f82411c3e040237), UINT64_C(0x5f8241223e040243), UINT64_C(0x5f8241193e040231),
+	UINT64_C(0x600241393f040271), UINT64_C(0x6002412e3f04025b), UINT64_C(0x6002410a3f040213), UINT64_C(0x600241073f04020d),
+	UINT64_C(0x600241143f040227), UINT64_C(0x600241293f040251), UINT64_C(0x6002410d3f040219), UINT64_C(0x600241043f040207),
+	UINT64_C(0x600241413f040281), UINT64_C(0x600241363f04026b), UINT64_C(0x6002413c3f040277), UINT64_C(0x600241313f040261),
+	UINT64_C(0x6002411f3f04023d), UINT64_C(0x6002411c3f040237), UINT64_C(0x600241223f040243), UINT64_C(0x600241193f040231),
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0,
@@ -3800,28 +4944,28 @@ static const uint64_t x86LegacyDecisions[X86_TERMINAL_ROW_COUNT][2][256] = {
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, UINT64_C(0x000000000b000558),
-	UINT64_C(0x5d08afbdb9035f7a), UINT64_C(0x5e07eff33b0f9fe5), 0, 0,
+	UINT64_C(0x5d88afbdba035f7a), UINT64_C(0x5e87eff33c0f9fe5), 0, 0,
 	0, 0, 0, 0,
-	UINT64_C(0x00000000281c0477), UINT64_C(0x00000000281c046e), UINT64_C(0x00000000281c0448), UINT64_C(0x00000000281c043f),
-	UINT64_C(0x00000000281c044d), UINT64_C(0x00000000281c046b), UINT64_C(0x00000000281c0445), UINT64_C(0x00000000281c0442),
-	UINT64_C(0x00000000281c047e), UINT64_C(0x00000000281c0474), UINT64_C(0x00000000281c047a), UINT64_C(0x00000000281c0471),
-	UINT64_C(0x00000000281c0459), UINT64_C(0x00000000281c0450), UINT64_C(0x00000000281c0456), UINT64_C(0x00000000281c0453),
-	0, UINT64_C(0x570bc4f49f0709e8), UINT64_C(0x570bc4ed9f0709da), UINT64_C(0x570bc4ea9f0709d4),
-	UINT64_C(0x570bc4ee9f0709dc), UINT64_C(0x570bc4f39f0709e6), UINT64_C(0x570bc4ec9f0709d8), UINT64_C(0x570bc4eb9f0709d6),
-	UINT64_C(0x570bc4fa1f0709f3), UINT64_C(0x570bc4f69f0709ec), UINT64_C(0x570bc4f89f0709f0), UINT64_C(0x570bc4f59f0709ea),
-	UINT64_C(0x570bc4f29f0709e4), UINT64_C(0x570bc4ef9f0709de), UINT64_C(0x570bc4f19f0709e2), UINT64_C(0x570bc4f09f0709e0),
-	UINT64_C(0x000000000b0008d1), UINT64_C(0x000000000b000856), UINT64_C(0x000000000b0002d9), UINT64_C(0x5d08a0dbb90341b5),
-	0, UINT64_C(0x5e822514b9034a27), UINT64_C(0x800000000002033e), UINT64_C(0x8000000000020386),
-	UINT64_C(0x000000000b0008d4), UINT64_C(0x000000000b000859), UINT64_C(0x000000000b00096d), UINT64_C(0x5e8220edb90341d9),
-	0, UINT64_C(0x5e822528b9034a4f), UINT64_C(0x8000000000020657), UINT64_C(0x5f8241fa3e0403f1),
-	UINT64_C(0x4609c1640104c2c7), UINT64_C(0x5d08a162b90342c4), UINT64_C(0x400000003b0f8510), UINT64_C(0x5e8220e7b90341cd),
-	UINT64_C(0x400000003b0f84ea), UINT64_C(0x400000003b0f84f0), UINT64_C(0x651663653b0f86c8), UINT64_C(0x65964364bb0f86c7),
-	0, 0, UINT64_C(0x80000000000306af), UINT64_C(0x5e8220e1b90341c1),
-	UINT64_C(0x5e07e0d13b0f81a1), UINT64_C(0x5e07e0d43b0f81a7), UINT64_C(0x65166359bb0f86b0), UINT64_C(0x65964358bb0f86ae),
-	0, 0, 0, UINT64_C(0x4000000039034683),
-	0, 0, 0, UINT64_C(0x80000000000306cb),
-	UINT64_C(0x00000000461041ab), UINT64_C(0x00000000461041ab), UINT64_C(0x00000000461041ab), UINT64_C(0x00000000461041ab),
-	UINT64_C(0x00000000461041ab), UINT64_C(0x00000000461041ab), UINT64_C(0x00000000461041ab), UINT64_C(0x00000000461041ab),
+	UINT64_C(0x00000000291c0477), UINT64_C(0x00000000291c046e), UINT64_C(0x00000000291c0448), UINT64_C(0x00000000291c043f),
+	UINT64_C(0x00000000291c044d), UINT64_C(0x00000000291c046b), UINT64_C(0x00000000291c0445), UINT64_C(0x00000000291c0442),
+	UINT64_C(0x00000000291c047e), UINT64_C(0x00000000291c0474), UINT64_C(0x00000000291c047a), UINT64_C(0x00000000291c0471),
+	UINT64_C(0x00000000291c0459), UINT64_C(0x00000000291c0450), UINT64_C(0x00000000291c0456), UINT64_C(0x00000000291c0453),
+	UINT64_C(0x578bc4f79f0709ee), UINT64_C(0x578bc4f49f0709e8), UINT64_C(0x578bc4ed9f0709da), UINT64_C(0x578bc4ea9f0709d4),
+	UINT64_C(0x578bc4ee9f0709dc), UINT64_C(0x578bc4f39f0709e6), UINT64_C(0x578bc4ec9f0709d8), UINT64_C(0x578bc4eb9f0709d6),
+	UINT64_C(0x578bc4fa1f0709f3), UINT64_C(0x578bc4f69f0709ec), UINT64_C(0x578bc4f89f0709f0), UINT64_C(0x578bc4f59f0709ea),
+	UINT64_C(0x578bc4f29f0709e4), UINT64_C(0x578bc4ef9f0709de), UINT64_C(0x578bc4f19f0709e2), UINT64_C(0x578bc4f09f0709e0),
+	UINT64_C(0x000000000b0008d1), UINT64_C(0x000000000b000856), UINT64_C(0x000000000b0002d9), UINT64_C(0x5d88a0dbba0341b5),
+	0, UINT64_C(0x5f022514ba034a27), UINT64_C(0x8000000000020345), UINT64_C(0x800000000002038d),
+	UINT64_C(0x000000000b0008d4), UINT64_C(0x000000000b000859), UINT64_C(0x000000000b00096d), UINT64_C(0x5f0220edba0341d9),
+	0, UINT64_C(0x5f022528ba034a4f), UINT64_C(0x8000000000020664), UINT64_C(0x600241fa3f0403f1),
+	UINT64_C(0x4609c1640104c2c7), UINT64_C(0x5d88a162ba0342c4), UINT64_C(0x400000003c0f8510), UINT64_C(0x5f0220e7ba0341cd),
+	UINT64_C(0x400000003c0f84ea), UINT64_C(0x400000003c0f84f0), UINT64_C(0x659663653c0f86c8), UINT64_C(0x66164364bc0f86c7),
+	0, 0, UINT64_C(0x80000000000306bc), UINT64_C(0x5f0220e1ba0341c1),
+	UINT64_C(0x5e87e0d13c0f81a1), UINT64_C(0x5e87e0d43c0f81a7), UINT64_C(0x65966359bc0f86b0), UINT64_C(0x66164358bc0f86ae),
+	0, 0, 0, UINT64_C(0x400000003a034683),
+	0, 0, 0, UINT64_C(0x80000000000306d8),
+	UINT64_C(0x00000000471041ab), UINT64_C(0x00000000471041ab), UINT64_C(0x00000000471041ab), UINT64_C(0x00000000471041ab),
+	UINT64_C(0x00000000471041ab), UINT64_C(0x00000000471041ab), UINT64_C(0x00000000471041ab), UINT64_C(0x00000000471041ab),
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0,
@@ -3870,47 +5014,985 @@ static const uint64_t x86LegacyDecisions[X86_TERMINAL_ROW_COUNT][2][256] = {
 	UINT64_C(0x00000000161bc44b), UINT64_C(0x00000000161bc469), UINT64_C(0x00000000161bc443), UINT64_C(0x00000000161bc440),
 	UINT64_C(0x00000000161bc47c), UINT64_C(0x00000000161bc472), UINT64_C(0x00000000161bc478), UINT64_C(0x00000000161bc46f),
 	UINT64_C(0x00000000161bc457), UINT64_C(0x00000000161bc44e), UINT64_C(0x00000000161bc454), UINT64_C(0x00000000161bc451),
-	UINT64_C(0x8000000000030079), UINT64_C(0x8000000000030715), UINT64_C(0x8000000000030099), UINT64_C(0x8000000000030725),
+	UINT64_C(0x8000000000030079), UINT64_C(0x8000000000030722), UINT64_C(0x8000000000030099), UINT64_C(0x8000000000030732),
 	UINT64_C(0x4609c58d0104cb17), UINT64_C(0x4688658283014b02), 0, 0,
 	UINT64_C(0x4609c3288104c648), UINT64_C(0x4688630b8301460f), UINT64_C(0x4789e3298e13464f), UINT64_C(0x4887a30c100f0616),
-	0, UINT64_C(0x40000000100f04df), 0, UINT64_C(0x800000000003073d),
-	0, UINT64_C(0x0000000012103b67), UINT64_C(0x0000000012103b67), UINT64_C(0x0000000012103b67),
+	0, UINT64_C(0x40000000100f04df), 0, UINT64_C(0x800000000003074a),
+	UINT64_C(0x000000000b000704), UINT64_C(0x0000000012103b67), UINT64_C(0x0000000012103b67), UINT64_C(0x0000000012103b67),
 	UINT64_C(0x0000000012103b67), UINT64_C(0x0000000012103b67), UINT64_C(0x0000000012103b67), UINT64_C(0x0000000012103b67),
-	UINT64_C(0x000000000b000326), UINT64_C(0x000000000b0001f0), UINT64_C(0x000000004c18c37e), UINT64_C(0x000000000b003b4e),
+	UINT64_C(0x000000000b0001ef), UINT64_C(0x000000000b000325), UINT64_C(0x000000004d18c37e), UINT64_C(0x000000000b003b4e),
+	UINT64_C(0x000000000b0008cc), UINT64_C(0x000000000b000851), UINT64_C(0x000000000b000975), UINT64_C(0x000000000b0004c2),
+	UINT64_C(0x000000002225c645), UINT64_C(0x000000002225c60c), UINT64_C(0x000000002225c64b), UINT64_C(0x000000002225c612),
+	0, 0, 0, 0,
+	UINT64_C(0x0000000009004b14), UINT64_C(0x000000000a008aff), 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d),
+	UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d),
+	UINT64_C(0x0000000024264614), UINT64_C(0x0000000024264614), UINT64_C(0x0000000024264614), UINT64_C(0x0000000024264614),
+	UINT64_C(0x0000000024264614), UINT64_C(0x0000000024264614), UINT64_C(0x0000000024264614), UINT64_C(0x0000000024264614),
+	UINT64_C(0x80000000000300e9), UINT64_C(0x8000000000030764), UINT64_C(0x000000000a008928), UINT64_C(0x000000000b00092b),
+	UINT64_C(0x40000000100f04e5), UINT64_C(0x40000000100f04cb), UINT64_C(0x800000000002010f), UINT64_C(0x800000000002077a),
+	UINT64_C(0x000000002a17c378), UINT64_C(0x000000000b0004e3), UINT64_C(0x000000000a008504), UINT64_C(0x000000000b000507),
+	UINT64_C(0x000000000b000414), UINT64_C(0x000000002b1ac412), UINT64_C(0x000000000b000415), UINT64_C(0x000000000b000420),
+	UINT64_C(0x80000000000301a7), UINT64_C(0x80000000000307c5), UINT64_C(0x80000000000301c7), UINT64_C(0x80000000000307d5),
+	UINT64_C(0x0000000009004094), UINT64_C(0x0000000009004093), UINT64_C(0x000000000b00098e), UINT64_C(0x000000000b003b7a),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x00000000161bc501), UINT64_C(0x00000000161bc500), UINT64_C(0x00000000161bc4ff), UINT64_C(0x00000000161bc44a),
+	UINT64_C(0x000000002b1ac3fd), UINT64_C(0x000000002b1ac3f9), UINT64_C(0x000000002b1ac757), UINT64_C(0x000000002b1ac753),
+	UINT64_C(0x000000004e1241ed), UINT64_C(0x00000000291c0467), UINT64_C(0x000000004d18c383), UINT64_C(0x00000000161bc466),
+	UINT64_C(0x000000000b0003fe), UINT64_C(0x000000000b0003fa), UINT64_C(0x000000000b000758), UINT64_C(0x000000000b000754),
+	UINT64_C(0x000000000b0004fa), UINT64_C(0x000000000b000413), UINT64_C(0x000000000b000924), UINT64_C(0x000000000b000925),
+	UINT64_C(0x000000000b0003c6), UINT64_C(0x000000000b000202), UINT64_C(0x8000000000030201), UINT64_C(0x80000000000307ec),
+	UINT64_C(0x000000000b0001f7), UINT64_C(0x000000000b000a7e), UINT64_C(0x000000000b0001fd), UINT64_C(0x000000000b000a81),
+	UINT64_C(0x000000000b0001f8), UINT64_C(0x000000000b000a7f), UINT64_C(0x8000000000030227), UINT64_C(0x80000000000307fc),
+},
+{
+	UINT64_C(0x800000000003080c), UINT64_C(0x800000000002081c), UINT64_C(0x4887a262100f04c3), UINT64_C(0x4887a284900f0508),
+	0, UINT64_C(0x000000000b000af5), UINT64_C(0x000000000b0001ff), UINT64_C(0x000000000b000af9),
+	UINT64_C(0x000000000b000416), UINT64_C(0x000000000b003b4f), 0, UINT64_C(0x000000000b000b3f),
+	0, UINT64_C(0x80000000000302a9), UINT64_C(0x000000000b000391), 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x8000000000030868), UINT64_C(0x4887a38a9f07071e), 0, 0,
+	UINT64_C(0x400000001f07071f), UINT64_C(0x400000001f070720), UINT64_C(0x400000001f070721), UINT64_C(0x5008c3911f07071d),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x000000000b003b55), UINT64_C(0x000000000b000922), UINT64_C(0x000000000b000915), UINT64_C(0x000000000b000919),
+	UINT64_C(0x000000000b000af6), UINT64_C(0x000000000b000af7), 0, UINT64_C(0x000000000b0003bb),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x440141370702026d), UINT64_C(0x4401412c07020257), UINT64_C(0x440141080702020f), UINT64_C(0x4401410507020209),
+	UINT64_C(0x4401411207020223), UINT64_C(0x440141270702024d), UINT64_C(0x4401410b07020215), UINT64_C(0x4401410207020203),
+	UINT64_C(0x4401413f0702027d), UINT64_C(0x4401413407020267), UINT64_C(0x4401413a07020273), UINT64_C(0x4401412f0702025d),
+	UINT64_C(0x4401411d07020239), UINT64_C(0x4401411a07020233), UINT64_C(0x440141200702023f), UINT64_C(0x440141170702022d),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x00000000291c0476), UINT64_C(0x00000000291c046d), UINT64_C(0x00000000291c0447), UINT64_C(0x00000000291c043e),
+	UINT64_C(0x00000000291c044c), UINT64_C(0x00000000291c046a), UINT64_C(0x00000000291c0444), UINT64_C(0x00000000291c0441),
+	UINT64_C(0x00000000291c047d), UINT64_C(0x00000000291c0473), UINT64_C(0x00000000291c0479), UINT64_C(0x00000000291c0470),
+	UINT64_C(0x00000000291c0458), UINT64_C(0x00000000291c044f), UINT64_C(0x00000000291c0455), UINT64_C(0x00000000291c0452),
+	UINT64_C(0x578bc4f79f0709ee), UINT64_C(0x578bc4f49f0709e8), UINT64_C(0x578bc4ed9f0709da), UINT64_C(0x578bc4ea9f0709d4),
+	UINT64_C(0x578bc4ee9f0709dc), UINT64_C(0x578bc4f39f0709e6), UINT64_C(0x578bc4ec9f0709d8), UINT64_C(0x578bc4eb9f0709d6),
+	UINT64_C(0x578bc4fa1f0709f3), UINT64_C(0x578bc4f69f0709ec), UINT64_C(0x578bc4f89f0709f0), UINT64_C(0x578bc4f59f0709ea),
+	UINT64_C(0x578bc4f29f0709e4), UINT64_C(0x578bc4ef9f0709de), UINT64_C(0x578bc4f19f0709e2), UINT64_C(0x578bc4f09f0709e0),
+	UINT64_C(0x000000000b0008cf), UINT64_C(0x000000000b000854), UINT64_C(0x000000000b0002d9), UINT64_C(0x468860d7830141ad),
+	0, UINT64_C(0x4201251083014a1f), UINT64_C(0x8000000000020345), UINT64_C(0x800000000002038d),
+	UINT64_C(0x000000000b0008d2), UINT64_C(0x000000000b000857), UINT64_C(0x000000000b00096d), UINT64_C(0x420120e9830141d1),
+	0, UINT64_C(0x4201252483014a47), UINT64_C(0x80000000000308be), UINT64_C(0x440141f2070203e1),
+	UINT64_C(0x4609c1640104c2c7), UINT64_C(0x46886160830142c0), UINT64_C(0x40000000100f050e), UINT64_C(0x420120e3830141c5),
+	UINT64_C(0x40000000100f04e8), UINT64_C(0x40000000100f04ee), UINT64_C(0x5a960360100f06be), UINT64_C(0x4887a35f900f06bd),
+	0, 0, UINT64_C(0x80000000000308de), UINT64_C(0x420120dd830141b9),
+	UINT64_C(0x4887a0cf100f019d), UINT64_C(0x4887a0d2100f01a3), UINT64_C(0x5a960353900f06a5), UINT64_C(0x4887a353100f06a4),
+	0, 0, 0, 0,
+	0, 0, 0, UINT64_C(0x80000000000308f8),
+	UINT64_C(0x00000000121001a9), UINT64_C(0x00000000121001a9), UINT64_C(0x00000000121001a9), UINT64_C(0x00000000121001a9),
+	UINT64_C(0x00000000121001a9), UINT64_C(0x00000000121001a9), UINT64_C(0x00000000121001a9), UINT64_C(0x00000000121001a9),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, UINT64_C(0x000000000b000b3d),
+},
+},
+{
+{
+	UINT64_C(0x4102c0720104c0e0), UINT64_C(0x42012069030140ce), UINT64_C(0x4302e072850540e3), UINT64_C(0x44014069870200d1),
+	UINT64_C(0x00000000090040dd), UINT64_C(0x000000000a0080cb), UINT64_C(0x000000000b0008cb), UINT64_C(0x000000000b000850),
+	UINT64_C(0x4102c3a68104c749), UINT64_C(0x4201239d83014737), UINT64_C(0x4302e3a70505474c), UINT64_C(0x4401439e0702073a),
+	UINT64_C(0x0000000009004746), UINT64_C(0x000000000a008734), UINT64_C(0x000000000b0008c7), 0,
+	UINT64_C(0x4102c05e0104c0b8), UINT64_C(0x42012055030140a6), UINT64_C(0x4302e05e850540bb), UINT64_C(0x44014055870200a9),
+	UINT64_C(0x00000000090040b5), UINT64_C(0x000000000a0080a3), UINT64_C(0x000000000b0008d6), UINT64_C(0x000000000b00085b),
+	UINT64_C(0x4102c4e70104c9ca), UINT64_C(0x420124de030149b8), UINT64_C(0x4302e4e7850549cd), UINT64_C(0x440144de870209bb),
+	UINT64_C(0x00000000090049c7), UINT64_C(0x000000000a0089b5), UINT64_C(0x000000000b0008c9), UINT64_C(0x000000000b00084e),
+	UINT64_C(0x4102c09e8104c139), UINT64_C(0x4201209583014127), UINT64_C(0x4302e09f0505413c), UINT64_C(0x440140960702012a),
+	UINT64_C(0x0000000009004136), UINT64_C(0x000000000a008124), 0, UINT64_C(0x000000000b000327),
+	UINT64_C(0x4102c55f8104cabb), UINT64_C(0x4201255683014aa9), UINT64_C(0x4302e56005054abe), UINT64_C(0x4401455707020aac),
+	UINT64_C(0x0000000009004ab8), UINT64_C(0x000000000a008aa6), 0, UINT64_C(0x000000000b000328),
+	UINT64_C(0x4102ddce8104fb99), UINT64_C(0x42013dc583017b87), UINT64_C(0x4302fdcf05057b9c), UINT64_C(0x44015dc607023b8a),
+	UINT64_C(0x0000000009007b96), UINT64_C(0x000000000a00bb84), 0, UINT64_C(0x000000000b000092),
+	UINT64_C(0x4609c1528104c2a1), UINT64_C(0x468861498301428f), UINT64_C(0x4789e1530e1342a4), UINT64_C(0x4887a14a100f0292),
+	UINT64_C(0x000000000900429e), UINT64_C(0x000000000a00828c), 0, UINT64_C(0x000000000b000095),
+	UINT64_C(0x0000000012100404), UINT64_C(0x0000000012100404), UINT64_C(0x0000000012100404), UINT64_C(0x0000000012100404),
+	UINT64_C(0x0000000012100404), UINT64_C(0x0000000012100404), UINT64_C(0x0000000012100404), UINT64_C(0x0000000012100404),
+	UINT64_C(0x000000001210032f), UINT64_C(0x000000001210032f), UINT64_C(0x000000001210032f), UINT64_C(0x000000001210032f),
+	UINT64_C(0x000000001210032f), UINT64_C(0x000000001210032f), UINT64_C(0x000000001210032f), UINT64_C(0x000000001210032f),
+	UINT64_C(0x00000000132e08bc), UINT64_C(0x00000000132e08bc), UINT64_C(0x00000000132e08bc), UINT64_C(0x00000000132e08bc),
+	UINT64_C(0x00000000132e08bc), UINT64_C(0x00000000132e08bc), UINT64_C(0x00000000132e08bc), UINT64_C(0x00000000132e08bc),
+	UINT64_C(0x00000000132e083f), UINT64_C(0x00000000132e083f), UINT64_C(0x00000000132e083f), UINT64_C(0x00000000132e083f),
+	UINT64_C(0x00000000132e083f), UINT64_C(0x00000000132e083f), UINT64_C(0x00000000132e083f), UINT64_C(0x00000000132e083f),
+	UINT64_C(0x000000000b0008c5), UINT64_C(0x000000000b000846), UINT64_C(0x40000000100f019c), UINT64_C(0x4a84e0a61409814b),
+	0, 0, UINT64_C(0x000000000b000329), 0,
+	UINT64_C(0x000000000a0088d8), 0, UINT64_C(0x00000000090048bb), 0,
+	0, 0, 0, 0,
+	UINT64_C(0x00000000161bc475), UINT64_C(0x00000000161bc46c), UINT64_C(0x00000000161bc446), UINT64_C(0x00000000161bc43d),
+	UINT64_C(0x00000000161bc44b), UINT64_C(0x00000000161bc469), UINT64_C(0x00000000161bc443), UINT64_C(0x00000000161bc440),
+	UINT64_C(0x00000000161bc47c), UINT64_C(0x00000000161bc472), UINT64_C(0x00000000161bc478), UINT64_C(0x00000000161bc46f),
+	UINT64_C(0x00000000161bc457), UINT64_C(0x00000000161bc44e), UINT64_C(0x00000000161bc454), UINT64_C(0x00000000161bc451),
+	UINT64_C(0x8000000000030079), UINT64_C(0x8000000000030089), UINT64_C(0x8000000000030099), UINT64_C(0x80000000000300a9),
+	UINT64_C(0x4609c58d0104cb17), UINT64_C(0x4688658603014b09), 0, 0,
+	UINT64_C(0x4609c3288104c648), UINT64_C(0x4688631583014622), UINT64_C(0x4789e3298e13464f), UINT64_C(0x4887a316100f062a),
+	0, UINT64_C(0x40000000100f04e0), 0, UINT64_C(0x80000000000300c7),
+	UINT64_C(0x000000000b000704), UINT64_C(0x0000000012103b6a), UINT64_C(0x0000000012103b6a), UINT64_C(0x0000000012103b6a),
+	UINT64_C(0x0000000012103b6a), UINT64_C(0x0000000012103b6a), UINT64_C(0x0000000012103b6a), UINT64_C(0x0000000012103b6a),
+	UINT64_C(0x000000000b000326), UINT64_C(0x000000000b0001f0), UINT64_C(0x0000000021190380), UINT64_C(0x000000000b003b4e),
+	UINT64_C(0x000000000b0008cd), UINT64_C(0x000000000b000852), UINT64_C(0x000000000b000975), UINT64_C(0x000000000b0004c2),
+	UINT64_C(0x000000002225c644), UINT64_C(0x000000002225c61c), UINT64_C(0x000000002225c64a), UINT64_C(0x000000002225c623),
+	0, 0, 0, 0,
+	UINT64_C(0x0000000009004b14), UINT64_C(0x000000000a008b06), 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d),
+	UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d),
+	UINT64_C(0x0000000024264628), UINT64_C(0x0000000024264628), UINT64_C(0x0000000024264628), UINT64_C(0x0000000024264628),
+	UINT64_C(0x0000000024264628), UINT64_C(0x0000000024264628), UINT64_C(0x0000000024264628), UINT64_C(0x0000000024264628),
+	UINT64_C(0x80000000000300e9), UINT64_C(0x80000000000300f9), UINT64_C(0x00000000281f4926), UINT64_C(0x000000000b000929),
+	UINT64_C(0x40000000100f04e6), UINT64_C(0x40000000100f04cc), UINT64_C(0x800000000002010f), UINT64_C(0x8000000000020157),
+	UINT64_C(0x000000002a17c378), UINT64_C(0x000000000b0004e3), UINT64_C(0x00000000281f4502), UINT64_C(0x000000000b000505),
+	UINT64_C(0x000000000b000414), UINT64_C(0x000000002b1ac412), UINT64_C(0x000000000b000415), UINT64_C(0x000000000b000421),
+	UINT64_C(0x80000000000301a7), UINT64_C(0x80000000000301b7), UINT64_C(0x80000000000301c7), UINT64_C(0x80000000000301d7),
+	UINT64_C(0x0000000009004094), UINT64_C(0x0000000009004093), UINT64_C(0x000000000b00098e), UINT64_C(0x000000000b003b7a),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x00000000161bc501), UINT64_C(0x00000000161bc500), UINT64_C(0x00000000161bc4ff), UINT64_C(0x00000000161bc449),
+	UINT64_C(0x000000002b1ac3fd), UINT64_C(0x000000002b1ac3fb), UINT64_C(0x000000002b1ac757), UINT64_C(0x000000002b1ac755),
+	UINT64_C(0x000000002e11c1ee), UINT64_C(0x00000000291c0468), UINT64_C(0x0000000021190385), UINT64_C(0x00000000161bc466),
+	UINT64_C(0x000000000b0003fe), UINT64_C(0x000000000b0003fc), UINT64_C(0x000000000b000758), UINT64_C(0x000000000b000756),
+	UINT64_C(0x000000000b0004fa), UINT64_C(0x000000000b000413), UINT64_C(0x000000000b000924), UINT64_C(0x000000000b000925),
+	UINT64_C(0x000000000b0003c6), UINT64_C(0x000000000b000202), UINT64_C(0x8000000000030201), UINT64_C(0x8000000000030211),
+	UINT64_C(0x000000000b0001f7), UINT64_C(0x000000000b000a7e), UINT64_C(0x000000000b0001fd), UINT64_C(0x000000000b000a81),
+	UINT64_C(0x000000000b0001f8), UINT64_C(0x000000000b000a7f), UINT64_C(0x8000000000030227), UINT64_C(0x8000000000030237),
+},
+{
+	UINT64_C(0x8000000000030247), UINT64_C(0x8000000000020257), UINT64_C(0x4887a263100f04c5), UINT64_C(0x4887a285900f050a),
+	0, UINT64_C(0x000000000b000af5), UINT64_C(0x000000000b0001ff), UINT64_C(0x000000000b000af9),
+	UINT64_C(0x000000000b000416), UINT64_C(0x000000000b003b4f), 0, UINT64_C(0x000000000b000b3f),
+	0, UINT64_C(0x80000000000302a9), UINT64_C(0x000000000b000391), 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x80000000000302ba), UINT64_C(0x4887a38a9f070717), 0, 0,
+	UINT64_C(0x80000000000302cc), UINT64_C(0x400000001f070718), UINT64_C(0x400000001f070719), UINT64_C(0x5008c38d1f070716),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x000000000b003b55), UINT64_C(0x000000000b000922), UINT64_C(0x000000000b000915), UINT64_C(0x000000000b000919),
+	UINT64_C(0x000000000b000af6), UINT64_C(0x000000000b000af7), 0, UINT64_C(0x000000000b0003bb),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x440141380702026f), UINT64_C(0x4401412d07020259), UINT64_C(0x4401410907020211), UINT64_C(0x440141060702020b),
+	UINT64_C(0x4401411307020225), UINT64_C(0x440141280702024f), UINT64_C(0x4401410c07020217), UINT64_C(0x4401410307020205),
+	UINT64_C(0x440141400702027f), UINT64_C(0x4401413507020269), UINT64_C(0x4401413b07020275), UINT64_C(0x440141300702025f),
+	UINT64_C(0x4401411e0702023b), UINT64_C(0x4401411b07020235), UINT64_C(0x4401412107020241), UINT64_C(0x440141180702022f),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, UINT64_C(0x000000000b000558),
+	UINT64_C(0x5955cfbcb12b1f78), UINT64_C(0x5a55eff23315dfe3), 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x00000000291c0477), UINT64_C(0x00000000291c046e), UINT64_C(0x00000000291c0448), UINT64_C(0x00000000291c043f),
+	UINT64_C(0x00000000291c044d), UINT64_C(0x00000000291c046b), UINT64_C(0x00000000291c0445), UINT64_C(0x00000000291c0442),
+	UINT64_C(0x00000000291c047e), UINT64_C(0x00000000291c0474), UINT64_C(0x00000000291c047a), UINT64_C(0x00000000291c0471),
+	UINT64_C(0x00000000291c0459), UINT64_C(0x00000000291c0450), UINT64_C(0x00000000291c0456), UINT64_C(0x00000000291c0453),
+	UINT64_C(0x578bc4f79f0709ee), UINT64_C(0x578bc4f49f0709e8), UINT64_C(0x578bc4ed9f0709da), UINT64_C(0x578bc4ea9f0709d4),
+	UINT64_C(0x578bc4ee9f0709dc), UINT64_C(0x578bc4f39f0709e6), UINT64_C(0x578bc4ec9f0709d8), UINT64_C(0x578bc4eb9f0709d6),
+	UINT64_C(0x578bc4fa1f0709f3), UINT64_C(0x578bc4f69f0709ec), UINT64_C(0x578bc4f89f0709f0), UINT64_C(0x578bc4f59f0709ea),
+	UINT64_C(0x578bc4f29f0709e4), UINT64_C(0x578bc4ef9f0709de), UINT64_C(0x578bc4f19f0709e2), UINT64_C(0x578bc4f09f0709e0),
+	UINT64_C(0x000000000b0008d0), UINT64_C(0x000000000b000855), UINT64_C(0x000000000b0002d9), UINT64_C(0x468860d9830141b1),
+	0, UINT64_C(0x4201251283014a23), UINT64_C(0x8000000000020345), UINT64_C(0x800000000002038d),
+	UINT64_C(0x000000000b0008d3), UINT64_C(0x000000000b000858), UINT64_C(0x000000000b00096d), UINT64_C(0x420120eb830141d5),
+	0, UINT64_C(0x4201252683014a4b), UINT64_C(0x80000000000203dc), UINT64_C(0x440141f6070203e9),
+	UINT64_C(0x4609c1640104c2c7), UINT64_C(0x46886161830142c2), UINT64_C(0x40000000100f050f), UINT64_C(0x420120e5830141c9),
+	UINT64_C(0x40000000100f04e9), UINT64_C(0x40000000100f04ef), UINT64_C(0x5a960362900f06c2), UINT64_C(0x5b162362100f06c1),
+	0, 0, UINT64_C(0x8000000000030436), UINT64_C(0x420120df830141bd),
+	UINT64_C(0x4887a0d0100f019f), UINT64_C(0x4887a0d3100f01a5), UINT64_C(0x5a960356100f06a9), UINT64_C(0x5b162355900f06a8),
+	0, 0, 0, UINT64_C(0x40000000312b0684),
+	0, 0, 0, UINT64_C(0x8000000000030452),
+	UINT64_C(0x00000000121001aa), UINT64_C(0x00000000121001aa), UINT64_C(0x00000000121001aa), UINT64_C(0x00000000121001aa),
+	UINT64_C(0x00000000121001aa), UINT64_C(0x00000000121001aa), UINT64_C(0x00000000121001aa), UINT64_C(0x00000000121001aa),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, UINT64_C(0x000000000b000b3d),
+},
+},
+{
+{
+	UINT64_C(0x4102c0720104c0e0), UINT64_C(0x42012064830140c5), UINT64_C(0x4302e072850540e3), UINT64_C(0x44014065070200c8),
+	UINT64_C(0x00000000090040dd), UINT64_C(0x000000000a0080c2), UINT64_C(0x000000000b0008ca), UINT64_C(0x000000000b00084f),
+	UINT64_C(0x4102c3a68104c749), UINT64_C(0x420123990301472e), UINT64_C(0x4302e3a70505474c), UINT64_C(0x4401439987020731),
+	UINT64_C(0x0000000009004746), UINT64_C(0x000000000a00872b), UINT64_C(0x000000000b0008c6), 0,
+	UINT64_C(0x4102c05e0104c0b8), UINT64_C(0x420120508301409d), UINT64_C(0x4302e05e850540bb), UINT64_C(0x44014051070200a0),
+	UINT64_C(0x00000000090040b5), UINT64_C(0x000000000a00809a), UINT64_C(0x000000000b0008d5), UINT64_C(0x000000000b00085a),
+	UINT64_C(0x4102c4e70104c9ca), UINT64_C(0x420124d9830149af), UINT64_C(0x4302e4e7850549cd), UINT64_C(0x440144da070209b2),
+	UINT64_C(0x00000000090049c7), UINT64_C(0x000000000a0089ac), UINT64_C(0x000000000b0008c8), UINT64_C(0x000000000b00084d),
+	UINT64_C(0x4102c09e8104c139), UINT64_C(0x420120910301411e), UINT64_C(0x4302e09f0505413c), UINT64_C(0x4401409187020121),
+	UINT64_C(0x0000000009004136), UINT64_C(0x000000000a00811b), 0, UINT64_C(0x000000000b000327),
+	UINT64_C(0x4102c55f8104cabb), UINT64_C(0x4201255203014aa0), UINT64_C(0x4302e56005054abe), UINT64_C(0x4401455287020aa3),
+	UINT64_C(0x0000000009004ab8), UINT64_C(0x000000000a008a9d), 0, UINT64_C(0x000000000b000328),
+	UINT64_C(0x4102ddce8104fb99), UINT64_C(0x42013dc103017b7e), UINT64_C(0x4302fdcf05057b9c), UINT64_C(0x44015dc187023b81),
+	UINT64_C(0x0000000009007b96), UINT64_C(0x000000000a00bb7b), 0, UINT64_C(0x000000000b000092),
+	UINT64_C(0x4609c1528104c2a1), UINT64_C(0x4688614503014286), UINT64_C(0x4789e1530e1342a4), UINT64_C(0x4887a145900f0289),
+	UINT64_C(0x000000000900429e), UINT64_C(0x000000000a008283), 0, UINT64_C(0x000000000b000095),
+	UINT64_C(0x0000000012100401), UINT64_C(0x0000000012100401), UINT64_C(0x0000000012100401), UINT64_C(0x0000000012100401),
+	UINT64_C(0x0000000012100401), UINT64_C(0x0000000012100401), UINT64_C(0x0000000012100401), UINT64_C(0x0000000012100401),
+	UINT64_C(0x000000001210032c), UINT64_C(0x000000001210032c), UINT64_C(0x000000001210032c), UINT64_C(0x000000001210032c),
+	UINT64_C(0x000000001210032c), UINT64_C(0x000000001210032c), UINT64_C(0x000000001210032c), UINT64_C(0x000000001210032c),
+	UINT64_C(0x00000000132e08b8), UINT64_C(0x00000000132e08b8), UINT64_C(0x00000000132e08b8), UINT64_C(0x00000000132e08b8),
+	UINT64_C(0x00000000132e08b8), UINT64_C(0x00000000132e08b8), UINT64_C(0x00000000132e08b8), UINT64_C(0x00000000132e08b8),
+	UINT64_C(0x00000000132e083c), UINT64_C(0x00000000132e083c), UINT64_C(0x00000000132e083c), UINT64_C(0x00000000132e083c),
+	UINT64_C(0x00000000132e083c), UINT64_C(0x00000000132e083c), UINT64_C(0x00000000132e083c), UINT64_C(0x00000000132e083c),
+	UINT64_C(0x000000000b0008c4), UINT64_C(0x000000000b000845), UINT64_C(0x40000000100f019b), UINT64_C(0x4a84e0a61409814b),
+	0, 0, UINT64_C(0x000000000b000329), 0,
+	UINT64_C(0x000000000a0088d7), 0, UINT64_C(0x00000000090048b7), 0,
+	0, 0, 0, 0,
+	UINT64_C(0x00000000161bc475), UINT64_C(0x00000000161bc46c), UINT64_C(0x00000000161bc446), UINT64_C(0x00000000161bc43d),
+	UINT64_C(0x00000000161bc44b), UINT64_C(0x00000000161bc469), UINT64_C(0x00000000161bc443), UINT64_C(0x00000000161bc440),
+	UINT64_C(0x00000000161bc47c), UINT64_C(0x00000000161bc472), UINT64_C(0x00000000161bc478), UINT64_C(0x00000000161bc46f),
+	UINT64_C(0x00000000161bc457), UINT64_C(0x00000000161bc44e), UINT64_C(0x00000000161bc454), UINT64_C(0x00000000161bc451),
+	UINT64_C(0x8000000000030079), UINT64_C(0x8000000000030722), UINT64_C(0x8000000000030099), UINT64_C(0x8000000000030732),
+	UINT64_C(0x4609c58d0104cb17), UINT64_C(0x4688658283014b02), 0, 0,
+	UINT64_C(0x4609c3288104c648), UINT64_C(0x4688630b8301460f), UINT64_C(0x4789e3298e13464f), UINT64_C(0x4887a30c100f0616),
+	0, UINT64_C(0x40000000100f04df), 0, UINT64_C(0x800000000003074a),
+	UINT64_C(0x000000000b000704), UINT64_C(0x0000000012103b67), UINT64_C(0x0000000012103b67), UINT64_C(0x0000000012103b67),
+	UINT64_C(0x0000000012103b67), UINT64_C(0x0000000012103b67), UINT64_C(0x0000000012103b67), UINT64_C(0x0000000012103b67),
+	UINT64_C(0x000000000b0001ef), UINT64_C(0x000000000b000325), UINT64_C(0x000000004d18c37e), UINT64_C(0x000000000b003b4e),
+	UINT64_C(0x000000000b0008cc), UINT64_C(0x000000000b000851), UINT64_C(0x000000000b000975), UINT64_C(0x000000000b0004c2),
+	UINT64_C(0x000000002225c644), UINT64_C(0x000000002225c60b), UINT64_C(0x000000002225c64a), UINT64_C(0x000000002225c611),
+	0, 0, 0, 0,
+	UINT64_C(0x0000000009004b14), UINT64_C(0x000000000a008aff), 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d),
+	UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d),
+	UINT64_C(0x0000000024264614), UINT64_C(0x0000000024264614), UINT64_C(0x0000000024264614), UINT64_C(0x0000000024264614),
+	UINT64_C(0x0000000024264614), UINT64_C(0x0000000024264614), UINT64_C(0x0000000024264614), UINT64_C(0x0000000024264614),
+	UINT64_C(0x80000000000300e9), UINT64_C(0x8000000000030764), UINT64_C(0x000000000a008928), UINT64_C(0x000000000b00092b),
+	UINT64_C(0x40000000100f04e5), UINT64_C(0x40000000100f04cb), UINT64_C(0x800000000002010f), UINT64_C(0x800000000002077a),
+	UINT64_C(0x000000002a17c378), UINT64_C(0x000000000b0004e3), UINT64_C(0x000000000a008504), UINT64_C(0x000000000b000507),
+	UINT64_C(0x000000000b000414), UINT64_C(0x000000002b1ac412), UINT64_C(0x000000000b000415), UINT64_C(0x000000000b000420),
+	UINT64_C(0x80000000000301a7), UINT64_C(0x80000000000307c5), UINT64_C(0x80000000000301c7), UINT64_C(0x80000000000307d5),
+	UINT64_C(0x0000000009004094), UINT64_C(0x0000000009004093), UINT64_C(0x000000000b00098e), UINT64_C(0x000000000b003b7a),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x00000000161bc501), UINT64_C(0x00000000161bc500), UINT64_C(0x00000000161bc4ff), UINT64_C(0x00000000161bc449),
+	UINT64_C(0x000000002b1ac3fd), UINT64_C(0x000000002b1ac3f9), UINT64_C(0x000000002b1ac757), UINT64_C(0x000000002b1ac753),
+	UINT64_C(0x000000004e1241ed), UINT64_C(0x00000000291c0467), UINT64_C(0x000000004d18c383), UINT64_C(0x00000000161bc466),
+	UINT64_C(0x000000000b0003fe), UINT64_C(0x000000000b0003fa), UINT64_C(0x000000000b000758), UINT64_C(0x000000000b000754),
+	UINT64_C(0x000000000b0004fa), UINT64_C(0x000000000b000413), UINT64_C(0x000000000b000924), UINT64_C(0x000000000b000925),
+	UINT64_C(0x000000000b0003c6), UINT64_C(0x000000000b000202), UINT64_C(0x8000000000030201), UINT64_C(0x80000000000307ec),
+	UINT64_C(0x000000000b0001f7), UINT64_C(0x000000000b000a7e), UINT64_C(0x000000000b0001fd), UINT64_C(0x000000000b000a81),
+	UINT64_C(0x000000000b0001f8), UINT64_C(0x000000000b000a7f), UINT64_C(0x8000000000030227), UINT64_C(0x80000000000307fc),
+},
+{
+	UINT64_C(0x800000000003080c), UINT64_C(0x800000000002081c), UINT64_C(0x4887a262100f04c3), UINT64_C(0x4887a284900f0508),
+	0, UINT64_C(0x000000000b000af5), UINT64_C(0x000000000b0001ff), UINT64_C(0x000000000b000af9),
+	UINT64_C(0x000000000b000416), UINT64_C(0x000000000b003b4f), 0, UINT64_C(0x000000000b000b3f),
+	0, UINT64_C(0x80000000000302a9), UINT64_C(0x000000000b000391), 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x8000000000030868), UINT64_C(0x4887a38a9f07071e), 0, 0,
+	UINT64_C(0x400000001f07071f), UINT64_C(0x400000001f070720), UINT64_C(0x400000001f070721), UINT64_C(0x5008c3911f07071d),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x000000000b003b55), UINT64_C(0x000000000b000922), UINT64_C(0x000000000b000915), UINT64_C(0x000000000b000919),
+	UINT64_C(0x000000000b000af6), UINT64_C(0x000000000b000af7), 0, UINT64_C(0x000000000b0003bb),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x440141370702026d), UINT64_C(0x4401412c07020257), UINT64_C(0x440141080702020f), UINT64_C(0x4401410507020209),
+	UINT64_C(0x4401411207020223), UINT64_C(0x440141270702024d), UINT64_C(0x4401410b07020215), UINT64_C(0x4401410207020203),
+	UINT64_C(0x4401413f0702027d), UINT64_C(0x4401413407020267), UINT64_C(0x4401413a07020273), UINT64_C(0x4401412f0702025d),
+	UINT64_C(0x4401411d07020239), UINT64_C(0x4401411a07020233), UINT64_C(0x440141200702023f), UINT64_C(0x440141170702022d),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, UINT64_C(0x000000000b000558),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x00000000291c0476), UINT64_C(0x00000000291c046d), UINT64_C(0x00000000291c0447), UINT64_C(0x00000000291c043e),
+	UINT64_C(0x00000000291c044c), UINT64_C(0x00000000291c046a), UINT64_C(0x00000000291c0444), UINT64_C(0x00000000291c0441),
+	UINT64_C(0x00000000291c047d), UINT64_C(0x00000000291c0473), UINT64_C(0x00000000291c0479), UINT64_C(0x00000000291c0470),
+	UINT64_C(0x00000000291c0458), UINT64_C(0x00000000291c044f), UINT64_C(0x00000000291c0455), UINT64_C(0x00000000291c0452),
+	UINT64_C(0x578bc4f79f0709ee), UINT64_C(0x578bc4f49f0709e8), UINT64_C(0x578bc4ed9f0709da), UINT64_C(0x578bc4ea9f0709d4),
+	UINT64_C(0x578bc4ee9f0709dc), UINT64_C(0x578bc4f39f0709e6), UINT64_C(0x578bc4ec9f0709d8), UINT64_C(0x578bc4eb9f0709d6),
+	UINT64_C(0x578bc4fa1f0709f3), UINT64_C(0x578bc4f69f0709ec), UINT64_C(0x578bc4f89f0709f0), UINT64_C(0x578bc4f59f0709ea),
+	UINT64_C(0x578bc4f29f0709e4), UINT64_C(0x578bc4ef9f0709de), UINT64_C(0x578bc4f19f0709e2), UINT64_C(0x578bc4f09f0709e0),
+	UINT64_C(0x000000000b0008cf), UINT64_C(0x000000000b000854), UINT64_C(0x000000000b0002d9), UINT64_C(0x468860d7830141ad),
+	0, UINT64_C(0x4201251083014a1f), UINT64_C(0x8000000000020345), UINT64_C(0x800000000002038d),
+	UINT64_C(0x000000000b0008d2), UINT64_C(0x000000000b000857), UINT64_C(0x000000000b00096d), UINT64_C(0x420120e9830141d1),
+	0, UINT64_C(0x4201252483014a47), UINT64_C(0x8000000000020910), UINT64_C(0x440141f2070203e1),
+	UINT64_C(0x4609c1640104c2c7), UINT64_C(0x46886160830142c0), UINT64_C(0x40000000100f050e), UINT64_C(0x420120e3830141c5),
+	UINT64_C(0x40000000100f04e8), UINT64_C(0x40000000100f04ee), UINT64_C(0x5a960360100f06be), UINT64_C(0x4887a35f900f06bd),
+	0, 0, UINT64_C(0x80000000000308de), UINT64_C(0x420120dd830141b9),
+	UINT64_C(0x4887a0cf100f019d), UINT64_C(0x4887a0d2100f01a3), UINT64_C(0x5a960353900f06a5), UINT64_C(0x4887a353100f06a4),
+	0, 0, 0, UINT64_C(0x40000000312b0684),
+	0, 0, 0, UINT64_C(0x8000000000030958),
+	UINT64_C(0x00000000121001a9), UINT64_C(0x00000000121001a9), UINT64_C(0x00000000121001a9), UINT64_C(0x00000000121001a9),
+	UINT64_C(0x00000000121001a9), UINT64_C(0x00000000121001a9), UINT64_C(0x00000000121001a9), UINT64_C(0x00000000121001a9),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, UINT64_C(0x000000000b000b3d),
+},
+},
+{
+{
+	UINT64_C(0x4102c0720104c0e0), UINT64_C(0x42012064830140c5), UINT64_C(0x4302e072850540e3), UINT64_C(0x44014065070200c8),
+	UINT64_C(0x00000000090040dd), UINT64_C(0x000000000a0080c2), 0, 0,
+	UINT64_C(0x4102c3a68104c749), UINT64_C(0x420123990301472e), UINT64_C(0x4302e3a70505474c), UINT64_C(0x4401439987020731),
+	UINT64_C(0x0000000009004746), UINT64_C(0x000000000a00872b), 0, 0,
+	UINT64_C(0x4102c05e0104c0b8), UINT64_C(0x420120508301409d), UINT64_C(0x4302e05e850540bb), UINT64_C(0x44014051070200a0),
+	UINT64_C(0x00000000090040b5), UINT64_C(0x000000000a00809a), 0, 0,
+	UINT64_C(0x4102c4e70104c9ca), UINT64_C(0x420124d9830149af), UINT64_C(0x4302e4e7850549cd), UINT64_C(0x440144da070209b2),
+	UINT64_C(0x00000000090049c7), UINT64_C(0x000000000a0089ac), 0, 0,
+	UINT64_C(0x4102c09e8104c139), UINT64_C(0x420120910301411e), UINT64_C(0x4302e09f0505413c), UINT64_C(0x4401409187020121),
+	UINT64_C(0x0000000009004136), UINT64_C(0x000000000a00811b), 0, 0,
+	UINT64_C(0x4102c55f8104cabb), UINT64_C(0x4201255203014aa0), UINT64_C(0x4302e56005054abe), UINT64_C(0x4401455287020aa3),
+	UINT64_C(0x0000000009004ab8), UINT64_C(0x000000000a008a9d), 0, 0,
+	UINT64_C(0x4102ddce8104fb99), UINT64_C(0x42013dc103017b7e), UINT64_C(0x4302fdcf05057b9c), UINT64_C(0x44015dc187023b81),
+	UINT64_C(0x0000000009007b96), UINT64_C(0x000000000a00bb7b), 0, 0,
+	UINT64_C(0x4609c1528104c2a1), UINT64_C(0x4688614503014286), UINT64_C(0x4789e1530e1342a4), UINT64_C(0x4887a145900f0289),
+	UINT64_C(0x000000000900429e), UINT64_C(0x000000000a008283), 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x000000000b00092c), 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x00000000132e08b8), UINT64_C(0x00000000132e08b8), UINT64_C(0x00000000132e08b8), UINT64_C(0x00000000132e08b8),
+	UINT64_C(0x00000000132e08b8), UINT64_C(0x00000000132e08b8), UINT64_C(0x00000000132e08b8), UINT64_C(0x00000000132e08b8),
+	UINT64_C(0x00000000132e083c), UINT64_C(0x00000000132e083c), UINT64_C(0x00000000132e083c), UINT64_C(0x00000000132e083c),
+	UINT64_C(0x00000000132e083c), UINT64_C(0x00000000132e083c), UINT64_C(0x00000000132e083c), UINT64_C(0x00000000132e083c),
+	0, 0, 0, UINT64_C(0x68f3dddc502afbb7),
+	0, 0, UINT64_C(0x000000000b000329), 0,
+	UINT64_C(0x000000000a0088d7), 0, UINT64_C(0x00000000090048b7), 0,
+	0, 0, 0, 0,
+	UINT64_C(0x00000000161bc475), UINT64_C(0x00000000161bc46c), UINT64_C(0x00000000161bc446), UINT64_C(0x00000000161bc43d),
+	UINT64_C(0x00000000161bc44b), UINT64_C(0x00000000161bc469), UINT64_C(0x00000000161bc443), UINT64_C(0x00000000161bc440),
+	UINT64_C(0x00000000161bc47c), UINT64_C(0x00000000161bc472), UINT64_C(0x00000000161bc478), UINT64_C(0x00000000161bc46f),
+	UINT64_C(0x00000000161bc457), UINT64_C(0x00000000161bc44e), UINT64_C(0x00000000161bc454), UINT64_C(0x00000000161bc451),
+	UINT64_C(0x8000000000030079), UINT64_C(0x8000000000030722), 0, UINT64_C(0x8000000000030732),
+	UINT64_C(0x4609c58d0104cb17), UINT64_C(0x4688658283014b02), 0, 0,
+	UINT64_C(0x4609c3288104c648), UINT64_C(0x4688630b8301460f), UINT64_C(0x4789e3298e13464f), UINT64_C(0x4887a30c100f0616),
+	0, UINT64_C(0x40000000100f04df), 0, UINT64_C(0x800000000003074a),
+	UINT64_C(0x000000000b000704), UINT64_C(0x0000000012103b67), UINT64_C(0x0000000012103b67), UINT64_C(0x0000000012103b67),
+	UINT64_C(0x0000000012103b67), UINT64_C(0x0000000012103b67), UINT64_C(0x0000000012103b67), UINT64_C(0x0000000012103b67),
+	UINT64_C(0x000000000b0001ef), UINT64_C(0x000000000b000325), 0, UINT64_C(0x000000000b003b4e),
+	UINT64_C(0x000000000b0008cc), UINT64_C(0x000000000b000851), UINT64_C(0x000000000b000975), UINT64_C(0x000000000b0004c2),
+	UINT64_C(0x000000002225c646), UINT64_C(0x000000002225c60d), UINT64_C(0x000000002225c64c), UINT64_C(0x000000002225c613),
+	0, 0, 0, 0,
+	UINT64_C(0x0000000009004b14), UINT64_C(0x000000000a008aff), 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d),
+	UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d),
+	UINT64_C(0x0000000024264614), UINT64_C(0x0000000024264614), UINT64_C(0x0000000024264614), UINT64_C(0x0000000024264614),
+	UINT64_C(0x0000000024264614), UINT64_C(0x0000000024264614), UINT64_C(0x0000000024264614), UINT64_C(0x0000000024264614),
+	UINT64_C(0x80000000000300e9), UINT64_C(0x8000000000030764), UINT64_C(0x000000000a008928), UINT64_C(0x000000000b00092b),
+	0, 0, UINT64_C(0x800000000002010f), UINT64_C(0x800000000002077a),
+	UINT64_C(0x000000002a17c378), UINT64_C(0x000000000b0004e4), UINT64_C(0x000000000a008504), UINT64_C(0x000000000b000507),
+	UINT64_C(0x000000000b000414), UINT64_C(0x000000002b1ac412), 0, UINT64_C(0x000000000b000420),
+	UINT64_C(0x80000000000301a7), UINT64_C(0x80000000000307c5), UINT64_C(0x80000000000301c7), UINT64_C(0x80000000000307d5),
+	0, 0, 0, UINT64_C(0x000000000b003b7a),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x00000000161bc501), UINT64_C(0x00000000161bc500), UINT64_C(0x00000000161bc4ff), UINT64_C(0x00000000161bc47b),
+	UINT64_C(0x000000002b1ac3fd), UINT64_C(0x000000002b1ac3f9), UINT64_C(0x000000002b1ac757), UINT64_C(0x000000002b1ac753),
+	UINT64_C(0x000000004e1241ed), UINT64_C(0x00000000291c0467), 0, UINT64_C(0x00000000161bc466),
+	UINT64_C(0x000000000b0003fe), UINT64_C(0x000000000b0003fa), UINT64_C(0x000000000b000758), UINT64_C(0x000000000b000754),
+	UINT64_C(0x000000000b0004fa), UINT64_C(0x000000000b000413), UINT64_C(0x000000000b000924), UINT64_C(0x000000000b000925),
+	UINT64_C(0x000000000b0003c6), UINT64_C(0x000000000b000202), UINT64_C(0x8000000000030201), UINT64_C(0x80000000000307ec),
+	UINT64_C(0x000000000b0001f7), UINT64_C(0x000000000b000a7e), UINT64_C(0x000000000b0001fd), UINT64_C(0x000000000b000a81),
+	UINT64_C(0x000000000b0001f8), UINT64_C(0x000000000b000a7f), UINT64_C(0x8000000000030227), UINT64_C(0x800000000003096c),
+},
+{
+	UINT64_C(0x800000000003080c), UINT64_C(0x800000000002097c), UINT64_C(0x4887a262100f04c3), UINT64_C(0x4887a284900f0508),
+	0, UINT64_C(0x000000000b000af5), UINT64_C(0x000000000b0001ff), UINT64_C(0x000000000b000af9),
+	UINT64_C(0x000000000b000416), UINT64_C(0x000000000b003b4f), 0, UINT64_C(0x000000000b000b3f),
+	0, UINT64_C(0x80000000000302a9), UINT64_C(0x000000000b000391), 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x8000000000030868), UINT64_C(0x4887a38a9f07071e), 0, 0,
+	UINT64_C(0x400000001f07071f), UINT64_C(0x400000001f070720), UINT64_C(0x400000001f070721), UINT64_C(0x5008c3911f07071d),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x000000000b003b55), UINT64_C(0x000000000b000922), UINT64_C(0x000000000b000915), UINT64_C(0x000000000b000919),
+	UINT64_C(0x000000000b000af6), UINT64_C(0x000000000b000af7), 0, UINT64_C(0x000000000b0003bb),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x440141370702026d), UINT64_C(0x4401412c07020257), UINT64_C(0x440141080702020f), UINT64_C(0x4401410507020209),
+	UINT64_C(0x4401411207020223), UINT64_C(0x440141270702024d), UINT64_C(0x4401410b07020215), UINT64_C(0x4401410207020203),
+	UINT64_C(0x4401413f0702027d), UINT64_C(0x4401413407020267), UINT64_C(0x4401413a07020273), UINT64_C(0x4401412f0702025d),
+	UINT64_C(0x4401411d07020239), UINT64_C(0x4401411a07020233), UINT64_C(0x440141200702023f), UINT64_C(0x440141170702022d),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x00000000291c0476), UINT64_C(0x00000000291c046d), UINT64_C(0x00000000291c0447), UINT64_C(0x00000000291c043e),
+	UINT64_C(0x00000000291c044c), UINT64_C(0x00000000291c046a), UINT64_C(0x00000000291c0444), UINT64_C(0x00000000291c0441),
+	UINT64_C(0x00000000291c047d), UINT64_C(0x00000000291c0473), UINT64_C(0x00000000291c0479), UINT64_C(0x00000000291c0470),
+	UINT64_C(0x00000000291c0458), UINT64_C(0x00000000291c044f), UINT64_C(0x00000000291c0455), UINT64_C(0x00000000291c0452),
+	UINT64_C(0x578bc4f79f0709ee), UINT64_C(0x578bc4f49f0709e8), UINT64_C(0x578bc4ed9f0709da), UINT64_C(0x578bc4ea9f0709d4),
+	UINT64_C(0x578bc4ee9f0709dc), UINT64_C(0x578bc4f39f0709e6), UINT64_C(0x578bc4ec9f0709d8), UINT64_C(0x578bc4eb9f0709d6),
+	UINT64_C(0x578bc4fa1f0709f3), UINT64_C(0x578bc4f69f0709ec), UINT64_C(0x578bc4f89f0709f0), UINT64_C(0x578bc4f59f0709ea),
+	UINT64_C(0x578bc4f29f0709e4), UINT64_C(0x578bc4ef9f0709de), UINT64_C(0x578bc4f19f0709e2), UINT64_C(0x578bc4f09f0709e0),
+	UINT64_C(0x000000000b0008cf), UINT64_C(0x000000000b000854), UINT64_C(0x000000000b0002d9), UINT64_C(0x468860d7830141ad),
+	0, UINT64_C(0x4201251083014a1f), UINT64_C(0x8000000000020345), UINT64_C(0x800000000002038d),
+	UINT64_C(0x000000000b0008d2), UINT64_C(0x000000000b000857), UINT64_C(0x000000000b00096d), UINT64_C(0x420120e9830141d1),
+	0, UINT64_C(0x4201252483014a47), UINT64_C(0x80000000000308be), UINT64_C(0x440141f2070203e1),
+	UINT64_C(0x4609c1640104c2c7), UINT64_C(0x46886160830142c0), UINT64_C(0x40000000100f050e), UINT64_C(0x420120e3830141c5),
+	UINT64_C(0x40000000100f04e8), UINT64_C(0x40000000100f04ee), UINT64_C(0x5a960360100f06be), UINT64_C(0x4887a35f900f06bd),
+	0, 0, UINT64_C(0x80000000000308de), UINT64_C(0x420120dd830141b9),
+	UINT64_C(0x4887a0cf100f019d), UINT64_C(0x4887a0d2100f01a3), UINT64_C(0x5a960353900f06a5), UINT64_C(0x4887a353100f06a4),
+	0, 0, 0, 0,
+	0, 0, 0, UINT64_C(0x80000000000308f8),
+	UINT64_C(0x00000000121001a9), UINT64_C(0x00000000121001a9), UINT64_C(0x00000000121001a9), UINT64_C(0x00000000121001a9),
+	UINT64_C(0x00000000121001a9), UINT64_C(0x00000000121001a9), UINT64_C(0x00000000121001a9), UINT64_C(0x00000000121001a9),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, UINT64_C(0x000000000b000b3d),
+},
+},
+{
+{
+	UINT64_C(0x4102c0720104c0e0), UINT64_C(0x42012069030140ce), UINT64_C(0x4302e072850540e3), UINT64_C(0x44014069870200d1),
+	UINT64_C(0x00000000090040dd), UINT64_C(0x000000000a0080cb), 0, 0,
+	UINT64_C(0x4102c3a68104c749), UINT64_C(0x4201239d83014737), UINT64_C(0x4302e3a70505474c), UINT64_C(0x4401439e0702073a),
+	UINT64_C(0x0000000009004746), UINT64_C(0x000000000a008734), 0, 0,
+	UINT64_C(0x4102c05e0104c0b8), UINT64_C(0x42012055030140a6), UINT64_C(0x4302e05e850540bb), UINT64_C(0x44014055870200a9),
+	UINT64_C(0x00000000090040b5), UINT64_C(0x000000000a0080a3), 0, 0,
+	UINT64_C(0x4102c4e70104c9ca), UINT64_C(0x420124de030149b8), UINT64_C(0x4302e4e7850549cd), UINT64_C(0x440144de870209bb),
+	UINT64_C(0x00000000090049c7), UINT64_C(0x000000000a0089b5), 0, 0,
+	UINT64_C(0x4102c09e8104c139), UINT64_C(0x4201209583014127), UINT64_C(0x4302e09f0505413c), UINT64_C(0x440140960702012a),
+	UINT64_C(0x0000000009004136), UINT64_C(0x000000000a008124), 0, 0,
+	UINT64_C(0x4102c55f8104cabb), UINT64_C(0x4201255683014aa9), UINT64_C(0x4302e56005054abe), UINT64_C(0x4401455707020aac),
+	UINT64_C(0x0000000009004ab8), UINT64_C(0x000000000a008aa6), 0, 0,
+	UINT64_C(0x4102ddce8104fb99), UINT64_C(0x42013dc583017b87), UINT64_C(0x4302fdcf05057b9c), UINT64_C(0x44015dc607023b8a),
+	UINT64_C(0x0000000009007b96), UINT64_C(0x000000000a00bb84), 0, 0,
+	UINT64_C(0x4609c1528104c2a1), UINT64_C(0x468861498301428f), UINT64_C(0x4789e1530e1342a4), UINT64_C(0x4887a14a100f0292),
+	UINT64_C(0x000000000900429e), UINT64_C(0x000000000a00828c), 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x000000000b00092c), 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x00000000372e48c1), UINT64_C(0x00000000372e48c1), UINT64_C(0x00000000372e48c1), UINT64_C(0x00000000372e48c1),
+	UINT64_C(0x00000000372e48c1), UINT64_C(0x00000000372e48c1), UINT64_C(0x00000000372e48c1), UINT64_C(0x00000000372e48c1),
+	UINT64_C(0x00000000372e4842), UINT64_C(0x00000000372e4842), UINT64_C(0x00000000372e4842), UINT64_C(0x00000000372e4842),
+	UINT64_C(0x00000000372e4842), UINT64_C(0x00000000372e4842), UINT64_C(0x00000000372e4842), UINT64_C(0x00000000372e4842),
+	0, 0, 0, 0,
+	0, 0, UINT64_C(0x000000000b000329), 0,
+	UINT64_C(0x000000003802c8bf), 0, UINT64_C(0x00000000090048c0), 0,
+	0, 0, 0, 0,
+	UINT64_C(0x00000000161bc475), UINT64_C(0x00000000161bc46c), UINT64_C(0x00000000161bc446), UINT64_C(0x00000000161bc43d),
+	UINT64_C(0x00000000161bc44b), UINT64_C(0x00000000161bc469), UINT64_C(0x00000000161bc443), UINT64_C(0x00000000161bc440),
+	UINT64_C(0x00000000161bc47c), UINT64_C(0x00000000161bc472), UINT64_C(0x00000000161bc478), UINT64_C(0x00000000161bc46f),
+	UINT64_C(0x00000000161bc457), UINT64_C(0x00000000161bc44e), UINT64_C(0x00000000161bc454), UINT64_C(0x00000000161bc451),
+	UINT64_C(0x8000000000030079), UINT64_C(0x8000000000030089), 0, UINT64_C(0x80000000000300a9),
+	UINT64_C(0x4609c58d0104cb17), UINT64_C(0x4688658603014b09), 0, 0,
+	UINT64_C(0x4609c3288104c648), UINT64_C(0x4688631583014622), UINT64_C(0x4789e3298e13464f), UINT64_C(0x4887a316100f062a),
+	0, UINT64_C(0x40000000100f04e1), 0, UINT64_C(0x800000000003046d),
+	UINT64_C(0x000000000b000704), UINT64_C(0x0000000012103b6a), UINT64_C(0x0000000012103b6a), UINT64_C(0x0000000012103b6a),
+	UINT64_C(0x0000000012103b6a), UINT64_C(0x0000000012103b6a), UINT64_C(0x0000000012103b6a), UINT64_C(0x0000000012103b6a),
+	UINT64_C(0x000000000b000326), UINT64_C(0x000000000b0001f0), 0, UINT64_C(0x000000000b003b4e),
+	UINT64_C(0x000000000b0008ce), UINT64_C(0x000000000b000853), UINT64_C(0x000000000b000975), UINT64_C(0x000000000b0004c2),
+	UINT64_C(0x000000002225c645), UINT64_C(0x000000002225c61d), UINT64_C(0x000000002225c64b), UINT64_C(0x000000002225c624),
+	0, 0, 0, 0,
+	UINT64_C(0x0000000009004b14), UINT64_C(0x000000000a008b06), 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d),
+	UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d),
+	UINT64_C(0x0000000024264628), UINT64_C(0x0000000024264628), UINT64_C(0x0000000024264628), UINT64_C(0x0000000024264628),
+	UINT64_C(0x0000000024264628), UINT64_C(0x0000000024264628), UINT64_C(0x0000000024264628), UINT64_C(0x0000000024264628),
+	UINT64_C(0x80000000000300e9), UINT64_C(0x80000000000300f9), UINT64_C(0x00000000281f4927), UINT64_C(0x000000000b00092a),
+	0, 0, UINT64_C(0x800000000002010f), UINT64_C(0x8000000000020157),
+	UINT64_C(0x000000002a17c378), UINT64_C(0x000000000b0004e4), UINT64_C(0x00000000281f4502), UINT64_C(0x000000000b000505),
+	UINT64_C(0x000000000b000414), UINT64_C(0x000000002b1ac412), 0, UINT64_C(0x000000000b000421),
+	UINT64_C(0x80000000000301a7), UINT64_C(0x80000000000301b7), UINT64_C(0x80000000000301c7), UINT64_C(0x80000000000301d7),
+	0, 0, 0, UINT64_C(0x000000000b003b7a),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x00000000161bc501), UINT64_C(0x00000000161bc500), UINT64_C(0x00000000161bc4ff), UINT64_C(0x00000000161bc44a),
+	UINT64_C(0x000000002b1ac3fd), UINT64_C(0x000000002b1ac3fb), UINT64_C(0x000000002b1ac757), UINT64_C(0x000000002b1ac755),
+	UINT64_C(0x000000002e11c1ea), UINT64_C(0x00000000291c0468), 0, UINT64_C(0x00000000161bc466),
+	UINT64_C(0x000000000b0003fe), UINT64_C(0x000000000b0003fc), UINT64_C(0x000000000b000758), UINT64_C(0x000000000b000756),
+	UINT64_C(0x000000000b0004fa), UINT64_C(0x000000000b000413), UINT64_C(0x000000000b000924), UINT64_C(0x000000000b000925),
+	UINT64_C(0x000000000b0003c6), UINT64_C(0x000000000b000202), UINT64_C(0x8000000000030201), UINT64_C(0x8000000000030211),
+	UINT64_C(0x000000000b0001f7), UINT64_C(0x000000000b000a7e), UINT64_C(0x000000000b0001fd), UINT64_C(0x000000000b000a81),
+	UINT64_C(0x000000000b0001f8), UINT64_C(0x000000000b000a7f), UINT64_C(0x8000000000030227), UINT64_C(0x8000000000030488),
+},
+{
+	UINT64_C(0x8000000000030247), UINT64_C(0x8000000000020498), UINT64_C(0x4887a263100f04c5), UINT64_C(0x4887a285900f050a),
+	0, UINT64_C(0x000000000b000af5), UINT64_C(0x000000000b0001ff), UINT64_C(0x000000000b000af9),
+	UINT64_C(0x000000000b000416), UINT64_C(0x000000000b003b4f), 0, UINT64_C(0x000000000b000b3f),
+	0, UINT64_C(0x80000000000302a9), UINT64_C(0x000000000b000391), 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x80000000000302ba), UINT64_C(0x4887a38a9f070717), 0, 0,
+	UINT64_C(0x80000000000302cc), UINT64_C(0x400000001f070718), UINT64_C(0x400000001f070719), UINT64_C(0x5008c38d1f070716),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x000000000b003b55), UINT64_C(0x000000000b000922), UINT64_C(0x000000000b000915), UINT64_C(0x000000000b000919),
+	UINT64_C(0x000000000b000af6), UINT64_C(0x000000000b000af7), 0, UINT64_C(0x000000000b0003bb),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x440141380702026f), UINT64_C(0x4401412d07020259), UINT64_C(0x4401410907020211), UINT64_C(0x440141060702020b),
+	UINT64_C(0x4401411307020225), UINT64_C(0x440141280702024f), UINT64_C(0x4401410c07020217), UINT64_C(0x4401410307020205),
+	UINT64_C(0x440141400702027f), UINT64_C(0x4401413507020269), UINT64_C(0x4401413b07020275), UINT64_C(0x440141300702025f),
+	UINT64_C(0x4401411e0702023b), UINT64_C(0x4401411b07020235), UINT64_C(0x4401412107020241), UINT64_C(0x440141180702022f),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, UINT64_C(0x000000000b000558),
+	UINT64_C(0x5d88afbdba035f7a), UINT64_C(0x5e87eff33c0f9fe5), 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x00000000291c0477), UINT64_C(0x00000000291c046e), UINT64_C(0x00000000291c0448), UINT64_C(0x00000000291c043f),
+	UINT64_C(0x00000000291c044d), UINT64_C(0x00000000291c046b), UINT64_C(0x00000000291c0445), UINT64_C(0x00000000291c0442),
+	UINT64_C(0x00000000291c047e), UINT64_C(0x00000000291c0474), UINT64_C(0x00000000291c047a), UINT64_C(0x00000000291c0471),
+	UINT64_C(0x00000000291c0459), UINT64_C(0x00000000291c0450), UINT64_C(0x00000000291c0456), UINT64_C(0x00000000291c0453),
+	UINT64_C(0x578bc4f79f0709ee), UINT64_C(0x578bc4f49f0709e8), UINT64_C(0x578bc4ed9f0709da), UINT64_C(0x578bc4ea9f0709d4),
+	UINT64_C(0x578bc4ee9f0709dc), UINT64_C(0x578bc4f39f0709e6), UINT64_C(0x578bc4ec9f0709d8), UINT64_C(0x578bc4eb9f0709d6),
+	UINT64_C(0x578bc4fa1f0709f3), UINT64_C(0x578bc4f69f0709ec), UINT64_C(0x578bc4f89f0709f0), UINT64_C(0x578bc4f59f0709ea),
+	UINT64_C(0x578bc4f29f0709e4), UINT64_C(0x578bc4ef9f0709de), UINT64_C(0x578bc4f19f0709e2), UINT64_C(0x578bc4f09f0709e0),
+	UINT64_C(0x000000000b0008d1), UINT64_C(0x000000000b000856), UINT64_C(0x000000000b0002d9), UINT64_C(0x468860d9830141b1),
+	0, UINT64_C(0x4201251283014a23), UINT64_C(0x8000000000020345), UINT64_C(0x800000000002038d),
+	UINT64_C(0x000000000b0008d4), UINT64_C(0x000000000b000859), UINT64_C(0x000000000b00096d), UINT64_C(0x420120eb830141d5),
+	0, UINT64_C(0x4201252683014a4b), UINT64_C(0x80000000000203dc), UINT64_C(0x440141f6070203e9),
+	UINT64_C(0x4609c1640104c2c7), UINT64_C(0x46886161830142c2), UINT64_C(0x40000000100f050f), UINT64_C(0x420120e5830141c9),
+	UINT64_C(0x40000000100f04e9), UINT64_C(0x40000000100f04ef), UINT64_C(0x5a960362900f06c2), UINT64_C(0x5b162362100f06c1),
+	0, 0, UINT64_C(0x8000000000030436), UINT64_C(0x420120df830141bd),
+	UINT64_C(0x4887a0d0100f019f), UINT64_C(0x4887a0d3100f01a5), UINT64_C(0x5a960356100f06a9), UINT64_C(0x5b162355900f06a8),
+	0, 0, 0, UINT64_C(0x40000000312b0684),
+	0, 0, 0, UINT64_C(0x8000000000030452),
+	UINT64_C(0x00000000121001aa), UINT64_C(0x00000000121001aa), UINT64_C(0x00000000121001aa), UINT64_C(0x00000000121001aa),
+	UINT64_C(0x00000000121001aa), UINT64_C(0x00000000121001aa), UINT64_C(0x00000000121001aa), UINT64_C(0x00000000121001aa),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, UINT64_C(0x000000000b000b3d),
+},
+},
+{
+{
+	UINT64_C(0x4102c0720104c0e0), UINT64_C(0x42012064830140c5), UINT64_C(0x4302e072850540e3), UINT64_C(0x44014065070200c8),
+	UINT64_C(0x00000000090040dd), UINT64_C(0x000000000a0080c2), 0, 0,
+	UINT64_C(0x4102c3a68104c749), UINT64_C(0x420123990301472e), UINT64_C(0x4302e3a70505474c), UINT64_C(0x4401439987020731),
+	UINT64_C(0x0000000009004746), UINT64_C(0x000000000a00872b), 0, 0,
+	UINT64_C(0x4102c05e0104c0b8), UINT64_C(0x420120508301409d), UINT64_C(0x4302e05e850540bb), UINT64_C(0x44014051070200a0),
+	UINT64_C(0x00000000090040b5), UINT64_C(0x000000000a00809a), 0, 0,
+	UINT64_C(0x4102c4e70104c9ca), UINT64_C(0x420124d9830149af), UINT64_C(0x4302e4e7850549cd), UINT64_C(0x440144da070209b2),
+	UINT64_C(0x00000000090049c7), UINT64_C(0x000000000a0089ac), 0, 0,
+	UINT64_C(0x4102c09e8104c139), UINT64_C(0x420120910301411e), UINT64_C(0x4302e09f0505413c), UINT64_C(0x4401409187020121),
+	UINT64_C(0x0000000009004136), UINT64_C(0x000000000a00811b), 0, 0,
+	UINT64_C(0x4102c55f8104cabb), UINT64_C(0x4201255203014aa0), UINT64_C(0x4302e56005054abe), UINT64_C(0x4401455287020aa3),
+	UINT64_C(0x0000000009004ab8), UINT64_C(0x000000000a008a9d), 0, 0,
+	UINT64_C(0x4102ddce8104fb99), UINT64_C(0x42013dc103017b7e), UINT64_C(0x4302fdcf05057b9c), UINT64_C(0x44015dc187023b81),
+	UINT64_C(0x0000000009007b96), UINT64_C(0x000000000a00bb7b), 0, 0,
+	UINT64_C(0x4609c1528104c2a1), UINT64_C(0x4688614503014286), UINT64_C(0x4789e1530e1342a4), UINT64_C(0x4887a145900f0289),
+	UINT64_C(0x000000000900429e), UINT64_C(0x000000000a008283), 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x000000000b00092c), 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x00000000132e08b8), UINT64_C(0x00000000132e08b8), UINT64_C(0x00000000132e08b8), UINT64_C(0x00000000132e08b8),
+	UINT64_C(0x00000000132e08b8), UINT64_C(0x00000000132e08b8), UINT64_C(0x00000000132e08b8), UINT64_C(0x00000000132e08b8),
+	UINT64_C(0x00000000132e083c), UINT64_C(0x00000000132e083c), UINT64_C(0x00000000132e083c), UINT64_C(0x00000000132e083c),
+	UINT64_C(0x00000000132e083c), UINT64_C(0x00000000132e083c), UINT64_C(0x00000000132e083c), UINT64_C(0x00000000132e083c),
+	0, 0, 0, 0,
+	0, 0, UINT64_C(0x000000000b000329), 0,
+	UINT64_C(0x000000000a0088d7), 0, UINT64_C(0x00000000090048b7), 0,
+	0, 0, 0, 0,
+	UINT64_C(0x00000000161bc475), UINT64_C(0x00000000161bc46c), UINT64_C(0x00000000161bc446), UINT64_C(0x00000000161bc43d),
+	UINT64_C(0x00000000161bc44b), UINT64_C(0x00000000161bc469), UINT64_C(0x00000000161bc443), UINT64_C(0x00000000161bc440),
+	UINT64_C(0x00000000161bc47c), UINT64_C(0x00000000161bc472), UINT64_C(0x00000000161bc478), UINT64_C(0x00000000161bc46f),
+	UINT64_C(0x00000000161bc457), UINT64_C(0x00000000161bc44e), UINT64_C(0x00000000161bc454), UINT64_C(0x00000000161bc451),
+	UINT64_C(0x8000000000030079), UINT64_C(0x8000000000030722), 0, UINT64_C(0x8000000000030732),
+	UINT64_C(0x4609c58d0104cb17), UINT64_C(0x4688658283014b02), 0, 0,
+	UINT64_C(0x4609c3288104c648), UINT64_C(0x4688630b8301460f), UINT64_C(0x4789e3298e13464f), UINT64_C(0x4887a30c100f0616),
+	0, UINT64_C(0x40000000100f04df), 0, UINT64_C(0x800000000003074a),
+	UINT64_C(0x000000000b000704), UINT64_C(0x0000000012103b67), UINT64_C(0x0000000012103b67), UINT64_C(0x0000000012103b67),
+	UINT64_C(0x0000000012103b67), UINT64_C(0x0000000012103b67), UINT64_C(0x0000000012103b67), UINT64_C(0x0000000012103b67),
+	UINT64_C(0x000000000b0001ef), UINT64_C(0x000000000b000325), 0, UINT64_C(0x000000000b003b4e),
+	UINT64_C(0x000000000b0008cc), UINT64_C(0x000000000b000851), UINT64_C(0x000000000b000975), UINT64_C(0x000000000b0004c2),
+	UINT64_C(0x000000002225c646), UINT64_C(0x000000002225c60c), UINT64_C(0x000000002225c64c), UINT64_C(0x000000002225c612),
+	0, 0, 0, 0,
+	UINT64_C(0x0000000009004b14), UINT64_C(0x000000000a008aff), 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d),
+	UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d),
+	UINT64_C(0x0000000024264614), UINT64_C(0x0000000024264614), UINT64_C(0x0000000024264614), UINT64_C(0x0000000024264614),
+	UINT64_C(0x0000000024264614), UINT64_C(0x0000000024264614), UINT64_C(0x0000000024264614), UINT64_C(0x0000000024264614),
+	UINT64_C(0x80000000000300e9), UINT64_C(0x8000000000030764), UINT64_C(0x000000000a008928), UINT64_C(0x000000000b00092b),
+	0, 0, UINT64_C(0x800000000002010f), UINT64_C(0x800000000002077a),
+	UINT64_C(0x000000002a17c378), UINT64_C(0x000000000b0004e4), UINT64_C(0x000000000a008504), UINT64_C(0x000000000b000507),
+	UINT64_C(0x000000000b000414), UINT64_C(0x000000002b1ac412), 0, UINT64_C(0x000000000b000420),
+	UINT64_C(0x80000000000301a7), UINT64_C(0x80000000000307c5), UINT64_C(0x80000000000301c7), UINT64_C(0x80000000000307d5),
+	0, 0, 0, UINT64_C(0x000000000b003b7a),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x00000000161bc501), UINT64_C(0x00000000161bc500), UINT64_C(0x00000000161bc4ff), UINT64_C(0x00000000161bc47b),
+	UINT64_C(0x000000002b1ac3fd), UINT64_C(0x000000002b1ac3f9), UINT64_C(0x000000002b1ac757), UINT64_C(0x000000002b1ac753),
+	UINT64_C(0x000000004e1241ed), UINT64_C(0x00000000291c0467), 0, UINT64_C(0x00000000161bc466),
+	UINT64_C(0x000000000b0003fe), UINT64_C(0x000000000b0003fa), UINT64_C(0x000000000b000758), UINT64_C(0x000000000b000754),
+	UINT64_C(0x000000000b0004fa), UINT64_C(0x000000000b000413), UINT64_C(0x000000000b000924), UINT64_C(0x000000000b000925),
+	UINT64_C(0x000000000b0003c6), UINT64_C(0x000000000b000202), UINT64_C(0x8000000000030201), UINT64_C(0x80000000000307ec),
+	UINT64_C(0x000000000b0001f7), UINT64_C(0x000000000b000a7e), UINT64_C(0x000000000b0001fd), UINT64_C(0x000000000b000a81),
+	UINT64_C(0x000000000b0001f8), UINT64_C(0x000000000b000a7f), UINT64_C(0x8000000000030227), UINT64_C(0x800000000003096c),
+},
+{
+	UINT64_C(0x800000000003080c), UINT64_C(0x800000000002097c), UINT64_C(0x4887a262100f04c3), UINT64_C(0x4887a284900f0508),
+	0, UINT64_C(0x000000000b000af5), UINT64_C(0x000000000b0001ff), UINT64_C(0x000000000b000af9),
+	UINT64_C(0x000000000b000416), UINT64_C(0x000000000b003b4f), 0, UINT64_C(0x000000000b000b3f),
+	0, UINT64_C(0x80000000000302a9), UINT64_C(0x000000000b000391), 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x8000000000030868), UINT64_C(0x4887a38a9f07071e), 0, 0,
+	UINT64_C(0x400000001f07071f), UINT64_C(0x400000001f070720), UINT64_C(0x400000001f070721), UINT64_C(0x5008c3911f07071d),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x000000000b003b55), UINT64_C(0x000000000b000922), UINT64_C(0x000000000b000915), UINT64_C(0x000000000b000919),
+	UINT64_C(0x000000000b000af6), UINT64_C(0x000000000b000af7), 0, UINT64_C(0x000000000b0003bb),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x440141370702026d), UINT64_C(0x4401412c07020257), UINT64_C(0x440141080702020f), UINT64_C(0x4401410507020209),
+	UINT64_C(0x4401411207020223), UINT64_C(0x440141270702024d), UINT64_C(0x4401410b07020215), UINT64_C(0x4401410207020203),
+	UINT64_C(0x4401413f0702027d), UINT64_C(0x4401413407020267), UINT64_C(0x4401413a07020273), UINT64_C(0x4401412f0702025d),
+	UINT64_C(0x4401411d07020239), UINT64_C(0x4401411a07020233), UINT64_C(0x440141200702023f), UINT64_C(0x440141170702022d),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, UINT64_C(0x000000000b000558),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x00000000291c0476), UINT64_C(0x00000000291c046d), UINT64_C(0x00000000291c0447), UINT64_C(0x00000000291c043e),
+	UINT64_C(0x00000000291c044c), UINT64_C(0x00000000291c046a), UINT64_C(0x00000000291c0444), UINT64_C(0x00000000291c0441),
+	UINT64_C(0x00000000291c047d), UINT64_C(0x00000000291c0473), UINT64_C(0x00000000291c0479), UINT64_C(0x00000000291c0470),
+	UINT64_C(0x00000000291c0458), UINT64_C(0x00000000291c044f), UINT64_C(0x00000000291c0455), UINT64_C(0x00000000291c0452),
+	UINT64_C(0x578bc4f79f0709ee), UINT64_C(0x578bc4f49f0709e8), UINT64_C(0x578bc4ed9f0709da), UINT64_C(0x578bc4ea9f0709d4),
+	UINT64_C(0x578bc4ee9f0709dc), UINT64_C(0x578bc4f39f0709e6), UINT64_C(0x578bc4ec9f0709d8), UINT64_C(0x578bc4eb9f0709d6),
+	UINT64_C(0x578bc4fa1f0709f3), UINT64_C(0x578bc4f69f0709ec), UINT64_C(0x578bc4f89f0709f0), UINT64_C(0x578bc4f59f0709ea),
+	UINT64_C(0x578bc4f29f0709e4), UINT64_C(0x578bc4ef9f0709de), UINT64_C(0x578bc4f19f0709e2), UINT64_C(0x578bc4f09f0709e0),
+	UINT64_C(0x000000000b0008cf), UINT64_C(0x000000000b000854), UINT64_C(0x000000000b0002d9), UINT64_C(0x468860d7830141ad),
+	0, UINT64_C(0x4201251083014a1f), UINT64_C(0x8000000000020345), UINT64_C(0x800000000002038d),
+	UINT64_C(0x000000000b0008d2), UINT64_C(0x000000000b000857), UINT64_C(0x000000000b00096d), UINT64_C(0x420120e9830141d1),
+	0, UINT64_C(0x4201252483014a47), UINT64_C(0x8000000000020910), UINT64_C(0x440141f2070203e1),
+	UINT64_C(0x4609c1640104c2c7), UINT64_C(0x46886160830142c0), UINT64_C(0x40000000100f050e), UINT64_C(0x420120e3830141c5),
+	UINT64_C(0x40000000100f04e8), UINT64_C(0x40000000100f04ee), UINT64_C(0x5a960360100f06be), UINT64_C(0x4887a35f900f06bd),
+	0, 0, UINT64_C(0x80000000000308de), UINT64_C(0x420120dd830141b9),
+	UINT64_C(0x4887a0cf100f019d), UINT64_C(0x4887a0d2100f01a3), UINT64_C(0x5a960353900f06a5), UINT64_C(0x4887a353100f06a4),
+	0, 0, 0, UINT64_C(0x40000000312b0684),
+	0, 0, 0, UINT64_C(0x8000000000030958),
+	UINT64_C(0x00000000121001a9), UINT64_C(0x00000000121001a9), UINT64_C(0x00000000121001a9), UINT64_C(0x00000000121001a9),
+	UINT64_C(0x00000000121001a9), UINT64_C(0x00000000121001a9), UINT64_C(0x00000000121001a9), UINT64_C(0x00000000121001a9),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, UINT64_C(0x000000000b000b3d),
+},
+},
+{
+{
+	UINT64_C(0x4102c0720104c0e0), UINT64_C(0x5f02206dba0340d7), UINT64_C(0x4302e072850540e3), UINT64_C(0x6002406e3f0400da),
+	UINT64_C(0x00000000090040dd), UINT64_C(0x000000003802c0d4), 0, 0,
+	UINT64_C(0x4102c3a68104c749), UINT64_C(0x5f0223a23a034740), UINT64_C(0x4302e3a70505474c), UINT64_C(0x600243a2bf040743),
+	UINT64_C(0x0000000009004746), UINT64_C(0x000000003802c73d), 0, 0,
+	UINT64_C(0x4102c05e0104c0b8), UINT64_C(0x5f022059ba0340af), UINT64_C(0x4302e05e850540bb), UINT64_C(0x6002405a3f0400b2),
+	UINT64_C(0x00000000090040b5), UINT64_C(0x000000003802c0ac), 0, 0,
+	UINT64_C(0x4102c4e70104c9ca), UINT64_C(0x5f0224e2ba0349c1), UINT64_C(0x4302e4e7850549cd), UINT64_C(0x600244e33f0409c4),
+	UINT64_C(0x00000000090049c7), UINT64_C(0x000000003802c9be), 0, 0,
+	UINT64_C(0x4102c09e8104c139), UINT64_C(0x5f02209a3a034130), UINT64_C(0x4302e09f0505413c), UINT64_C(0x6002409abf040133),
+	UINT64_C(0x0000000009004136), UINT64_C(0x000000003802c12d), 0, 0,
+	UINT64_C(0x4102c55f8104cabb), UINT64_C(0x5f02255b3a034ab2), UINT64_C(0x4302e56005054abe), UINT64_C(0x6002455bbf040ab5),
+	UINT64_C(0x0000000009004ab8), UINT64_C(0x000000003802caaf), 0, 0,
+	UINT64_C(0x4102ddce8104fb99), UINT64_C(0x5f023dca3a037b90), UINT64_C(0x4302fdcf05057b9c), UINT64_C(0x60025dcabf043b93),
+	UINT64_C(0x0000000009007b96), UINT64_C(0x000000003802fb8d), 0, 0,
+	UINT64_C(0x4609c1528104c2a1), UINT64_C(0x5d88a14e3a034298), UINT64_C(0x4789e1530e1342a4), UINT64_C(0x5e87e14ebc0f829b),
+	UINT64_C(0x000000000900429e), UINT64_C(0x000000003802c295), 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x000000000b00092c), 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x00000000132e08b8), UINT64_C(0x00000000132e08b8), UINT64_C(0x00000000132e08b8), UINT64_C(0x00000000132e08b8),
+	UINT64_C(0x00000000132e08b8), UINT64_C(0x00000000132e08b8), UINT64_C(0x00000000132e08b8), UINT64_C(0x00000000132e08b8),
+	UINT64_C(0x00000000132e083c), UINT64_C(0x00000000132e083c), UINT64_C(0x00000000132e083c), UINT64_C(0x00000000132e083c),
+	UINT64_C(0x00000000132e083c), UINT64_C(0x00000000132e083c), UINT64_C(0x00000000132e083c), UINT64_C(0x00000000132e083c),
+	0, 0, 0, UINT64_C(0x608f43593c0f86af),
+	0, 0, UINT64_C(0x000000000b000329), 0,
+	UINT64_C(0x000000000a0088d7), 0, UINT64_C(0x00000000090048b7), 0,
+	0, 0, 0, 0,
+	UINT64_C(0x00000000161bc475), UINT64_C(0x00000000161bc46c), UINT64_C(0x00000000161bc446), UINT64_C(0x00000000161bc43d),
+	UINT64_C(0x00000000161bc44b), UINT64_C(0x00000000161bc469), UINT64_C(0x00000000161bc443), UINT64_C(0x00000000161bc440),
+	UINT64_C(0x00000000161bc47c), UINT64_C(0x00000000161bc472), UINT64_C(0x00000000161bc478), UINT64_C(0x00000000161bc46f),
+	UINT64_C(0x00000000161bc457), UINT64_C(0x00000000161bc44e), UINT64_C(0x00000000161bc454), UINT64_C(0x00000000161bc451),
+	UINT64_C(0x8000000000030079), UINT64_C(0x8000000000030512), 0, UINT64_C(0x8000000000030522),
+	UINT64_C(0x4609c58d0104cb17), UINT64_C(0x5d88a589ba034b10), 0, 0,
+	UINT64_C(0x4609c3288104c648), UINT64_C(0x5d88a31e3a034634), UINT64_C(0x4789e3298e13464f), UINT64_C(0x5e87e31ebc0f863b),
+	0, UINT64_C(0x400000003c0f84e2), 0, UINT64_C(0x800000000003074a),
+	UINT64_C(0x000000000b000704), UINT64_C(0x0000000047107b6d), UINT64_C(0x0000000047107b6d), UINT64_C(0x0000000047107b6d),
+	UINT64_C(0x0000000047107b6d), UINT64_C(0x0000000047107b6d), UINT64_C(0x0000000047107b6d), UINT64_C(0x0000000047107b6d),
+	UINT64_C(0x000000000b0001f1), UINT64_C(0x000000000b0002da), 0, UINT64_C(0x000000000b003b4e),
+	UINT64_C(0x000000000b0008cc), UINT64_C(0x000000000b000851), UINT64_C(0x000000000b000975), UINT64_C(0x000000000b0004c2),
+	UINT64_C(0x000000002225c646), UINT64_C(0x000000002225c630), UINT64_C(0x000000002225c64c), UINT64_C(0x000000002225c636),
+	0, 0, 0, 0,
+	UINT64_C(0x0000000009004b14), UINT64_C(0x000000003802cb0d), 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d),
+	UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d),
+	UINT64_C(0x0000000048294639), UINT64_C(0x0000000048294639), UINT64_C(0x0000000048294639), UINT64_C(0x0000000048294639),
+	UINT64_C(0x0000000048294639), UINT64_C(0x0000000048294639), UINT64_C(0x0000000048294639), UINT64_C(0x0000000048294639),
+	UINT64_C(0x80000000000300e9), UINT64_C(0x8000000000030541), UINT64_C(0x000000000a008928), UINT64_C(0x000000000b00092b),
+	0, 0, UINT64_C(0x800000000002010f), UINT64_C(0x80000000000209c4),
+	UINT64_C(0x000000002a17c378), UINT64_C(0x000000000b0004e4), UINT64_C(0x00000000281f4503), UINT64_C(0x000000000b000506),
+	UINT64_C(0x000000000b000414), UINT64_C(0x000000002b1ac412), 0, UINT64_C(0x000000000b000422),
+	UINT64_C(0x80000000000301a7), UINT64_C(0x800000000003059c), UINT64_C(0x80000000000301c7), UINT64_C(0x80000000000305ac),
+	0, 0, 0, UINT64_C(0x000000000b003b7a),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x00000000161bc501), UINT64_C(0x00000000161bc500), UINT64_C(0x00000000161bc4ff), UINT64_C(0x00000000161bc47b),
+	UINT64_C(0x000000002b1ac3fd), UINT64_C(0x000000002b1ac3f9), UINT64_C(0x000000002b1ac757), UINT64_C(0x000000002b1ac753),
+	UINT64_C(0x000000004e1241ed), UINT64_C(0x00000000291c0467), 0, UINT64_C(0x00000000161bc466),
+	UINT64_C(0x000000000b0003fe), UINT64_C(0x000000000b0003fa), UINT64_C(0x000000000b000758), UINT64_C(0x000000000b000754),
+	UINT64_C(0x000000000b0004fa), UINT64_C(0x000000000b000413), UINT64_C(0x000000000b000924), UINT64_C(0x000000000b000925),
+	UINT64_C(0x000000000b0003c6), UINT64_C(0x000000000b000202), UINT64_C(0x8000000000030201), UINT64_C(0x80000000000305bc),
+	UINT64_C(0x000000000b0001f7), UINT64_C(0x000000000b000a7e), UINT64_C(0x000000000b0001fd), UINT64_C(0x000000000b000a81),
+	UINT64_C(0x000000000b0001f8), UINT64_C(0x000000000b000a7f), UINT64_C(0x8000000000030227), UINT64_C(0x8000000000030a0c),
+},
+{
+	UINT64_C(0x80000000000305dc), UINT64_C(0x80000000000205ec), UINT64_C(0x608f42643c0f84c7), UINT64_C(0x608f4286bc0f850c),
+	0, UINT64_C(0x000000000b000af5), UINT64_C(0x000000000b0001ff), UINT64_C(0x000000000b000afa),
+	UINT64_C(0x000000000b000416), UINT64_C(0x000000000b003b4f), 0, UINT64_C(0x000000000b000b3f),
+	0, UINT64_C(0x80000000000302a9), UINT64_C(0x000000000b000391), 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x8000000000030868), UINT64_C(0x4887a38a9f07071e), 0, 0,
+	UINT64_C(0x400000001f07071f), UINT64_C(0x400000001f070720), UINT64_C(0x400000001f070721), UINT64_C(0x5c89038e1f07071b),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x000000000b003b55), UINT64_C(0x000000000b000922), UINT64_C(0x000000000b000915), UINT64_C(0x000000000b000919),
+	UINT64_C(0x000000000b000af6), UINT64_C(0x000000000b000af8), 0, UINT64_C(0x000000000b0003bb),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x600241393f040271), UINT64_C(0x6002412e3f04025b), UINT64_C(0x6002410a3f040213), UINT64_C(0x600241073f04020d),
+	UINT64_C(0x600241143f040227), UINT64_C(0x600241293f040251), UINT64_C(0x6002410d3f040219), UINT64_C(0x600241043f040207),
+	UINT64_C(0x600241413f040281), UINT64_C(0x600241363f04026b), UINT64_C(0x6002413c3f040277), UINT64_C(0x600241313f040261),
+	UINT64_C(0x6002411f3f04023d), UINT64_C(0x6002411c3f040237), UINT64_C(0x600241223f040243), UINT64_C(0x600241193f040231),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, UINT64_C(0x000000000b000558),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	UINT64_C(0x00000000291c0476), UINT64_C(0x00000000291c046d), UINT64_C(0x00000000291c0447), UINT64_C(0x00000000291c043e),
+	UINT64_C(0x00000000291c044c), UINT64_C(0x00000000291c046a), UINT64_C(0x00000000291c0444), UINT64_C(0x00000000291c0441),
+	UINT64_C(0x00000000291c047d), UINT64_C(0x00000000291c0473), UINT64_C(0x00000000291c0479), UINT64_C(0x00000000291c0470),
+	UINT64_C(0x00000000291c0458), UINT64_C(0x00000000291c044f), UINT64_C(0x00000000291c0455), UINT64_C(0x00000000291c0452),
+	UINT64_C(0x578bc4f79f0709ee), UINT64_C(0x578bc4f49f0709e8), UINT64_C(0x578bc4ed9f0709da), UINT64_C(0x578bc4ea9f0709d4),
+	UINT64_C(0x578bc4ee9f0709dc), UINT64_C(0x578bc4f39f0709e6), UINT64_C(0x578bc4ec9f0709d8), UINT64_C(0x578bc4eb9f0709d6),
+	UINT64_C(0x578bc4fa1f0709f3), UINT64_C(0x578bc4f69f0709ec), UINT64_C(0x578bc4f89f0709f0), UINT64_C(0x578bc4f59f0709ea),
+	UINT64_C(0x578bc4f29f0709e4), UINT64_C(0x578bc4ef9f0709de), UINT64_C(0x578bc4f19f0709e2), UINT64_C(0x578bc4f09f0709e0),
+	UINT64_C(0x000000000b0008cf), UINT64_C(0x000000000b000854), UINT64_C(0x000000000b0002d9), UINT64_C(0x5d88a0dbba0341b5),
+	0, UINT64_C(0x5f022514ba034a27), UINT64_C(0x8000000000020345), UINT64_C(0x800000000002038d),
+	UINT64_C(0x000000000b0008d2), UINT64_C(0x000000000b000857), UINT64_C(0x000000000b00096d), UINT64_C(0x5f0220edba0341d9),
+	0, UINT64_C(0x5f022528ba034a4f), UINT64_C(0x8000000000020a1c), UINT64_C(0x600241fa3f0403f1),
+	UINT64_C(0x4609c1640104c2c7), UINT64_C(0x5d88a162ba0342c4), UINT64_C(0x400000003c0f8510), UINT64_C(0x5f0220e7ba0341cd),
+	UINT64_C(0x400000003c0f84ea), UINT64_C(0x400000003c0f84f0), UINT64_C(0x659663653c0f86c8), UINT64_C(0x66164364bc0f86c7),
+	0, 0, UINT64_C(0x80000000000306bc), UINT64_C(0x5f0220e1ba0341c1),
+	UINT64_C(0x4887a0cf100f019d), UINT64_C(0x4887a0d2100f01a3), UINT64_C(0x65966359bc0f86b0), UINT64_C(0x66164358bc0f86ae),
+	0, 0, 0, UINT64_C(0x40000000312b0684),
+	0, 0, 0, UINT64_C(0x8000000000030a64),
+	UINT64_C(0x00000000471041ab), UINT64_C(0x00000000471041ab), UINT64_C(0x00000000471041ab), UINT64_C(0x00000000471041ab),
+	UINT64_C(0x00000000471041ab), UINT64_C(0x00000000471041ab), UINT64_C(0x00000000471041ab), UINT64_C(0x00000000471041ab),
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, UINT64_C(0x000000000b000b3d),
+},
+},
+{
+{
+	UINT64_C(0x4102c0720104c0e0), UINT64_C(0x42012064830140c5), UINT64_C(0x4302e072850540e3), UINT64_C(0x44014065070200c8),
+	UINT64_C(0x00000000090040dd), UINT64_C(0x000000000a0080c2), UINT64_C(0x000000000b0008ca), UINT64_C(0x000000000b00084f),
+	UINT64_C(0x4102c3a68104c749), UINT64_C(0x420123990301472e), UINT64_C(0x4302e3a70505474c), UINT64_C(0x4401439987020731),
+	UINT64_C(0x0000000009004746), UINT64_C(0x000000000a00872b), UINT64_C(0x000000000b0008c6), 0,
+	UINT64_C(0x4102c05e0104c0b8), UINT64_C(0x420120508301409d), UINT64_C(0x4302e05e850540bb), UINT64_C(0x44014051070200a0),
+	UINT64_C(0x00000000090040b5), UINT64_C(0x000000000a00809a), UINT64_C(0x000000000b0008d5), UINT64_C(0x000000000b00085a),
+	UINT64_C(0x4102c4e70104c9ca), UINT64_C(0x420124d9830149af), UINT64_C(0x4302e4e7850549cd), UINT64_C(0x440144da070209b2),
+	UINT64_C(0x00000000090049c7), UINT64_C(0x000000000a0089ac), UINT64_C(0x000000000b0008c8), UINT64_C(0x000000000b00084d),
+	UINT64_C(0x4102c09e8104c139), UINT64_C(0x420120910301411e), UINT64_C(0x4302e09f0505413c), UINT64_C(0x4401409187020121),
+	UINT64_C(0x0000000009004136), UINT64_C(0x000000000a00811b), 0, UINT64_C(0x000000000b000327),
+	UINT64_C(0x4102c55f8104cabb), UINT64_C(0x4201255203014aa0), UINT64_C(0x4302e56005054abe), UINT64_C(0x4401455287020aa3),
+	UINT64_C(0x0000000009004ab8), UINT64_C(0x000000000a008a9d), 0, UINT64_C(0x000000000b000328),
+	UINT64_C(0x4102ddce8104fb99), UINT64_C(0x42013dc103017b7e), UINT64_C(0x4302fdcf05057b9c), UINT64_C(0x44015dc187023b81),
+	UINT64_C(0x0000000009007b96), UINT64_C(0x000000000a00bb7b), 0, UINT64_C(0x000000000b000092),
+	UINT64_C(0x4609c1528104c2a1), UINT64_C(0x4688614503014286), UINT64_C(0x4789e1530e1342a4), UINT64_C(0x4887a145900f0289),
+	UINT64_C(0x000000000900429e), UINT64_C(0x000000000a008283), 0, UINT64_C(0x000000000b000095),
+	UINT64_C(0x0000000012100401), UINT64_C(0x0000000012100401), UINT64_C(0x0000000012100401), UINT64_C(0x0000000012100401),
+	UINT64_C(0x0000000012100401), UINT64_C(0x0000000012100401), UINT64_C(0x0000000012100401), UINT64_C(0x0000000012100401),
+	UINT64_C(0x000000001210032c), UINT64_C(0x000000001210032c), UINT64_C(0x000000001210032c), UINT64_C(0x000000001210032c),
+	UINT64_C(0x000000001210032c), UINT64_C(0x000000001210032c), UINT64_C(0x000000001210032c), UINT64_C(0x000000001210032c),
+	UINT64_C(0x00000000132e08b8), UINT64_C(0x00000000132e08b8), UINT64_C(0x00000000132e08b8), UINT64_C(0x00000000132e08b8),
+	UINT64_C(0x00000000132e08b8), UINT64_C(0x00000000132e08b8), UINT64_C(0x00000000132e08b8), UINT64_C(0x00000000132e08b8),
+	UINT64_C(0x00000000132e083c), UINT64_C(0x00000000132e083c), UINT64_C(0x00000000132e083c), UINT64_C(0x00000000132e083c),
+	UINT64_C(0x00000000132e083c), UINT64_C(0x00000000132e083c), UINT64_C(0x00000000132e083c), UINT64_C(0x00000000132e083c),
+	UINT64_C(0x000000000b0008c4), UINT64_C(0x000000000b000845), UINT64_C(0x40000000100f019b), UINT64_C(0x4a84e0a61409814b),
+	0, 0, UINT64_C(0x000000000b000329), 0,
+	UINT64_C(0x000000000a0088d7), 0, UINT64_C(0x00000000090048b7), 0,
+	0, 0, 0, 0,
+	UINT64_C(0x00000000161bc475), UINT64_C(0x00000000161bc46c), UINT64_C(0x00000000161bc446), UINT64_C(0x00000000161bc43d),
+	UINT64_C(0x00000000161bc44b), UINT64_C(0x00000000161bc469), UINT64_C(0x00000000161bc443), UINT64_C(0x00000000161bc440),
+	UINT64_C(0x00000000161bc47c), UINT64_C(0x00000000161bc472), UINT64_C(0x00000000161bc478), UINT64_C(0x00000000161bc46f),
+	UINT64_C(0x00000000161bc457), UINT64_C(0x00000000161bc44e), UINT64_C(0x00000000161bc454), UINT64_C(0x00000000161bc451),
+	UINT64_C(0x8000000000030079), UINT64_C(0x8000000000030722), UINT64_C(0x8000000000030099), UINT64_C(0x8000000000030732),
+	UINT64_C(0x4609c58d0104cb17), UINT64_C(0x4688658283014b02), 0, 0,
+	UINT64_C(0x4609c3288104c648), UINT64_C(0x4688630b8301460f), UINT64_C(0x4789e3298e13464f), UINT64_C(0x4887a30c100f0616),
+	0, UINT64_C(0x40000000100f04df), 0, UINT64_C(0x800000000003074a),
+	UINT64_C(0x000000000b000704), UINT64_C(0x0000000012103b67), UINT64_C(0x0000000012103b67), UINT64_C(0x0000000012103b67),
+	UINT64_C(0x0000000012103b67), UINT64_C(0x0000000012103b67), UINT64_C(0x0000000012103b67), UINT64_C(0x0000000012103b67),
+	UINT64_C(0x000000000b000326), UINT64_C(0x000000000b0001f0), UINT64_C(0x000000004d18c37e), UINT64_C(0x000000000b003b4e),
 	UINT64_C(0x000000000b0008cc), UINT64_C(0x000000000b000851), UINT64_C(0x000000000b000975), UINT64_C(0x000000000b0004c2),
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	UINT64_C(0x0000000009004b14), UINT64_C(0x000000000a008aff), 0, 0,
 	0, 0, 0, 0,
-	UINT64_C(0x00000000222a064d), UINT64_C(0x00000000222a064d), UINT64_C(0x00000000222a064d), UINT64_C(0x00000000222a064d),
-	UINT64_C(0x00000000222a064d), UINT64_C(0x00000000222a064d), UINT64_C(0x00000000222a064d), UINT64_C(0x00000000222a064d),
-	UINT64_C(0x0000000023264614), UINT64_C(0x0000000023264614), UINT64_C(0x0000000023264614), UINT64_C(0x0000000023264614),
-	UINT64_C(0x0000000023264614), UINT64_C(0x0000000023264614), UINT64_C(0x0000000023264614), UINT64_C(0x0000000023264614),
-	UINT64_C(0x80000000000300e4), UINT64_C(0x8000000000030753), UINT64_C(0x000000000a008928), UINT64_C(0x000000000b00092b),
-	UINT64_C(0x40000000100f04e5), UINT64_C(0x40000000100f04cb), UINT64_C(0x800000000002010a), UINT64_C(0x8000000000020769),
-	UINT64_C(0x000000002917c378), UINT64_C(0x000000000b0004e3), UINT64_C(0x000000000a008504), UINT64_C(0x000000000b000507),
-	UINT64_C(0x000000000b000414), UINT64_C(0x000000002a1ac412), UINT64_C(0x000000000b000415), UINT64_C(0x000000000b000420),
-	UINT64_C(0x80000000000301a2), UINT64_C(0x80000000000307b4), UINT64_C(0x80000000000301c2), UINT64_C(0x80000000000307c4),
+	UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d),
+	UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d),
+	UINT64_C(0x0000000024264614), UINT64_C(0x0000000024264614), UINT64_C(0x0000000024264614), UINT64_C(0x0000000024264614),
+	UINT64_C(0x0000000024264614), UINT64_C(0x0000000024264614), UINT64_C(0x0000000024264614), UINT64_C(0x0000000024264614),
+	UINT64_C(0x80000000000300e9), UINT64_C(0x8000000000030764), UINT64_C(0x000000000a008928), UINT64_C(0x000000000b00092b),
+	UINT64_C(0x40000000100f04e5), UINT64_C(0x40000000100f04cb), UINT64_C(0x800000000002010f), UINT64_C(0x8000000000020a74),
+	UINT64_C(0x000000002a17c378), UINT64_C(0x000000000b0004e3), UINT64_C(0x000000000a008504), UINT64_C(0x000000000b000507),
+	UINT64_C(0x000000000b000414), UINT64_C(0x000000002b1ac412), UINT64_C(0x000000000b000415), UINT64_C(0x000000000b000420),
+	UINT64_C(0x80000000000301a7), UINT64_C(0x80000000000307c5), UINT64_C(0x80000000000301c7), UINT64_C(0x80000000000307d5),
 	UINT64_C(0x0000000009004094), UINT64_C(0x0000000009004093), UINT64_C(0x000000000b00098e), UINT64_C(0x000000000b003b7a),
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	UINT64_C(0x00000000161bc501), UINT64_C(0x00000000161bc500), UINT64_C(0x00000000161bc4ff), 0,
-	UINT64_C(0x000000002a1ac3fd), UINT64_C(0x000000002a1ac3f9), UINT64_C(0x000000002a1ac757), UINT64_C(0x000000002a1ac753),
-	UINT64_C(0x000000004d1241ed), UINT64_C(0x00000000281c0468), UINT64_C(0x000000004c18c383), UINT64_C(0x00000000161bc466),
+	UINT64_C(0x000000002b1ac3fd), UINT64_C(0x000000002b1ac3f9), UINT64_C(0x000000002b1ac757), UINT64_C(0x000000002b1ac753),
+	UINT64_C(0x000000004e1241ed), UINT64_C(0x00000000291c0468), UINT64_C(0x000000004d18c383), UINT64_C(0x00000000161bc466),
 	UINT64_C(0x000000000b0003fe), UINT64_C(0x000000000b0003fa), UINT64_C(0x000000000b000758), UINT64_C(0x000000000b000754),
 	UINT64_C(0x000000000b0004fa), UINT64_C(0x000000000b000413), UINT64_C(0x000000000b000924), UINT64_C(0x000000000b000925),
-	UINT64_C(0x000000000b0003c6), UINT64_C(0x000000000b000202), UINT64_C(0x80000000000301fc), UINT64_C(0x80000000000307da),
+	UINT64_C(0x000000000b0003c6), UINT64_C(0x000000000b000202), UINT64_C(0x8000000000030201), UINT64_C(0x80000000000307ec),
 	UINT64_C(0x000000000b0001f7), UINT64_C(0x000000000b000a7e), UINT64_C(0x000000000b0001fd), UINT64_C(0x000000000b000a81),
-	UINT64_C(0x000000000b0001f8), UINT64_C(0x000000000b000a7f), UINT64_C(0x8000000000030222), UINT64_C(0x80000000000307ea),
+	UINT64_C(0x000000000b0001f8), UINT64_C(0x000000000b000a7f), UINT64_C(0x8000000000030227), UINT64_C(0x80000000000307fc),
 },
 {
-	UINT64_C(0x80000000000307fa), UINT64_C(0x800000000002080a), UINT64_C(0x4887a262100f04c3), UINT64_C(0x4887a284900f0508),
+	UINT64_C(0x800000000003080c), UINT64_C(0x800000000002081c), UINT64_C(0x4887a262100f04c3), UINT64_C(0x4887a284900f0508),
 	0, UINT64_C(0x000000000b000af5), UINT64_C(0x000000000b0001ff), UINT64_C(0x000000000b000af9),
 	UINT64_C(0x000000000b000416), UINT64_C(0x000000000b003b4f), 0, UINT64_C(0x000000000b000b3f),
-	0, UINT64_C(0x80000000000302a4), UINT64_C(0x000000000b000391), 0,
+	0, UINT64_C(0x80000000000302a9), UINT64_C(0x000000000b000391), 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0,
-	UINT64_C(0x80000000000302b5), UINT64_C(0x4887a38a9f07071e), 0, 0,
+	UINT64_C(0x80000000000302ba), UINT64_C(0x4887a38a9f07071e), 0, 0,
 	0, UINT64_C(0x400000001f070720), UINT64_C(0x400000001f070721), UINT64_C(0x5008c3911f07071d),
 	0, 0, 0, 0,
 	0, 0, 0, 0,
@@ -3934,26 +6016,26 @@ static const uint64_t x86LegacyDecisions[X86_TERMINAL_ROW_COUNT][2][256] = {
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, UINT64_C(0x000000000b000558),
-	UINT64_C(0x58d5cfbcb02b1f78), UINT64_C(0x59d5eff23215dfe3), 0, 0,
+	UINT64_C(0x5955cfbcb12b1f78), UINT64_C(0x5a55eff23315dfe3), 0, 0,
 	0, 0, 0, 0,
-	UINT64_C(0x00000000281c0477), UINT64_C(0x00000000281c046e), UINT64_C(0x00000000281c0448), UINT64_C(0x00000000281c043f),
-	UINT64_C(0x00000000281c044d), UINT64_C(0x00000000281c046b), UINT64_C(0x00000000281c0445), UINT64_C(0x00000000281c0442),
-	UINT64_C(0x00000000281c047e), UINT64_C(0x00000000281c0474), UINT64_C(0x00000000281c047a), UINT64_C(0x00000000281c0471),
-	UINT64_C(0x00000000281c0459), UINT64_C(0x00000000281c0450), UINT64_C(0x00000000281c0456), UINT64_C(0x00000000281c0453),
-	0, UINT64_C(0x570bc4f49f0709e8), UINT64_C(0x570bc4ed9f0709da), UINT64_C(0x570bc4ea9f0709d4),
-	UINT64_C(0x570bc4ee9f0709dc), UINT64_C(0x570bc4f39f0709e6), UINT64_C(0x570bc4ec9f0709d8), UINT64_C(0x570bc4eb9f0709d6),
-	UINT64_C(0x570bc4fa1f0709f3), UINT64_C(0x570bc4f69f0709ec), UINT64_C(0x570bc4f89f0709f0), UINT64_C(0x570bc4f59f0709ea),
-	UINT64_C(0x570bc4f29f0709e4), UINT64_C(0x570bc4ef9f0709de), UINT64_C(0x570bc4f19f0709e2), UINT64_C(0x570bc4f09f0709e0),
+	UINT64_C(0x00000000291c0477), UINT64_C(0x00000000291c046e), UINT64_C(0x00000000291c0448), UINT64_C(0x00000000291c043f),
+	UINT64_C(0x00000000291c044d), UINT64_C(0x00000000291c046b), UINT64_C(0x00000000291c0445), UINT64_C(0x00000000291c0442),
+	UINT64_C(0x00000000291c047e), UINT64_C(0x00000000291c0474), UINT64_C(0x00000000291c047a), UINT64_C(0x00000000291c0471),
+	UINT64_C(0x00000000291c0459), UINT64_C(0x00000000291c0450), UINT64_C(0x00000000291c0456), UINT64_C(0x00000000291c0453),
+	UINT64_C(0x578bc4f79f0709ee), UINT64_C(0x578bc4f49f0709e8), UINT64_C(0x578bc4ed9f0709da), UINT64_C(0x578bc4ea9f0709d4),
+	UINT64_C(0x578bc4ee9f0709dc), UINT64_C(0x578bc4f39f0709e6), UINT64_C(0x578bc4ec9f0709d8), UINT64_C(0x578bc4eb9f0709d6),
+	UINT64_C(0x578bc4fa1f0709f3), UINT64_C(0x578bc4f69f0709ec), UINT64_C(0x578bc4f89f0709f0), UINT64_C(0x578bc4f59f0709ea),
+	UINT64_C(0x578bc4f29f0709e4), UINT64_C(0x578bc4ef9f0709de), UINT64_C(0x578bc4f19f0709e2), UINT64_C(0x578bc4f09f0709e0),
 	UINT64_C(0x000000000b0008cf), UINT64_C(0x000000000b000854), UINT64_C(0x000000000b0002d9), UINT64_C(0x468860d7830141ad),
-	0, UINT64_C(0x4201251083014a1f), UINT64_C(0x800000000002033e), UINT64_C(0x8000000000020386),
+	0, UINT64_C(0x4201251083014a1f), UINT64_C(0x8000000000020345), UINT64_C(0x800000000002038d),
 	UINT64_C(0x000000000b0008d2), UINT64_C(0x000000000b000857), UINT64_C(0x000000000b00096d), UINT64_C(0x420120e9830141d1),
 	0, UINT64_C(0x4201252483014a47), 0, UINT64_C(0x440141f2070203e1),
 	UINT64_C(0x4609c1640104c2c7), UINT64_C(0x46886160830142c0), UINT64_C(0x40000000100f050e), UINT64_C(0x420120e3830141c5),
-	UINT64_C(0x40000000100f04e8), UINT64_C(0x40000000100f04ee), UINT64_C(0x5a160360100f06be), UINT64_C(0x4887a35f900f06bd),
-	0, 0, UINT64_C(0x800000000003089a), UINT64_C(0x420120dd830141b9),
-	UINT64_C(0x4887a0cf100f019d), UINT64_C(0x4887a0d2100f01a3), UINT64_C(0x5a160353900f06a5), UINT64_C(0x4887a353100f06a4),
+	UINT64_C(0x40000000100f04e8), UINT64_C(0x40000000100f04ee), UINT64_C(0x5a960360100f06be), UINT64_C(0x4887a35f900f06bd),
+	0, 0, UINT64_C(0x80000000000308de), UINT64_C(0x420120dd830141b9),
+	UINT64_C(0x4887a0cf100f019d), UINT64_C(0x4887a0d2100f01a3), UINT64_C(0x5a960353900f06a5), UINT64_C(0x4887a353100f06a4),
 	0, 0, 0, 0,
-	0, 0, 0, UINT64_C(0x80000000000308b4),
+	0, 0, 0, UINT64_C(0x8000000000030abc),
 	UINT64_C(0x00000000121001aa), UINT64_C(0x00000000121001aa), UINT64_C(0x00000000121001aa), UINT64_C(0x00000000121001aa),
 	UINT64_C(0x00000000121001aa), UINT64_C(0x00000000121001aa), UINT64_C(0x00000000121001aa), UINT64_C(0x00000000121001aa),
 	0, 0, 0, 0,
@@ -4008,7 +6090,7 @@ static const uint64_t x86LegacyDecisions[X86_TERMINAL_ROW_COUNT][2][256] = {
 	UINT64_C(0x4609c58d0104cb17), UINT64_C(0x4688658603014b09), 0, 0,
 	UINT64_C(0x4609c3288104c648), UINT64_C(0x4688631583014622), UINT64_C(0x4789e3298e13464f), UINT64_C(0x4887a316100f062a),
 	0, UINT64_C(0x40000000100f04e0), 0, UINT64_C(0x80000000000300c7),
-	0, UINT64_C(0x0000000012103b6a), UINT64_C(0x0000000012103b6a), UINT64_C(0x0000000012103b6a),
+	UINT64_C(0x000000000b000704), UINT64_C(0x0000000012103b6a), UINT64_C(0x0000000012103b6a), UINT64_C(0x0000000012103b6a),
 	UINT64_C(0x0000000012103b6a), UINT64_C(0x0000000012103b6a), UINT64_C(0x0000000012103b6a), UINT64_C(0x0000000012103b6a),
 	UINT64_C(0x000000000b000326), UINT64_C(0x000000000b0001f0), UINT64_C(0x0000000021190380), UINT64_C(0x000000000b003b4e),
 	UINT64_C(0x000000000b0008cd), UINT64_C(0x000000000b000852), UINT64_C(0x000000000b000975), UINT64_C(0x000000000b0004c2),
@@ -4016,35 +6098,35 @@ static const uint64_t x86LegacyDecisions[X86_TERMINAL_ROW_COUNT][2][256] = {
 	0, 0, 0, 0,
 	UINT64_C(0x0000000009004b14), UINT64_C(0x000000000a008b06), 0, 0,
 	0, 0, 0, 0,
-	UINT64_C(0x00000000222a064d), UINT64_C(0x00000000222a064d), UINT64_C(0x00000000222a064d), UINT64_C(0x00000000222a064d),
-	UINT64_C(0x00000000222a064d), UINT64_C(0x00000000222a064d), UINT64_C(0x00000000222a064d), UINT64_C(0x00000000222a064d),
-	UINT64_C(0x0000000023264628), UINT64_C(0x0000000023264628), UINT64_C(0x0000000023264628), UINT64_C(0x0000000023264628),
-	UINT64_C(0x0000000023264628), UINT64_C(0x0000000023264628), UINT64_C(0x0000000023264628), UINT64_C(0x0000000023264628),
-	UINT64_C(0x80000000000300e4), UINT64_C(0x80000000000300f4), UINT64_C(0x00000000271f4926), UINT64_C(0x000000000b000929),
-	UINT64_C(0x40000000100f04e6), UINT64_C(0x40000000100f04cc), UINT64_C(0x800000000002010a), UINT64_C(0x8000000000020152),
-	UINT64_C(0x000000002917c378), UINT64_C(0x000000000b0004e3), UINT64_C(0x00000000271f4502), UINT64_C(0x000000000b000505),
-	UINT64_C(0x000000000b000414), UINT64_C(0x000000002a1ac412), UINT64_C(0x000000000b000415), UINT64_C(0x000000000b000421),
-	UINT64_C(0x80000000000301a2), UINT64_C(0x80000000000301b2), UINT64_C(0x80000000000301c2), UINT64_C(0x80000000000301d2),
+	UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d),
+	UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d),
+	UINT64_C(0x0000000024264628), UINT64_C(0x0000000024264628), UINT64_C(0x0000000024264628), UINT64_C(0x0000000024264628),
+	UINT64_C(0x0000000024264628), UINT64_C(0x0000000024264628), UINT64_C(0x0000000024264628), UINT64_C(0x0000000024264628),
+	UINT64_C(0x80000000000300e9), UINT64_C(0x80000000000300f9), UINT64_C(0x00000000281f4926), UINT64_C(0x000000000b000929),
+	UINT64_C(0x40000000100f04e6), UINT64_C(0x40000000100f04cc), UINT64_C(0x800000000002010f), UINT64_C(0x8000000000020157),
+	UINT64_C(0x000000002a17c378), UINT64_C(0x000000000b0004e3), UINT64_C(0x00000000281f4502), UINT64_C(0x000000000b000505),
+	UINT64_C(0x000000000b000414), UINT64_C(0x000000002b1ac412), UINT64_C(0x000000000b000415), UINT64_C(0x000000000b000421),
+	UINT64_C(0x80000000000301a7), UINT64_C(0x80000000000301b7), UINT64_C(0x80000000000301c7), UINT64_C(0x80000000000301d7),
 	UINT64_C(0x0000000009004094), UINT64_C(0x0000000009004093), UINT64_C(0x000000000b00098e), UINT64_C(0x000000000b003b7a),
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	UINT64_C(0x00000000161bc501), UINT64_C(0x00000000161bc500), UINT64_C(0x00000000161bc4ff), 0,
-	UINT64_C(0x000000002a1ac3fd), UINT64_C(0x000000002a1ac3fb), UINT64_C(0x000000002a1ac757), UINT64_C(0x000000002a1ac755),
-	UINT64_C(0x000000002d11c1ee), UINT64_C(0x00000000281c0468), UINT64_C(0x0000000021190385), UINT64_C(0x00000000161bc466),
+	UINT64_C(0x000000002b1ac3fd), UINT64_C(0x000000002b1ac3fb), UINT64_C(0x000000002b1ac757), UINT64_C(0x000000002b1ac755),
+	UINT64_C(0x000000002e11c1ee), UINT64_C(0x00000000291c0468), UINT64_C(0x0000000021190385), UINT64_C(0x00000000161bc466),
 	UINT64_C(0x000000000b0003fe), UINT64_C(0x000000000b0003fc), UINT64_C(0x000000000b000758), UINT64_C(0x000000000b000756),
 	UINT64_C(0x000000000b0004fa), UINT64_C(0x000000000b000413), UINT64_C(0x000000000b000924), UINT64_C(0x000000000b000925),
-	UINT64_C(0x000000000b0003c6), UINT64_C(0x000000000b000202), UINT64_C(0x80000000000301fc), UINT64_C(0x800000000003020c),
+	UINT64_C(0x000000000b0003c6), UINT64_C(0x000000000b000202), UINT64_C(0x8000000000030201), UINT64_C(0x8000000000030211),
 	UINT64_C(0x000000000b0001f7), UINT64_C(0x000000000b000a7e), UINT64_C(0x000000000b0001fd), UINT64_C(0x000000000b000a81),
-	UINT64_C(0x000000000b0001f8), UINT64_C(0x000000000b000a7f), UINT64_C(0x8000000000030222), UINT64_C(0x8000000000030232),
+	UINT64_C(0x000000000b0001f8), UINT64_C(0x000000000b000a7f), UINT64_C(0x8000000000030227), UINT64_C(0x8000000000030237),
 },
 {
-	UINT64_C(0x8000000000030242), UINT64_C(0x8000000000020252), UINT64_C(0x4887a263100f04c5), UINT64_C(0x4887a285900f050a),
+	UINT64_C(0x8000000000030247), UINT64_C(0x8000000000020257), UINT64_C(0x4887a263100f04c5), UINT64_C(0x4887a285900f050a),
 	0, UINT64_C(0x000000000b000af5), UINT64_C(0x000000000b0001ff), UINT64_C(0x000000000b000af9),
 	UINT64_C(0x000000000b000416), UINT64_C(0x000000000b003b4f), 0, UINT64_C(0x000000000b000b3f),
-	0, UINT64_C(0x80000000000302a4), UINT64_C(0x000000000b000391), 0,
+	0, UINT64_C(0x80000000000302a9), UINT64_C(0x000000000b000391), 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0,
-	UINT64_C(0x80000000000302b5), UINT64_C(0x4887a38a9f070717), 0, 0,
+	UINT64_C(0x80000000000302ba), UINT64_C(0x4887a38a9f070717), 0, 0,
 	0, UINT64_C(0x400000001f070718), UINT64_C(0x400000001f070719), UINT64_C(0x5008c38d1f070716),
 	0, 0, 0, 0,
 	0, 0, 0, 0,
@@ -4068,26 +6150,26 @@ static const uint64_t x86LegacyDecisions[X86_TERMINAL_ROW_COUNT][2][256] = {
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, UINT64_C(0x000000000b000558),
-	UINT64_C(0x58d5cfbcb02b1f78), UINT64_C(0x59d5eff23215dfe3), 0, 0,
+	UINT64_C(0x5955cfbcb12b1f78), UINT64_C(0x5a55eff23315dfe3), 0, 0,
 	0, 0, 0, 0,
-	UINT64_C(0x00000000281c0477), UINT64_C(0x00000000281c046e), UINT64_C(0x00000000281c0448), UINT64_C(0x00000000281c043f),
-	UINT64_C(0x00000000281c044d), UINT64_C(0x00000000281c046b), UINT64_C(0x00000000281c0445), UINT64_C(0x00000000281c0442),
-	UINT64_C(0x00000000281c047e), UINT64_C(0x00000000281c0474), UINT64_C(0x00000000281c047a), UINT64_C(0x00000000281c0471),
-	UINT64_C(0x00000000281c0459), UINT64_C(0x00000000281c0450), UINT64_C(0x00000000281c0456), UINT64_C(0x00000000281c0453),
-	0, UINT64_C(0x570bc4f49f0709e8), UINT64_C(0x570bc4ed9f0709da), UINT64_C(0x570bc4ea9f0709d4),
-	UINT64_C(0x570bc4ee9f0709dc), UINT64_C(0x570bc4f39f0709e6), UINT64_C(0x570bc4ec9f0709d8), UINT64_C(0x570bc4eb9f0709d6),
-	UINT64_C(0x570bc4fa1f0709f3), UINT64_C(0x570bc4f69f0709ec), UINT64_C(0x570bc4f89f0709f0), UINT64_C(0x570bc4f59f0709ea),
-	UINT64_C(0x570bc4f29f0709e4), UINT64_C(0x570bc4ef9f0709de), UINT64_C(0x570bc4f19f0709e2), UINT64_C(0x570bc4f09f0709e0),
+	UINT64_C(0x00000000291c0477), UINT64_C(0x00000000291c046e), UINT64_C(0x00000000291c0448), UINT64_C(0x00000000291c043f),
+	UINT64_C(0x00000000291c044d), UINT64_C(0x00000000291c046b), UINT64_C(0x00000000291c0445), UINT64_C(0x00000000291c0442),
+	UINT64_C(0x00000000291c047e), UINT64_C(0x00000000291c0474), UINT64_C(0x00000000291c047a), UINT64_C(0x00000000291c0471),
+	UINT64_C(0x00000000291c0459), UINT64_C(0x00000000291c0450), UINT64_C(0x00000000291c0456), UINT64_C(0x00000000291c0453),
+	UINT64_C(0x578bc4f79f0709ee), UINT64_C(0x578bc4f49f0709e8), UINT64_C(0x578bc4ed9f0709da), UINT64_C(0x578bc4ea9f0709d4),
+	UINT64_C(0x578bc4ee9f0709dc), UINT64_C(0x578bc4f39f0709e6), UINT64_C(0x578bc4ec9f0709d8), UINT64_C(0x578bc4eb9f0709d6),
+	UINT64_C(0x578bc4fa1f0709f3), UINT64_C(0x578bc4f69f0709ec), UINT64_C(0x578bc4f89f0709f0), UINT64_C(0x578bc4f59f0709ea),
+	UINT64_C(0x578bc4f29f0709e4), UINT64_C(0x578bc4ef9f0709de), UINT64_C(0x578bc4f19f0709e2), UINT64_C(0x578bc4f09f0709e0),
 	UINT64_C(0x000000000b0008d0), UINT64_C(0x000000000b000855), UINT64_C(0x000000000b0002d9), UINT64_C(0x468860d9830141b1),
-	0, UINT64_C(0x4201251283014a23), UINT64_C(0x800000000002033e), UINT64_C(0x8000000000020386),
+	0, UINT64_C(0x4201251283014a23), UINT64_C(0x8000000000020345), UINT64_C(0x800000000002038d),
 	UINT64_C(0x000000000b0008d3), UINT64_C(0x000000000b000858), UINT64_C(0x000000000b00096d), UINT64_C(0x420120eb830141d5),
 	0, UINT64_C(0x4201252683014a4b), 0, UINT64_C(0x440141f6070203e9),
 	UINT64_C(0x4609c1640104c2c7), UINT64_C(0x46886161830142c2), UINT64_C(0x40000000100f050f), UINT64_C(0x420120e5830141c9),
-	UINT64_C(0x40000000100f04e9), UINT64_C(0x40000000100f04ef), UINT64_C(0x5a160362900f06c2), UINT64_C(0x5a962362100f06c1),
-	0, 0, UINT64_C(0x800000000003042f), UINT64_C(0x420120df830141bd),
-	UINT64_C(0x4887a0d0100f019f), UINT64_C(0x4887a0d3100f01a5), UINT64_C(0x5a160356100f06a9), UINT64_C(0x5a962355900f06a8),
+	UINT64_C(0x40000000100f04e9), UINT64_C(0x40000000100f04ef), UINT64_C(0x5a960362900f06c2), UINT64_C(0x5b162362100f06c1),
+	0, 0, UINT64_C(0x8000000000030436), UINT64_C(0x420120df830141bd),
+	UINT64_C(0x4887a0d0100f019f), UINT64_C(0x4887a0d3100f01a5), UINT64_C(0x5a960356100f06a9), UINT64_C(0x5b162355900f06a8),
 	0, 0, 0, 0,
-	0, 0, 0, UINT64_C(0x800000000003044b),
+	0, 0, 0, UINT64_C(0x8000000000030452),
 	UINT64_C(0x00000000121001aa), UINT64_C(0x00000000121001aa), UINT64_C(0x00000000121001aa), UINT64_C(0x00000000121001aa),
 	UINT64_C(0x00000000121001aa), UINT64_C(0x00000000121001aa), UINT64_C(0x00000000121001aa), UINT64_C(0x00000000121001aa),
 	0, 0, 0, 0,
@@ -4138,47 +6220,47 @@ static const uint64_t x86LegacyDecisions[X86_TERMINAL_ROW_COUNT][2][256] = {
 	UINT64_C(0x00000000161bc44b), UINT64_C(0x00000000161bc469), UINT64_C(0x00000000161bc443), UINT64_C(0x00000000161bc440),
 	UINT64_C(0x00000000161bc47c), UINT64_C(0x00000000161bc472), UINT64_C(0x00000000161bc478), UINT64_C(0x00000000161bc46f),
 	UINT64_C(0x00000000161bc457), UINT64_C(0x00000000161bc44e), UINT64_C(0x00000000161bc454), UINT64_C(0x00000000161bc451),
-	UINT64_C(0x8000000000030079), UINT64_C(0x8000000000030715), UINT64_C(0x8000000000030099), UINT64_C(0x8000000000030725),
+	UINT64_C(0x8000000000030079), UINT64_C(0x8000000000030722), UINT64_C(0x8000000000030099), UINT64_C(0x8000000000030732),
 	UINT64_C(0x4609c58d0104cb17), UINT64_C(0x4688658283014b02), 0, 0,
 	UINT64_C(0x4609c3288104c648), UINT64_C(0x4688630b8301460f), UINT64_C(0x4789e3298e13464f), UINT64_C(0x4887a30c100f0616),
-	0, UINT64_C(0x40000000100f04df), 0, UINT64_C(0x800000000003073d),
-	0, UINT64_C(0x0000000012103b67), UINT64_C(0x0000000012103b67), UINT64_C(0x0000000012103b67),
+	0, UINT64_C(0x40000000100f04df), 0, UINT64_C(0x800000000003074a),
+	UINT64_C(0x000000000b000704), UINT64_C(0x0000000012103b67), UINT64_C(0x0000000012103b67), UINT64_C(0x0000000012103b67),
 	UINT64_C(0x0000000012103b67), UINT64_C(0x0000000012103b67), UINT64_C(0x0000000012103b67), UINT64_C(0x0000000012103b67),
-	UINT64_C(0x000000000b000326), UINT64_C(0x000000000b0001f0), UINT64_C(0x000000004c18c37e), UINT64_C(0x000000000b003b4e),
+	UINT64_C(0x000000000b000326), UINT64_C(0x000000000b0001f0), UINT64_C(0x000000004d18c37e), UINT64_C(0x000000000b003b4e),
 	UINT64_C(0x000000000b0008cc), UINT64_C(0x000000000b000851), UINT64_C(0x000000000b000975), UINT64_C(0x000000000b0004c2),
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	UINT64_C(0x0000000009004b14), UINT64_C(0x000000000a008aff), 0, 0,
 	0, 0, 0, 0,
-	UINT64_C(0x00000000222a064d), UINT64_C(0x00000000222a064d), UINT64_C(0x00000000222a064d), UINT64_C(0x00000000222a064d),
-	UINT64_C(0x00000000222a064d), UINT64_C(0x00000000222a064d), UINT64_C(0x00000000222a064d), UINT64_C(0x00000000222a064d),
-	UINT64_C(0x0000000023264614), UINT64_C(0x0000000023264614), UINT64_C(0x0000000023264614), UINT64_C(0x0000000023264614),
-	UINT64_C(0x0000000023264614), UINT64_C(0x0000000023264614), UINT64_C(0x0000000023264614), UINT64_C(0x0000000023264614),
-	UINT64_C(0x80000000000300e4), UINT64_C(0x8000000000030753), UINT64_C(0x000000000a008928), UINT64_C(0x000000000b00092b),
-	UINT64_C(0x40000000100f04e5), UINT64_C(0x40000000100f04cb), UINT64_C(0x800000000002010a), UINT64_C(0x8000000000020769),
-	UINT64_C(0x000000002917c378), UINT64_C(0x000000000b0004e3), UINT64_C(0x000000000a008504), UINT64_C(0x000000000b000507),
-	UINT64_C(0x000000000b000414), UINT64_C(0x000000002a1ac412), UINT64_C(0x000000000b000415), UINT64_C(0x000000000b000420),
-	UINT64_C(0x80000000000301a2), UINT64_C(0x80000000000307b4), UINT64_C(0x80000000000301c2), UINT64_C(0x80000000000307c4),
+	UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d),
+	UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d),
+	UINT64_C(0x0000000024264614), UINT64_C(0x0000000024264614), UINT64_C(0x0000000024264614), UINT64_C(0x0000000024264614),
+	UINT64_C(0x0000000024264614), UINT64_C(0x0000000024264614), UINT64_C(0x0000000024264614), UINT64_C(0x0000000024264614),
+	UINT64_C(0x80000000000300e9), UINT64_C(0x8000000000030764), UINT64_C(0x000000000a008928), UINT64_C(0x000000000b00092b),
+	UINT64_C(0x40000000100f04e5), UINT64_C(0x40000000100f04cb), UINT64_C(0x800000000002010f), UINT64_C(0x8000000000020a74),
+	UINT64_C(0x000000002a17c378), UINT64_C(0x000000000b0004e3), UINT64_C(0x000000000a008504), UINT64_C(0x000000000b000507),
+	UINT64_C(0x000000000b000414), UINT64_C(0x000000002b1ac412), UINT64_C(0x000000000b000415), UINT64_C(0x000000000b000420),
+	UINT64_C(0x80000000000301a7), UINT64_C(0x80000000000307c5), UINT64_C(0x80000000000301c7), UINT64_C(0x80000000000307d5),
 	UINT64_C(0x0000000009004094), UINT64_C(0x0000000009004093), UINT64_C(0x000000000b00098e), UINT64_C(0x000000000b003b7a),
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	UINT64_C(0x00000000161bc501), UINT64_C(0x00000000161bc500), UINT64_C(0x00000000161bc4ff), 0,
-	UINT64_C(0x000000002a1ac3fd), UINT64_C(0x000000002a1ac3f9), UINT64_C(0x000000002a1ac757), UINT64_C(0x000000002a1ac753),
-	UINT64_C(0x000000004d1241ed), UINT64_C(0x00000000281c0468), UINT64_C(0x000000004c18c383), UINT64_C(0x00000000161bc466),
+	UINT64_C(0x000000002b1ac3fd), UINT64_C(0x000000002b1ac3f9), UINT64_C(0x000000002b1ac757), UINT64_C(0x000000002b1ac753),
+	UINT64_C(0x000000004e1241ed), UINT64_C(0x00000000291c0468), UINT64_C(0x000000004d18c383), UINT64_C(0x00000000161bc466),
 	UINT64_C(0x000000000b0003fe), UINT64_C(0x000000000b0003fa), UINT64_C(0x000000000b000758), UINT64_C(0x000000000b000754),
 	UINT64_C(0x000000000b0004fa), UINT64_C(0x000000000b000413), UINT64_C(0x000000000b000924), UINT64_C(0x000000000b000925),
-	UINT64_C(0x000000000b0003c6), UINT64_C(0x000000000b000202), UINT64_C(0x80000000000301fc), UINT64_C(0x80000000000307da),
+	UINT64_C(0x000000000b0003c6), UINT64_C(0x000000000b000202), UINT64_C(0x8000000000030201), UINT64_C(0x80000000000307ec),
 	UINT64_C(0x000000000b0001f7), UINT64_C(0x000000000b000a7e), UINT64_C(0x000000000b0001fd), UINT64_C(0x000000000b000a81),
-	UINT64_C(0x000000000b0001f8), UINT64_C(0x000000000b000a7f), UINT64_C(0x8000000000030222), UINT64_C(0x80000000000307ea),
+	UINT64_C(0x000000000b0001f8), UINT64_C(0x000000000b000a7f), UINT64_C(0x8000000000030227), UINT64_C(0x80000000000307fc),
 },
 {
-	UINT64_C(0x80000000000307fa), UINT64_C(0x800000000002080a), UINT64_C(0x4887a262100f04c3), UINT64_C(0x4887a284900f0508),
+	UINT64_C(0x800000000003080c), UINT64_C(0x800000000002081c), UINT64_C(0x4887a262100f04c3), UINT64_C(0x4887a284900f0508),
 	0, UINT64_C(0x000000000b000af5), UINT64_C(0x000000000b0001ff), UINT64_C(0x000000000b000af9),
 	UINT64_C(0x000000000b000416), UINT64_C(0x000000000b003b4f), 0, UINT64_C(0x000000000b000b3f),
-	0, UINT64_C(0x80000000000302a4), UINT64_C(0x000000000b000391), 0,
+	0, UINT64_C(0x80000000000302a9), UINT64_C(0x000000000b000391), 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0,
-	UINT64_C(0x80000000000302b5), UINT64_C(0x4887a38a9f07071e), 0, 0,
+	UINT64_C(0x80000000000302ba), UINT64_C(0x4887a38a9f07071e), 0, 0,
 	0, UINT64_C(0x400000001f070720), UINT64_C(0x400000001f070721), UINT64_C(0x5008c3911f07071d),
 	0, 0, 0, 0,
 	0, 0, 0, 0,
@@ -4202,26 +6284,26 @@ static const uint64_t x86LegacyDecisions[X86_TERMINAL_ROW_COUNT][2][256] = {
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, UINT64_C(0x000000000b000558),
-	UINT64_C(0x58d5cfbcb02b1f78), UINT64_C(0x59d5eff23215dfe3), 0, 0,
+	UINT64_C(0x5955cfbcb12b1f78), UINT64_C(0x5a55eff23315dfe3), 0, 0,
 	0, 0, 0, 0,
-	UINT64_C(0x00000000281c0477), UINT64_C(0x00000000281c046e), UINT64_C(0x00000000281c0448), UINT64_C(0x00000000281c043f),
-	UINT64_C(0x00000000281c044d), UINT64_C(0x00000000281c046b), UINT64_C(0x00000000281c0445), UINT64_C(0x00000000281c0442),
-	UINT64_C(0x00000000281c047e), UINT64_C(0x00000000281c0474), UINT64_C(0x00000000281c047a), UINT64_C(0x00000000281c0471),
-	UINT64_C(0x00000000281c0459), UINT64_C(0x00000000281c0450), UINT64_C(0x00000000281c0456), UINT64_C(0x00000000281c0453),
-	0, UINT64_C(0x570bc4f49f0709e8), UINT64_C(0x570bc4ed9f0709da), UINT64_C(0x570bc4ea9f0709d4),
-	UINT64_C(0x570bc4ee9f0709dc), UINT64_C(0x570bc4f39f0709e6), UINT64_C(0x570bc4ec9f0709d8), UINT64_C(0x570bc4eb9f0709d6),
-	UINT64_C(0x570bc4fa1f0709f3), UINT64_C(0x570bc4f69f0709ec), UINT64_C(0x570bc4f89f0709f0), UINT64_C(0x570bc4f59f0709ea),
-	UINT64_C(0x570bc4f29f0709e4), UINT64_C(0x570bc4ef9f0709de), UINT64_C(0x570bc4f19f0709e2), UINT64_C(0x570bc4f09f0709e0),
+	UINT64_C(0x00000000291c0477), UINT64_C(0x00000000291c046e), UINT64_C(0x00000000291c0448), UINT64_C(0x00000000291c043f),
+	UINT64_C(0x00000000291c044d), UINT64_C(0x00000000291c046b), UINT64_C(0x00000000291c0445), UINT64_C(0x00000000291c0442),
+	UINT64_C(0x00000000291c047e), UINT64_C(0x00000000291c0474), UINT64_C(0x00000000291c047a), UINT64_C(0x00000000291c0471),
+	UINT64_C(0x00000000291c0459), UINT64_C(0x00000000291c0450), UINT64_C(0x00000000291c0456), UINT64_C(0x00000000291c0453),
+	UINT64_C(0x578bc4f79f0709ee), UINT64_C(0x578bc4f49f0709e8), UINT64_C(0x578bc4ed9f0709da), UINT64_C(0x578bc4ea9f0709d4),
+	UINT64_C(0x578bc4ee9f0709dc), UINT64_C(0x578bc4f39f0709e6), UINT64_C(0x578bc4ec9f0709d8), UINT64_C(0x578bc4eb9f0709d6),
+	UINT64_C(0x578bc4fa1f0709f3), UINT64_C(0x578bc4f69f0709ec), UINT64_C(0x578bc4f89f0709f0), UINT64_C(0x578bc4f59f0709ea),
+	UINT64_C(0x578bc4f29f0709e4), UINT64_C(0x578bc4ef9f0709de), UINT64_C(0x578bc4f19f0709e2), UINT64_C(0x578bc4f09f0709e0),
 	UINT64_C(0x000000000b0008cf), UINT64_C(0x000000000b000854), UINT64_C(0x000000000b0002d9), UINT64_C(0x468860d7830141ad),
-	0, UINT64_C(0x4201251083014a1f), UINT64_C(0x800000000002033e), UINT64_C(0x8000000000020386),
+	0, UINT64_C(0x4201251083014a1f), UINT64_C(0x8000000000020345), UINT64_C(0x800000000002038d),
 	UINT64_C(0x000000000b0008d2), UINT64_C(0x000000000b000857), UINT64_C(0x000000000b00096d), UINT64_C(0x420120e9830141d1),
 	0, UINT64_C(0x4201252483014a47), 0, UINT64_C(0x440141f2070203e1),
 	UINT64_C(0x4609c1640104c2c7), UINT64_C(0x46886160830142c0), UINT64_C(0x40000000100f050e), UINT64_C(0x420120e3830141c5),
-	UINT64_C(0x40000000100f04e8), UINT64_C(0x40000000100f04ee), UINT64_C(0x5a160360100f06be), UINT64_C(0x4887a35f900f06bd),
-	0, 0, UINT64_C(0x800000000003089a), UINT64_C(0x420120dd830141b9),
-	UINT64_C(0x4887a0cf100f019d), UINT64_C(0x4887a0d2100f01a3), UINT64_C(0x5a160353900f06a5), UINT64_C(0x4887a353100f06a4),
-	0, 0, 0, UINT64_C(0x40000000302b0684),
-	0, 0, 0, UINT64_C(0x80000000000308b4),
+	UINT64_C(0x40000000100f04e8), UINT64_C(0x40000000100f04ee), UINT64_C(0x5a960360100f06be), UINT64_C(0x4887a35f900f06bd),
+	0, 0, UINT64_C(0x80000000000308de), UINT64_C(0x420120dd830141b9),
+	UINT64_C(0x4887a0cf100f019d), UINT64_C(0x4887a0d2100f01a3), UINT64_C(0x5a960353900f06a5), UINT64_C(0x4887a353100f06a4),
+	0, 0, 0, UINT64_C(0x40000000312b0684),
+	0, 0, 0, UINT64_C(0x8000000000030abc),
 	UINT64_C(0x00000000121001aa), UINT64_C(0x00000000121001aa), UINT64_C(0x00000000121001aa), UINT64_C(0x00000000121001aa),
 	UINT64_C(0x00000000121001aa), UINT64_C(0x00000000121001aa), UINT64_C(0x00000000121001aa), UINT64_C(0x00000000121001aa),
 	0, 0, 0, 0,
@@ -4276,7 +6358,7 @@ static const uint64_t x86LegacyDecisions[X86_TERMINAL_ROW_COUNT][2][256] = {
 	UINT64_C(0x4609c58d0104cb17), UINT64_C(0x4688658603014b09), 0, 0,
 	UINT64_C(0x4609c3288104c648), UINT64_C(0x4688631583014622), UINT64_C(0x4789e3298e13464f), UINT64_C(0x4887a316100f062a),
 	0, UINT64_C(0x40000000100f04e0), 0, UINT64_C(0x80000000000300c7),
-	0, UINT64_C(0x0000000012103b6a), UINT64_C(0x0000000012103b6a), UINT64_C(0x0000000012103b6a),
+	UINT64_C(0x000000000b000704), UINT64_C(0x0000000012103b6a), UINT64_C(0x0000000012103b6a), UINT64_C(0x0000000012103b6a),
 	UINT64_C(0x0000000012103b6a), UINT64_C(0x0000000012103b6a), UINT64_C(0x0000000012103b6a), UINT64_C(0x0000000012103b6a),
 	UINT64_C(0x000000000b000326), UINT64_C(0x000000000b0001f0), UINT64_C(0x0000000021190380), UINT64_C(0x000000000b003b4e),
 	UINT64_C(0x000000000b0008cd), UINT64_C(0x000000000b000852), UINT64_C(0x000000000b000975), UINT64_C(0x000000000b0004c2),
@@ -4284,35 +6366,35 @@ static const uint64_t x86LegacyDecisions[X86_TERMINAL_ROW_COUNT][2][256] = {
 	0, 0, 0, 0,
 	UINT64_C(0x0000000009004b14), UINT64_C(0x000000000a008b06), 0, 0,
 	0, 0, 0, 0,
-	UINT64_C(0x00000000222a064d), UINT64_C(0x00000000222a064d), UINT64_C(0x00000000222a064d), UINT64_C(0x00000000222a064d),
-	UINT64_C(0x00000000222a064d), UINT64_C(0x00000000222a064d), UINT64_C(0x00000000222a064d), UINT64_C(0x00000000222a064d),
-	UINT64_C(0x0000000023264628), UINT64_C(0x0000000023264628), UINT64_C(0x0000000023264628), UINT64_C(0x0000000023264628),
-	UINT64_C(0x0000000023264628), UINT64_C(0x0000000023264628), UINT64_C(0x0000000023264628), UINT64_C(0x0000000023264628),
-	UINT64_C(0x80000000000300e4), UINT64_C(0x80000000000300f4), UINT64_C(0x00000000271f4926), UINT64_C(0x000000000b000929),
-	UINT64_C(0x40000000100f04e6), UINT64_C(0x40000000100f04cc), UINT64_C(0x800000000002010a), UINT64_C(0x8000000000020152),
-	UINT64_C(0x000000002917c378), UINT64_C(0x000000000b0004e3), UINT64_C(0x00000000271f4502), UINT64_C(0x000000000b000505),
-	UINT64_C(0x000000000b000414), UINT64_C(0x000000002a1ac412), UINT64_C(0x000000000b000415), UINT64_C(0x000000000b000421),
-	UINT64_C(0x80000000000301a2), UINT64_C(0x80000000000301b2), UINT64_C(0x80000000000301c2), UINT64_C(0x80000000000301d2),
+	UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d),
+	UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d), UINT64_C(0x00000000232a064d),
+	UINT64_C(0x0000000024264628), UINT64_C(0x0000000024264628), UINT64_C(0x0000000024264628), UINT64_C(0x0000000024264628),
+	UINT64_C(0x0000000024264628), UINT64_C(0x0000000024264628), UINT64_C(0x0000000024264628), UINT64_C(0x0000000024264628),
+	UINT64_C(0x80000000000300e9), UINT64_C(0x80000000000300f9), UINT64_C(0x00000000281f4926), UINT64_C(0x000000000b000929),
+	UINT64_C(0x40000000100f04e6), UINT64_C(0x40000000100f04cc), UINT64_C(0x800000000002010f), UINT64_C(0x8000000000020157),
+	UINT64_C(0x000000002a17c378), UINT64_C(0x000000000b0004e3), UINT64_C(0x00000000281f4502), UINT64_C(0x000000000b000505),
+	UINT64_C(0x000000000b000414), UINT64_C(0x000000002b1ac412), UINT64_C(0x000000000b000415), UINT64_C(0x000000000b000421),
+	UINT64_C(0x80000000000301a7), UINT64_C(0x80000000000301b7), UINT64_C(0x80000000000301c7), UINT64_C(0x80000000000301d7),
 	UINT64_C(0x0000000009004094), UINT64_C(0x0000000009004093), UINT64_C(0x000000000b00098e), UINT64_C(0x000000000b003b7a),
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	UINT64_C(0x00000000161bc501), UINT64_C(0x00000000161bc500), UINT64_C(0x00000000161bc4ff), 0,
-	UINT64_C(0x000000002a1ac3fd), UINT64_C(0x000000002a1ac3fb), UINT64_C(0x000000002a1ac757), UINT64_C(0x000000002a1ac755),
-	UINT64_C(0x000000002d11c1ee), UINT64_C(0x00000000281c0468), UINT64_C(0x0000000021190385), UINT64_C(0x00000000161bc466),
+	UINT64_C(0x000000002b1ac3fd), UINT64_C(0x000000002b1ac3fb), UINT64_C(0x000000002b1ac757), UINT64_C(0x000000002b1ac755),
+	UINT64_C(0x000000002e11c1ee), UINT64_C(0x00000000291c0468), UINT64_C(0x0000000021190385), UINT64_C(0x00000000161bc466),
 	UINT64_C(0x000000000b0003fe), UINT64_C(0x000000000b0003fc), UINT64_C(0x000000000b000758), UINT64_C(0x000000000b000756),
 	UINT64_C(0x000000000b0004fa), UINT64_C(0x000000000b000413), UINT64_C(0x000000000b000924), UINT64_C(0x000000000b000925),
-	UINT64_C(0x000000000b0003c6), UINT64_C(0x000000000b000202), UINT64_C(0x80000000000301fc), UINT64_C(0x800000000003020c),
+	UINT64_C(0x000000000b0003c6), UINT64_C(0x000000000b000202), UINT64_C(0x8000000000030201), UINT64_C(0x8000000000030211),
 	UINT64_C(0x000000000b0001f7), UINT64_C(0x000000000b000a7e), UINT64_C(0x000000000b0001fd), UINT64_C(0x000000000b000a81),
-	UINT64_C(0x000000000b0001f8), UINT64_C(0x000000000b000a7f), UINT64_C(0x8000000000030222), UINT64_C(0x8000000000030232),
+	UINT64_C(0x000000000b0001f8), UINT64_C(0x000000000b000a7f), UINT64_C(0x8000000000030227), UINT64_C(0x8000000000030237),
 },
 {
-	UINT64_C(0x8000000000030242), UINT64_C(0x8000000000020252), UINT64_C(0x4887a263100f04c5), UINT64_C(0x4887a285900f050a),
+	UINT64_C(0x8000000000030247), UINT64_C(0x8000000000020257), UINT64_C(0x4887a263100f04c5), UINT64_C(0x4887a285900f050a),
 	0, UINT64_C(0x000000000b000af5), UINT64_C(0x000000000b0001ff), UINT64_C(0x000000000b000af9),
 	UINT64_C(0x000000000b000416), UINT64_C(0x000000000b003b4f), 0, UINT64_C(0x000000000b000b3f),
-	0, UINT64_C(0x80000000000302a4), UINT64_C(0x000000000b000391), 0,
+	0, UINT64_C(0x80000000000302a9), UINT64_C(0x000000000b000391), 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0,
-	UINT64_C(0x80000000000302b5), UINT64_C(0x4887a38a9f070717), 0, 0,
+	UINT64_C(0x80000000000302ba), UINT64_C(0x4887a38a9f070717), 0, 0,
 	0, UINT64_C(0x400000001f070718), UINT64_C(0x400000001f070719), UINT64_C(0x5008c38d1f070716),
 	0, 0, 0, 0,
 	0, 0, 0, 0,
@@ -4336,26 +6418,26 @@ static const uint64_t x86LegacyDecisions[X86_TERMINAL_ROW_COUNT][2][256] = {
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, UINT64_C(0x000000000b000558),
-	UINT64_C(0x58d5cfbcb02b1f78), UINT64_C(0x59d5eff23215dfe3), 0, 0,
+	UINT64_C(0x5955cfbcb12b1f78), UINT64_C(0x5a55eff23315dfe3), 0, 0,
 	0, 0, 0, 0,
-	UINT64_C(0x00000000281c0477), UINT64_C(0x00000000281c046e), UINT64_C(0x00000000281c0448), UINT64_C(0x00000000281c043f),
-	UINT64_C(0x00000000281c044d), UINT64_C(0x00000000281c046b), UINT64_C(0x00000000281c0445), UINT64_C(0x00000000281c0442),
-	UINT64_C(0x00000000281c047e), UINT64_C(0x00000000281c0474), UINT64_C(0x00000000281c047a), UINT64_C(0x00000000281c0471),
-	UINT64_C(0x00000000281c0459), UINT64_C(0x00000000281c0450), UINT64_C(0x00000000281c0456), UINT64_C(0x00000000281c0453),
-	0, UINT64_C(0x570bc4f49f0709e8), UINT64_C(0x570bc4ed9f0709da), UINT64_C(0x570bc4ea9f0709d4),
-	UINT64_C(0x570bc4ee9f0709dc), UINT64_C(0x570bc4f39f0709e6), UINT64_C(0x570bc4ec9f0709d8), UINT64_C(0x570bc4eb9f0709d6),
-	UINT64_C(0x570bc4fa1f0709f3), UINT64_C(0x570bc4f69f0709ec), UINT64_C(0x570bc4f89f0709f0), UINT64_C(0x570bc4f59f0709ea),
-	UINT64_C(0x570bc4f29f0709e4), UINT64_C(0x570bc4ef9f0709de), UINT64_C(0x570bc4f19f0709e2), UINT64_C(0x570bc4f09f0709e0),
+	UINT64_C(0x00000000291c0477), UINT64_C(0x00000000291c046e), UINT64_C(0x00000000291c0448), UINT64_C(0x00000000291c043f),
+	UINT64_C(0x00000000291c044d), UINT64_C(0x00000000291c046b), UINT64_C(0x00000000291c0445), UINT64_C(0x00000000291c0442),
+	UINT64_C(0x00000000291c047e), UINT64_C(0x00000000291c0474), UINT64_C(0x00000000291c047a), UINT64_C(0x00000000291c0471),
+	UINT64_C(0x00000000291c0459), UINT64_C(0x00000000291c0450), UINT64_C(0x00000000291c0456), UINT64_C(0x00000000291c0453),
+	UINT64_C(0x578bc4f79f0709ee), UINT64_C(0x578bc4f49f0709e8), UINT64_C(0x578bc4ed9f0709da), UINT64_C(0x578bc4ea9f0709d4),
+	UINT64_C(0x578bc4ee9f0709dc), UINT64_C(0x578bc4f39f0709e6), UINT64_C(0x578bc4ec9f0709d8), UINT64_C(0x578bc4eb9f0709d6),
+	UINT64_C(0x578bc4fa1f0709f3), UINT64_C(0x578bc4f69f0709ec), UINT64_C(0x578bc4f89f0709f0), UINT64_C(0x578bc4f59f0709ea),
+	UINT64_C(0x578bc4f29f0709e4), UINT64_C(0x578bc4ef9f0709de), UINT64_C(0x578bc4f19f0709e2), UINT64_C(0x578bc4f09f0709e0),
 	UINT64_C(0x000000000b0008d0), UINT64_C(0x000000000b000855), UINT64_C(0x000000000b0002d9), UINT64_C(0x468860d9830141b1),
-	0, UINT64_C(0x4201251283014a23), UINT64_C(0x800000000002033e), UINT64_C(0x8000000000020386),
+	0, UINT64_C(0x4201251283014a23), UINT64_C(0x8000000000020345), UINT64_C(0x800000000002038d),
 	UINT64_C(0x000000000b0008d3), UINT64_C(0x000000000b000858), UINT64_C(0x000000000b00096d), UINT64_C(0x420120eb830141d5),
 	0, UINT64_C(0x4201252683014a4b), 0, UINT64_C(0x440141f6070203e9),
 	UINT64_C(0x4609c1640104c2c7), UINT64_C(0x46886161830142c2), UINT64_C(0x40000000100f050f), UINT64_C(0x420120e5830141c9),
-	UINT64_C(0x40000000100f04e9), UINT64_C(0x40000000100f04ef), UINT64_C(0x5a160362900f06c2), UINT64_C(0x5a962362100f06c1),
-	0, 0, UINT64_C(0x800000000003042f), UINT64_C(0x420120df830141bd),
-	UINT64_C(0x4887a0d0100f019f), UINT64_C(0x4887a0d3100f01a5), UINT64_C(0x5a160356100f06a9), UINT64_C(0x5a962355900f06a8),
-	0, 0, 0, UINT64_C(0x40000000302b0684),
-	0, 0, 0, UINT64_C(0x800000000003044b),
+	UINT64_C(0x40000000100f04e9), UINT64_C(0x40000000100f04ef), UINT64_C(0x5a960362900f06c2), UINT64_C(0x5b162362100f06c1),
+	0, 0, UINT64_C(0x8000000000030436), UINT64_C(0x420120df830141bd),
+	UINT64_C(0x4887a0d0100f019f), UINT64_C(0x4887a0d3100f01a5), UINT64_C(0x5a960356100f06a9), UINT64_C(0x5b162355900f06a8),
+	0, 0, 0, UINT64_C(0x40000000312b0684),
+	0, 0, 0, UINT64_C(0x8000000000030452),
 	UINT64_C(0x00000000121001aa), UINT64_C(0x00000000121001aa), UINT64_C(0x00000000121001aa), UINT64_C(0x00000000121001aa),
 	UINT64_C(0x00000000121001aa), UINT64_C(0x00000000121001aa), UINT64_C(0x00000000121001aa), UINT64_C(0x00000000121001aa),
 	0, 0, 0, 0,

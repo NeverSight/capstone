@@ -27,6 +27,13 @@ TERMINAL_ROWS = (
     ("X86_TERMINAL_32", 0, False, False),
     ("X86_TERMINAL_64", 1, False, False),
     ("X86_TERMINAL_64_REXW", 9, False, False),
+    ("X86_TERMINAL_32_OPSIZE", 16, False, True),
+    ("X86_TERMINAL_32_ADSIZE", 32, False, False),
+    ("X86_TERMINAL_32_OPSIZE_ADSIZE", 48, False, True),
+    ("X86_TERMINAL_64_OPSIZE", 17, False, True),
+    ("X86_TERMINAL_64_ADSIZE", 33, False, False),
+    ("X86_TERMINAL_64_OPSIZE_ADSIZE", 49, False, True),
+    ("X86_TERMINAL_64_REXW_OPSIZE", 25, False, True),
     ("X86_TERMINAL_16", 0, True, False),
     ("X86_TERMINAL_16_OPSIZE", 0, True, True),
     ("X86_TERMINAL_16_ADSIZE", 32, True, False),
@@ -46,6 +53,7 @@ TYPES = {
     "TYPE_RELv",
     "TYPE_IMM",
     "TYPE_UIMM8",
+    "TYPE_MOFFS",
 }
 IMMEDIATES = {
     "ENCODING_IB": "1",
@@ -53,6 +61,7 @@ IMMEDIATES = {
     "ENCODING_ID": "4",
     "ENCODING_IO": "8",
     "ENCODING_Iv": "insn->immediateSize",
+    "ENCODING_Ia": "insn->addressSize",
 }
 REGISTERS = {
     "ENCODING_RB": "1",
@@ -151,6 +160,10 @@ def read_operand_calls(operands, *, materialize=True):
             calls.append(f"readVVVVOperand(insn, {operand_type}, hasVVVV, &needVVVV)")
         elif encoding == "ENCODING_WRITEMASK":
             calls.append("readMaskRegister(insn)")
+        elif encoding == "ENCODING_Ia":
+            calls.append(
+                f"readMemoryOffset(insn, {'true' if materialize else 'false'})"
+            )
         elif encoding in IMMEDIATES:
             reader = (
                 f"readImmediate(insn, {IMMEDIATES[encoding]})"
@@ -458,6 +471,9 @@ def scalar_terminal_form(operands, modrm):
         elif encoding == "ENCODING_REG" or encoding in REGISTERS:
             if operand_type not in gprs:
                 return False
+        elif encoding == "ENCODING_Ia":
+            if operand_type != "TYPE_MOFFS":
+                return False
         elif encoding in IMMEDIATES:
             if operand_type not in immediates:
                 return False
@@ -586,10 +602,8 @@ def legacy_terminal_model(suffix):
                         for a, b in zip(uids, other_uids)
                     )
                 if (
-                    # Opcode 90 has XCHG/PAUSE repair; UD1 overrides its generated
-                    # descriptor at runtime. Neither is an ordinary terminal.
-                    opcode == 0x90
-                    or ud1 in uids
+                    # UD1 overrides its generated descriptor at runtime.
+                    ud1 in uids
                     or not any(uids)
                     or any(uid and specifiers[uid] not in selected for uid in uids)
                 ):

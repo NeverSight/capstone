@@ -10,7 +10,14 @@
 #include <string.h>
 
 #include "../../arch/X86/X86DisassemblerDecoder.h"
+#include "../../arch/X86/X86Disassembler.h"
 #include "../../arch/X86/X86Mapping.h"
+#define GET_INSTRINFO_ENUM
+#ifdef CAPSTONE_X86_REDUCE
+#include "../../arch/X86/X86GenInstrInfo_reduce.inc"
+#else
+#include "../../arch/X86/X86GenInstrInfo.inc"
+#endif
 #ifdef CAPSTONE_X86_REDUCE
 #include "../../arch/X86/X86GenDisassemblerTables_reduce.inc"
 #else
@@ -33,6 +40,68 @@ static bool check_operand_sets(void)
 					set, op);
 				return false;
 			}
+		}
+	}
+	return true;
+}
+
+/* The raw entry preserves incoming size flags for MOFFS ID selection, even
+ * without an encoded prefix. Truncation must retain the same partial read. */
+static bool check_inherited_moffs_size(void)
+{
+	const uint8_t bytes[] = { 0xa1, 0x34, 0x12, 0, 0 };
+	const unsigned ids[] = { X86_MOV32ao32, X86_MOV16ao32, X86_MOV32ao16,
+				 X86_MOV16ao16 };
+	for (unsigned flags = 0; flags != 4; ++flags)
+		for (size_t size = 1; size <= sizeof(bytes); ++size) {
+			InternalInstruction insn = { 0 };
+			insn.hasOpSize = (flags & 1) != 0;
+			insn.hasAdSize = (flags & 2) != 0;
+			const int status = decodeInstructionScan(
+				&insn, bytes, size, CS_MODE_32, NULL, NULL);
+			const bool complete = size == sizeof(bytes);
+			if ((status == 0) != complete ||
+			    insn.instructionID != ids[flags] ||
+			    insn.readerCursor != (complete ? 5 : 1) ||
+			    insn.immediateOffset != (complete ? 0 : 1) ||
+			    insn.immediateSize != (complete ? 0 : 4) ||
+			    insn.numImmediatesConsumed != (complete ? 1 : 0) ||
+			    insn.consumedDisplacement != complete ||
+			    insn.displacementOffset != (complete ? 1 : 0) ||
+			    (complete && (insn.displacement != 0x1234 ||
+					  insn.displacementSize != 4))) {
+				fprintf(stderr, "raw MOFFS flags %u size %zu\n",
+					flags, size);
+				return false;
+			}
+		}
+	return true;
+}
+
+static bool check_internal_scan_mode(void)
+{
+	const uint8_t bytes[] = { 0x66, 0xb8, 0x34, 0x12, 0x90, 0x90 };
+	const cs_mode modes[] = { CS_MODE_16, CS_MODE_32, CS_MODE_64 };
+	for (size_t m = 0; m < sizeof(modes) / sizeof(modes[0]); ++m) {
+		csh handle;
+		if (cs_open(CS_ARCH_X86, modes[m], &handle) != CS_ERR_OK)
+			return false;
+		cs_insn flat = { 0 };
+		MCInst insn = { 0 };
+		insn.csh = (cs_struct *)(uintptr_t)handle;
+		insn.flat_insn = &flat;
+		uint16_t size = 0;
+		const bool ok = X86_getInstructionScan(handle, bytes,
+						       sizeof(bytes), &insn,
+						       &size) &&
+				size == (modes[m] == CS_MODE_16 ? 6 : 4) &&
+				MCInst_getOpcode(&insn) ==
+					(modes[m] == CS_MODE_16 ? X86_MOV32ri :
+								  X86_MOV16ri);
+		cs_close(&handle);
+		if (!ok) {
+			fprintf(stderr, "internal scan mode %u\n", modes[m]);
+			return false;
 		}
 	}
 	return true;
@@ -927,7 +996,8 @@ int main(void)
 	};
 	const cs_mode modes[] = { CS_MODE_16, CS_MODE_32, CS_MODE_64 };
 	const unsigned syntaxes[] = { CS_OPT_SYNTAX_INTEL, CS_OPT_SYNTAX_ATT };
-	bool ok = check_operand_sets() && check_id_cache() &&
+	bool ok = check_operand_sets() && check_internal_scan_mode() &&
+		  check_inherited_moffs_size() && check_id_cache() &&
 		  check_instruction_names();
 	for (size_t m = 0; m < sizeof(modes) / sizeof(modes[0]); ++m)
 		for (size_t s = 0; s < sizeof(syntaxes) / sizeof(syntaxes[0]);

@@ -199,6 +199,38 @@ static inline bool may_be_0f_feature_extension(const uint8_t *suffix,
 		 suffix[1] == 0xff));
 }
 
+/* The selector and dispatcher share the source-owned VEX families. */
+typedef enum x86_vex_feature_family {
+	X86_VEX_FEATURE_NONE,
+	X86_VEX_FEATURE_ATOMIC,
+	X86_VEX_FEATURE_SHA512,
+	X86_VEX_FEATURE_AMX,
+	X86_VEX_FEATURE_SYSTEM,
+} x86_vex_feature_family;
+
+static inline x86_vex_feature_family X86_vexFeatureFamily(uint8_t map,
+							  uint8_t opcode)
+{
+	switch (map) {
+	case 2:
+		if (opcode >= 0xe0 && opcode <= 0xef)
+			return X86_VEX_FEATURE_ATOMIC;
+		if (opcode >= 0xcb && opcode <= 0xcd)
+			return X86_VEX_FEATURE_SHA512;
+		if ((opcode >= 0x48 && opcode <= 0x4b) || opcode == 0x5c ||
+		    opcode == 0x5e || opcode == 0x6c)
+			return X86_VEX_FEATURE_AMX;
+		return X86_VEX_FEATURE_NONE;
+	case 5:
+		return opcode == 0xfd ? X86_VEX_FEATURE_AMX :
+					X86_VEX_FEATURE_NONE;
+	case 7:
+		return X86_VEX_FEATURE_SYSTEM;
+	default:
+		return X86_VEX_FEATURE_NONE;
+	}
+}
+
 /* Classify prefixes and escapes in one lookup. In 16/32-bit modes the
  * 40..4f opcodes end the scan; subsequent instructions cannot be extensions
  * of the current INC/DEC. opcode receives the first non-prefix byte, or zero

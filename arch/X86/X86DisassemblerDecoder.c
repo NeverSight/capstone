@@ -1793,7 +1793,9 @@ X86_DECODE_INLINE int readModRMImpl(struct InternalInstruction *insn,
 	insn->orgModRM = insn->modRM;
 
 	// handle MOVcr, MOVdr, MOVrc, MOVrd by pretending they have MRM.mod = 3
-	if ((insn->firstByte == 0x0f && insn->opcodeType == TWOBYTE) &&
+	/* Compact admission excludes control/debug-register operands. */
+	if (materialize &&
+	    (insn->firstByte == 0x0f && insn->opcodeType == TWOBYTE) &&
 	    (insn->opcode >= 0x20 && insn->opcode <= 0x23))
 		insn->modRM |= 0xC0;
 
@@ -2191,6 +2193,23 @@ static int readImmediate(struct InternalInstruction *insn, uint8_t size)
 	return readImmediateImpl(insn, size, true);
 }
 
+X86_DECODE_INLINE int readMemoryOffset(struct InternalInstruction *insn,
+				       bool materialize)
+{
+	if (readImmediateImpl(insn, insn->addressSize, materialize))
+		return -1;
+	if (materialize) {
+		insn->displacementOffset = insn->immediateOffset;
+		insn->consumedDisplacement = true;
+		insn->displacementSize = insn->immediateSize;
+		insn->displacement =
+			insn->immediates[insn->numImmediatesConsumed - 1];
+		insn->immediateOffset = 0;
+	}
+	insn->immediateSize = 0;
+	return 0;
+}
+
 /*
  * readVVVV - Consumes vvvv from an instruction if it has a VEX prefix.
  *
@@ -2455,19 +2474,8 @@ CASE_ENCODING_RM:
 			break;
 
 		case ENCODING_Ia:
-			if (readImmediate(insn, insn->addressSize))
+			if (readMemoryOffset(insn, true))
 				return -1;
-			/* Direct memory-offset (moffset) immediate will get mapped
-				   to memory operand later. We want the encoding info to
-				   reflect that as well. */
-			insn->displacementOffset = insn->immediateOffset;
-			insn->consumedDisplacement = true;
-			insn->displacementSize = insn->immediateSize;
-			insn->displacement =
-				insn->immediates[insn->numImmediatesConsumed -
-						 1];
-			insn->immediateOffset = 0;
-			insn->immediateSize = 0;
 			break;
 
 		case ENCODING_IRC:
@@ -2884,9 +2892,9 @@ readInstructionHeader(struct InternalInstruction *insn, const uint8_t *code,
 }
 
 X86_DECODE_INLINE int finishDecodedInstruction(struct InternalInstruction *insn,
-					       bool vectorChecks)
+					       bool genericChecks)
 {
-	if (vectorChecks) {
+	if (genericChecks) {
 		if (insn->vectorExtensionType == TYPE_EVEX && checkEVEX(insn))
 			return -1;
 
@@ -2896,10 +2904,11 @@ X86_DECODE_INLINE int finishDecodedInstruction(struct InternalInstruction *insn,
 			return -1;
 	}
 
-	/* MOV can read CS (8C /1), but loading CS (8E /1) always raises #UD.
+	/* Compact terminal admission excludes segment-register operands.
+	 * MOV can read CS (8C /1), but loading CS (8E /1) always raises #UD.
 	 * Segment selectors ignore REX/REX2 register extension bits. */
-	if (insn->opcodeType == ONEBYTE && insn->opcode == 0x8e &&
-	    regFromModRM(insn->orgModRM) == 1)
+	if (genericChecks && insn->opcodeType == ONEBYTE &&
+	    insn->opcode == 0x8e && regFromModRM(insn->orgModRM) == 1)
 		return -1;
 
 	insn->length = insn->readerCursor;
@@ -2941,8 +2950,41 @@ legacyTerminalDecision(const struct InternalInstruction *insn, bool sizePrefixes
 {
 	if (insn->opcodeType != ONEBYTE && insn->opcodeType != TWOBYTE)
 		return 0;
+	/* Opcode 90 with REX.B is repaired to XCHG by getIDForMode. */
+	if (insn->opcodeType == ONEBYTE && insn->opcode == 0x90 &&
+	    bFromREX(insn->rexPrefix))
+		return 0;
 	unsigned int row;
-	if (insn->mode == MODE_64BIT)
+	if (sizePrefixes && insn->mode != MODE_16BIT) {
+		/* Preserve address-dependent and relative-branch size repairs. */
+		if ((insn->opcodeType == ONEBYTE &&
+		     ((insn->mode == MODE_64BIT && insn->opcode >= 0xa0 &&
+		       insn->opcode <= 0xa3) ||
+		      insn->opcode == 0xe8 || insn->opcode == 0xe9 ||
+		      insn->opcode == 0xc2 || insn->opcode == 0xc3)) ||
+		    (insn->opcodeType == TWOBYTE &&
+		     (insn->opcode == 0xae ||
+		      (insn->opcode >= 0x80 && insn->opcode <= 0x8f))))
+			return 0;
+		if (insn->mode == MODE_64BIT) {
+			if (wFromREX(insn->rexPrefix))
+				row = insn->hasOpSize ?
+					      X86_TERMINAL_64_REXW_OPSIZE :
+					      X86_TERMINAL_64_REXW;
+			else if (insn->hasAdSize)
+				row = insn->hasOpSize ?
+					      X86_TERMINAL_64_OPSIZE_ADSIZE :
+					      X86_TERMINAL_64_ADSIZE;
+			else
+				row = insn->hasOpSize ? X86_TERMINAL_64_OPSIZE :
+							X86_TERMINAL_64;
+		} else if (insn->hasAdSize)
+			row = insn->hasOpSize ? X86_TERMINAL_32_OPSIZE_ADSIZE :
+						X86_TERMINAL_32_ADSIZE;
+		else
+			row = insn->hasOpSize ? X86_TERMINAL_32_OPSIZE :
+						X86_TERMINAL_32;
+	} else if (insn->mode == MODE_64BIT)
 		row = X86_TERMINAL_64 + wFromREX(insn->rexPrefix);
 	else if (insn->mode == MODE_16BIT)
 		row = (sizePrefixes && insn->hasAdSize ? X86_TERMINAL_16_ADSIZE :
@@ -2969,7 +3011,12 @@ decodeInstructionScanImpl(struct InternalInstruction *insn, const uint8_t *code,
 		readInstructionHeader(insn, code, codeSize, mode);
 	if (prefixResult == PREFIX_READ_INVALID)
 		return X86_SCAN_INVALID;
-	if (prefixResult == PREFIX_READ_SIMPLE_LEGACY &&
+	/* getIDForMode restores incoming size flags for absolute moves even
+	 * when this header contains no size prefix. Preserve that raw contract. */
+	const bool inheritedMoffsSize = insn->opcodeType == ONEBYTE &&
+					(insn->opcode & 0xfc) == 0xa0 &&
+					(insn->hasOpSize || insn->hasAdSize);
+	if (prefixResult == PREFIX_READ_SIMPLE_LEGACY && !inheritedMoffsSize &&
 	    (insn->opcodeType == ONEBYTE || insn->opcodeType == TWOBYTE)) {
 		const uint64_t decision = legacyTerminalDecision(insn, false);
 		if (decision) {
@@ -3054,29 +3101,39 @@ static bool decodeGenericScan(const uint8_t *code, size_t code_len,
 	return X86_completeScan(instr, &insn, size);
 }
 
-X86_DECODE_INLINE int try16BitSizePrefixedScan(const uint8_t *code,
-					       size_t code_len,
-					       unsigned *instructionID,
-					       uint16_t *size)
+X86_DECODE_INLINE int tryLegacyPrefixedScan(const uint8_t *code,
+					    size_t code_len, cs_mode mode,
+					    unsigned *instructionID,
+					    uint16_t *size)
 {
 	InternalInstruction insn = { 0 };
-	/* The caller has selected the decoder's 16-bit mode priority. */
-	initializeInstructionHeader(&insn, code, code_len, CS_MODE_16);
+	/* Retain the decoder's bitness priority for mixed mode flags. */
+	initializeInstructionHeader(&insn, code, code_len, mode);
 	size_t offset = 0;
-	while (offset < code_len) {
+	/* Keep the 16-bit size-prefix loop small; other prefixes use the full reader. */
+	while (offset < code_len && (insn.mode == MODE_16BIT || offset < 15)) {
 		if (code[offset] == 0x66)
 			setOperandSizePrefix(&insn);
 		else if (code[offset] == 0x67)
 			setAddressSizePrefix(&insn);
+		else if (insn.mode != MODE_16BIT && isREX(&insn, code[offset]))
+			insn.rexPrefix = code[offset];
+		else if (insn.mode != MODE_16BIT &&
+			 (code[offset] == 0x26 || code[offset] == 0x2e ||
+			  code[offset] == 0x36 || code[offset] == 0x3e ||
+			  code[offset] == 0x64 || code[offset] == 0x65))
+			insn.rexPrefix = 0;
 		else
 			break;
 		++offset;
 	}
-	if (!offset || offset == code_len)
+	if (!offset || offset == code_len ||
+	    (insn.mode != MODE_16BIT && offset == 15))
 		return X86_SCAN_NOT_HANDLED;
 	const uint8_t opcode = code[offset];
 	if ((feature_prefix_flags[opcode] &
-	     (FEATURE_LEGACY_PREFIX | FEATURE_ESCAPE)) ||
+	     (FEATURE_LEGACY_PREFIX | FEATURE_ESCAPE |
+	      (insn.mode == MODE_64BIT ? FEATURE_REX_PREFIX : 0))) ||
 	    opcode == 0xc5 || opcode == 0x8f)
 		return X86_SCAN_NOT_HANDLED;
 	insn.readerCursor = offset;
@@ -3106,8 +3163,8 @@ static bool decode16BitSizePrefixedScan(const uint8_t *code, size_t code_len,
 					uint16_t *size)
 {
 	unsigned instructionID;
-	int result =
-		try16BitSizePrefixedScan(code, code_len, &instructionID, size);
+	int result = tryLegacyPrefixedScan(code, code_len, CS_MODE_16,
+					   &instructionID, size);
 	if (result == X86_SCAN_NOT_HANDLED)
 		return decodeGenericScan(code, code_len, mode, instr, size);
 	if (result != X86_SCAN_COMPLETE)
@@ -3217,7 +3274,10 @@ static bool decodeScanResultFallback(csh ud, const uint8_t *code,
 	instr.flat_insn = insn;
 	uint16_t size;
 	x86_feature_decode_result extension = X86_FEATURE_NOT_HANDLED;
-	if (tryExtension)
+	if (tryExtension && !(code_len >= 4 && code[0] == 0xc4 &&
+			      !(handle->mode & (CS_MODE_16 | CS_MODE_32)) &&
+			      X86_vexFeatureFamily(code[1] & 0x1f, code[3]) ==
+				      X86_VEX_FEATURE_NONE))
 		extension = X86_decodeFeatureExtension(ud, code, code_len,
 						       &instr, &size, opcode);
 	if (extension == X86_FEATURE_INVALID)
@@ -3274,13 +3334,22 @@ __declspec(noinline)
 #elif defined(__GNUC__)
 __attribute__((noinline))
 #endif
-static bool decode16BitSizePrefixedResult(csh ud, const uint8_t *code,
-					  size_t code_len, cs_insn *insn,
-					  X86ScanResult *result)
+static bool decodeLegacyPrefixedResult(csh ud, const uint8_t *code,
+				       size_t code_len, cs_insn *insn,
+				       X86ScanResult *result)
 {
 	unsigned instructionID = 0;
-	int status = try16BitSizePrefixedScan(code, code_len, &instructionID,
-					      &result->length);
+	const cs_mode mode = ((cs_struct *)(uintptr_t)ud)->mode;
+	int status;
+	if (mode & CS_MODE_16)
+		status = tryLegacyPrefixedScan(code, code_len, CS_MODE_16,
+					       &instructionID, &result->length);
+	else if (mode & CS_MODE_32)
+		status = tryLegacyPrefixedScan(code, code_len, CS_MODE_32,
+					       &instructionID, &result->length);
+	else
+		status = tryLegacyPrefixedScan(code, code_len, CS_MODE_64,
+					       &instructionID, &result->length);
 	if (status == X86_SCAN_NOT_HANDLED)
 		return decodeScanResultFallback(ud, code, code_len, insn,
 						result, 0, false);
@@ -3407,10 +3476,9 @@ X86_DECODE_INLINE bool getInstructionScanResult(csh ud, const uint8_t *code,
 	if (status != X86_SCAN_NOT_HANDLED)
 		return completeTerminalScanResult(result, instructionID,
 						  status);
-	if ((handle->mode & CS_MODE_16) && code_len &&
-	    (code[0] == 0x66 || code[0] == 0x67))
-		return decode16BitSizePrefixedResult(ud, code, code_len, insn,
-						     result);
+	if (opcodeOffset && opcodeOffset != SIZE_MAX)
+		return decodeLegacyPrefixedResult(ud, code, code_len, insn,
+						  result);
 	if (code_len && (code[0] == 0xc4 || code[0] == 0xc5) &&
 	    !(handle->mode & (CS_MODE_16 | CS_MODE_32)))
 		return decodeVexTerminalResult(ud, code, code_len, insn, result,
