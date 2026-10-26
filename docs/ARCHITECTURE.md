@@ -267,18 +267,25 @@ GFNI displacement correction remains before backend translation. Public output
 modes and instruction state remain caller-local.
 
 The dedicated scan entries share the parser with raw decoding. Their scalar
-terminals return only the validated internal ID and length before constructing
+terminals return only the validated ID and length before constructing
 the requested compact or `MCInst` result. They need no intermediate opcode
 translation because terminal admission excludes acquire/release prefixes and
 opcode-changing operands. Prefix, opcode, ID selection, prefix validation,
 terminal, checked scalar reads and compact ModR/M helpers stay inline so the
 compiler can remove unused local state.
 
-The extension selector also supplies the bounded first non-prefix offset.
-Ordinary terminal admission uses that offset for no-prefix and single-REX
-headers with the decoder's existing bitness priority. An outlined compact reader
-also admits operand/address-size prefixes, segment prefixes and ordered REX
-prefixes in 32/64-bit mode, including repeats. In 16-bit mode it retains the
+Compact results first try unprefixed and single-REX legacy headers, plus
+16-bit size-prefix headers, in the shared readers. These common instructions
+finish without a separate extension-prefix walk. The existing feature-byte
+flags and 0F refinement predicate defer possible source-owned extensions before
+a generated invalid terminal can reject them. Mixed mode flags retain the
+original extension-selector ordering because its CS_MODE_64 test differs from
+the raw decoder's 16/32-bit priority.
+
+On an admission miss, the extension selector supplies the bounded first
+non-prefix offset. Ordinary terminal admission and the outlined compact reader
+retain operand/address-size prefixes, segment prefixes and ordered REX prefixes
+in 32/64-bit mode, including repeats. The 16-bit reader retains its
 size-prefix-only loop. Prefix field updates and size calculation use the full
 parser's helpers, including clearing REX when a legacy prefix follows it.
 Generated size-prefix rows select ordinary scalar instructions and multi-byte
@@ -295,7 +302,8 @@ owns a separate state. No terminal copies register/address values merely to
 discard them; byte consumption, bounds and legality still come from the shared
 readers.
 
-The scan entry consumes the existing extension selector once. Source-owned
+After the initial admission miss, the scan entry runs the existing extension
+selector once. Source-owned
 extensions keep their handlers and precedence; EVEX enters the same backend
 after extension dispatch, retaining normalization and restoration. Generic raw
 results share backend size assignment, displacement correction and scan

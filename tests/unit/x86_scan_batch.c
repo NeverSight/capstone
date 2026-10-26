@@ -69,6 +69,22 @@ static bool check_public_ids(csh handle, cs_insn *insn, size_t mode_index)
 		{ { 0xfe, 0xf8 },
 		  2,
 		  { X86_INS_INVALID, X86_INS_INVALID, X86_INS_INVALID } },
+		/* Source-owned refinements take precedence over generated terminals. */
+		{ { 0x0f, 0x01, 0xc6 },
+		  3,
+		  { X86_INS_WRMSRNS, X86_INS_WRMSRNS, X86_INS_WRMSRNS } },
+		{ { 0x67, 0x0f, 0x01, 0xc6 },
+		  4,
+		  { X86_INS_WRMSRNS, X86_INS_WRMSRNS, X86_INS_WRMSRNS } },
+		{ { 0x66, 0x0f, 0x01, 0xc6 },
+		  4,
+		  { X86_INS_INVALID, X86_INS_INVALID, X86_INS_INVALID } },
+		{ { 0x0f, 0x01, 0xfe },
+		  3,
+		  { X86_INS_INVALID, X86_INS_INVLPGB, X86_INS_INVLPGB } },
+		{ { 0x0f, 0x01, 0xff },
+		  3,
+		  { X86_INS_TLBSYNC, X86_INS_TLBSYNC, X86_INS_TLBSYNC } },
 	};
 	for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
 		const unsigned id = cases[i].ids[mode_index];
@@ -94,6 +110,30 @@ static bool check_public_ids(csh handle, cs_insn *insn, size_t mode_index)
 			      array[0].size == cases[i].size);
 			cs_free(array, 1);
 		}
+	}
+	return true;
+}
+
+static bool check_mixed_modes(void)
+{
+	const cs_mode modes[] = { CS_MODE_16 | CS_MODE_64,
+				  CS_MODE_32 | CS_MODE_64,
+				  CS_MODE_16 | CS_MODE_32 | CS_MODE_64 };
+	const uint8_t code[] = { 0x48, 0x0f, 0x01, 0xc6 };
+	for (size_t m = 0; m < sizeof(modes) / sizeof(modes[0]); ++m) {
+		csh handle = 0;
+		CHECK(cs_open(CS_ARCH_X86, CS_MODE_64, &handle) == CS_ERR_OK);
+		CHECK(cs_option(handle, CS_OPT_TEXT, CS_OPT_OFF) == CS_ERR_OK);
+		CHECK(cs_option(handle, CS_OPT_MODE, modes[m]) == CS_ERR_OK);
+		uint32_t output = 0;
+		X86ScanBatchResult batch = X86_scanBatch(
+			handle, code, sizeof(code), 0, &output, 1);
+		CHECK(batch.count == 1 && batch.bytes == sizeof(code));
+		CHECK(output == ((X86_INS_WRMSRNS << 8) | sizeof(code)));
+		cs_insn *insn = cs_malloc(handle);
+		CHECK(insn && compare(handle, insn, code, sizeof(code), 1));
+		cs_free(insn, 1);
+		cs_close(&handle);
 	}
 	return true;
 }
@@ -181,5 +221,5 @@ static bool check(void)
 
 int main(void)
 {
-	return check() ? 0 : 1;
+	return check() && check_mixed_modes() ? 0 : 1;
 }
