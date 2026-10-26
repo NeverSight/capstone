@@ -27,6 +27,10 @@ truncations, wrapped addresses and malformed input. It also checks option
 independence and untouched output on rejection. `unit_x86_buffer_bounds` places
 complete and truncated calls immediately before an inaccessible page.
 
+`unit_x86_scan_batch` checks bounded output against iteration, and explicit
+public IDs against the iterator and allocated-array API in all three bitness
+modes. Cases include grouped opcodes, size prefixes and invalid ModR/M forms.
+
 ### Testing tools and usage
 
 #### `cstest`

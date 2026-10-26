@@ -189,6 +189,10 @@ The plans derive from the same full/reduced opcode tables and operand helpers;
 they do not define another instruction set. Direct decisions embed terminals;
 indexed decisions retain their ModR/M read and branch selection, including
 invalid IDs. Generation checks every selected ModR/M value and packed result.
+For compact scan results, the same plans have a public-ID projection derived
+from `X86MappingInsn*.inc` and `x86.h`. It uses the same operand readers and
+decision kinds, while avoiding a subsequent UID-to-public-ID lookup. Raw and
+operand-producing decoding retain internal IDs and their original state writes.
 
 The 16-bit rows compose the existing primary and operand-size lookups only when
 their decision kinds match. Both then require the same read, and the second
@@ -221,6 +225,9 @@ reuse the generic decoder's policy; checked address and immediate readers
 consume the same bytes. An unused VVVV field must still be zero after inversion.
 Within these admitted forms, the VEX register indices and ordinary addresses
 already satisfy the operand fixup and translation checks.
+The VEX metadata word combines these flags with the public ID from the same
+mapping source. Unmapped UIDs retain their existing mapping behavior. Neither
+projection changes opcode admission, prefix checks or operand-read ordering.
 
 Source-owned extensions retain precedence. The extension dispatcher and compact
 C4 fallback share a map/opcode family classifier. An ordinary unprefixed C4

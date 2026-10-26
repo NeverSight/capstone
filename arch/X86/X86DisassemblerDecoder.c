@@ -2947,7 +2947,8 @@ static int readOperandsScan(struct InternalInstruction *insn, MCInst *mcInst,
 }
 
 X86_DECODE_INLINE uint64_t
-legacyTerminalDecision(const struct InternalInstruction *insn, bool sizePrefixes)
+legacyTerminalDecision(const struct InternalInstruction *insn,
+		       bool sizePrefixes, bool publicID)
 {
 	if (insn->opcodeType != ONEBYTE && insn->opcodeType != TWOBYTE)
 		return 0;
@@ -2993,8 +2994,10 @@ legacyTerminalDecision(const struct InternalInstruction *insn, bool sizePrefixes
 		      (sizePrefixes && insn->hasOpSize);
 	else
 		row = X86_TERMINAL_32;
-	return x86LegacyDecisions[row][insn->opcodeType == TWOBYTE]
-				 [insn->opcode];
+	return publicID ? x86LegacyPublicDecisions[row][insn->opcodeType ==
+							TWOBYTE][insn->opcode] :
+			  x86LegacyDecisions[row][insn->opcodeType == TWOBYTE]
+					    [insn->opcode];
 }
 
 /* Private to the direct scan entry; existing decoder entries never return it. */
@@ -3019,11 +3022,13 @@ decodeInstructionScanImpl(struct InternalInstruction *insn, const uint8_t *code,
 					(insn->hasOpSize || insn->hasAdSize);
 	if (prefixResult == PREFIX_READ_SIMPLE_LEGACY && !inheritedMoffsSize &&
 	    (insn->opcodeType == ONEBYTE || insn->opcodeType == TWOBYTE)) {
-		const uint64_t decision = legacyTerminalDecision(insn, false);
+		const uint64_t decision =
+			legacyTerminalDecision(insn, false, false);
 		if (decision) {
 			int result = decodeLegacyTerminal(
 				insn, directTerminal ? NULL : mcInst, size,
-				decision, directTerminal || mcInst != NULL);
+				decision, directTerminal || mcInst != NULL,
+				NULL);
 			return directTerminal && result == X86_SCAN_COMPLETE ?
 				       X86_SCAN_UID_READY :
 				       result;
@@ -3054,7 +3059,7 @@ X86_DECODE_INLINE int trySimpleLegacyScan(const uint8_t *code, size_t codeSize,
 					  cs_mode mode, uint8_t opcode,
 					  size_t opcodeOffset,
 					  unsigned *instructionID,
-					  uint16_t *size)
+					  uint16_t *size, bool publicID)
 {
 	if (opcodeOffset >= 2)
 		return X86_SCAN_NOT_HANDLED;
@@ -3072,11 +3077,13 @@ X86_DECODE_INLINE int trySimpleLegacyScan(const uint8_t *code, size_t codeSize,
 		return opcodeResult == OPCODE_READ_GENERIC ?
 			       X86_SCAN_NOT_HANDLED :
 			       X86_SCAN_INVALID;
-	const uint64_t decision = legacyTerminalDecision(&insn, false);
+	const uint64_t decision =
+		legacyTerminalDecision(&insn, false, publicID);
 	if (!decision)
 		return X86_SCAN_NOT_HANDLED;
-	int result = decodeLegacyTerminal(&insn, NULL, size, decision, true);
-	if (result == X86_SCAN_COMPLETE)
+	int result = decodeLegacyTerminal(&insn, NULL, size, decision, true,
+					  publicID ? instructionID : NULL);
+	if (result == X86_SCAN_COMPLETE && !publicID)
 		*instructionID = insn.instructionID;
 	return result;
 }
@@ -3105,7 +3112,7 @@ static bool decodeGenericScan(const uint8_t *code, size_t code_len,
 X86_DECODE_INLINE int tryLegacyPrefixedScan(const uint8_t *code,
 					    size_t code_len, cs_mode mode,
 					    unsigned *instructionID,
-					    uint16_t *size)
+					    uint16_t *size, bool publicID)
 {
 	InternalInstruction insn = { 0 };
 	/* Retain the decoder's bitness priority for mixed mode flags. */
@@ -3145,11 +3152,12 @@ X86_DECODE_INLINE int tryLegacyPrefixedScan(const uint8_t *code,
 		return X86_SCAN_NOT_HANDLED;
 	if (opcodeResult)
 		return X86_SCAN_INVALID;
-	const uint64_t decision = legacyTerminalDecision(&insn, true);
+	const uint64_t decision = legacyTerminalDecision(&insn, true, publicID);
 	if (!decision)
 		return X86_SCAN_NOT_HANDLED;
-	int result = decodeLegacyTerminal(&insn, NULL, size, decision, true);
-	if (result == X86_SCAN_COMPLETE)
+	int result = decodeLegacyTerminal(&insn, NULL, size, decision, true,
+					  publicID ? instructionID : NULL);
+	if (result == X86_SCAN_COMPLETE && !publicID)
 		*instructionID = insn.instructionID;
 	return result;
 }
@@ -3165,7 +3173,7 @@ static bool decode16BitSizePrefixedScan(const uint8_t *code, size_t code_len,
 {
 	unsigned instructionID;
 	int result = tryLegacyPrefixedScan(code, code_len, CS_MODE_16,
-					   &instructionID, size);
+					   &instructionID, size, false);
 	if (result == X86_SCAN_NOT_HANDLED)
 		return decodeGenericScan(code, code_len, mode, instr, size);
 	if (result != X86_SCAN_COMPLETE)
@@ -3196,7 +3204,8 @@ bool X86_getInstructionScan(csh ud, const uint8_t *code, size_t code_len,
 							 instr, size, opcode);
 	unsigned instructionID;
 	int terminal = trySimpleLegacyScan(code, code_len, handle->mode, opcode,
-					   opcodeOffset, &instructionID, size);
+					   opcodeOffset, &instructionID, size,
+					   false);
 	if (terminal != X86_SCAN_NOT_HANDLED) {
 		if (terminal != X86_SCAN_COMPLETE)
 			return false;
@@ -3230,9 +3239,7 @@ CAPSTONE_INTERNAL bool X86_setScanAdapter(csh ud, cs_mode mode,
 #endif
 
 X86_DECODE_INLINE int tryVexTerminalScan(const uint8_t *code, size_t code_len,
-					 uint8_t prefix,
-					 unsigned *instructionID,
-					 uint16_t *size);
+					 uint8_t prefix, X86ScanResult *result);
 
 /* Only generic and extension decoding need an MCInst in the core scan path. */
 #if defined(_MSC_VER)
@@ -3287,19 +3294,10 @@ static bool decodeScanResultFallback(csh ud, const uint8_t *code,
 		if (tryExtension &&
 		    !(handle->mode & (CS_MODE_16 | CS_MODE_32)) && code_len &&
 		    code[0] == 0xc4) {
-			unsigned instructionID = 0;
 			const int status = tryVexTerminalScan(code, code_len,
-							      code[0],
-							      &instructionID,
-							      &result->length);
-			if (status != X86_SCAN_NOT_HANDLED) {
-				if (status != X86_SCAN_COMPLETE)
-					return false;
-				result->opcode = instructionID;
-				result->opcode_pub = 0;
-				result->popcode_adjust = 0;
-				return true;
-			}
+							      code[0], result);
+			if (status != X86_SCAN_NOT_HANDLED)
+				return status == X86_SCAN_COMPLETE;
 		}
 		bool decoded = opcode == 0x62 ?
 				       X86_getInstructionAfterExtensions(
@@ -3324,8 +3322,8 @@ X86_DECODE_INLINE bool completeTerminalScanResult(X86ScanResult *result,
 {
 	if (status != X86_SCAN_COMPLETE)
 		return false;
-	result->opcode = instructionID;
-	result->opcode_pub = 0;
+	result->opcode = 0;
+	result->opcode_pub = instructionID;
 	result->popcode_adjust = 0;
 	return true;
 }
@@ -3344,13 +3342,16 @@ static bool decodeLegacyPrefixedResult(csh ud, const uint8_t *code,
 	int status;
 	if (mode & CS_MODE_16)
 		status = tryLegacyPrefixedScan(code, code_len, CS_MODE_16,
-					       &instructionID, &result->length);
+					       &instructionID, &result->length,
+					       true);
 	else if (mode & CS_MODE_32)
 		status = tryLegacyPrefixedScan(code, code_len, CS_MODE_32,
-					       &instructionID, &result->length);
+					       &instructionID, &result->length,
+					       true);
 	else
 		status = tryLegacyPrefixedScan(code, code_len, CS_MODE_64,
-					       &instructionID, &result->length);
+					       &instructionID, &result->length,
+					       true);
 	if (status == X86_SCAN_NOT_HANDLED)
 		return decodeScanResultFallback(ud, code, code_len, insn,
 						result, 0, false);
@@ -3358,9 +3359,7 @@ static bool decodeLegacyPrefixedResult(csh ud, const uint8_t *code,
 }
 
 X86_DECODE_INLINE int tryVexTerminalScan(const uint8_t *code, size_t code_len,
-					 uint8_t prefix,
-					 unsigned *instructionID,
-					 uint16_t *size)
+					 uint8_t prefix, X86ScanResult *result)
 {
 	InternalInstruction insn = { 0 };
 	initializeInstructionHeader(&insn, code, code_len, CS_MODE_64);
@@ -3402,9 +3401,10 @@ X86_DECODE_INLINE int tryVexTerminalScan(const uint8_t *code, size_t code_len,
 	insn.instructionID = decode(packed, modrm);
 	if (!insn.instructionID)
 		return X86_SCAN_INVALID;
-	if (insn.instructionID >= ARR_SIZE(x86VexScanFlags))
+	if (insn.instructionID >= ARR_SIZE(x86VexScanMetadata))
 		return X86_SCAN_NOT_HANDLED;
-	const uint8_t flags = x86VexScanFlags[insn.instructionID];
+	const uint32_t metadata = x86VexScanMetadata[insn.instructionID];
+	const uint8_t flags = (uint8_t)metadata;
 	if (!flags)
 		return X86_SCAN_NOT_HANDLED;
 	if (decisionModRM || (flags & X86_VEX_SCAN_MODRM)) {
@@ -3422,8 +3422,10 @@ X86_DECODE_INLINE int tryVexTerminalScan(const uint8_t *code, size_t code_len,
 		    X86_SCAN_COMPLETE ||
 	    finishDecodedInstruction(&insn, false))
 		return X86_SCAN_INVALID;
-	*instructionID = insn.instructionID;
-	*size = (uint16_t)insn.length;
+	result->opcode = insn.instructionID;
+	result->opcode_pub = metadata >> X86_VEX_SCAN_PUBLIC_SHIFT;
+	result->length = (uint16_t)insn.length;
+	result->popcode_adjust = 0;
 	return X86_SCAN_COMPLETE;
 }
 
@@ -3436,13 +3438,11 @@ static bool decodeVexTerminalResult(csh ud, const uint8_t *code,
 				    size_t code_len, cs_insn *insn,
 				    X86ScanResult *result, uint8_t prefix)
 {
-	unsigned instructionID = 0;
-	int status = tryVexTerminalScan(code, code_len, prefix, &instructionID,
-					&result->length);
+	int status = tryVexTerminalScan(code, code_len, prefix, result);
 	if (status == X86_SCAN_NOT_HANDLED)
 		return decodeScanResultFallback(ud, code, code_len, insn,
 						result, prefix, false);
-	return completeTerminalScanResult(result, instructionID, status);
+	return status == X86_SCAN_COMPLETE;
 }
 
 X86_DECODE_INLINE bool getInstructionScanResult(csh ud, const uint8_t *code,
@@ -3465,15 +3465,15 @@ X86_DECODE_INLINE bool getInstructionScanResult(csh ud, const uint8_t *code,
 	if (!(handle->mode & (CS_MODE_16 | CS_MODE_32)))
 		status = trySimpleLegacyScan(code, code_len, CS_MODE_64, opcode,
 					     opcodeOffset, &instructionID,
-					     &result->length);
+					     &result->length, true);
 	else if (handle->mode & CS_MODE_16)
 		status = trySimpleLegacyScan(code, code_len, CS_MODE_16, opcode,
 					     opcodeOffset, &instructionID,
-					     &result->length);
+					     &result->length, true);
 	else
 		status = trySimpleLegacyScan(code, code_len, CS_MODE_32, opcode,
 					     opcodeOffset, &instructionID,
-					     &result->length);
+					     &result->length, true);
 	if (status != X86_SCAN_NOT_HANDLED)
 		return completeTerminalScanResult(result, instructionID,
 						  status);

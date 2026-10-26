@@ -114,11 +114,12 @@ CS_DECODE_INLINE void finish_x86_scan(cs_struct *handle, cs_insn *insn,
 				      bool store_bytes)
 {
 	insn->size = result->length;
-	map_insn_id(handle, insn, result->opcode);
+	if (CS_DECODE_LIKELY(result->opcode_pub))
+		insn->id = result->opcode_pub;
+	else
+		map_insn_id(handle, insn, result->opcode);
 	if (store_bytes)
 		fill_insn_without_text(insn, 0, code);
-	if (CS_DECODE_UNLIKELY(result->opcode_pub))
-		insn->id = result->opcode_pub;
 	if (!batch || insn->id != X86_INS_VCMP)
 		insn->id += result->popcode_adjust;
 }

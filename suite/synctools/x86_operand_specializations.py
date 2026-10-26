@@ -453,6 +453,71 @@ def packed_terminal_decision(first, kind, words, kinds):
     return TERMINAL_INDEXED | (kinds[kind] << tables.TYPE_SHIFT) | first
 
 
+def public_instruction_ids(suffix):
+    header = (ROOT / "include/capstone/x86.h").read_text()
+    body = header.split("typedef enum x86_insn {", 1)[1].split("} x86_insn;", 1)[0]
+    public = {}
+    value = -1
+    for name, assigned in tables.scan_entries(
+        tables.uncomment(body),
+        re.compile(r"\s*(X86_INS_\w+)(?:\s*=\s*(0x[0-9a-fA-F]+|\d+))?\s*,"),
+        "public instruction ID",
+    ):
+        value = int(assigned, 0) if assigned is not None else value + 1
+        tables.require(name not in public, "Duplicate public instruction ID")
+        public[name] = value
+    tables.require(public["X86_INS_INVALID"] == 0, "Invalid public ID changed")
+    source = (X86 / f"X86GenInstrInfo{suffix}.inc").read_text()
+    body = source.split("enum {", 1)[1].split("};", 1)[0]
+    internal = {
+        name: int(value)
+        for name, value in tables.scan_entries(
+            tables.uncomment(body),
+            re.compile(r"\s*(X86_\w+)\s*=\s*(\d+)\s*(?:,|$)"),
+            "internal instruction ID",
+        )
+    }
+    mapping = {}
+    source = tables.uncomment((X86 / f"X86MappingInsn{suffix}.inc").read_text())
+    for name, public_name in re.findall(
+        r"\{\s*(X86_\w+)\s*,\s*(X86_INS_\w+)\s*,", source
+    ):
+        uid, mapid = internal[name], public[public_name]
+        tables.require(uid not in mapping, "Duplicate mapped instruction ID")
+        tables.require(
+            0 < mapid < (1 << TERMINAL_UID_BITS), "Public ID exceeds terminal storage"
+        )
+        mapping[uid] = mapid
+    return mapping
+
+
+def emit_terminal_tables(name, words, rows, kinds):
+    lines = [f"static const uint32_t x86{name}Terminals[] = {{"]
+    lines += [
+        "\t" + ", ".join(f"0x{word:08x}u" for word in words[start : start + 8]) + ","
+        for start in range(0, len(words), 8)
+    ]
+    lines += [
+        "};",
+        f"static const uint64_t x86{name}Decisions[X86_TERMINAL_ROW_COUNT][2][256] = {{",
+    ]
+    for row_maps in rows:
+        lines.append("{")
+        for row in row_maps:
+            lines.append("{")
+            values = []
+            for first, kind in row:
+                word = packed_terminal_decision(first, kind, words, kinds)
+                values.append(f"UINT64_C(0x{word:016x})" if word else "0")
+            lines += [
+                "\t" + ", ".join(values[start : start + 4]) + ","
+                for start in range(0, 256, 4)
+            ]
+            lines.append("},")
+        lines.append("},")
+    return lines + ["};", ""]
+
+
 def scalar_terminal_form(operands, modrm):
     """Prove that checked ordinary-legacy reads produce legal scan operands.
 
@@ -707,37 +772,21 @@ def emit_terminal(suffix):
         f"#define X86_TERMINAL_OPERAND_SHIFT {TERMINAL_UID_BITS}",
         f"#define X86_TERMINAL_OPERAND_MASK 0x{(1 << TERMINAL_OPERAND_BITS) - 1:x}u",
         f"#define X86_TERMINAL_HANDLER_SHIFT {TERMINAL_HANDLER_SHIFT}",
-        "static const uint32_t x86LegacyTerminals[] = {",
+        "enum {",
     ]
-    lines += [
-        "\t" + ", ".join(f"0x{word:08x}u" for word in words[start : start + 8]) + ","
-        for start in range(0, len(words), 8)
-    ]
-    lines += ["};", "enum {"]
     lines += [f"\t{name}," for name, _, _, _ in TERMINAL_ROWS]
     lines += ["\tX86_TERMINAL_ROW_COUNT,", "};"]
+    mapping = public_instruction_ids(suffix)
+    public_words = []
+    for uid, _, handler in terminals:
+        tables.require(not uid or uid in mapping, "Unmapped scalar terminal")
+        public_words.append(packed_terminal((mapping[uid] if uid else 0, 0, handler)))
+    # Both projections retain the same decision kind, invalid entries and readers.
+    lines += emit_terminal_tables("Legacy", words, rows, kinds)
+    lines += emit_terminal_tables("LegacyPublic", public_words, rows, kinds)
     lines += [
-        "static const uint64_t x86LegacyDecisions[X86_TERMINAL_ROW_COUNT][2][256] = {"
-    ]
-    for row_maps in rows:
-        lines.append("{")
-        for row in row_maps:
-            lines.append("{")
-            values = []
-            for first, kind in row:
-                word = packed_terminal_decision(first, kind, words, kinds)
-                values.append(f"UINT64_C(0x{word:016x})" if word else "0")
-            lines += [
-                "\t" + ", ".join(values[start : start + 4]) + ","
-                for start in range(0, 256, 4)
-            ]
-            lines.append("},")
-        lines.append("},")
-    lines += [
-        "};",
-        "",
         "X86_DECODE_INLINE int decodeLegacyTerminal(struct InternalInstruction *insn,",
-        "\t\t\t\tMCInst *mcInst, uint16_t *size, uint64_t decision, bool scan)",
+        "\t\t\t\tMCInst *mcInst, uint16_t *size, uint64_t decision, bool scan, unsigned *publicID)",
         "{",
         "\tuint32_t terminal;",
         "\tif ((decision & (X86_TERMINAL_INDEXED | X86_TERMINAL_SPLIT)) && (scan ? readModRMScan(insn) : readModRM(insn)))",
@@ -757,15 +806,24 @@ def emit_terminal(suffix):
         "\t\tdefault:",
         "\t\t\treturn X86_SCAN_INVALID;",
         "\t\t}",
-        "\t\tterminal = x86LegacyTerminals[index];",
+        "\t\tterminal = publicID ? x86LegacyPublicTerminals[index] : x86LegacyTerminals[index];",
         "\t} else {",
         "\t\tunsigned int shift = (decision & X86_TERMINAL_SPLIT) && insn->modRM >= 0xc0 ?",
         "\t\t\tX86_TERMINAL_REGISTER_SHIFT : 0;",
         "\t\tterminal = (decision >> shift) & X86_TERMINAL_MASK;",
         "\t}",
-        "\tinsn->instructionID = terminal & X86_TERMINAL_UID_MASK;",
+        "\tunsigned instructionID = terminal & X86_TERMINAL_UID_MASK;",
+        "\tif (publicID) {",
+        "\t\tif (!instructionID)",
+        "\t\t\treturn X86_SCAN_INVALID;",
+        "\t\tint status = scanLegacyOperands(insn, NULL, size, terminal >> X86_TERMINAL_HANDLER_SHIFT);",
+        "\t\tif (status == X86_SCAN_COMPLETE)",
+        "\t\t\t*publicID = instructionID;",
+        "\t\treturn status;",
+        "\t}",
+        "\tinsn->instructionID = instructionID;",
         "\tinsn->spec = specifierForUID(insn->instructionID);",
-        "\tif (!insn->instructionID)",
+        "\tif (!instructionID)",
         "\t\treturn X86_SCAN_INVALID;",
         "\tif (scan)",
         "\t\treturn scanLegacyOperands(insn, mcInst, size, terminal >> X86_TERMINAL_HANDLER_SHIFT);",
@@ -907,16 +965,20 @@ def emit_vex_scan(suffix):
     )
     flags[ud1] = 0
     tables.require(all(0 <= f <= 255 for f in flags), "VEX scan flags exceed a byte")
+    mapping = public_instruction_ids(suffix)
+    metadata = [
+        f | (mapping.get(uid, 0) << 8) if f else 0 for uid, f in enumerate(flags)
+    ]
     lines = [
         f"/* {sum(bool(f) for f in flags)} admitted UIDs, {len(patterns)} immediate patterns. */",
         "enum { X86_VEX_SCAN_MEMORY = 1, X86_VEX_SCAN_REGISTER = 2,",
         "       X86_VEX_SCAN_MODRM = 4, X86_VEX_SCAN_VVVV = 8,",
-        "       X86_VEX_SCAN_PATTERN_SHIFT = 4 };",
-        "static const uint8_t x86VexScanFlags[] = {",
+        "       X86_VEX_SCAN_PATTERN_SHIFT = 4, X86_VEX_SCAN_PUBLIC_SHIFT = 8 };",
+        "static const uint32_t x86VexScanMetadata[] = {",
     ]
     lines += [
-        "\t" + ", ".join(f"0x{f:02x}" for f in flags[i : i + 16]) + ","
-        for i in range(0, len(flags), 16)
+        "\t" + ", ".join(f"0x{f:08x}u" for f in metadata[i : i + 8]) + ","
+        for i in range(0, len(metadata), 8)
     ]
     lines += [
         "};",
