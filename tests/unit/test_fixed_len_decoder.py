@@ -65,6 +65,7 @@ class CheckoutNewlines(unittest.TestCase):
             ("PowerPC", "PPC", 4, "uint64_t", "uint32_t"),
             ("Mips", "Mips", 2, "uint32_t", "uint16_t"),
             ("Mips", "Mips", 8, "uint64_t", "uint32_t"),
+            ("SystemZ", "SystemZ", 8, "uint64_t", "uint32_t"),
         ):
             with self.subTest(arch=arch, suffix=suffix):
                 with tempfile.TemporaryDirectory() as directory:

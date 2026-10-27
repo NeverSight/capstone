@@ -23,8 +23,9 @@ and controlling the decoding procedure.
 
 ### Direct decoder generation
 
-ARM, AArch64, RISC-V, LoongArch, SPARC, PowerPC and MIPS lower their generated
-decoder state machines to C branches with `suite/synctools/fixed_len_decoder.py`.
+ARM, AArch64, RISC-V, LoongArch, SPARC, PowerPC, MIPS and SystemZ lower their
+generated decoder state machines to C branches with
+`suite/synctools/fixed_len_decoder.py`.
 The existing LLVM tables
 remain the instruction authority. Lowering preserves field extraction,
 predicate order, soft failures, operand decoder calls and incomplete-decode
@@ -42,7 +43,8 @@ and runtime decoding of table parameters, without changing the public API.
 The generator records encoded table widths separately from helper suffixes
 and C input widths. PowerPC's 32-bit and prefixed 64-bit tables both use the
 64-bit `_4` helper input; MIPS halfwords use a 32-bit input, and NanoMIPS
-48-bit words use the 64-bit `_8` input. The wrappers retain those exact types
+48-bit words use the 64-bit `_8` input. SystemZ's 16-, 32- and 48-bit tables
+all use the 64-bit `_8` input. The wrappers retain those exact types
 and the original reader, table-selection order and fallback interpreter.
 
 ARM, AArch64 and RISC-V define their feature queries in the existing

@@ -50,6 +50,7 @@ class Includes(Patch):
                 "Sparc",
                 "PPC",
                 "Mips",
+                "SystemZ",
             ):
                 result += (
                     b'#include "'

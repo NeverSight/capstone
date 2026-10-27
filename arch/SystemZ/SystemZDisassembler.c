@@ -364,6 +364,7 @@ static DecodeStatus decodePC32DBLOperand(MCInst *Inst, uint64_t Imm,
 }
 
 #include "SystemZGenDisassemblerTables.inc"
+#include "SystemZGenDirectDecoder.inc"
 
 static DecodeStatus getInstruction(MCInst *MI, uint16_t *Size,
 				   const uint8_t *Bytes, size_t BytesLen,

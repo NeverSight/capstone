@@ -405,11 +405,12 @@ public:
             "PPC",
             "Mips",
             "SystemZ",
+            "ARC",
         ):
             with self.subTest(arch=arch):
                 syntax = f'#include "{arch}GenDisassemblerTables.inc"\n'.encode()
                 expected = syntax
-                if arch != "SystemZ":
+                if arch != "ARC":
                     expected += f'#include "{arch}GenDirectDecoder.inc"\n'.encode()
                 self.check_patching_result(
                     Includes(0, arch),
@@ -697,7 +698,7 @@ class TestFeatureIncludes(unittest.TestCase):
                 self.assertNotIn(b"GET_SUBTARGETINFO_ENUM", result)
 
     def test_wide_decoder_tables(self):
-        for arch in ("PPC", "Mips"):
+        for arch in ("PPC", "Mips", "SystemZ"):
             with self.subTest(arch=arch):
                 patch = Includes(0, arch)
                 patch.include_count = {}
