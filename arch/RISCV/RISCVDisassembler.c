@@ -40,9 +40,6 @@
 #include "RISCVBaseInfo.h"
 #include "RISCVMapping.h"
 
-#define GET_SUBTARGETINFO_ENUM
-#include "RISCVGenSubtargetInfo.inc"
-
 #define GET_REGINFO_ENUM
 #include "RISCVGenRegisterInfo.inc"
 

@@ -30,9 +30,7 @@
 
 #include "RISCVMapping.h"
 #include "RISCVInstPrinter.h"
-
-#define GET_SUBTARGETINFO_ENUM
-#include "RISCVGenSubtargetInfo.inc"
+#include "RISCVDisassemblerExtension.h"
 
 #define GET_INSTRINFO_ENUM
 #include "RISCVGenInstrInfo.inc"

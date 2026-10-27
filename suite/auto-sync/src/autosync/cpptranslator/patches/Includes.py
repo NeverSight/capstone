@@ -503,8 +503,6 @@ def get_RISCV_includes(filename: str) -> bytes:
                 + b'#include "../../utils.h"\n'
                 + b'#include "RISCVDisassemblerExtension.h"\n'
                 + b'#include "RISCVBaseInfo.h"\n\n'
-                + b"#define GET_SUBTARGETINFO_ENUM\n"
-                + b'#include "RISCVGenSubtargetInfo.inc"\n\n'
                 + b"#define GET_REGINFO_ENUM\n"
                 + b'#include "RISCVGenRegisterInfo.inc"\n\n'
                 + b"#define GET_INSTRINFO_ENUM\n"
@@ -514,9 +512,8 @@ def get_RISCV_includes(filename: str) -> bytes:
         case "RISCVInstPrinter.cpp":
             return (
                 b'#include "RISCVMapping.h"\n'
-                + b'#include "RISCVInstPrinter.h"\n\n'
-                + b"#define GET_SUBTARGETINFO_ENUM\n"
-                + b'#include "RISCVGenSubtargetInfo.inc"\n\n'
+                + b'#include "RISCVInstPrinter.h"\n'
+                + b'#include "RISCVDisassemblerExtension.h"\n\n'
                 + b"#define GET_INSTRINFO_ENUM\n"
                 + b'#include "RISCVGenInstrInfo.inc"\n\n'
                 + b"#define GET_REGINFO_ENUM\n"

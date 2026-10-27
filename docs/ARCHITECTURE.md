@@ -39,6 +39,13 @@ the original table include. Unrecognized table pointers retain the interpreter.
 This trades additional machine code for removal of repeated bytecode dispatch
 and runtime decoding of table parameters, without changing the public API.
 
+ARM, AArch64 and RISC-V define their feature queries in the existing
+disassembler extension headers. Constant feature numbers can then fold into
+mode-bit checks at decoder and printer call sites. Each extension source emits
+the external definition from that same body; the enabled-feature policy and
+mode changes remain unchanged. The RISC-V extension header owns its generated
+feature enum include, including after Auto-Sync regeneration.
+
 ### Operand postprocessing
 
 AArch64 projects descriptor requirements with

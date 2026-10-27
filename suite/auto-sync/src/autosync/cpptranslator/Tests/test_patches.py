@@ -645,3 +645,27 @@ public:
         self.check_patching_result(
             patch, syntax, b'CS_ASSERT(0 && "Unknown condition code passed");'
         )
+
+
+class TestFeatureIncludes(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        from tree_sitter import Language, Parser
+        import tree_sitter_cpp
+
+        cls.parser = Parser(Language(tree_sitter_cpp.language()))
+
+    def test_riscv_feature_enum_owner(self):
+        for filename in ("RISCVDisassembler.cpp", "RISCVInstPrinter.cpp"):
+            with self.subTest(filename=filename):
+                patch = Includes(0, "RISCV")
+                patch.include_count = {}
+                syntax = b'#include "some_llvm_header.h"'
+                tree = self.parser.parse(syntax)
+                result = patch.get_patch(
+                    [(tree.root_node.children[0], "preproc_include")],
+                    syntax,
+                    filename=filename,
+                )
+                self.assertIn(b'#include "RISCVDisassemblerExtension.h"', result)
+                self.assertNotIn(b"GET_SUBTARGETINFO_ENUM", result)
