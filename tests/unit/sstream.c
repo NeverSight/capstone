@@ -707,6 +707,43 @@ bool test_replc()
 	return true;
 }
 
+static bool test_replc_str_edges(void)
+{
+	printf("Test test_replc_str_edges\n");
+	SStream OS;
+	SStream_Init(&OS);
+	SStream_concat0(&OS, "ABCD");
+	SStream_replc_str(&OS, 'B', "");
+	CHECK_OS_EQUAL_RET_FALSE(OS, "ACD");
+	CHECK_INT_EQUAL_RET_FALSE(OS.index, 3);
+
+	SStream_Init(&OS);
+	SStream_concat0(&OS, "ABCD");
+	SStream_replc(&OS, 'B', '\0');
+	SStream_replc_str(&OS, '\0', "X");
+	CHECK_OS_EQUAL_RET_FALSE(OS, "AX");
+	CHECK_INT_EQUAL_RET_FALSE(OS.index, 2);
+
+	SStream_Init(&OS);
+	SStream_concat0(&OS, "ABCDEFG");
+	SStream_replc_str(&OS, 'A', OS.buffer + 4);
+	CHECK_OS_EQUAL_RET_FALSE(OS, "EFGBCDEFG");
+	CHECK_INT_EQUAL_RET_FALSE(OS.index, 9);
+
+	char almost_full[SSTREAM_BUF_LEN] = { 0 };
+	memset(almost_full, 'A', SSTREAM_BUF_LEN - 2);
+	SStream_Init(&OS);
+	SStream_concat0(&OS, almost_full);
+	SStream_replc_str(&OS, '\0', "XY");
+	CHECK_OS_EQUAL_RET_FALSE(OS, almost_full);
+	CHECK_INT_EQUAL_RET_FALSE(OS.index, SSTREAM_BUF_LEN - 2);
+	SStream_replc_str(&OS, '\0', "X");
+	almost_full[SSTREAM_BUF_LEN - 2] = 'X';
+	CHECK_OS_EQUAL_RET_FALSE(OS, almost_full);
+	CHECK_INT_EQUAL_RET_FALSE(OS.index, SSTREAM_BUF_LEN - 1);
+	return true;
+}
+
 bool test_replc_str()
 {
 	printf("Test test_replc_str\n");
@@ -865,6 +902,7 @@ int main()
 	result &= test_stream_unsigned_imm();
 	result &= test_replc();
 	result &= test_replc_str();
+	result &= test_replc_str_edges();
 	result &= test_printfFloat();
 	result &= test_copy_mnem_opstr();
 	result &= test_trimls();

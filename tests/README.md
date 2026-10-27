@@ -39,6 +39,9 @@ modes. Cases include grouped opcodes, size prefixes and invalid ModR/M forms.
 `unit_sstream` covers bounded token appends, including truncation, markup,
 self-appends and a source immediately preceding the stream. Such a source can
 end at the first output byte, so its length must be determined before writing.
+String replacement checks include empty replacements, appending at an earlier
+terminator, replacement text borrowed from the stream, and the final-byte
+capacity boundary.
 
 ### Testing tools and usage
 

@@ -105,6 +105,8 @@ const char *SStream_replc(const SStream *ss, char elem, char repl)
 
 /// Searches in the stream for the first (from the left) occurrence of @chr and replaces
 /// it with @rstr.
+/// Replacing '\0' appends the string. If the result does not fit, the stream is
+/// unchanged. The replacement may refer to the stream's buffer.
 void SStream_replc_str(SStream *ss, char chr, const char *rstr)
 {
 	assert(ss && rstr);
@@ -112,15 +114,25 @@ void SStream_replc_str(SStream *ss, char chr, const char *rstr)
 	if (!found || found == ss->buffer + (SSTREAM_BUF_LEN - 1)) {
 		return;
 	}
-	size_t post_len = strlen(found + 1);
 	size_t buf_str_len = strlen(ss->buffer);
+	size_t prefix_len = (size_t)(found - ss->buffer);
+	size_t removed = *found != '\0';
 	size_t repl_len = strlen(rstr);
-	if (repl_len - 1 + buf_str_len >= SSTREAM_BUF_LEN) {
+	size_t kept_len = buf_str_len - removed;
+	if (repl_len > SSTREAM_BUF_LEN - 1 - kept_len) {
 		return;
 	}
-	memmove(found + repl_len, found + 1, post_len);
+
+	// The suffix move may overwrite a replacement borrowed from this stream.
+	char saved[SSTREAM_BUF_LEN];
+	if ((uintptr_t)rstr - (uintptr_t)ss->buffer < sizeof(ss->buffer)) {
+		memcpy(saved, rstr, repl_len);
+		rstr = saved;
+	}
+	size_t post_len = buf_str_len - prefix_len - removed;
+	memmove(found + repl_len, found + removed, post_len + 1);
 	memcpy(found, rstr, repl_len);
-	ss->index = strlen(ss->buffer);
+	ss->index = kept_len + repl_len;
 }
 
 /// Removes the space characters '\t' and ' ' from the beginning of the stream buffer.
