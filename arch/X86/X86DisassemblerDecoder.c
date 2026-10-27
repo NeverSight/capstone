@@ -527,8 +527,8 @@ X86_DECODE_INLINE PrefixReadStatus readPrefixes(struct InternalInstruction *insn
 		if (offset)
 			insn->rexPrefix = insn->code[0];
 		insn->readerCursor = offset + 1;
-		if ((feature_prefix_flags[byte] & FEATURE_ESCAPE) ||
-		    byte == 0xc5 || byte == 0x8f)
+		if (feature_prefix_flags[byte] &
+		    (FEATURE_ESCAPE | FEATURE_VEX2_XOP))
 			goto legacyPrefixesRead;
 		return readSimpleLegacyPrefix(insn, offset);
 	}
@@ -3067,10 +3067,10 @@ X86_DECODE_INLINE int trySimpleLegacyScan(const uint8_t *code, size_t codeSize,
 	InternalInstruction insn = { 0 };
 	initializeInstructionHeader(&insn, code, codeSize, mode);
 	const uint8_t prefixMask =
-		FEATURE_LEGACY_PREFIX | FEATURE_ESCAPE |
+		FEATURE_LEGACY_PREFIX | FEATURE_ESCAPE | FEATURE_VEX2_XOP |
 		(insn.mode == MODE_64BIT ? FEATURE_REX_PREFIX : 0);
-	if ((feature_prefix_flags[opcode] & prefixMask) || opcode == 0xc5 ||
-	    opcode == 0x8f || (opcodeOffset && !isREX(&insn, code[0])))
+	if ((feature_prefix_flags[opcode] & prefixMask) ||
+	    (opcodeOffset && !isREX(&insn, code[0])))
 		return X86_SCAN_NOT_HANDLED;
 	readSimpleLegacyPrefix(&insn, opcodeOffset);
 	int opcodeResult = readOpcode(&insn, true, true);
@@ -3142,9 +3142,8 @@ tryLegacyPrefixedScan(const uint8_t *code, size_t code_len, cs_mode mode,
 		return X86_SCAN_NOT_HANDLED;
 	const uint8_t opcode = code[offset];
 	if ((feature_prefix_flags[opcode] &
-	     (FEATURE_LEGACY_PREFIX | FEATURE_ESCAPE |
-	      (insn.mode == MODE_64BIT ? FEATURE_REX_PREFIX : 0))) ||
-	    opcode == 0xc5 || opcode == 0x8f)
+	     (FEATURE_LEGACY_PREFIX | FEATURE_ESCAPE | FEATURE_VEX2_XOP |
+	      (insn.mode == MODE_64BIT ? FEATURE_REX_PREFIX : 0))))
 		return X86_SCAN_NOT_HANDLED;
 	if (guardExtensions && opcode == 0x0f &&
 	    may_be_0f_feature_extension(code + offset + 1,

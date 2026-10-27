@@ -348,6 +348,15 @@ a generated invalid terminal can reject them. Mixed mode flags retain the
 original extension-selector ordering because its CS_MODE_64 test differs from
 the raw decoder's 16/32-bit priority.
 
+The shared byte classifier includes the C5 and 8F headers in compact legacy
+exclusions, so admission uses one mask. Their existing prefix and extension
+routes retain the same precedence.
+
+The public iterator selects a terminal from a bounded ModR/M peek before the
+shared reader consumes SIB and displacement bytes. The complete reader still
+runs before invalid-ID rejection. Native batches retain their original read
+order, and both interfaces share the same generated decisions and operands.
+
 The public iterator completes an admitted terminal through the shared output
 helper before joining fallback result handling. This keeps its public ID,
 length and zero alias adjustment separate from the result object passed by

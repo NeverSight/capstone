@@ -5469,8 +5469,16 @@ X86_DECODE_INLINE int decodeLegacyTerminal(struct InternalInstruction *insn,
 				MCInst *mcInst, uint16_t *size, uint64_t decision, bool scan, unsigned *publicID, bool readerFlags)
 {
 	uint32_t terminal;
-	if ((decision & (X86_TERMINAL_INDEXED | X86_TERMINAL_SPLIT)) && (scan ? readModRMScan(insn) : readModRM(insn)))
-		return X86_SCAN_INVALID;
+	const bool decisionModRM = (decision & (X86_TERMINAL_INDEXED | X86_TERMINAL_SPLIT)) != 0;
+	if (decisionModRM) {
+		if (publicID && readerFlags) {
+			/* Select the public descriptor before consuming its addressing bytes. */
+			if (!insn->consumedModRM && lookAtByte(insn, &insn->modRM))
+				return X86_SCAN_INVALID;
+		} else if (scan ? readModRMScan(insn) : readModRM(insn)) {
+			return X86_SCAN_INVALID;
+		}
+	}
 	if (decision & X86_TERMINAL_INDEXED) {
 		unsigned int index = decision & X86_DECISION_OFFSET_MASK;
 		switch ((decision >> X86_DECISION_TYPE_SHIFT) & X86_DECISION_TYPE_MASK) {
@@ -5494,6 +5502,9 @@ X86_DECODE_INLINE int decodeLegacyTerminal(struct InternalInstruction *insn,
 	}
 	unsigned instructionID = terminal & X86_TERMINAL_UID_MASK;
 	if (publicID) {
+		/* Retain the original reader before invalid-ID rejection, including truncation. */
+		if (readerFlags && decisionModRM && readModRMScan(insn))
+			return X86_SCAN_INVALID;
 		if (!instructionID)
 			return X86_SCAN_INVALID;
 		int status = readerFlags ?
@@ -11183,8 +11194,16 @@ X86_DECODE_INLINE int decodeLegacyTerminal(struct InternalInstruction *insn,
 				MCInst *mcInst, uint16_t *size, uint64_t decision, bool scan, unsigned *publicID, bool readerFlags)
 {
 	uint32_t terminal;
-	if ((decision & (X86_TERMINAL_INDEXED | X86_TERMINAL_SPLIT)) && (scan ? readModRMScan(insn) : readModRM(insn)))
-		return X86_SCAN_INVALID;
+	const bool decisionModRM = (decision & (X86_TERMINAL_INDEXED | X86_TERMINAL_SPLIT)) != 0;
+	if (decisionModRM) {
+		if (publicID && readerFlags) {
+			/* Select the public descriptor before consuming its addressing bytes. */
+			if (!insn->consumedModRM && lookAtByte(insn, &insn->modRM))
+				return X86_SCAN_INVALID;
+		} else if (scan ? readModRMScan(insn) : readModRM(insn)) {
+			return X86_SCAN_INVALID;
+		}
+	}
 	if (decision & X86_TERMINAL_INDEXED) {
 		unsigned int index = decision & X86_DECISION_OFFSET_MASK;
 		switch ((decision >> X86_DECISION_TYPE_SHIFT) & X86_DECISION_TYPE_MASK) {
@@ -11208,6 +11227,9 @@ X86_DECODE_INLINE int decodeLegacyTerminal(struct InternalInstruction *insn,
 	}
 	unsigned instructionID = terminal & X86_TERMINAL_UID_MASK;
 	if (publicID) {
+		/* Retain the original reader before invalid-ID rejection, including truncation. */
+		if (readerFlags && decisionModRM && readModRMScan(insn))
+			return X86_SCAN_INVALID;
 		if (!instructionID)
 			return X86_SCAN_INVALID;
 		int status = readerFlags ?
