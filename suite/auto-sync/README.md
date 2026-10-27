@@ -104,6 +104,11 @@ SystemZ's shared 64-bit input for all three instruction lengths. Xtensa's
 table calls share the generated 64-bit `_3` helper; the translator preserves
 that choice instead of inferring a helper suffix from the encoded width.
 
+After changing `X86ImmSize.inc` or either `X86GenInstrInfo*.inc` enum, run
+`python3 suite/synctools/x86_immediate_sizes.py`, then run it with `--check`.
+The generated immediate-size lookup preserves the original metadata and uses
+the separate opcode numbering of full and reduced builds.
+
 
 ## Post-processing steps
 

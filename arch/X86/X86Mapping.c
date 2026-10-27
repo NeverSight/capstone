@@ -11720,53 +11720,16 @@ void X86_reg_access(const cs_insn *insn, cs_regs regs_read,
 }
 #endif
 
-// map immediate size to instruction id
-// this array is sorted for binary searching
-static const struct size_id {
-	uint8_t enc_size;
-	uint8_t size;
-	uint16_t id;
-} x86_imm_size[] = {
-#include "X86ImmSize.inc"
-};
+// Generated from X86ImmSize.inc for the full and reduced instruction enums.
+#include "X86GenImmSize.inc"
 
-// given the instruction name, return the size of its immediate operand (or 0)
+// Return the immediate operand size and its encoded size, or zero if absent.
 uint8_t X86_immediate_size(unsigned int id, uint8_t *enc_size)
 {
+	uint8_t packed = id < ARR_SIZE(x86_imm_sizes) ? x86_imm_sizes[id] : 0;
 	if (enc_size != NULL)
-		*enc_size = 0;
-
-	// binary searching since the IDs are sorted in order
-	unsigned int left, right, m;
-
-	right = ARR_SIZE(x86_imm_size) - 1;
-
-	if (id < x86_imm_size[0].id || id > x86_imm_size[right].id)
-		// not found
-		return 0;
-
-	left = 0;
-
-	while (left <= right) {
-		m = (left + right) / 2;
-		if (id == x86_imm_size[m].id) {
-			if (enc_size != NULL)
-				*enc_size = x86_imm_size[m].enc_size;
-
-			return x86_imm_size[m].size;
-		}
-
-		if (id > x86_imm_size[m].id)
-			left = m + 1;
-		else {
-			if (m == 0)
-				break;
-			right = m - 1;
-		}
-	}
-
-	// not found
-	return 0;
+		*enc_size = packed >> 4;
+	return packed & 15;
 }
 
 #define GET_REGINFO_ENUM

@@ -36,6 +36,11 @@ flags), bounded output against iteration, and explicit
 public IDs against the iterator and allocated-array API in all three bitness
 modes. Cases include grouped opcodes, size prefixes and invalid ModR/M forms.
 
+`unit_x86_immediate_size` compares both immediate sizes against the original
+metadata for every 16-bit opcode ID, holes and larger unknown IDs. It checks
+both optional-output forms in full and reduced builds. The generator check
+detects stale indices after either instruction enum or the metadata changes.
+
 `unit_sstream` covers bounded token appends, including truncation, markup,
 self-appends and a source immediately preceding the stream. Such a source can
 end at the first output byte, so its length must be determined before writing.

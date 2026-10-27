@@ -45,13 +45,15 @@ if(CAPSTONE_AARCH64_SUPPORT)
     endif()
 endif()
 if(CAPSTONE_X86_SUPPORT)
-    list(APPEND UNIT_TEST_SOURCES x86_scan_batch.c x86_call_target.c)
+    list(APPEND UNIT_TEST_SOURCES x86_scan_batch.c x86_call_target.c x86_immediate_size.c)
     find_package(Python3 3.8 COMPONENTS Interpreter QUIET)
     if(Python3_Interpreter_FOUND)
         add_test(NAME unit_x86_operand_specializations
             COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/suite/synctools/x86_operand_specializations.py" --check)
         add_test(NAME unit_x86_disassembler_tables
             COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/suite/synctools/x86_disassembler_tables.py" --check)
+        add_test(NAME unit_x86_immediate_sizes_generator
+            COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/suite/synctools/x86_immediate_sizes.py" --check)
     endif()
     list(APPEND UNIT_TEST_SOURCES x86_far_immediate_encoding.c)
     list(APPEND UNIT_TEST_SOURCES x86_buffer_bounds.c)
