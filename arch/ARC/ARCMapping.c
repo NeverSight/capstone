@@ -43,9 +43,11 @@ void ARC_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
 	// Not used by ARC. Information is set after disassembly.
 }
 
+#ifndef CAPSTONE_DIET
 static const char *const insn_name_maps[] = {
 #include "ARCGenCSMappingInsnName.inc"
 };
+#endif
 
 const char *ARC_insn_name(csh handle, unsigned int id)
 {
@@ -177,9 +179,11 @@ void ARC_init_cs_detail(MCInst *MI)
 		ARC_setup_op(&ARC_get_detail(MI)->operands[i]);
 }
 
+#ifndef CAPSTONE_DIET
 static const map_insn_ops insn_operands[] = {
 #include "ARCGenCSMappingInsnOp.inc"
 };
+#endif
 
 void ARC_set_detail_op_imm(MCInst *MI, unsigned OpNum, arc_op_type ImmType,
 			   int64_t Imm)

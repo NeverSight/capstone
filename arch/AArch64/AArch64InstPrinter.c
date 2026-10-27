@@ -58,9 +58,11 @@
 // are also defined in the ARM module.
 // If they are not static, we fail during linking.
 
+#ifndef CAPSTONE_DIET
 static void printCustomAliasOperand(MCInst *MI, uint64_t Address,
 				    unsigned OpIdx, unsigned PrintMethodIdx,
 				    SStream *OS);
+#endif
 
 static void printFPImmOperand(MCInst *MI, unsigned OpNum, SStream *O);
 

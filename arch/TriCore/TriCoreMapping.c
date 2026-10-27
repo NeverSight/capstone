@@ -18,6 +18,7 @@
 
 #include "TriCoreGenInstrInfo.inc"
 
+#ifndef CAPSTONE_DIET
 static const name_map group_name_maps[] = {
 	{ TRICORE_GRP_INVALID, "invalid" },
 	{ TRICORE_GRP_CALL, "call" },
@@ -40,13 +41,10 @@ static const char *const insn_names[] = {
 // special alias insn
 static const name_map alias_insn_names[] = { { 0, NULL } };
 
-#ifndef CAPSTONE_DIET
 static const tricore_reg flag_regs[] = { TRICORE_REG_PSW };
-#endif // CAPSTONE_DIET
 
 static inline void check_updates_flags(MCInst *MI)
 {
-#ifndef CAPSTONE_DIET
 	if (!detail_is_set(MI)) {
 		return;
 	}
@@ -63,8 +61,8 @@ static inline void check_updates_flags(MCInst *MI)
 			}
 		}
 	}
-#endif // CAPSTONE_DIET
 }
+#endif // CAPSTONE_DIET
 
 static void set_instr_map_data(MCInst *MI)
 {

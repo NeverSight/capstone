@@ -35,17 +35,24 @@ pip install -e .
 
 #### Clone Capstones LLVM fork and build `llvm-tblgen`
 
+The NeverSight generator branch carries the Capstone emitters and their DIET
+fixes. Use this source branch when regenerating this fork's tables:
+
 ```bash
-git clone https://github.com/capstone-engine/llvm-capstone <capstone-root>/suite/auto-sync/vendor/llvm_root/
-cd <capstone-root>/suite/auto-sync/vendor/llvm_root/llvm-capstone
-git checkout auto-sync
+git clone --single-branch --branch codex/capstone-diet-generator https://github.com/NeverSight/llvm-project.git <capstone-root>/suite/auto-sync/vendor/llvm_root/
+cd <capstone-root>/suite/auto-sync/vendor/llvm_root/
 mkdir build
 cd build
-# You can also build the "Release" version
-cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug ../llvm
-cmake --build . --target llvm-tblgen --config Debug
+cmake -G Ninja -DCMAKE_BUILD_TYPE=Release ../llvm
+cmake --build . --target llvm-tblgen --config Release
 cd <capstone-root>/suite/auto-sync/
 ```
+
+Alias printing helpers and operand predicate helpers must be excluded as whole
+functions in DIET builds, including their declarations. An alias printer with
+no aliases must still return `false`. The TableGen regression is
+`llvm/test/TableGen/AsmWriterCapstoneDiet.td`; the C++ translator's class
+declaration test covers the corresponding forward declarations.
 
 #### Install `llvm-mc` and `FileCheck`
 

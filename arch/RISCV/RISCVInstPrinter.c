@@ -52,9 +52,11 @@
 
 #define DEBUG_TYPE "asm-printer"
 
+#ifndef CAPSTONE_DIET
 static void printCustomAliasOperand(MCInst *MI, uint64_t Address,
 				    unsigned OpIdx, unsigned PrintMethodIdx,
 				    SStream *OS);
+#endif
 static inline void printRegName(SStream *O, MCRegister Reg);
 static inline void printOperand(MCInst *MI, unsigned OpNo, SStream *O);
 // Include the auto-generated portion of the assembly writer.

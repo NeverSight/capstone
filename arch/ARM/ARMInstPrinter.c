@@ -867,6 +867,7 @@ printMandatoryRestrictedPredicateOperand(MCInst *MI, unsigned OpNum, SStream *O)
 		printMandatoryPredicateOperand(MI, OpNum, O);
 }
 
+#ifndef CAPSTONE_DIET
 static inline void
 printMandatoryInvertedPredicateOperand(MCInst *MI, unsigned OpNum, SStream *O)
 {
@@ -876,6 +877,7 @@ printMandatoryInvertedPredicateOperand(MCInst *MI, unsigned OpNum, SStream *O)
 		MCInst_getOperand(MI, (OpNum)));
 	SStream_concat0(O, ARMCondCodeToString(ARMCC_getOppositeCondition(CC)));
 }
+#endif
 
 static inline void printNoHashImmediate(MCInst *MI, unsigned OpNum, SStream *O)
 {

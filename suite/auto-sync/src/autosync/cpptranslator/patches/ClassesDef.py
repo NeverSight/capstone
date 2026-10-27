@@ -46,5 +46,10 @@ class ClassesDef(Patch):
                 functions.append(field_decl)
         fcn_decl_text = b""
         for f in functions:
-            fcn_decl_text += get_text(src, f.start_byte, f.end_byte) + b"\n"
+            declaration = get_text(src, f.start_byte, f.end_byte) + b"\n"
+            if f.type == "field_declaration" and re.search(
+                rb"\bprintCustomAliasOperand\s*\(", declaration
+            ):
+                declaration = b"#ifndef CAPSTONE_DIET\n" + declaration + b"#endif\n"
+            fcn_decl_text += declaration
         return fcn_decl_text

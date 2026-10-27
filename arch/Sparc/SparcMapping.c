@@ -197,18 +197,16 @@ void Sparc_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
 	// Not used by Sparc. Information is set after disassembly.
 }
 
+#ifndef CAPSTONE_DIET
 static const char *const insn_name_maps[] = {
 #include "SparcGenCSMappingInsnName.inc"
 };
 
-#ifndef CAPSTONE_DIET
 static const name_map insn_alias_mnem_map[] = {
 #include "SparcGenCSAliasMnemMap.inc"
 	{ SPARC_INS_ALIAS_CALL, "call" },
 	{ SPARC_INS_ALIAS_END, NULL },
 };
-#endif
-
 static void insert_op(MCInst *MI, unsigned index, cs_sparc_op op)
 {
 	if (!detail_is_set(MI)) {
@@ -292,6 +290,8 @@ static void Sparc_correct_details(MCInst *MI)
 	}
 }
 
+#endif
+
 void Sparc_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
 {
 	MCRegisterInfo *MRI = (MCRegisterInfo *)info;
@@ -353,9 +353,11 @@ const char *Sparc_group_name(csh handle, unsigned int id)
 #endif
 }
 
+#ifndef CAPSTONE_DIET
 static const map_insn_ops insn_operands[] = {
 #include "SparcGenCSMappingInsnOp.inc"
 };
+#endif
 
 void Sparc_set_detail_op_imm(MCInst *MI, unsigned OpNum, sparc_op_type ImmType,
 			     int64_t Imm)

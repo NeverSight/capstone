@@ -103,9 +103,11 @@ static const char *MipsFCCToString(Mips_CondCode CC);
 static const char *getRegisterName(unsigned RegNo);
 static void printInstruction(MCInst *MI, uint64_t Address, SStream *O);
 static bool printAliasInstr(MCInst *MI, uint64_t Address, SStream *OS);
+#ifndef CAPSTONE_DIET
 static void printCustomAliasOperand(MCInst *MI, uint64_t Address,
 				    unsigned OpIdx, unsigned PrintMethodIdx,
 				    SStream *O);
+#endif
 static void printOperand(MCInst *MI, unsigned OpNo, SStream *O);
 static void printJumpOperand(MCInst *MI, unsigned OpNo, SStream *O);
 static void printBranchOperand(MCInst *MI, uint64_t Address, unsigned OpNo,

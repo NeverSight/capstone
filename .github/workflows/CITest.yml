@@ -30,6 +30,28 @@ env:
   MSAN_OPTIONS: "halt_on_error=1:abort_on_error=1:print_summary=1:print_stacktrace=1"
 
 jobs:
+  DIETBuild:
+    runs-on: ubuntu-24.04
+    name: DIET Release (${{ matrix.compiler }})
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, clang]
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build all DIET backends with warnings as errors
+        run: |
+          cmake -S . -B build-diet \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=${{ matrix.compiler }} \
+            -DCAPSTONE_BUILD_DIET=ON \
+            -DCAPSTONE_BUILD_SHARED_LIBS=ON \
+            -DCAPSTONE_BUILD_STATIC_LIBS=ON \
+            -DCAPSTONE_BUILD_CSTEST=OFF \
+            -DCAPSTONE_BUILD_LEGACY_TESTS=OFF \
+            -DCAPSTONE_BUILD_CSTOOL=OFF
+          cmake --build build-diet --target capstone_shared capstone_static --parallel 2
+
   Linux:
     runs-on: ${{ matrix.config.os }}
     name: ${{ matrix.config.name }}

@@ -38,6 +38,17 @@ modes. Cases include grouped opcodes, size prefixes and invalid ModR/M forms.
 
 ### Testing tools and usage
 
+The CI DIET jobs build every backend in Release with GCC and Clang and retain
+the normal warning-as-error flags. To reproduce the library build locally:
+
+```bash
+cmake -S . -B build-diet -DCMAKE_BUILD_TYPE=Release \
+  -DCAPSTONE_BUILD_DIET=ON -DCAPSTONE_BUILD_SHARED_LIBS=ON \
+  -DCAPSTONE_BUILD_STATIC_LIBS=ON -DCAPSTONE_BUILD_CSTEST=OFF \
+  -DCAPSTONE_BUILD_LEGACY_TESTS=OFF -DCAPSTONE_BUILD_CSTOOL=OFF
+cmake --build build-diet --target capstone_shared capstone_static
+```
+
 #### `cstest`
 
 `cstest` is the testing tool written in C. It is implemented in `suite/cstest/`

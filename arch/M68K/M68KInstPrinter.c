@@ -624,8 +624,6 @@ static void printPackedMoveDestination(SStream *O, uint32_t pc,
 	SStream_concat0(O, "}");
 }
 
-#endif
-
 static void printOpSize(SStream *O, const cs_m68k *ext)
 {
 	switch (ext->op_size.type) {
@@ -666,6 +664,8 @@ static void printOpSize(SStream *O, const cs_m68k *ext)
 		break;
 	}
 }
+
+#endif
 
 void M68K_printInst(MCInst *MI, SStream *O, void *PrinterInfo)
 {

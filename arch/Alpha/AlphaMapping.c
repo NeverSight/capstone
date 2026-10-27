@@ -26,9 +26,11 @@ static const insn_map insns[] = {
 const insn_map *Alpha_insns = insns;
 const unsigned int Alpha_insn_count = ARR_SIZE(insns);
 
+#ifndef CAPSTONE_DIET
 static const map_insn_ops insn_operands[] = {
 #include "AlphaGenCSMappingInsnOp.inc"
 };
+#endif
 
 void Alpha_init_cs_detail(MCInst *MI)
 {

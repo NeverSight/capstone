@@ -164,6 +164,23 @@ class TestPatches(unittest.TestCase):
         syntax = b"Check(S, functions())"
         self.check_patching_result(patch, syntax, b"Check(&S, functions())")
 
+    def test_classesdef_alias_diet(self):
+        patch = ClassesDef(0)
+        syntax = b"""class InstPrinter {
+public:
+  void printCustomAliasOperand(const MCInst *MI, unsigned OpIdx) const;
+  void printOperand(const MCInst *MI, unsigned OpIdx) const;
+};
+"""
+        self.check_patching_result(
+            patch,
+            syntax,
+            b"#ifndef CAPSTONE_DIET\n"
+            b"void printCustomAliasOperand(const MCInst *MI, unsigned OpIdx) const;\n"
+            b"#endif\n"
+            b"void printOperand(const MCInst *MI, unsigned OpIdx) const;\n",
+        )
+
     def test_classesdef(self):
         patch = ClassesDef(0)
         syntax = b"""class AArch64Disassembler : public MCDisassembler {

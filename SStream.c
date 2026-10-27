@@ -18,6 +18,7 @@
 #include "cs_priv.h"
 #include "utils.h"
 
+#ifndef CAPSTONE_DIET
 static size_t SStream_remaining(SStream *ss)
 {
 	assert(ss);
@@ -58,6 +59,7 @@ static void SStream_close_markup(SStream *ss)
 		SStream_concat1_raw(ss, '>');
 	}
 }
+#endif
 
 void SStream_Init(SStream *ss)
 {

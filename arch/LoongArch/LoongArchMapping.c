@@ -52,11 +52,11 @@ void LoongArch_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
 	// Not used by LoongArch. Information is set after disassembly.
 }
 
+#ifndef CAPSTONE_DIET
 static const char *const insn_name_maps[] = {
 #include "LoongArchGenCSMappingInsnName.inc"
 };
 
-#ifndef CAPSTONE_DIET
 static const name_map insn_alias_mnem_map[] = {
 #include "LoongArchGenCSAliasMnemMap.inc"
 	{ LOONGARCH_INS_ALIAS_END, NULL },
@@ -506,9 +506,11 @@ void LoongArch_init_cs_detail(MCInst *MI)
 	}
 }
 
+#ifndef CAPSTONE_DIET
 static const map_insn_ops insn_operands[] = {
 #include "LoongArchGenCSMappingInsnOp.inc"
 };
+#endif
 
 void LoongArch_set_detail_op_imm(MCInst *MI, unsigned OpNum,
 				 loongarch_op_type ImmType, int64_t Imm)

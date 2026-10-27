@@ -42,9 +42,11 @@
 
 #define DEBUG_TYPE "asm-printer"
 
+#ifndef CAPSTONE_DIET
 static void printCustomAliasOperand(MCInst *MI, uint64_t Address,
 				    unsigned OpIdx, unsigned PrintMethodIdx,
 				    SStream *OS);
+#endif
 static void printOperand(MCInst *MI, int opNum, SStream *O);
 
 #define GET_INSTRUCTION_NAME

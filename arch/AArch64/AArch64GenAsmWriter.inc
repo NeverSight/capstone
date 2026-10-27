@@ -22359,8 +22359,10 @@ getRegisterName(unsigned RegNo, unsigned AltIdx) {
 #ifdef PRINT_ALIAS_INSTR
 #undef PRINT_ALIAS_INSTR
 
+#ifndef CAPSTONE_DIET
 static bool AArch64InstPrinterValidateMCOperand(const MCOperand *MCOp,
                   unsigned PredicateIndex);
+#endif // CAPSTONE_DIET
 static bool printAliasInstr(MCInst *MI, uint64_t Address, SStream *OS) {
 #ifndef CAPSTONE_DIET
   static const PatternsForOpcode OpToPatterns[] = {
@@ -34605,11 +34607,11 @@ static bool printAliasInstr(MCInst *MI, uint64_t Address, SStream *OS) {
 #endif // CAPSTONE_DIET
 }
 
+#ifndef CAPSTONE_DIET
 static void printCustomAliasOperand(
          MCInst *MI, uint64_t Address, unsigned OpIdx,
          unsigned PrintMethodIdx,
          SStream *OS) {
-#ifndef CAPSTONE_DIET
   switch (PrintMethodIdx) {
   default:
     CS_ASSERT_RET(0 && "Unknown PrintMethod kind");
@@ -34804,9 +34806,10 @@ static void printCustomAliasOperand(
     printSysCROperand(MI, OpIdx, OS);
     break;
   }
-#endif // CAPSTONE_DIET
 }
+#endif // CAPSTONE_DIET
 
+#ifndef CAPSTONE_DIET
 static bool AArch64InstPrinterValidateMCOperand(const MCOperand *MCOp,
                   unsigned PredicateIndex) {
   switch (PredicateIndex) {
@@ -34890,5 +34893,6 @@ static bool AArch64InstPrinterValidateMCOperand(const MCOperand *MCOp,
     }
   }
 }
+#endif // CAPSTONE_DIET
 
 #endif // PRINT_ALIAS_INSTR
