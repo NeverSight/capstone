@@ -25,6 +25,21 @@
 #define GET_INSTRINFO_ENUM
 #include "MipsGenInstrInfo.inc"
 
+unsigned Mips_getRegisterListCount(const MCInst *MI)
+{
+	switch (MCInst_getOpcode(MI)) {
+	case Mips_SWM32_MM:
+	case Mips_LWM32_MM:
+	case Mips_SWM16_MM:
+	case Mips_SWM16_MMR6:
+	case Mips_LWM16_MM:
+	case Mips_LWM16_MMR6:
+		return MCInst_getNumOperands(MI) - 2;
+	default:
+		return 0;
+	}
+}
+
 void Mips_init_mri(MCRegisterInfo *MRI)
 {
 	MCRegisterInfo_InitMCRegisterInfo(MRI, MipsRegDesc, sizeof(MipsRegDesc),
@@ -244,18 +259,40 @@ static const map_insn_ops insn_operands[] = {
 #include "MipsGenCSMappingInsnOp.inc"
 };
 
+#ifndef CAPSTONE_DIET
+static unsigned Mips_map_op_index(const MCInst *MI, unsigned OpNum)
+{
+	unsigned count = Mips_getRegisterListCount(MI);
+	if (!count)
+		return OpNum;
+	// The descriptor has one list operand followed by base and displacement.
+	return OpNum < count ? 0 : OpNum - count + 1;
+}
+
+#endif
+
+static cs_op_type Mips_map_op_type(MCInst *MI, unsigned OpNum)
+{
+	return map_get_op_type(MI, Mips_map_op_index(MI, OpNum));
+}
+
+static cs_ac_type Mips_map_op_access(MCInst *MI, unsigned OpNum)
+{
+	return map_get_op_access(MI, Mips_map_op_index(MI, OpNum));
+}
+
 static void Mips_set_detail_op_mem_reg(MCInst *MI, unsigned OpNum, mips_reg Reg)
 {
 	Mips_get_detail_op(MI, 0)->type = MIPS_OP_MEM;
 	Mips_get_detail_op(MI, 0)->mem.base = Reg;
-	Mips_get_detail_op(MI, 0)->access = map_get_op_access(MI, OpNum);
+	Mips_get_detail_op(MI, 0)->access = Mips_map_op_access(MI, OpNum);
 }
 
 static void Mips_set_detail_op_mem_disp(MCInst *MI, unsigned OpNum, int64_t Imm)
 {
 	Mips_get_detail_op(MI, 0)->type = MIPS_OP_MEM;
 	Mips_get_detail_op(MI, 0)->mem.disp = Imm;
-	Mips_get_detail_op(MI, 0)->access = map_get_op_access(MI, OpNum);
+	Mips_get_detail_op(MI, 0)->access = Mips_map_op_access(MI, OpNum);
 }
 
 static void Mips_set_detail_op_imm(MCInst *MI, unsigned OpNum, int64_t Imm)
@@ -270,7 +307,7 @@ static void Mips_set_detail_op_imm(MCInst *MI, unsigned OpNum, int64_t Imm)
 
 	Mips_get_detail_op(MI, 0)->type = MIPS_OP_IMM;
 	Mips_get_detail_op(MI, 0)->imm = Imm;
-	Mips_get_detail_op(MI, 0)->access = map_get_op_access(MI, OpNum);
+	Mips_get_detail_op(MI, 0)->access = Mips_map_op_access(MI, OpNum);
 	Mips_inc_op_count(MI);
 }
 
@@ -287,7 +324,7 @@ static void Mips_set_detail_op_uimm(MCInst *MI, unsigned OpNum, uint64_t Imm)
 	Mips_get_detail_op(MI, 0)->type = MIPS_OP_IMM;
 	Mips_get_detail_op(MI, 0)->uimm = Imm;
 	Mips_get_detail_op(MI, 0)->is_unsigned = true;
-	Mips_get_detail_op(MI, 0)->access = map_get_op_access(MI, OpNum);
+	Mips_get_detail_op(MI, 0)->access = Mips_map_op_access(MI, OpNum);
 	Mips_inc_op_count(MI);
 }
 
@@ -303,17 +340,17 @@ static void Mips_set_detail_op_reg(MCInst *MI, unsigned OpNum, mips_reg Reg,
 	}
 
 	CS_ASSERT(is_reglist ||
-		  (map_get_op_type(MI, OpNum) & ~CS_OP_MEM) == CS_OP_REG);
+		  (Mips_map_op_type(MI, OpNum) & ~CS_OP_MEM) == CS_OP_REG);
 	Mips_get_detail_op(MI, 0)->type = MIPS_OP_REG;
 	Mips_get_detail_op(MI, 0)->reg = Reg;
 	Mips_get_detail_op(MI, 0)->is_reglist = is_reglist;
-	Mips_get_detail_op(MI, 0)->access = map_get_op_access(MI, OpNum);
+	Mips_get_detail_op(MI, 0)->access = Mips_map_op_access(MI, OpNum);
 	Mips_inc_op_count(MI);
 }
 
 static void Mips_set_detail_op_operand(MCInst *MI, unsigned OpNum)
 {
-	cs_op_type op_type = map_get_op_type(MI, OpNum) & ~CS_OP_MEM;
+	cs_op_type op_type = Mips_map_op_type(MI, OpNum) & ~CS_OP_MEM;
 	int64_t value = MCInst_getOpVal(MI, OpNum);
 	if (op_type == CS_OP_IMM) {
 		Mips_set_detail_op_imm(MI, OpNum, value);
@@ -336,7 +373,7 @@ static void Mips_set_detail_op_operand(MCInst *MI, unsigned OpNum)
 
 static void Mips_set_detail_op_jump(MCInst *MI, unsigned OpNum)
 {
-	cs_op_type op_type = map_get_op_type(MI, OpNum) & ~CS_OP_MEM;
+	cs_op_type op_type = Mips_map_op_type(MI, OpNum) & ~CS_OP_MEM;
 	if (op_type == CS_OP_IMM) {
 		uint64_t Base = MI->address & ~0x0fffffffull;
 		uint64_t Target = Base | (uint64_t)MCInst_getOpVal(MI, OpNum);
@@ -350,7 +387,7 @@ static void Mips_set_detail_op_jump(MCInst *MI, unsigned OpNum)
 
 static void Mips_set_detail_op_branch(MCInst *MI, unsigned OpNum)
 {
-	cs_op_type op_type = map_get_op_type(MI, OpNum) & ~CS_OP_MEM;
+	cs_op_type op_type = Mips_map_op_type(MI, OpNum) & ~CS_OP_MEM;
 	if (op_type == CS_OP_IMM) {
 		uint64_t Target = MI->address + MCInst_getOpVal(MI, OpNum);
 		Mips_set_detail_op_uimm(MI, OpNum, Target);
@@ -384,7 +421,7 @@ static void Mips_set_detail_op_mem_nanomips(MCInst *MI, unsigned OpNum)
 	Mips_get_detail_op(MI, 0)->type = MIPS_OP_MEM;
 	// Base is a register, but nanoMips uses the Imm value as register.
 	Mips_get_detail_op(MI, 0)->mem.base = MCOperand_getImm(Op);
-	Mips_get_detail_op(MI, 0)->access = map_get_op_access(MI, OpNum);
+	Mips_get_detail_op(MI, 0)->access = Mips_map_op_access(MI, OpNum);
 }
 
 static void Mips_set_detail_op_reglist(MCInst *MI, unsigned OpNum,
@@ -505,7 +542,7 @@ void Mips_set_mem_access(MCInst *MI, bool status)
 
 #ifndef CAPSTONE_DIET
 		uint8_t access =
-			map_get_op_access(MI, Mips_get_detail(MI)->op_count);
+			Mips_map_op_access(MI, Mips_get_detail(MI)->op_count);
 		Mips_get_detail_op(MI, 0)->access = access;
 #endif
 	} else {

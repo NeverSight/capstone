@@ -39,6 +39,8 @@ void Mips_init_cs_detail(MCInst *MI);
 
 void Mips_set_mem_access(MCInst *MI, bool status);
 
+unsigned Mips_getRegisterListCount(const MCInst *MI);
+
 void Mips_add_cs_detail_0(MCInst *MI, mips_op_group op_group, size_t op_num);
 
 static inline void set_mem_access(MCInst *MI, bool status)

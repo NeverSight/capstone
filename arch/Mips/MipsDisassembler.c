@@ -2429,7 +2429,8 @@ static DecodeStatus DecodeMemMMReglistImm4Lsl2(MCInst *Inst, uint32_t Insn,
 		return MCDisassembler_Fail;
 
 	MCOperand_CreateReg0(Inst, (Mips_SP));
-	MCOperand_CreateImm0(Inst, (Offset << 2));
+	// Pre-R6 offsets are signed; multiplication also preserves the R6 range.
+	MCOperand_CreateImm0(Inst, (Offset * 4));
 
 	return MCDisassembler_Success;
 }

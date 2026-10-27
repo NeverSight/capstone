@@ -1946,7 +1946,7 @@
     },
     "DecodeMemMMReglistImm4Lsl2": {
       "apply_type": "OLD",
-      "old_hash": "78b5d0b6414ccfc223c8a64113f18a80d2d1fd9243159dcfed731c80907000a5",
+      "old_hash": "4ad80c8556434f7911a3b8e246dff4430f64b918218a76789a4a51a35f8976e5",
       "new_hash": "83380670202831bb60ea31219e44657cd976e660bc3d671cc72e8a3307db5e51",
       "edit": ""
     },
@@ -2254,7 +2254,7 @@
     },
     "printMemOperand": {
       "apply_type": "OLD",
-      "old_hash": "0bee738dab28731710512bf16fa03f31f10209f777cea83f0d16aa66412e6201",
+      "old_hash": "f0434e1dd6f10e3a6799d876e1bafdf20a2077a800fd530e2d9ff841afad7bfc",
       "new_hash": "b23d985030fe56708a6cb5bb6a433c24fbca10e89f094a24ebfeae33b65af0d3",
       "edit": ""
     },

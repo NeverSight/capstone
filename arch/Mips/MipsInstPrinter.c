@@ -401,18 +401,9 @@ static void printMemOperand(MCInst *MI, int opNum, SStream *O)
 
 	// opNum can be invalid if instruction had reglist as operand.
 	// MemOperand is always last operand of instruction (base + offset).
-	switch (MCInst_getOpcode(MI)) {
-	default:
-		break;
-	case Mips_SWM32_MM:
-	case Mips_LWM32_MM:
-	case Mips_SWM16_MM:
-	case Mips_SWM16_MMR6:
-	case Mips_LWM16_MM:
-	case Mips_LWM16_MMR6:
-		opNum = MCInst_getNumOperands(MI) - 2;
-		break;
-	}
+	unsigned RegCount = Mips_getRegisterListCount(MI);
+	if (RegCount)
+		opNum = RegCount;
 
 	set_mem_access(MI, true);
 	// Index register is encoded as immediate value
