@@ -15,7 +15,7 @@ DRIVER = "294f3d96b91037ef613f4e036e91dc055861c901fc3a741f5708908ad4452ab3"
 ROOT = Path(__file__).resolve().parents[2]
 # Encoded table width maps to (helper suffix, C input width). These differ for
 # widened halfwords, NanoMIPS 48-bit words, PowerPC prefixed instructions and
-# SystemZ's shared 64-bit input for every encoded width.
+# the shared 64-bit inputs of SystemZ and Xtensa.
 BACKENDS = (
     ("AArch64", "AArch64", {32: (4, 32)}),
     ("ARM", "ARM", {16: (2, 16), 32: (4, 32)}),
@@ -25,6 +25,11 @@ BACKENDS = (
     ("PowerPC", "PPC", {32: (4, 64), 64: (4, 64)}),
     ("Mips", "Mips", {16: (2, 32), 32: (4, 32), 48: (8, 64)}),
     ("SystemZ", "SystemZ", {16: (8, 64), 32: (8, 64), 48: (8, 64)}),
+    (
+        "Xtensa",
+        "Xtensa",
+        {16: (3, 64), 24: (3, 64), 32: (3, 64), 48: (3, 64), 64: (3, 64)},
+    ),
 )
 OPS = {
     s: i + 1

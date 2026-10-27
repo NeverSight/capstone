@@ -1017,21 +1017,7 @@ static DecodeStatus readInstructionN(const uint8_t *Bytes, size_t BytesLen,
 }
 
 #include "XtensaGenDisassemblerTables.inc"
-
-FieldFromInstruction(fieldFromInstruction_2, uint64_t);
-DecodeToMCInst(decodeToMCInst_2, fieldFromInstruction_2, uint64_t);
-DecodeInstruction(decodeInstruction_2, fieldFromInstruction_2, decodeToMCInst_2,
-		  uint64_t);
-
-FieldFromInstruction(fieldFromInstruction_4, uint64_t);
-DecodeToMCInst(decodeToMCInst_4, fieldFromInstruction_4, uint64_t);
-DecodeInstruction(decodeInstruction_4, fieldFromInstruction_4, decodeToMCInst_4,
-		  uint64_t);
-
-FieldFromInstruction(fieldFromInstruction_6, uint64_t);
-DecodeToMCInst(decodeToMCInst_6, fieldFromInstruction_6, uint64_t);
-DecodeInstruction(decodeInstruction_6, fieldFromInstruction_6, decodeToMCInst_6,
-		  uint64_t);
+#include "XtensaGenDirectDecoder.inc"
 
 static bool hasDensity(MCInst *MI)
 {
@@ -1061,7 +1047,7 @@ static DecodeStatus getInstruction(MCInst *MI, uint64_t *Size,
 		if (Result == MCDisassembler_Fail)
 			return MCDisassembler_Fail;
 
-		Result = decodeInstruction_2(DecoderTable16, MI, Insn, Address,
+		Result = decodeInstruction_3(DecoderTable16, MI, Insn, Address,
 					     NULL);
 		if (Result != MCDisassembler_Fail) {
 			*Size = 2;
@@ -1100,7 +1086,7 @@ static DecodeStatus getInstruction(MCInst *MI, uint64_t *Size,
 		if (Result == MCDisassembler_Fail)
 			return MCDisassembler_Fail;
 
-		Result = decodeInstruction_4(DecoderTableESP32S332, MI, Insn,
+		Result = decodeInstruction_3(DecoderTableESP32S332, MI, Insn,
 					     Address, NULL);
 		if (Result != MCDisassembler_Fail) {
 			*Size = 4;
@@ -1119,7 +1105,7 @@ static DecodeStatus getInstruction(MCInst *MI, uint64_t *Size,
 		if (Result == MCDisassembler_Fail)
 			return MCDisassembler_Fail;
 
-		Result = decodeInstruction_6(DecoderTableHIFI348, MI, Insn,
+		Result = decodeInstruction_3(DecoderTableHIFI348, MI, Insn,
 					     Address, NULL);
 		if (Result != MCDisassembler_Fail)
 			return Result;

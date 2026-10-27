@@ -1,6 +1,8 @@
 # Copyright © 2022 Rot127 <unisono@quyllur.org>
 # SPDX-License-Identifier: BSD-3
 
+from pathlib import Path
+
 from tree_sitter import Node
 
 from autosync.cpptranslator.patches.Helper import get_text
@@ -10,7 +12,7 @@ from autosync.cpptranslator.patches.Patch import Patch
 class DecodeInstruction(Patch):
     """
     Patch   decodeInstruction(..., this, STI)
-    to      decodeInstruction_<instr_width>(..., NULL)
+    to      decodeInstruction_<helper_suffix>(..., NULL)
 
     It also removes the arguments `this, STI`.
     """
@@ -43,6 +45,11 @@ class DecodeInstruction(Patch):
         args = (
             table + b", " + mi_inst + b", " + opcode_var + b", " + address + b",  NULL"
         )
+
+        filename = kwargs.get("filename")
+        if filename is not None and Path(filename).name == "XtensaDisassembler.cpp":
+            # All Xtensa tables use the generated 64-bit input helper.
+            return b"decodeInstruction_3(" + args + b")"
 
         if is_16bit and not is_32bit:
             return b"decodeInstruction_2(" + args + b")"

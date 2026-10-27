@@ -273,6 +273,26 @@ public:
             b"decodeInstruction_2(Table[i],  MI,  Insn16,  Address,  NULL)",
         )
 
+    def test_xtensa_decodeinstruction_input(self):
+        for table in (
+            "DecoderTable16",
+            "DecoderTable24",
+            "DecoderTableESP32S324",
+            "DecoderTableESP32S332",
+            "DecoderTableHIFI324",
+            "DecoderTableHIFI348",
+            "DecoderTableHIFI364",
+            "DecoderTableFallback16",
+            "DecoderTableFallback24",
+        ):
+            with self.subTest(table=table):
+                self.check_patching_result(
+                    DecodeInstruction(0),
+                    f"decodeInstruction({table}, MI, Insn, Address, this, STI);".encode(),
+                    f"decodeInstruction_3({table},  MI,  Insn,  Address,  NULL)".encode(),
+                    filename=Path("XtensaDisassembler.cpp"),
+                )
+
     def test_decodercast(self):
         patch = DecoderCast(0)
         syntax = (
@@ -405,6 +425,7 @@ public:
             "PPC",
             "Mips",
             "SystemZ",
+            "Xtensa",
             "ARC",
         ):
             with self.subTest(arch=arch):
@@ -698,7 +719,7 @@ class TestFeatureIncludes(unittest.TestCase):
                 self.assertNotIn(b"GET_SUBTARGETINFO_ENUM", result)
 
     def test_wide_decoder_tables(self):
-        for arch in ("PPC", "Mips", "SystemZ"):
+        for arch in ("PPC", "Mips", "SystemZ", "Xtensa"):
             with self.subTest(arch=arch):
                 patch = Includes(0, arch)
                 patch.include_count = {}
