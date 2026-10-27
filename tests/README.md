@@ -36,6 +36,10 @@ flags), bounded output against iteration, and explicit
 public IDs against the iterator and allocated-array API in all three bitness
 modes. Cases include grouped opcodes, size prefixes and invalid ModR/M forms.
 
+`unit_sstream` covers bounded token appends, including truncation, markup,
+self-appends and a source immediately preceding the stream. Such a source can
+end at the first output byte, so its length must be determined before writing.
+
 ### Testing tools and usage
 
 The CI DIET jobs build every backend in Release with GCC and Clang and retain

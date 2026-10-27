@@ -221,7 +221,22 @@ void SStream_concat0(SStream *ss, const char *s)
 	if (s[0] == '\0')
 		return;
 
-	SStream_concat_raw(ss, s, strlen(s));
+	if ((uintptr_t)s - (uintptr_t)ss < sizeof(*ss) ||
+	    (uintptr_t)ss - (uintptr_t)s < sizeof(ss->buffer)) {
+		// A nearby source can end where appending starts. Determine its
+		// length before overwriting that terminator or repairing the index.
+		SStream_concat_raw(ss, s, strlen(s));
+	} else {
+		size_t remaining = SStream_remaining(ss);
+		size_t index = ss->index;
+		size_t len = 0;
+		while (len < remaining && s[len] != '\0') {
+			ss->buffer[index + len] = s[len];
+			len++;
+		}
+		ss->index = index + len;
+		ss->buffer[ss->index] = '\0';
+	}
 	SStream_close_markup(ss);
 #else
 	ss->buffer[ss->index] = '\0';

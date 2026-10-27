@@ -5,6 +5,7 @@
 #include "../SStream.h"
 #include "../utils.h"
 #include <math.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -93,6 +94,40 @@ static bool test_truncating_appends()
 	SStream_concat1(&OS, 'E');
 	CHECK_OS_EQUAL_RET_FALSE(OS, almost_full);
 	CHECK_INT_EQUAL_RET_FALSE(OS.index, SSTREAM_BUF_LEN - 1);
+	return true;
+}
+
+static bool test_aliased_appends(void)
+{
+	printf("Test test_aliased_appends\n");
+	SStream OS;
+	SStream_Init(&OS);
+	SStream_concat0(&OS, "abc");
+	SStream_concat0(&OS, OS.buffer);
+	CHECK_OS_EQUAL_RET_FALSE(OS, "abcabc");
+	SStream_concat0(&OS, OS.buffer + 1);
+	CHECK_OS_EQUAL_RET_FALSE(OS, "abcabcbcabc");
+	CHECK_INT_EQUAL_RET_FALSE(OS.index, 11);
+
+	// This source ends at the first output byte, before any append writes it.
+	struct PrefixStream {
+		char prefix[16];
+		SStream stream;
+	} prefixed;
+	SStream_Init(&prefixed.stream);
+	char *source =
+		(char *)&prefixed + offsetof(struct PrefixStream, stream) - 4;
+	memcpy(source, "HEAD", 4);
+	SStream_concat0(&prefixed.stream, source);
+	CHECK_OS_EQUAL_RET_FALSE(prefixed.stream, "HEAD");
+	CHECK_INT_EQUAL_RET_FALSE(prefixed.stream.index, 4);
+
+	SStream_Init(&prefixed.stream);
+	prefixed.stream.markup_stream = true;
+	prefixed.stream.prefixed_by_markup = true;
+	SStream_concat0(&prefixed.stream, source);
+	CHECK_OS_EQUAL_RET_FALSE(prefixed.stream, "HEAD>");
+	CHECK_INT_EQUAL_RET_FALSE(prefixed.stream.index, 5);
 	return true;
 }
 
@@ -814,6 +849,7 @@ int main()
 	result &= test_markup_os();
 	result &= test_overflow_check();
 	result &= test_truncating_appends();
+	result &= test_aliased_appends();
 	result &= test_hex64_formatting();
 	result &= test_hex64_custom_formatter();
 	result &= test_printint8();
