@@ -6,14 +6,25 @@ if(POLICY CMP0135)
 endif()
 
 include(ExternalProject)
+set(CSTEST_APPLE_CMAKE_ARGS)
+if(APPLE)
+    # ExternalProject splits lists; preserve universal architecture lists too.
+    string(REPLACE ";" "|" CSTEST_OSX_ARCHITECTURES "${CMAKE_OSX_ARCHITECTURES}")
+    list(APPEND CSTEST_APPLE_CMAKE_ARGS
+        "-DCMAKE_OSX_ARCHITECTURES:STRING=${CSTEST_OSX_ARCHITECTURES}"
+        "-DCMAKE_OSX_SYSROOT:STRING=${CMAKE_OSX_SYSROOT}"
+        "-DCMAKE_OSX_DEPLOYMENT_TARGET:STRING=${CMAKE_OSX_DEPLOYMENT_TARGET}")
+endif()
 set(CMOCKA_LIB_FILE "${CMAKE_CURRENT_BINARY_DIR}/extern/src/cmocka_ext-build/src/${CMAKE_STATIC_LIBRARY_PREFIX}cmocka${CMAKE_STATIC_LIBRARY_SUFFIX}")
 
 # CMocka is the unit testing library we use.
 ExternalProject_Add(cmocka_ext
     PREFIX extern
+    LIST_SEPARATOR |
     URL "https://gitlab.com/cmocka/cmocka/-/archive/cmocka-1.1.8/cmocka-cmocka-1.1.8.tar.gz"
     URL_HASH SHA256=0994a7cd6b67c46b1cbfbb56c3b22ac379e1ac26fbe68e9cf7cea259b60e201c
     CMAKE_ARGS
+        ${CSTEST_APPLE_CMAKE_ARGS}
         -DBUILD_SHARED_LIBS=OFF
         -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
         -DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
@@ -43,11 +54,13 @@ if (NOT libyaml OR NOT LIBYAML_INCLUDE_DIRS)
     set(LIBYAML_INCLUDE_DIRS "${CMAKE_CURRENT_BINARY_DIR}/extern/src/libyaml_ext/include")
     ExternalProject_Add(libyaml_ext
         PREFIX extern
+        LIST_SEPARATOR |
         URL "https://github.com/yaml/libyaml/archive/refs/tags/0.2.5.tar.gz"
         URL_HASH SHA256=fa240dbf262be053f3898006d502d514936c818e422afdcf33921c63bed9bf2e
         # URL "https://github.com/yaml/libyaml/archive/refs/tags/0.1.7.tar.gz"
         # URL_HASH SHA256=e1884d0fa1eec8cf869ac6bebbf25391e81956aa2970267f974a9fa5e0b968e2
         CMAKE_ARGS
+            ${CSTEST_APPLE_CMAKE_ARGS}
             -DCMAKE_POLICY_VERSION_MINIMUM=3.5
             -DBUILD_TESTING=OFF
             -DBUILD_SHARED_LIBS=OFF
@@ -78,10 +91,12 @@ set(LIBCYAML_LIBRARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/extern/src/libcyaml_ext-bu
 set(LIBCYAML_SRC_DIR "${CMAKE_CURRENT_BINARY_DIR}/extern/src/libcyaml_ext/")
 ExternalProject_Add(libcyaml_ext
     PREFIX extern
+    LIST_SEPARATOR |
     URL "https://github.com/tlsa/libcyaml/archive/refs/tags/v1.4.2.tar.gz"
     URL_HASH SHA256=3211b2a0589ebfe02c563c96adce9246c0787be2af30353becbbd362998d16dc
     PATCH_COMMAND cmake -E copy_if_different ${EXTERNAL_PROJ_PATCH_DIR}/libcyaml/CMakeLists.txt ${LIBCYAML_SRC_DIR}
     CMAKE_ARGS
+        ${CSTEST_APPLE_CMAKE_ARGS}
         -DUSE_BUILT_LIBYAML=${USE_BUILT_LIBYAML}
         -DLIBYAML_INCLUDE_DIRS=${LIBYAML_INCLUDE_DIRS}
         -DLIBYAML_LIBRARY_DIRS=${LIBYAML_LIBRARY_DIRS}
