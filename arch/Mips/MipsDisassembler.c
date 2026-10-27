@@ -763,6 +763,7 @@ static DecodeStatus DecodeFIXMEInstruction(MCInst *Inst, uint32_t Insn,
 					   const void *Decoder);
 
 #include "MipsGenDisassemblerTables.inc"
+#include "MipsGenDirectDecoder.inc"
 
 static unsigned getReg(const MCInst *Inst, unsigned RC, unsigned RegNo)
 {

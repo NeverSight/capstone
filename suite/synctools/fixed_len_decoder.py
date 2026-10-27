@@ -13,6 +13,17 @@ import re
 # its state transitions, failure handling and integer widths have been reviewed.
 DRIVER = "294f3d96b91037ef613f4e036e91dc055861c901fc3a741f5708908ad4452ab3"
 ROOT = Path(__file__).resolve().parents[2]
+# Encoded table width maps to (helper suffix, C input width). These differ for
+# widened halfwords, NanoMIPS 48-bit words and PowerPC prefixed instructions.
+BACKENDS = (
+    ("AArch64", "AArch64", {32: (4, 32)}),
+    ("ARM", "ARM", {16: (2, 16), 32: (4, 32)}),
+    ("RISCV", "RISCV", {16: (2, 16), 32: (4, 32)}),
+    ("LoongArch", "LoongArch", {32: (4, 32)}),
+    ("Sparc", "Sparc", {32: (4, 32)}),
+    ("PowerPC", "PPC", {32: (4, 64), 64: (4, 64)}),
+    ("Mips", "Mips", {16: (2, 32), 32: (4, 32), 48: (8, 64)}),
+)
 OPS = {
     s: i + 1
     for i, s in enumerate(
@@ -126,7 +137,7 @@ def successors(n):
     return [n.end] + ([] if n.target is None else [n.target])
 
 
-def emit(name, nodes, width):
+def emit(name, nodes, width, w):
     incoming = {p: set() for p in nodes}
     for p, n in nodes.items():
         for dst in successors(n):
@@ -153,7 +164,6 @@ def emit(name, nodes, width):
             seen.add(nn.args[0])
             absorbed.add(dst)
         groups[p] = group
-    w = width // 8
     out = [
         f"static DecodeStatus direct_{name}(MCInst *MI, uint{width}_t insn, uint64_t Address, const void *Decoder)",
         "{",
@@ -228,8 +238,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true")
     args = ap.parse_args()
-    for arch in ("AArch64", "ARM", "RISCV", "LoongArch", "Sparc"):
-        src = ROOT / f"arch/{arch}/{arch}GenDisassemblerTables.inc"
+    for arch, prefix, inputs in BACKENDS:
+        src = ROOT / f"arch/{arch}/{prefix}GenDisassemblerTables.inc"
         text = src.read_text(encoding="utf-8")
         start = text.index("#define DecodeInstruction(")
         end = text.index("\nFieldFromInstruction(fieldFromInstruction_", start)
@@ -248,22 +258,21 @@ def main():
         ]
         counts = []
         for name, body in tables:
-            width = int(name[-2:])
-            require(width in (16, 32), "Unsupported instruction width")
-            w = width // 8
+            encoded_width = int(name[-2:])
+            require(encoded_width in inputs, "Unsupported instruction width")
+            w, width = inputs[encoded_width]
             require(
                 f"DecodeInstruction(decodeInstruction_{w},fieldFromInstruction_{w},"
                 f"decodeToMCInst_{w},uint{width}_t)" in re.sub(r"\s+", "", text[end:]),
                 "Review changed decoder input width before regenerating",
             )
             nodes = parse(body)
-            output.append(emit(name, nodes, width))
+            output.append(emit(name, nodes, width, w))
             counts.append((name, len(nodes)))
-        for width in (16, 32):
-            selected = [n for n, _ in tables if n.endswith(str(width))]
+        for w, width in sorted(set(inputs.values())):
+            selected = [n for n, _ in tables if inputs[int(n[-2:])] == (w, width)]
             if not selected:
                 continue
-            w = width // 8
             output += [
                 f"static DecodeStatus directInstruction_{w}(const uint8_t *Table, MCInst *MI, uint{width}_t insn, uint64_t Address, const void *Decoder)",
                 "{",
@@ -278,7 +287,7 @@ def main():
                 f"#define decodeInstruction_{w} directInstruction_{w}",
             ]
         generated = "\n\n".join(output) + "\n"
-        dst = ROOT / f"arch/{arch}/{arch}GenDirectDecoder.inc"
+        dst = ROOT / f"arch/{arch}/{prefix}GenDirectDecoder.inc"
         if args.check:
             require(
                 dst.read_text(encoding="utf-8") == generated,

@@ -85,12 +85,14 @@ ASUpdater -a <ARCH>
 and update them if necessary (some architectures don't have this file).
 3. Try to build Capstone and fix the build errors.
 
-After updating ARM, AArch64, RISC-V, LoongArch or SPARC, run
+After updating ARM, AArch64, RISC-V, LoongArch, SPARC, PowerPC or MIPS, run
 `python3 suite/synctools/fixed_len_decoder.py` from the repository root, then
 run it with `--check`. This derives the direct decoder from the updated tables.
 If the interpreter fingerprint changed, review its state transitions and update
 the lowering before accepting the new fingerprint. The translator retains both
 the original table include and the generated direct-decoder include.
+The generator also checks the C input width separately from the encoded table
+width, including PowerPC prefixed instructions and NanoMIPS 48-bit words.
 
 
 ## Post-processing steps

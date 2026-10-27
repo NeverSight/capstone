@@ -379,11 +379,20 @@ public:
         )
 
     def test_direct_decoder_includes(self):
-        for arch in ("ARM", "AArch64", "RISCV", "LoongArch", "Sparc", "PPC"):
+        for arch in (
+            "ARM",
+            "AArch64",
+            "RISCV",
+            "LoongArch",
+            "Sparc",
+            "PPC",
+            "Mips",
+            "SystemZ",
+        ):
             with self.subTest(arch=arch):
                 syntax = f'#include "{arch}GenDisassemblerTables.inc"\n'.encode()
                 expected = syntax
-                if arch != "PPC":
+                if arch != "SystemZ":
                     expected += f'#include "{arch}GenDirectDecoder.inc"\n'.encode()
                 self.check_patching_result(
                     Includes(0, arch),
@@ -669,3 +678,20 @@ class TestFeatureIncludes(unittest.TestCase):
                 )
                 self.assertIn(b'#include "RISCVDisassemblerExtension.h"', result)
                 self.assertNotIn(b"GET_SUBTARGETINFO_ENUM", result)
+
+    def test_wide_decoder_tables(self):
+        for arch in ("PPC", "Mips"):
+            with self.subTest(arch=arch):
+                patch = Includes(0, arch)
+                patch.include_count = {}
+                syntax = f'#include "{arch}GenDisassemblerTables.inc"'.encode()
+                tree = self.parser.parse(syntax)
+                result = patch.get_patch(
+                    [(tree.root_node.children[0], "preproc_include")],
+                    syntax,
+                    filename=arch + "Disassembler.cpp",
+                )
+                self.assertEqual(
+                    result,
+                    syntax + f'\n#include "{arch}GenDirectDecoder.inc"\n\n'.encode(),
+                )

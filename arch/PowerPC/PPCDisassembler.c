@@ -392,6 +392,7 @@ static DecodeStatus decodeCRBitMOperand(MCInst *Inst, uint64_t Imm,
 }
 
 #include "PPCGenDisassemblerTables.inc"
+#include "PPCGenDirectDecoder.inc"
 
 DecodeStatus getInstruction(csh ud, const uint8_t *Bytes, size_t BytesLen,
 			    MCInst *MI, uint16_t *Size, uint64_t Address,
