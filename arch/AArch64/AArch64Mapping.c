@@ -428,6 +428,42 @@ static void add_non_alias_details(MCInst *MI)
 		op1->shift.value = shift;
 		AArch64_dec_op_count(MI);
 		break;
+	case AArch64_LDAPRWpost:
+	case AArch64_LDAPRXpost:
+	case AArch64_LDIAPPWpost:
+	case AArch64_LDIAPPXpost:
+	case AArch64_STLRWpre:
+	case AArch64_STLRXpre:
+	case AArch64_STILPWpre:
+	case AArch64_STILPXpre: {
+		// These LRCPC3 forms have a fixed displacement, not an MCOperand.
+		int displacement = 8;
+		switch (Opcode) {
+		case AArch64_LDAPRWpost:
+			displacement = 4;
+			break;
+		case AArch64_LDIAPPXpost:
+			displacement = 16;
+			break;
+		case AArch64_STLRWpre:
+			displacement = -4;
+			break;
+		case AArch64_STLRXpre:
+		case AArch64_STILPWpre:
+			displacement = -8;
+			break;
+		case AArch64_STILPXpre:
+			displacement = -16;
+			break;
+		default:
+			break;
+		}
+		cs_aarch64_op *mem = AArch64_get_detail_op(MI, -1);
+		CS_ASSERT_RET(mem && mem->type == AARCH64_OP_MEM);
+		mem->mem.disp = displacement;
+		AArch64_get_detail(MI)->post_index = displacement > 0;
+		break;
+	}
 	case AArch64_FCMPDri:
 	case AArch64_FCMPEDri:
 	case AArch64_FCMPEHri:

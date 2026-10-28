@@ -19,7 +19,7 @@ static bool check_addressing_details(void)
 		unsigned id, reg, base;
 		int displacement;
 		bool writeback, post_index;
-		unsigned post_reg;
+		unsigned post_reg, pair_reg;
 	} cases[] = {
 		/* Existing basic-a64-instructions.s.yaml encodings. */
 		{ "ldr x0, [x0]",
@@ -30,6 +30,7 @@ static bool check_addressing_details(void)
 		  0,
 		  false,
 		  false,
+		  AARCH64_REG_INVALID,
 		  AARCH64_REG_INVALID },
 		{ "ldr x2, [x3, #1]!",
 		  { 0x62, 0x1c, 0x40, 0xf8 },
@@ -39,6 +40,7 @@ static bool check_addressing_details(void)
 		  1,
 		  true,
 		  false,
+		  AARCH64_REG_INVALID,
 		  AARCH64_REG_INVALID },
 		{ "ldr x2, [x3], #1",
 		  { 0x62, 0x14, 0x40, 0xf8 },
@@ -48,6 +50,7 @@ static bool check_addressing_details(void)
 		  1,
 		  true,
 		  true,
+		  AARCH64_REG_INVALID,
 		  AARCH64_REG_INVALID },
 		/* neon-simd-post-ldst-multi-elem.s.yaml: register post-increment. */
 		{ "ld1 { v0.16b }, [x0], x1",
@@ -58,6 +61,88 @@ static bool check_addressing_details(void)
 		  0,
 		  true,
 		  true,
+		  AARCH64_REG_X1,
+		  AARCH64_REG_INVALID },
+		/* armv8.9a-lrcpc3.s.yaml: fixed offsets absent from MC operands. */
+		{ "ldapr w3, [sp], #4",
+		  { 0xe3, 0x0b, 0xc0, 0x99 },
+		  AARCH64_INS_LDAPR,
+		  AARCH64_REG_W3,
+		  AARCH64_REG_SP,
+		  4,
+		  true,
+		  true,
+		  AARCH64_REG_INVALID,
+		  AARCH64_REG_INVALID },
+		{ "ldapr x3, [x15], #8",
+		  { 0xe3, 0x09, 0xc0, 0xd9 },
+		  AARCH64_INS_LDAPR,
+		  AARCH64_REG_X3,
+		  AARCH64_REG_X15,
+		  8,
+		  true,
+		  true,
+		  AARCH64_REG_INVALID,
+		  AARCH64_REG_INVALID },
+		{ "ldiapp w28, w4, [x20], #8",
+		  { 0x9c, 0x0a, 0x44, 0x99 },
+		  AARCH64_INS_LDIAPP,
+		  AARCH64_REG_W28,
+		  AARCH64_REG_X20,
+		  8,
+		  true,
+		  true,
+		  AARCH64_REG_INVALID,
+		  AARCH64_REG_W4 },
+		{ "ldiapp x29, x5, [x21], #16",
+		  { 0xbd, 0x0a, 0x45, 0xd9 },
+		  AARCH64_INS_LDIAPP,
+		  AARCH64_REG_X29,
+		  AARCH64_REG_X21,
+		  16,
+		  true,
+		  true,
+		  AARCH64_REG_INVALID,
+		  AARCH64_REG_X5 },
+		{ "stlr w3, [x15, #-4]!",
+		  { 0xe3, 0x09, 0x80, 0x99 },
+		  AARCH64_INS_STLR,
+		  AARCH64_REG_W3,
+		  AARCH64_REG_X15,
+		  -4,
+		  true,
+		  false,
+		  AARCH64_REG_INVALID,
+		  AARCH64_REG_INVALID },
+		{ "stlr x3, [x15, #-8]!",
+		  { 0xe3, 0x09, 0x80, 0xd9 },
+		  AARCH64_INS_STLR,
+		  AARCH64_REG_X3,
+		  AARCH64_REG_X15,
+		  -8,
+		  true,
+		  false,
+		  AARCH64_REG_INVALID,
+		  AARCH64_REG_INVALID },
+		{ "stilp w24, w0, [x16, #-8]!",
+		  { 0x18, 0x0a, 0x00, 0x99 },
+		  AARCH64_INS_STILP,
+		  AARCH64_REG_W24,
+		  AARCH64_REG_X16,
+		  -8,
+		  true,
+		  false,
+		  AARCH64_REG_INVALID,
+		  AARCH64_REG_W0 },
+		{ "stilp x25, x1, [x17, #-16]!",
+		  { 0x39, 0x0a, 0x01, 0xd9 },
+		  AARCH64_INS_STILP,
+		  AARCH64_REG_X25,
+		  AARCH64_REG_X17,
+		  -16,
+		  true,
+		  false,
+		  AARCH64_REG_INVALID,
 		  AARCH64_REG_X1 },
 	};
 	csh handle;
@@ -85,20 +170,26 @@ static bool check_addressing_details(void)
 		}
 		const cs_aarch64 *detail = &insn->detail->aarch64;
 		const cs_aarch64_op *reg = &detail->operands[0];
-		const cs_aarch64_op *mem = &detail->operands[1];
-		unsigned count = cases[i].post_reg == AARCH64_REG_INVALID ? 2 :
-									    3;
+		unsigned reg_count =
+			cases[i].pair_reg == AARCH64_REG_INVALID ? 1 : 2;
+		const cs_aarch64_op *mem = &detail->operands[reg_count];
+		unsigned count = reg_count + 1 +
+				 (cases[i].post_reg != AARCH64_REG_INVALID);
 		if (detail->op_count != count ||
 		    insn->detail->writeback != cases[i].writeback ||
 		    detail->post_index != cases[i].post_index ||
 		    reg->type != AARCH64_OP_REG || reg->reg != cases[i].reg ||
+		    (reg_count == 2 &&
+		     (detail->operands[1].type != AARCH64_OP_REG ||
+		      detail->operands[1].reg != cases[i].pair_reg)) ||
 		    mem->type != AARCH64_OP_MEM ||
 		    mem->mem.base != cases[i].base ||
 		    mem->mem.index != AARCH64_REG_INVALID ||
 		    mem->mem.disp != cases[i].displacement ||
-		    (count == 3 &&
-		     (detail->operands[2].type != AARCH64_OP_REG ||
-		      detail->operands[2].reg != cases[i].post_reg))) {
+		    (cases[i].post_reg != AARCH64_REG_INVALID &&
+		     (detail->operands[reg_count + 1].type != AARCH64_OP_REG ||
+		      detail->operands[reg_count + 1].reg !=
+			      cases[i].post_reg))) {
 			fprintf(stderr,
 				"%s: count=%u writeback=%u post_index=%u base=%u displacement=%lld\n",
 				cases[i].name, (unsigned)detail->op_count,

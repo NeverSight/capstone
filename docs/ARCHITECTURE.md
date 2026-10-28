@@ -110,6 +110,10 @@ AArch64 records post-index addressing while constructing its operands: a
 separate immediate after a writeback base, or a post-increment register operand,
 identifies the update. It does not recover this semantic flag by searching
 printed assembly, which is absent in DIET and may use different register names.
+The fixed-offset LRCPC3 pre/post-index forms encode their displacement in the
+opcode rather than an immediate operand. Their detail completion supplies the
+fixed displacement and post-index flag; tied-operand metadata still owns
+writeback detection.
 
 ### Instruction representation
 
