@@ -1053,8 +1053,11 @@ bool test_printfFloat()
 	return true;
 }
 
+static unsigned evil_vsnprintf_calls;
+
 static int evil_vsnprintf(char *str, size_t size, const char *fmt, va_list ap)
 {
+	++evil_vsnprintf_calls;
 	(void)str;
 	(void)size;
 	(void)fmt;
@@ -1085,8 +1088,46 @@ bool test_underflow_in_sstream(void)
 	return true;
 }
 
+static bool test_diet_appends(void)
+{
+	cs_opt_mem mem = { .malloc = malloc,
+			   .calloc = calloc,
+			   .realloc = realloc,
+			   .free = free,
+			   .vsnprintf = evil_vsnprintf };
+	CS_ASSERT_RET_VAL(cs_option(0, CS_OPT_MEM, (size_t)&mem) == CS_ERR_OK,
+			  false);
+	evil_vsnprintf_calls = 0;
+	for (unsigned prefix = 0; prefix < 2; ++prefix) {
+		SStream OS;
+		SStream_Init(&OS);
+		if (prefix) {
+			memcpy(OS.buffer, "prefix", 7);
+			OS.index = 6;
+		}
+		SStream_concat0(&OS, "text");
+		SStream_concat0_n(&OS, "text", 4);
+		SStream_concat0_substr(&OS, "text suffix", 4);
+		SStream_concat1(&OS, 'x');
+		SStream_concat(&OS, "%s", "text");
+		SStream_concat_hex64(&OS, UINT64_MAX, true);
+		printInt64(&OS, INT64_MIN);
+		printUInt64Bang(&OS, UINT64_MAX);
+		printfFloat(&OS, "%f", 1.5);
+		CHECK_OS_EQUAL_RET_FALSE(OS, prefix ? "prefix" : "");
+		CS_ASSERT_RET_VAL(OS.index == (prefix ? 6 : 0), false);
+	}
+	mem.vsnprintf = vsnprintf;
+	CS_ASSERT_RET_VAL(cs_option(0, CS_OPT_MEM, (size_t)&mem) == CS_ERR_OK,
+			  false);
+	CS_ASSERT_RET_VAL(evil_vsnprintf_calls == 0, false);
+	return true;
+}
+
 int main()
 {
+	if (cs_support(CS_SUPPORT_DIET))
+		return test_diet_appends() ? 0 : -1;
 	bool result = true;
 	result &= test_markup_os();
 	result &= test_overflow_check();
