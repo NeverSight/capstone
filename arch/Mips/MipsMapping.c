@@ -15,6 +15,10 @@
 #include "../../cs_simple_types.h"
 
 #include "MipsMapping.h"
+
+#ifdef CAPSTONE_DIET
+#include "MipsGenCSMappingInsnOpDiet.inc"
+#endif
 #include "MipsLinkage.h"
 #include "MipsDisassembler.h"
 
@@ -259,6 +263,7 @@ void Mips_init_cs_detail(MCInst *MI)
 static const map_insn_ops insn_operands[] = {
 #include "MipsGenCSMappingInsnOp.inc"
 };
+#endif
 
 static unsigned Mips_map_op_index(const MCInst *MI, unsigned OpNum)
 {
@@ -268,8 +273,6 @@ static unsigned Mips_map_op_index(const MCInst *MI, unsigned OpNum)
 	// The descriptor has one list operand followed by base and displacement.
 	return OpNum < count ? 0 : OpNum - count + 1;
 }
-
-#endif
 
 static cs_op_type Mips_map_op_type(MCInst *MI, unsigned OpNum)
 {

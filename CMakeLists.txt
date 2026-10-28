@@ -293,6 +293,7 @@ if(CAPSTONE_ARM_SUPPORT)
         arch/ARM/ARMGenCSFeatureName.inc
         arch/ARM/ARMGenCSMappingInsn.inc
         arch/ARM/ARMGenCSMappingInsnOp.inc
+        arch/ARM/ARMGenCSMappingInsnOpDiet.inc
         arch/ARM/ARMGenCSMappingInsnName.inc
         arch/ARM/ARMGenSystemRegister.inc
     )
@@ -327,6 +328,7 @@ if(CAPSTONE_AARCH64_SUPPORT)
         arch/AArch64/AArch64GenCSMappingInsn.inc
         arch/AArch64/AArch64GenCSMappingInsnName.inc
         arch/AArch64/AArch64GenCSMappingInsnOp.inc
+        arch/AArch64/AArch64GenCSMappingInsnOpDiet.inc
     )
 endif()
 
@@ -386,6 +388,7 @@ if(CAPSTONE_PPC_SUPPORT)
         arch/PowerPC/PPCGenCSFeatureName.inc
         arch/PowerPC/PPCGenCSMappingInsn.inc
         arch/PowerPC/PPCGenCSMappingInsnOp.inc
+        arch/PowerPC/PPCGenCSMappingInsnOpDiet.inc
         arch/PowerPC/PPCGenCSMappingInsnName.inc
         arch/PowerPC/PPCGenCSOpGroup.inc
         arch/PowerPC/PPCGenDisassemblerTables.inc
@@ -478,6 +481,7 @@ if(CAPSTONE_SPARC_SUPPORT)
         arch/Sparc/SparcGenCSMappingInsn.inc
         arch/Sparc/SparcGenCSMappingInsnName.inc
         arch/Sparc/SparcGenCSMappingInsnOp.inc
+        arch/Sparc/SparcGenCSMappingInsnOpDiet.inc
         arch/Sparc/SparcGenCSOpGroup.inc
         arch/Sparc/SparcGenDisassemblerTables.inc
         arch/Sparc/SparcGenInstrInfo.inc
@@ -694,6 +698,7 @@ if(CAPSTONE_RISCV_SUPPORT)
         arch/RISCV/RISCVGenCSMappingInsn.inc
         arch/RISCV/RISCVGenCSMappingInsnName.inc
         arch/RISCV/RISCVGenCSMappingInsnOp.inc
+        arch/RISCV/RISCVGenCSMappingInsnOpDiet.inc
         arch/RISCV/RISCVGenCSOpGroup.inc
         arch/RISCV/RISCVGenCSSystemOperandsEnum.inc
         arch/RISCV/RISCVGenDisassemblerTables.inc
@@ -771,6 +776,7 @@ if (CAPSTONE_ALPHA_SUPPORT)
             arch/Alpha/AlphaMapping.h
             arch/Alpha/AlphaModule.h
             arch/Alpha/AlphaGenCSMappingInsnOp.inc
+            arch/Alpha/AlphaGenCSMappingInsnOpDiet.inc
             arch/Alpha/AlphaGenCSMappingInsn.inc
             arch/Alpha/AlphaGenCSMappingInsnName.inc
             )

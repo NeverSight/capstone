@@ -14,6 +14,10 @@
 #include "RISCVBaseInfo.h"
 #include "RISCVMapping.h"
 
+#ifdef CAPSTONE_DIET
+#include "RISCVGenCSMappingInsnOpDiet.inc"
+#endif
+
 #define GET_INSTRINFO_ENUM
 #include "RISCVGenInstrInfo.inc"
 

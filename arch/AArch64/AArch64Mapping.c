@@ -19,6 +19,10 @@
 #include "AArch64Linkage.h"
 #include "AArch64Mapping.h"
 
+#ifdef CAPSTONE_DIET
+#include "AArch64GenCSMappingInsnOpDiet.inc"
+#endif
+
 #define CHAR(c) #c[0]
 
 static float aarch64_exact_fp_to_fp(aarch64_exactfpimm exact)
@@ -298,43 +302,6 @@ void AArch64_init_cs_detail(MCInst *MI)
 			AArch64_setup_op(&AArch64_get_detail(MI)->operands[i]);
 		AArch64_get_detail(MI)->cc = AArch64CC_Invalid;
 	}
-}
-
-/// Unfortunately, the AARCH64 definitions do not indicate in any way
-/// (exception are the instruction identifiers), if memory accesses
-/// is post- or pre-indexed.
-/// So the only generic way to determine, if the memory access is in
-/// post-indexed addressing mode, is by search for "<membase>], #<memdisp>" in
-/// @p OS.
-/// Searching the asm string to determine such a property is enormously ugly
-/// and wastes resources.
-/// Sorry, I know and do feel bad about it. But for now it works.
-static bool AArch64_check_post_index_am(const MCInst *MI, const SStream *OS)
-{
-	if (AArch64_get_detail(MI)->post_index) {
-		return true;
-	}
-	cs_aarch64_op *memop = NULL;
-	for (int i = 0; i < AArch64_get_detail(MI)->op_count; ++i) {
-		if (AArch64_get_detail(MI)->operands[i].type & CS_OP_MEM) {
-			memop = &AArch64_get_detail(MI)->operands[i];
-			break;
-		}
-	}
-	if (!memop)
-		return false;
-	if (memop->mem.base == AARCH64_REG_INVALID) {
-		// Load/Store from/to label. Has no register base.
-		return false;
-	}
-	const char *membase = AArch64_LLVM_getRegisterName(
-		memop->mem.base, AArch64_NoRegAltName);
-	int64_t memdisp = memop->mem.disp;
-	SStream pattern = { 0 };
-	SStream_concat(&pattern, membase);
-	SStream_concat(&pattern, "], ");
-	printInt32Bang(&pattern, memdisp);
-	return strstr(OS->buffer, pattern.buffer) != NULL;
 }
 
 static void AArch64_check_updates_flags(MCInst *MI)
@@ -985,8 +952,6 @@ void AArch64_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
 			AArch64_get_detail(MI)->is_doing_sme = false;
 			AArch64_inc_op_count(MI);
 		}
-		AArch64_get_detail(MI)->post_index =
-			AArch64_check_post_index_am(MI, O);
 	}
 	AArch64_check_updates_flags(MI);
 	AArch64_add_sysreg_alias_access(MI);
@@ -1697,17 +1662,8 @@ void AArch64_add_cs_detail_0(MCInst *MI, aarch64_op_group op_group,
 		break;
 	}
 	case AArch64_OP_GROUP_MatrixTile: {
-		const char *RegName = AArch64_LLVM_getRegisterName(
-			MCInst_getOpVal(MI, OpNum), AArch64_NoRegAltName);
-		const char *Dot = strstr(RegName, ".");
-		AArch64Layout_VectorLayout vas = AARCH64LAYOUT_INVALID;
-		if (!Dot) {
-			// The matrix dimensions are machine dependent.
-			// Currently we do not support differentiation of machines.
-			// So we just indicate the use of the complete matrix.
-			vas = sme_reg_to_vas(MCInst_getOpVal(MI, OpNum));
-		} else
-			vas = get_vl_by_suffix(Dot[1]);
+		AArch64Layout_VectorLayout vas =
+			sme_reg_to_vas(MCInst_getOpVal(MI, OpNum));
 		AArch64_set_detail_op_sme(MI, OpNum, AARCH64_SME_MATRIX_TILE,
 					  vas, 0, 0);
 		break;
@@ -2063,17 +2019,8 @@ void AArch64_add_cs_detail_1(MCInst *MI, aarch64_op_group op_group,
 	case AArch64_OP_GROUP_MatrixTileVector_0:
 	case AArch64_OP_GROUP_MatrixTileVector_1: {
 		bool isVertical = temp_arg_0;
-		const char *RegName = AArch64_LLVM_getRegisterName(
-			MCInst_getOpVal(MI, OpNum), AArch64_NoRegAltName);
-		const char *Dot = strstr(RegName, ".");
-		AArch64Layout_VectorLayout vas = AARCH64LAYOUT_INVALID;
-		if (!Dot) {
-			// The matrix dimensions are machine dependent.
-			// Currently we do not support differentiation of machines.
-			// So we just indicate the use of the complete matrix.
-			vas = sme_reg_to_vas(MCInst_getOpVal(MI, OpNum));
-		} else
-			vas = get_vl_by_suffix(Dot[1]);
+		AArch64Layout_VectorLayout vas =
+			sme_reg_to_vas(MCInst_getOpVal(MI, OpNum));
 		setup_sme_operand(MI);
 		AArch64_set_detail_op_sme(MI, OpNum, AARCH64_SME_MATRIX_TILE,
 					  vas, 0, 0);
@@ -2094,9 +2041,9 @@ void AArch64_add_cs_detail_1(MCInst *MI, aarch64_op_group op_group,
 	case AArch64_OP_GROUP_PostIncOperand_8: {
 		uint64_t Imm = temp_arg_0;
 		unsigned Reg = MCInst_getOpVal(MI, OpNum);
+		AArch64_get_detail(MI)->post_index = true;
 		if (Reg == AArch64_XZR) {
 			AArch64_get_detail_op(MI, -1)->mem.disp = Imm;
-			AArch64_get_detail(MI)->post_index = true;
 			AArch64_inc_op_count(MI);
 		} else
 			AArch64_set_detail_op_reg(MI, OpNum, Reg);
@@ -2586,7 +2533,13 @@ void AArch64_set_detail_op_imm(MCInst *MI, unsigned OpNum,
 		}
 		return;
 	}
-	if (map_get_op_type(MI, OpNum) & CS_OP_MEM || prev_is_membase_wb(MI)) {
+	if (map_get_op_type(MI, OpNum) & CS_OP_MEM) {
+		AArch64_set_detail_op_mem(MI, OpNum, Imm);
+		return;
+	}
+	if (prev_is_membase_wb(MI)) {
+		// An immediate outside the memory operand updates the base afterward.
+		AArch64_get_detail(MI)->post_index = true;
 		AArch64_set_detail_op_mem(MI, OpNum, Imm);
 		return;
 	}

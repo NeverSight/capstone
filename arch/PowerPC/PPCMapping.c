@@ -14,6 +14,10 @@
 
 #include "PPCLinkage.h"
 #include "PPCMapping.h"
+
+#ifdef CAPSTONE_DIET
+#include "PPCGenCSMappingInsnOpDiet.inc"
+#endif
 #include "PPCMCTargetDesc.h"
 
 static int P7InheritableFeatures[] = {

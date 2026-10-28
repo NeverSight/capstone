@@ -12,6 +12,10 @@
 
 #include "SparcMapping.h"
 
+#ifdef CAPSTONE_DIET
+#include "SparcGenCSMappingInsnOpDiet.inc"
+#endif
+
 void Sparc_init_cs_detail(MCInst *MI)
 {
 	if (!detail_is_set(MI)) {

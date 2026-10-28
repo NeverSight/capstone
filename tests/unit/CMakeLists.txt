@@ -2,6 +2,17 @@ cmake_minimum_required(VERSION 3.15)
 
 enable_testing()
 set(UNIT_TEST_SOURCES sstream.c utils.c api.c mcinst.c mapping.c feature_mode.c)
+if(CAPSTONE_AARCH64_SUPPORT OR CAPSTONE_ARM_SUPPORT OR CAPSTONE_ALPHA_SUPPORT
+   OR CAPSTONE_ARC_SUPPORT OR CAPSTONE_MIPS_SUPPORT OR CAPSTONE_PPC_SUPPORT
+   OR CAPSTONE_SPARC_SUPPORT OR CAPSTONE_LOONGARCH_SUPPORT OR CAPSTONE_RISCV_SUPPORT)
+    find_package(Python3 3.8 COMPONENTS Interpreter QUIET)
+    if(Python3_Interpreter_FOUND)
+        add_test(NAME unit_mapping_diet_types_generator
+            COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/suite/synctools/mapping_diet_types.py" --check)
+        add_test(NAME unit_mapping_diet_types_parser
+            COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/test_mapping_diet_types.py")
+    endif()
+endif()
 if(CAPSTONE_MIPS_SUPPORT)
     list(APPEND UNIT_TEST_SOURCES mips_reglist_offset.c)
 endif()
@@ -70,6 +81,7 @@ if(CAPSTONE_X86_SUPPORT)
     list(APPEND UNIT_TEST_SOURCES x86_evex_reserved_fields.c)
     list(APPEND UNIT_TEST_SOURCES x86_gfni_broadcast_detail.c)
     list(APPEND UNIT_TEST_SOURCES x86_sha512.c)
+    list(APPEND UNIT_TEST_SOURCES x86_diet_feature_details.c)
     list(APPEND UNIT_TEST_SOURCES x86_amx_avx512.c x86_amx_compute.c x86_amx_fp8_tf32.c x86_amx_tile_contract.c x86_amx_tile_state.c x86_amx_tilezero.c x86_apx_cmov.c x86_apx_evex_arithmetic.c x86_apx_evex_alu.c x86_apx_evex_imul.c x86_apx_evex_shift_rotate.c x86_apx_jmpabs.c x86_apx_push2_pop2.c x86_apx_rex2.c x86_apx_rex2_alu.c x86_apx_rex2_push_pop.c x86_apx_setcc.c x86_evex_detail.c x86_evex_mask_conversion_access.c x86_evex_vpcmp_id.c x86_evex_vpcmp_mask_size.c x86_kmask_access.c x86_kmask_width.c x86_vpbroadcast_mask_source_size.c)
     list(APPEND UNIT_TEST_SOURCES x86_apx_evex_adx.c)
     list(APPEND UNIT_TEST_SOURCES x86_apx_evex_unary.c)

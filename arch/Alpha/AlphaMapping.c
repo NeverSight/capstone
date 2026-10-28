@@ -13,6 +13,10 @@
 
 #include "AlphaLinkage.h"
 #include "AlphaMapping.h"
+
+#ifdef CAPSTONE_DIET
+#include "AlphaGenCSMappingInsnOpDiet.inc"
+#endif
 #include "./AlphaDisassembler.h"
 
 #define GET_INSTRINFO_ENUM

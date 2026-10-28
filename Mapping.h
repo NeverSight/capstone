@@ -67,7 +67,22 @@ const cs_ac_type mapping_get_op_access(MCInst *MI, unsigned OpNum,
 	mapping_get_op_type(MI, OpNum, (const map_insn_ops *)insn_operands, \
 			    sizeof(insn_operands) / sizeof(insn_operands[0]))
 #else
-#define map_get_op_type(MI, OpNum) CS_OP_INVALID
+static inline cs_op_type
+mapping_get_op_type_diet(MCInst *MI, unsigned OpNum,
+			 const uint8_t types[][MAX_NO_INSN_MAP_OPS],
+			 const uint16_t *indices, size_t map_size)
+{
+	assert(MI);
+	assert(MI->Opcode < map_size);
+	assert(OpNum < MAX_NO_INSN_MAP_OPS);
+	return (cs_op_type)types[indices[MI->Opcode]][OpNum];
+}
+
+#define map_get_op_type(MI, OpNum) \
+	mapping_get_op_type_diet(MI, OpNum, insn_operand_types, \
+				 insn_operand_type_index, \
+				 sizeof(insn_operand_type_index) / \
+					 sizeof(insn_operand_type_index[0]))
 #endif
 
 /// Macro for easier access of operand access flags from the map.

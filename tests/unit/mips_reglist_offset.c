@@ -9,6 +9,7 @@ struct Case {
 	cs_insn *insn;
 	bool big;
 	bool detail;
+	bool check_access;
 };
 
 static bool check(struct Case *test, uint32_t word, unsigned size, unsigned id,
@@ -39,7 +40,8 @@ static bool check(struct Case *test, uint32_t word, unsigned size, unsigned id,
 	bool store = id == MIPS_INS_SWM16 || id == MIPS_INS_SWM32;
 	if (detail->op_count != reg_count + 1 || mem->type != MIPS_OP_MEM ||
 	    mem->mem.base != base || mem->mem.disp != displacement ||
-	    mem->access != (store ? CS_AC_WRITE : CS_AC_READ)) {
+	    (test->check_access &&
+	     mem->access != (store ? CS_AC_WRITE : CS_AC_READ))) {
 		fprintf(stderr,
 			"MIPS reglist word=%08x count=%u base=%u displacement=%lld expected=%d\n",
 			word, detail->op_count, mem->mem.base,
@@ -49,7 +51,8 @@ static bool check(struct Case *test, uint32_t word, unsigned size, unsigned id,
 	for (unsigned i = 0; i < reg_count; ++i) {
 		const cs_mips_op *reg = &detail->operands[i];
 		if (reg->type != MIPS_OP_REG || !reg->is_reglist ||
-		    reg->access != (store ? CS_AC_READ : CS_AC_WRITE))
+		    (test->check_access &&
+		     reg->access != (store ? CS_AC_READ : CS_AC_WRITE)))
 			return false;
 	}
 	return true;
@@ -60,12 +63,16 @@ int main(void)
 	static const int signed_offsets[] = { 0,   4,	8,   12,  16,  20,
 					      24,  28,	-32, -28, -24, -20,
 					      -16, -12, -8,  -4 };
+	// Operand structure is retained in DIET; access metadata is not.
+	bool check_access = !cs_support(CS_SUPPORT_DIET);
 	for (unsigned r6 = 0; r6 < 2; ++r6) {
 		for (unsigned big = 0; big < 2; ++big) {
 			for (unsigned output = 0; output < 4; ++output) {
 				// MIPS operand details are filled by its printer.
 				struct Case test = { .big = big,
-						     .detail = output == 3 };
+						     .detail = output == 3,
+						     .check_access =
+							     check_access };
 				cs_mode mode = r6 ? CS_MODE_MICRO32R6 :
 						    CS_MODE_MICRO;
 				if (big)

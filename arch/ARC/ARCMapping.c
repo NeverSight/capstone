@@ -15,6 +15,10 @@
 #include "../../cs_simple_types.h"
 
 #include "ARCMapping.h"
+
+#ifdef CAPSTONE_DIET
+#include "ARCGenCSMappingInsnOpDiet.inc"
+#endif
 #include "ARCLinkage.h"
 
 #define GET_REGINFO_ENUM

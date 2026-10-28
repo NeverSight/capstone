@@ -16,6 +16,10 @@
 #include "../../cs_simple_types.h"
 
 #include "LoongArchMapping.h"
+
+#ifdef CAPSTONE_DIET
+#include "LoongArchGenCSMappingInsnOpDiet.inc"
+#endif
 #include "LoongArchLinkage.h"
 
 #define GET_REGINFO_ENUM

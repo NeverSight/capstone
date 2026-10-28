@@ -22,6 +22,10 @@
 #include "ARMInstPrinter.h"
 #include "ARMMapping.h"
 
+#ifdef CAPSTONE_DIET
+#include "ARMGenCSMappingInsnOpDiet.inc"
+#endif
+
 static const name_map insn_alias_mnem_map[] = {
 #include "ARMGenCSAliasMnemMap.inc"
 	{ ARM_INS_ALIAS_ASR, "asr" },	   { ARM_INS_ALIAS_LSL, "lsl" },

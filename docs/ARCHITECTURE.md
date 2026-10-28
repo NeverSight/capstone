@@ -86,6 +86,31 @@ The mapping component has three different task:
 3. Adding additional detail to the Capstone instructions
 (e.g. operand `read/write` attributes etc.).
 
+For AArch64, ARM, Alpha, ARC, Mips, PPC, Sparc, LoongArch, and RISC-V, DIET retains
+the operand type classifications used to construct architectural operands,
+including memory components and AArch64 bound operands. Its compact
+rows in `*GenCSMappingInsnOpDiet.inc` are projections of the checked-in full
+`*GenCSMappingInsnOp.inc` tables, not independent ISA descriptions. Run
+`python3 suite/synctools/mapping_diet_types.py` after changing those tables,
+`*GenInstrInfo.inc` opcode enums, common operand type values, or the mapping
+capacities in `Mapping.h`. `--check`
+validates every opcode name/index, type expression, row extent and zero sentinel,
+and rejects stale output. Equal padded type rows share a uint16-indexed entry.
+Only DIET includes the projection; full builds keep the original mapping tables
+and access path. Access metadata and data-type lists remain omitted in DIET.
+The private x86 feature printers validate decoded register IDs independently of
+the public register-name API, which intentionally returns no names in DIET.
+Lack of a printable name must not reject a valid feature instruction or route its
+private opcode into an unrelated generated instruction table.
+These checks establish that the compact table preserves its source's numeric
+operand classifications and opcode alignment. They do not validate ISA semantics
+or replace decoder and architectural-detail regression tests.
+
+AArch64 records post-index addressing while constructing its operands: a
+separate immediate after a writeback base, or a post-increment register operand,
+identifies the update. It does not recover this semantic flag by searching
+printed assembly, which is absent in DIET and may use different register names.
+
 ### Instruction representation
 
 There exist two structs which represent an instruction:

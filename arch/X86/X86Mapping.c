@@ -5638,6 +5638,19 @@ static bool print_tile_compute(MCInst *instr, SStream *stream, bool att_syntax)
 	return true;
 }
 
+#ifdef CAPSTONE_DIET
+// Public register names are unavailable in DIET, but their absence must not
+// reject decoded operands. All public IDs between INVALID and ENDING have a
+// name in full builds. DIET text appenders discard this empty placeholder.
+static const char *feature_operand_register_name(csh handle, unsigned int reg)
+{
+	(void)handle;
+	return reg > X86_REG_INVALID && reg < X86_REG_ENDING ? "" : NULL;
+}
+#else
+#define feature_operand_register_name X86_reg_name
+#endif
+
 static bool print_rex2(MCInst *instr, SStream *stream, bool att_syntax)
 {
 	unsigned int opcode = MCInst_getOpcode(instr);
@@ -5722,8 +5735,8 @@ static bool print_rex2(MCInst *instr, SStream *stream, bool att_syntax)
 	destination = (x86_reg)MCOperand_getImm(destination_operand);
 	source = (x86_reg)MCOperand_getImm(source_operand);
 	width = (uint8_t)MCOperand_getImm(width_operand);
-	destination_name = X86_reg_name((csh)instr->csh, destination);
-	source_name = X86_reg_name((csh)instr->csh, source);
+	destination_name = feature_operand_register_name((csh)instr->csh, destination);
+	source_name = feature_operand_register_name((csh)instr->csh, source);
 	if (!destination_name || !source_name)
 		return false;
 
@@ -5843,8 +5856,8 @@ static bool print_apx_push2_pop2(MCInst *instr, SStream *stream,
 		return false;
 	v_register = (x86_reg)MCOperand_getImm(v_operand);
 	b_register = (x86_reg)MCOperand_getImm(b_operand);
-	v_name = X86_reg_name((csh)instr->csh, v_register);
-	b_name = X86_reg_name((csh)instr->csh, b_register);
+	v_name = feature_operand_register_name((csh)instr->csh, v_register);
+	b_name = feature_operand_register_name((csh)instr->csh, b_register);
 	if (!v_name || !b_name)
 		return false;
 
@@ -5920,7 +5933,7 @@ static bool print_rex2_push_pop(MCInst *instr, SStream *stream, bool att_syntax)
 		return false;
 	reg = (x86_reg)MCOperand_getImm(reg_operand);
 	width = (uint8_t)MCOperand_getImm(width_operand);
-	name = X86_reg_name((csh)instr->csh, reg);
+	name = feature_operand_register_name((csh)instr->csh, reg);
 	if (!name || (width != 2 && width != 8))
 		return false;
 
@@ -6057,8 +6070,8 @@ static bool print_apx_cmov(MCInst *instr, SStream *stream, bool att_syntax)
 	if ((width != 2 && width != 4 && width != 8) || cfcmov == (nd && !nf) ||
 	    (nd ? ndd_field == X86_REG_INVALID :
 		  ndd_field != X86_REG_INVALID) ||
-	    !X86_reg_name((csh)instr->csh, reg_field) ||
-	    (!memory_form && !X86_reg_name((csh)instr->csh, rm_field))) {
+	    !feature_operand_register_name((csh)instr->csh, reg_field) ||
+	    (!memory_form && !feature_operand_register_name((csh)instr->csh, rm_field))) {
 		return false;
 	}
 
@@ -6121,7 +6134,7 @@ static bool print_apx_cmov(MCInst *instr, SStream *stream, bool att_syntax)
 				return false;
 		} else {
 			const char *name =
-				X86_reg_name((csh)instr->csh, operand->reg);
+				feature_operand_register_name((csh)instr->csh, operand->reg);
 
 			if (!name)
 				return false;
@@ -6290,8 +6303,8 @@ static bool print_apx_shift_rotate(MCInst *instr, SStream *stream,
 	    (nd		 ? destination == X86_REG_INVALID :
 	     memory_form ? destination != X86_REG_INVALID :
 			   destination != source) ||
-	    (!memory_form && !X86_reg_name((csh)instr->csh, source)) ||
-	    (nd && !X86_reg_name((csh)instr->csh, destination)) ||
+	    (!memory_form && !feature_operand_register_name((csh)instr->csh, source)) ||
+	    (nd && !feature_operand_register_name((csh)instr->csh, destination)) ||
 	    (nf && reads_carry)) {
 		return false;
 	}
@@ -6356,7 +6369,7 @@ static bool print_apx_shift_rotate(MCInst *instr, SStream *stream,
 				return false;
 		} else {
 			const char *name =
-				X86_reg_name((csh)instr->csh, operand->reg);
+				feature_operand_register_name((csh)instr->csh, operand->reg);
 
 			if (!name)
 				return false;
@@ -6432,18 +6445,18 @@ static bool print_apx_shift_rotate(MCInst *instr, SStream *stream,
 	return true;
 }
 
-static bool print_apx_mulx(MCInst*in,SStream*s,bool att){const MCOperand*a,*b,*mf,*wo;x86_reg d1,d2,src=X86_REG_INVALID,seg=X86_REG_INVALID;bool mem;uint8_t w,i;x86_feature_memory m;cs_detail*detail;cs_x86*x;if(MCInst_getOpcode(in)!=X86_FEATURE_APX_MULX)return false;a=MCInst_getOperand(in,0);b=MCInst_getOperand(in,1);mf=MCInst_getOperand(in,2);d1=(x86_reg)MCOperand_getImm(a);d2=(x86_reg)MCOperand_getImm(b);mem=MCOperand_getImm(mf)!=0;memset(&m,0,sizeof(m));if(mem){if(MCInst_getNumOperands(in)!=10||!get_feature_memory(in,3,&m))return false;seg=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,7));wo=MCInst_getOperand(in,9);}else{if(MCInst_getNumOperands(in)!=5)return false;src=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,3));wo=MCInst_getOperand(in,4);}w=(uint8_t)MCOperand_getImm(wo);SStream_concat(s,att?"mulx%c\t":"mulx\t",w==4?'l':'q');for(i=0;i<3;i++){unsigned k=att?2-i:i;if(i)SStream_concat0(s,", ");if(k<2)SStream_concat(s,att?"%%%s":"%s",X86_reg_name((csh)in->csh,k?d2:d1));else if(mem){if(!att)SStream_concat0(s,w==4?"dword ptr ":"qword ptr ");if(seg!=X86_REG_INVALID)SStream_concat(s,att?"%%%s:":"%s:",feature_register_name(seg));if(!print_feature_memory(s,&m,att))return false;}else SStream_concat(s,att?"%%%s":"%s",X86_reg_name((csh)in->csh,src));}if(!in->flat_insn->detail)return true;detail=in->flat_insn->detail;x=&detail->x86;for(i=0;i<3;i++){unsigned k=att?2-i:i;cs_x86_op*o=&x->operands[i];if(k<2){o->type=X86_OP_REG;o->reg=k?d2:d1;o->size=w;o->access=CS_AC_WRITE;}else if(mem){set_feature_memory_operand(o,&m,w,CS_AC_READ);o->mem.segment=seg;}else{o->type=X86_OP_REG;o->reg=src;o->size=w;o->access=CS_AC_READ;}}x->op_count=3;detail->regs_read[detail->regs_read_count++]=w==4?X86_REG_EDX:X86_REG_RDX;return true;}
+static bool print_apx_mulx(MCInst*in,SStream*s,bool att){const MCOperand*a,*b,*mf,*wo;x86_reg d1,d2,src=X86_REG_INVALID,seg=X86_REG_INVALID;bool mem;uint8_t w,i;x86_feature_memory m;cs_detail*detail;cs_x86*x;if(MCInst_getOpcode(in)!=X86_FEATURE_APX_MULX)return false;a=MCInst_getOperand(in,0);b=MCInst_getOperand(in,1);mf=MCInst_getOperand(in,2);d1=(x86_reg)MCOperand_getImm(a);d2=(x86_reg)MCOperand_getImm(b);mem=MCOperand_getImm(mf)!=0;memset(&m,0,sizeof(m));if(mem){if(MCInst_getNumOperands(in)!=10||!get_feature_memory(in,3,&m))return false;seg=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,7));wo=MCInst_getOperand(in,9);}else{if(MCInst_getNumOperands(in)!=5)return false;src=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,3));wo=MCInst_getOperand(in,4);}w=(uint8_t)MCOperand_getImm(wo);SStream_concat(s,att?"mulx%c\t":"mulx\t",w==4?'l':'q');for(i=0;i<3;i++){unsigned k=att?2-i:i;if(i)SStream_concat0(s,", ");if(k<2)SStream_concat(s,att?"%%%s":"%s",feature_operand_register_name((csh)in->csh,k?d2:d1));else if(mem){if(!att)SStream_concat0(s,w==4?"dword ptr ":"qword ptr ");if(seg!=X86_REG_INVALID)SStream_concat(s,att?"%%%s:":"%s:",feature_register_name(seg));if(!print_feature_memory(s,&m,att))return false;}else SStream_concat(s,att?"%%%s":"%s",feature_operand_register_name((csh)in->csh,src));}if(!in->flat_insn->detail)return true;detail=in->flat_insn->detail;x=&detail->x86;for(i=0;i<3;i++){unsigned k=att?2-i:i;cs_x86_op*o=&x->operands[i];if(k<2){o->type=X86_OP_REG;o->reg=k?d2:d1;o->size=w;o->access=CS_AC_WRITE;}else if(mem){set_feature_memory_operand(o,&m,w,CS_AC_READ);o->mem.segment=seg;}else{o->type=X86_OP_REG;o->reg=src;o->size=w;o->access=CS_AC_READ;}}x->op_count=3;detail->regs_read[detail->regs_read_count++]=w==4?X86_REG_EDX:X86_REG_RDX;return true;}
 
-static bool print_apx_convert(MCInst*in,SStream*out,bool att){unsigned opc=MCInst_getOpcode(in);bool crc=opc==X86_FEATURE_APX_CRC32,mem,store;const MCOperand*mf;x86_reg reg,rm=X86_REG_INVALID,seg=X86_REG_INVALID;uint8_t dw,sw,i;x86_feature_memory m;cs_x86*x;if(!crc&&opc!=X86_FEATURE_APX_MOVBE)return false;reg=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,0));mf=MCInst_getOperand(in,1);mem=MCOperand_getImm(mf)!=0;store=MCOperand_getImm(MCInst_getOperand(in,2))!=0;memset(&m,0,sizeof(m));if(mem){if(MCInst_getNumOperands(in)!=11||!get_feature_memory(in,3,&m))return false;seg=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,7));dw=(uint8_t)MCOperand_getImm(MCInst_getOperand(in,9));sw=(uint8_t)MCOperand_getImm(MCInst_getOperand(in,10));}else{if(MCInst_getNumOperands(in)!=6)return false;rm=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,3));dw=(uint8_t)MCOperand_getImm(MCInst_getOperand(in,4));sw=(uint8_t)MCOperand_getImm(MCInst_getOperand(in,5));}SStream_concat(out,att?"%s%c\t":"%s\t",crc?"crc32":"movbe",(crc?dw:(store?sw:dw))==2?'w':(crc?dw:(store?sw:dw))==4?'l':'q');for(i=0;i<2;i++){unsigned logical=att?1-i:i;bool rmop=store?(logical==0):(logical==1);uint8_t w=rmop?sw:dw;if(i)SStream_concat0(out,", ");if(rmop&&mem){if(!att)SStream_concat0(out,w==1?"byte ptr ":w==2?"word ptr ":w==4?"dword ptr ":"qword ptr ");if(seg!=X86_REG_INVALID)SStream_concat(out,att?"%%%s:":"%s:",feature_register_name(seg));if(!print_feature_memory(out,&m,att))return false;}else{SStream_concat(out,att?"%%%s":"%s",X86_reg_name((csh)in->csh,rmop?rm:reg));}}if(!in->flat_insn->detail)return true;x=&in->flat_insn->detail->x86;for(i=0;i<2;i++){unsigned logical=att?1-i:i;bool rmop=store?(logical==0):(logical==1);uint8_t w=rmop?sw:dw;uint8_t ac=crc&&!rmop?CS_AC_READ_WRITE:(store?(!rmop?CS_AC_READ:CS_AC_WRITE):(!rmop?CS_AC_WRITE:CS_AC_READ));cs_x86_op*o=&x->operands[i];if(rmop&&mem){set_feature_memory_operand(o,&m,w,ac);o->mem.segment=seg;}else{o->type=X86_OP_REG;o->reg=rmop?rm:reg;o->size=w;o->access=ac;}}x->op_count=2;return true;}
+static bool print_apx_convert(MCInst*in,SStream*out,bool att){unsigned opc=MCInst_getOpcode(in);bool crc=opc==X86_FEATURE_APX_CRC32,mem,store;const MCOperand*mf;x86_reg reg,rm=X86_REG_INVALID,seg=X86_REG_INVALID;uint8_t dw,sw,i;x86_feature_memory m;cs_x86*x;if(!crc&&opc!=X86_FEATURE_APX_MOVBE)return false;reg=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,0));mf=MCInst_getOperand(in,1);mem=MCOperand_getImm(mf)!=0;store=MCOperand_getImm(MCInst_getOperand(in,2))!=0;memset(&m,0,sizeof(m));if(mem){if(MCInst_getNumOperands(in)!=11||!get_feature_memory(in,3,&m))return false;seg=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,7));dw=(uint8_t)MCOperand_getImm(MCInst_getOperand(in,9));sw=(uint8_t)MCOperand_getImm(MCInst_getOperand(in,10));}else{if(MCInst_getNumOperands(in)!=6)return false;rm=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,3));dw=(uint8_t)MCOperand_getImm(MCInst_getOperand(in,4));sw=(uint8_t)MCOperand_getImm(MCInst_getOperand(in,5));}SStream_concat(out,att?"%s%c\t":"%s\t",crc?"crc32":"movbe",(crc?dw:(store?sw:dw))==2?'w':(crc?dw:(store?sw:dw))==4?'l':'q');for(i=0;i<2;i++){unsigned logical=att?1-i:i;bool rmop=store?(logical==0):(logical==1);uint8_t w=rmop?sw:dw;if(i)SStream_concat0(out,", ");if(rmop&&mem){if(!att)SStream_concat0(out,w==1?"byte ptr ":w==2?"word ptr ":w==4?"dword ptr ":"qword ptr ");if(seg!=X86_REG_INVALID)SStream_concat(out,att?"%%%s:":"%s:",feature_register_name(seg));if(!print_feature_memory(out,&m,att))return false;}else{SStream_concat(out,att?"%%%s":"%s",feature_operand_register_name((csh)in->csh,rmop?rm:reg));}}if(!in->flat_insn->detail)return true;x=&in->flat_insn->detail->x86;for(i=0;i<2;i++){unsigned logical=att?1-i:i;bool rmop=store?(logical==0):(logical==1);uint8_t w=rmop?sw:dw;uint8_t ac=crc&&!rmop?CS_AC_READ_WRITE:(store?(!rmop?CS_AC_READ:CS_AC_WRITE):(!rmop?CS_AC_WRITE:CS_AC_READ));cs_x86_op*o=&x->operands[i];if(rmop&&mem){set_feature_memory_operand(o,&m,w,ac);o->mem.segment=seg;}else{o->type=X86_OP_REG;o->reg=rmop?rm:reg;o->size=w;o->access=ac;}}x->op_count=2;return true;}
 
 static bool print_apx_double_shift(MCInst*in,SStream*s,bool att)
 {
-	unsigned op=MCInst_getOpcode(in),n,i;bool right=op==X86_FEATURE_APX_SHRD,mem,nd,nf,cl;x86_reg dst,src,rm=X86_REG_INVALID,seg=X86_REG_INVALID;uint8_t w,imm;x86_feature_memory m;cs_detail*d;cs_x86*x;if(!right&&op!=X86_FEATURE_APX_SHLD)return false;dst=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,0));src=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,1));mem=MCOperand_getImm(MCInst_getOperand(in,2))!=0;nd=MCOperand_getImm(MCInst_getOperand(in,3))!=0;nf=MCOperand_getImm(MCInst_getOperand(in,4))!=0;memset(&m,0,sizeof(m));if(mem){if(MCInst_getNumOperands(in)!=14||!get_feature_memory(in,5,&m))return false;seg=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,9));w=(uint8_t)MCOperand_getImm(MCInst_getOperand(in,11));cl=MCOperand_getImm(MCInst_getOperand(in,12))!=0;imm=(uint8_t)MCOperand_getImm(MCInst_getOperand(in,13));}else{if(MCInst_getNumOperands(in)!=9)return false;rm=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,5));w=(uint8_t)MCOperand_getImm(MCInst_getOperand(in,6));cl=MCOperand_getImm(MCInst_getOperand(in,7))!=0;imm=(uint8_t)MCOperand_getImm(MCInst_getOperand(in,8));}if(nf)SStream_concat0(s,"{nf}|");SStream_concat(s,att?"%s%c\t":"%s\t",right?"shrd":"shld",w==2?'w':w==4?'l':'q');n=nd?4:3;for(i=0;i<n;i++){unsigned k=att?n-1-i:i;if(i)SStream_concat0(s,", ");if(k==n-1){if(cl)SStream_concat0(s,att?"%cl":"cl");else print_apx_scalar_immediate(in,s,imm,1,att);}else if(nd&&k==0)SStream_concat(s,att?"%%%s":"%s",X86_reg_name((csh)in->csh,dst));else if((nd&&k==1)||(!nd&&k==0)){if(mem){if(!att)SStream_concat0(s,w==2?"word ptr ":w==4?"dword ptr ":"qword ptr ");if(seg!=X86_REG_INVALID)SStream_concat(s,att?"%%%s:":"%s:",feature_register_name(seg));if(!print_feature_memory(s,&m,att))return false;}else SStream_concat(s,att?"%%%s":"%s",X86_reg_name((csh)in->csh,rm));}else SStream_concat(s,att?"%%%s":"%s",X86_reg_name((csh)in->csh,src));}if(!in->flat_insn->detail)return true;d=in->flat_insn->detail;x=&d->x86;for(i=0;i<n;i++){unsigned k=att?n-1-i:i;cs_x86_op*o=&x->operands[i];if(k==n-1){o->type=cl?X86_OP_REG:X86_OP_IMM;if(cl)o->reg=X86_REG_CL;else o->imm=imm;o->size=1;o->access=CS_AC_READ;}else if(nd&&k==0){o->type=X86_OP_REG;o->reg=dst;o->size=w;o->access=CS_AC_WRITE;}else if((nd&&k==1)||(!nd&&k==0)){uint8_t ac=nd?CS_AC_READ:CS_AC_READ_WRITE;if(mem){set_feature_memory_operand(o,&m,w,ac);o->mem.segment=seg;}else{o->type=X86_OP_REG;o->reg=rm;o->size=w;o->access=ac;}}else{o->type=X86_OP_REG;o->reg=src;o->size=w;o->access=CS_AC_READ;}}x->op_count=n;if(cl)d->regs_read[d->regs_read_count++]=X86_REG_CL;if(!nf){d->regs_write[d->regs_write_count++]=X86_REG_EFLAGS;x->eflags=X86_EFLAGS_MODIFY_OF|X86_EFLAGS_MODIFY_SF|X86_EFLAGS_MODIFY_ZF|X86_EFLAGS_UNDEFINED_AF|X86_EFLAGS_MODIFY_PF|X86_EFLAGS_MODIFY_CF;}return true;
+	unsigned op=MCInst_getOpcode(in),n,i;bool right=op==X86_FEATURE_APX_SHRD,mem,nd,nf,cl;x86_reg dst,src,rm=X86_REG_INVALID,seg=X86_REG_INVALID;uint8_t w,imm;x86_feature_memory m;cs_detail*d;cs_x86*x;if(!right&&op!=X86_FEATURE_APX_SHLD)return false;dst=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,0));src=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,1));mem=MCOperand_getImm(MCInst_getOperand(in,2))!=0;nd=MCOperand_getImm(MCInst_getOperand(in,3))!=0;nf=MCOperand_getImm(MCInst_getOperand(in,4))!=0;memset(&m,0,sizeof(m));if(mem){if(MCInst_getNumOperands(in)!=14||!get_feature_memory(in,5,&m))return false;seg=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,9));w=(uint8_t)MCOperand_getImm(MCInst_getOperand(in,11));cl=MCOperand_getImm(MCInst_getOperand(in,12))!=0;imm=(uint8_t)MCOperand_getImm(MCInst_getOperand(in,13));}else{if(MCInst_getNumOperands(in)!=9)return false;rm=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,5));w=(uint8_t)MCOperand_getImm(MCInst_getOperand(in,6));cl=MCOperand_getImm(MCInst_getOperand(in,7))!=0;imm=(uint8_t)MCOperand_getImm(MCInst_getOperand(in,8));}if(nf)SStream_concat0(s,"{nf}|");SStream_concat(s,att?"%s%c\t":"%s\t",right?"shrd":"shld",w==2?'w':w==4?'l':'q');n=nd?4:3;for(i=0;i<n;i++){unsigned k=att?n-1-i:i;if(i)SStream_concat0(s,", ");if(k==n-1){if(cl)SStream_concat0(s,att?"%cl":"cl");else print_apx_scalar_immediate(in,s,imm,1,att);}else if(nd&&k==0)SStream_concat(s,att?"%%%s":"%s",feature_operand_register_name((csh)in->csh,dst));else if((nd&&k==1)||(!nd&&k==0)){if(mem){if(!att)SStream_concat0(s,w==2?"word ptr ":w==4?"dword ptr ":"qword ptr ");if(seg!=X86_REG_INVALID)SStream_concat(s,att?"%%%s:":"%s:",feature_register_name(seg));if(!print_feature_memory(s,&m,att))return false;}else SStream_concat(s,att?"%%%s":"%s",feature_operand_register_name((csh)in->csh,rm));}else SStream_concat(s,att?"%%%s":"%s",feature_operand_register_name((csh)in->csh,src));}if(!in->flat_insn->detail)return true;d=in->flat_insn->detail;x=&d->x86;for(i=0;i<n;i++){unsigned k=att?n-1-i:i;cs_x86_op*o=&x->operands[i];if(k==n-1){o->type=cl?X86_OP_REG:X86_OP_IMM;if(cl)o->reg=X86_REG_CL;else o->imm=imm;o->size=1;o->access=CS_AC_READ;}else if(nd&&k==0){o->type=X86_OP_REG;o->reg=dst;o->size=w;o->access=CS_AC_WRITE;}else if((nd&&k==1)||(!nd&&k==0)){uint8_t ac=nd?CS_AC_READ:CS_AC_READ_WRITE;if(mem){set_feature_memory_operand(o,&m,w,ac);o->mem.segment=seg;}else{o->type=X86_OP_REG;o->reg=rm;o->size=w;o->access=ac;}}else{o->type=X86_OP_REG;o->reg=src;o->size=w;o->access=CS_AC_READ;}}x->op_count=n;if(cl)d->regs_read[d->regs_read_count++]=X86_REG_CL;if(!nf){d->regs_write[d->regs_write_count++]=X86_REG_EFLAGS;x->eflags=X86_EFLAGS_MODIFY_OF|X86_EFLAGS_MODIFY_SF|X86_EFLAGS_MODIFY_ZF|X86_EFLAGS_UNDEFINED_AF|X86_EFLAGS_MODIFY_PF|X86_EFLAGS_MODIFY_CF;}return true;
 }
 
 static bool print_apx_cmpccxadd(MCInst*in,SStream*s,bool att)
 {
-	static const char*const names[]={"cmpoxadd","cmpnoxadd","cmpbxadd","cmpnbxadd","cmpzxadd","cmpnzxadd","cmpbexadd","cmpnbexadd","cmpsxadd","cmpnsxadd","cmppxadd","cmpnpxadd","cmplxadd","cmpnlxadd","cmplexadd","cmpnlexadd"};unsigned op=MCInst_getOpcode(in),idx,i;x86_reg cmp,add,seg;x86_feature_memory m;uint8_t w;cs_detail*d;cs_x86*x;if(op<X86_FEATURE_APX_CMPCCXADD_BASE||op>=X86_FEATURE_APX_CMPCCXADD_BASE+16)return false;idx=op-X86_FEATURE_APX_CMPCCXADD_BASE;if(MCInst_getNumOperands(in)!=9||!get_feature_memory(in,2,&m))return false;cmp=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,0));add=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,1));seg=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,6));w=(uint8_t)MCOperand_getImm(MCInst_getOperand(in,8));SStream_concat(s,att?"%s%c\t":"%s\t",names[idx],w==4?'l':'q');for(i=0;i<3;i++){unsigned k=att?2-i:i;if(i)SStream_concat0(s,", ");if(k==0){if(!att)SStream_concat0(s,w==4?"dword ptr ":"qword ptr ");if(seg!=X86_REG_INVALID)SStream_concat(s,att?"%%%s:":"%s:",feature_register_name(seg));if(!print_feature_memory(s,&m,att))return false;}else SStream_concat(s,att?"%%%s":"%s",X86_reg_name((csh)in->csh,k==1?cmp:add));}if(!in->flat_insn->detail)return true;d=in->flat_insn->detail;x=&d->x86;for(i=0;i<3;i++){unsigned k=att?2-i:i;cs_x86_op*o=&x->operands[i];if(k==0){set_feature_memory_operand(o,&m,w,CS_AC_READ_WRITE);o->mem.segment=seg;}else{o->type=X86_OP_REG;o->reg=k==1?cmp:add;o->size=w;o->access=k==1?CS_AC_READ_WRITE:CS_AC_READ;}}x->op_count=3;d->regs_write[d->regs_write_count++]=X86_REG_EFLAGS;x->eflags=X86_EFLAGS_MODIFY_OF|X86_EFLAGS_MODIFY_SF|X86_EFLAGS_MODIFY_ZF|X86_EFLAGS_MODIFY_AF|X86_EFLAGS_MODIFY_PF|X86_EFLAGS_MODIFY_CF;return true;
+	static const char*const names[]={"cmpoxadd","cmpnoxadd","cmpbxadd","cmpnbxadd","cmpzxadd","cmpnzxadd","cmpbexadd","cmpnbexadd","cmpsxadd","cmpnsxadd","cmppxadd","cmpnpxadd","cmplxadd","cmpnlxadd","cmplexadd","cmpnlexadd"};unsigned op=MCInst_getOpcode(in),idx,i;x86_reg cmp,add,seg;x86_feature_memory m;uint8_t w;cs_detail*d;cs_x86*x;if(op<X86_FEATURE_APX_CMPCCXADD_BASE||op>=X86_FEATURE_APX_CMPCCXADD_BASE+16)return false;idx=op-X86_FEATURE_APX_CMPCCXADD_BASE;if(MCInst_getNumOperands(in)!=9||!get_feature_memory(in,2,&m))return false;cmp=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,0));add=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,1));seg=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,6));w=(uint8_t)MCOperand_getImm(MCInst_getOperand(in,8));SStream_concat(s,att?"%s%c\t":"%s\t",names[idx],w==4?'l':'q');for(i=0;i<3;i++){unsigned k=att?2-i:i;if(i)SStream_concat0(s,", ");if(k==0){if(!att)SStream_concat0(s,w==4?"dword ptr ":"qword ptr ");if(seg!=X86_REG_INVALID)SStream_concat(s,att?"%%%s:":"%s:",feature_register_name(seg));if(!print_feature_memory(s,&m,att))return false;}else SStream_concat(s,att?"%%%s":"%s",feature_operand_register_name((csh)in->csh,k==1?cmp:add));}if(!in->flat_insn->detail)return true;d=in->flat_insn->detail;x=&d->x86;for(i=0;i<3;i++){unsigned k=att?2-i:i;cs_x86_op*o=&x->operands[i];if(k==0){set_feature_memory_operand(o,&m,w,CS_AC_READ_WRITE);o->mem.segment=seg;}else{o->type=X86_OP_REG;o->reg=k==1?cmp:add;o->size=w;o->access=k==1?CS_AC_READ_WRITE:CS_AC_READ;}}x->op_count=3;d->regs_write[d->regs_write_count++]=X86_REG_EFLAGS;x->eflags=X86_EFLAGS_MODIFY_OF|X86_EFLAGS_MODIFY_SF|X86_EFLAGS_MODIFY_ZF|X86_EFLAGS_MODIFY_AF|X86_EFLAGS_MODIFY_PF|X86_EFLAGS_MODIFY_CF;return true;
 }
 
 static bool print_apx_ccmp(MCInst *in, SStream *s, bool att) {
@@ -6517,7 +6530,7 @@ static bool print_apx_ccmp(MCInst *in, SStream *s, bool att) {
       if (imm)
         print_apx_scalar_immediate(in, s, iv, w, att);
       else
-        SStream_concat(s, att ? "%%%s" : "%s", X86_reg_name((csh)in->csh, rr));
+        SStream_concat(s, att ? "%%%s" : "%s", feature_operand_register_name((csh)in->csh, rr));
     } else if (mem) {
       if (!att)
         SStream_concat0(s, w == 1   ? "byte ptr "
@@ -6529,7 +6542,7 @@ static bool print_apx_ccmp(MCInst *in, SStream *s, bool att) {
       if (!print_feature_memory(s, &m, att))
         return false;
     } else
-      SStream_concat(s, att ? "%%%s" : "%s", X86_reg_name((csh)in->csh, rm));
+      SStream_concat(s, att ? "%%%s" : "%s", feature_operand_register_name((csh)in->csh, rm));
   }
   if (!in->flat_insn->detail)
     return true;
@@ -6575,22 +6588,22 @@ static bool print_apx_ccmp(MCInst *in, SStream *s, bool att) {
 
 static bool print_apx_kmov(MCInst*in,SStream*s,bool att)
 {
-	unsigned f=MCInst_getOpcode(in),op,i;x86_reg reg,rm=X86_REG_INVALID,seg=X86_REG_INVALID;x86_feature_memory m;bool mem;uint8_t w;cs_x86*x;if(f<X86_FEATURE_APX_KMOV_BASE||f>=X86_FEATURE_APX_KMOV_BASE+4)return false;op=(unsigned)MCOperand_getImm(MCInst_getOperand(in,0));reg=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,1));mem=MCOperand_getImm(MCInst_getOperand(in,2))!=0;memset(&m,0,sizeof(m));if(mem){if(MCInst_getNumOperands(in)!=10||!get_feature_memory(in,3,&m))return false;seg=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,7));w=(uint8_t)MCOperand_getImm(MCInst_getOperand(in,9));}else{if(MCInst_getNumOperands(in)!=5)return false;rm=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,3));w=(uint8_t)MCOperand_getImm(MCInst_getOperand(in,4));}SStream_concat(s,"kmov%c\t",w==1?'b':w==2?'w':w==4?'d':'q');for(i=0;i<2;i++){unsigned k=att?1-i:i;bool ismem=mem&&((op==0x91&&k==0)||(op==0x90&&k==1));x86_reg r=k==0?reg:rm;if(op==0x91){if(k==0)r=X86_REG_INVALID;else r=reg;}if(i)SStream_concat0(s,", ");if(ismem){if(!att)SStream_concat0(s,w==1?"byte ptr ":w==2?"word ptr ":w==4?"dword ptr ":"qword ptr ");if(seg!=X86_REG_INVALID)SStream_concat(s,att?"%%%s:":"%s:",feature_register_name(seg));if(!print_feature_memory(s,&m,att))return false;}else SStream_concat(s,att?"%%%s":"%s",X86_reg_name((csh)in->csh,r));}if(!in->flat_insn->detail)return true;x=&in->flat_insn->detail->x86;for(i=0;i<2;i++){unsigned k=att?1-i:i;bool ismem=mem&&((op==0x91&&k==0)||(op==0x90&&k==1));bool gpr=(op==0x92&&k==1)||(op==0x93&&k==0);x86_reg r=k==0?reg:rm;uint8_t sz=gpr?(w==8?8:4):w;if(op==0x91){if(k==0)r=X86_REG_INVALID;else r=reg;}if(ismem){set_feature_memory_operand(&x->operands[i],&m,w,k==0?CS_AC_WRITE:CS_AC_READ);x->operands[i].mem.segment=seg;}else{x->operands[i].type=X86_OP_REG;x->operands[i].reg=r;x->operands[i].size=sz;x->operands[i].access=k==0?CS_AC_WRITE:CS_AC_READ;}}x->op_count=2;return true;
+	unsigned f=MCInst_getOpcode(in),op,i;x86_reg reg,rm=X86_REG_INVALID,seg=X86_REG_INVALID;x86_feature_memory m;bool mem;uint8_t w;cs_x86*x;if(f<X86_FEATURE_APX_KMOV_BASE||f>=X86_FEATURE_APX_KMOV_BASE+4)return false;op=(unsigned)MCOperand_getImm(MCInst_getOperand(in,0));reg=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,1));mem=MCOperand_getImm(MCInst_getOperand(in,2))!=0;memset(&m,0,sizeof(m));if(mem){if(MCInst_getNumOperands(in)!=10||!get_feature_memory(in,3,&m))return false;seg=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,7));w=(uint8_t)MCOperand_getImm(MCInst_getOperand(in,9));}else{if(MCInst_getNumOperands(in)!=5)return false;rm=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,3));w=(uint8_t)MCOperand_getImm(MCInst_getOperand(in,4));}SStream_concat(s,"kmov%c\t",w==1?'b':w==2?'w':w==4?'d':'q');for(i=0;i<2;i++){unsigned k=att?1-i:i;bool ismem=mem&&((op==0x91&&k==0)||(op==0x90&&k==1));x86_reg r=k==0?reg:rm;if(op==0x91){if(k==0)r=X86_REG_INVALID;else r=reg;}if(i)SStream_concat0(s,", ");if(ismem){if(!att)SStream_concat0(s,w==1?"byte ptr ":w==2?"word ptr ":w==4?"dword ptr ":"qword ptr ");if(seg!=X86_REG_INVALID)SStream_concat(s,att?"%%%s:":"%s:",feature_register_name(seg));if(!print_feature_memory(s,&m,att))return false;}else SStream_concat(s,att?"%%%s":"%s",feature_operand_register_name((csh)in->csh,r));}if(!in->flat_insn->detail)return true;x=&in->flat_insn->detail->x86;for(i=0;i<2;i++){unsigned k=att?1-i:i;bool ismem=mem&&((op==0x91&&k==0)||(op==0x90&&k==1));bool gpr=(op==0x92&&k==1)||(op==0x93&&k==0);x86_reg r=k==0?reg:rm;uint8_t sz=gpr?(w==8?8:4):w;if(op==0x91){if(k==0)r=X86_REG_INVALID;else r=reg;}if(ismem){set_feature_memory_operand(&x->operands[i],&m,w,k==0?CS_AC_WRITE:CS_AC_READ);x->operands[i].mem.segment=seg;}else{x->operands[i].type=X86_OP_REG;x->operands[i].reg=r;x->operands[i].size=sz;x->operands[i].access=k==0?CS_AC_WRITE:CS_AC_READ;}}x->op_count=2;return true;
 }
 
 static bool print_apx_movrs(MCInst*in,SStream*s,bool att)
 {
-	x86_reg dst,seg;x86_feature_memory m;uint8_t w,i;cs_x86*x;if(MCInst_getOpcode(in)!=X86_FEATURE_APX_MOVRS)return false;if(MCInst_getNumOperands(in)!=8||!get_feature_memory(in,1,&m))return false;dst=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,0));seg=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,5));w=(uint8_t)MCOperand_getImm(MCInst_getOperand(in,7));if(att)SStream_concat(s,"movrs%c\t",w==1?'b':w==2?'w':w==4?'l':'q');else SStream_concat0(s,"movrs\t");for(i=0;i<2;i++){unsigned k=att?1-i:i;if(i)SStream_concat0(s,", ");if(k==0)SStream_concat(s,att?"%%%s":"%s",X86_reg_name((csh)in->csh,dst));else{if(!att)SStream_concat0(s,w==1?"byte ptr ":w==2?"word ptr ":w==4?"dword ptr ":"qword ptr ");if(seg!=X86_REG_INVALID)SStream_concat(s,att?"%%%s:":"%s:",feature_register_name(seg));if(!print_feature_memory(s,&m,att))return false;}}if(!in->flat_insn->detail)return true;x=&in->flat_insn->detail->x86;for(i=0;i<2;i++){unsigned k=att?1-i:i;if(k==0){x->operands[i].type=X86_OP_REG;x->operands[i].reg=dst;x->operands[i].size=w;x->operands[i].access=CS_AC_WRITE;}else{set_feature_memory_operand(&x->operands[i],&m,w,CS_AC_READ);x->operands[i].mem.segment=seg;}}x->op_count=2;return true;
+	x86_reg dst,seg;x86_feature_memory m;uint8_t w,i;cs_x86*x;if(MCInst_getOpcode(in)!=X86_FEATURE_APX_MOVRS)return false;if(MCInst_getNumOperands(in)!=8||!get_feature_memory(in,1,&m))return false;dst=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,0));seg=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,5));w=(uint8_t)MCOperand_getImm(MCInst_getOperand(in,7));if(att)SStream_concat(s,"movrs%c\t",w==1?'b':w==2?'w':w==4?'l':'q');else SStream_concat0(s,"movrs\t");for(i=0;i<2;i++){unsigned k=att?1-i:i;if(i)SStream_concat0(s,", ");if(k==0)SStream_concat(s,att?"%%%s":"%s",feature_operand_register_name((csh)in->csh,dst));else{if(!att)SStream_concat0(s,w==1?"byte ptr ":w==2?"word ptr ":w==4?"dword ptr ":"qword ptr ");if(seg!=X86_REG_INVALID)SStream_concat(s,att?"%%%s:":"%s:",feature_register_name(seg));if(!print_feature_memory(s,&m,att))return false;}}if(!in->flat_insn->detail)return true;x=&in->flat_insn->detail->x86;for(i=0;i<2;i++){unsigned k=att?1-i:i;if(k==0){x->operands[i].type=X86_OP_REG;x->operands[i].reg=dst;x->operands[i].size=w;x->operands[i].access=CS_AC_WRITE;}else{set_feature_memory_operand(&x->operands[i],&m,w,CS_AC_READ);x->operands[i].mem.segment=seg;}}x->op_count=2;return true;
 }
 
 static bool print_apx_invalidate(MCInst*in,SStream*s,bool att)
 {
-	unsigned f=MCInst_getOpcode(in),i;x86_reg type,seg;x86_feature_memory m;cs_x86*x;const char*mn;if(f<X86_FEATURE_APX_INV_BASE||f>=X86_FEATURE_APX_INV_BASE+3)return false;mn=f==X86_FEATURE_APX_INV_BASE?"invept":f==X86_FEATURE_APX_INV_BASE+1?"invvpid":"invpcid";if(MCInst_getNumOperands(in)!=7||!get_feature_memory(in,1,&m))return false;type=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,0));seg=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,5));SStream_concat(s,"%s\t",mn);for(i=0;i<2;i++){unsigned k=att?1-i:i;if(i)SStream_concat0(s,", ");if(k==0)SStream_concat(s,att?"%%%s":"%s",X86_reg_name((csh)in->csh,type));else{if(!att)SStream_concat0(s,"xmmword ptr ");if(seg!=X86_REG_INVALID)SStream_concat(s,att?"%%%s:":"%s:",feature_register_name(seg));if(!print_feature_memory(s,&m,att))return false;}}if(!in->flat_insn->detail)return true;x=&in->flat_insn->detail->x86;for(i=0;i<2;i++){unsigned k=att?1-i:i;if(k==0){x->operands[i].type=X86_OP_REG;x->operands[i].reg=type;x->operands[i].size=8;x->operands[i].access=CS_AC_READ;}else{set_feature_memory_operand(&x->operands[i],&m,16,CS_AC_READ);x->operands[i].mem.segment=seg;}}x->op_count=2;return true;
+	unsigned f=MCInst_getOpcode(in),i;x86_reg type,seg;x86_feature_memory m;cs_x86*x;const char*mn;if(f<X86_FEATURE_APX_INV_BASE||f>=X86_FEATURE_APX_INV_BASE+3)return false;mn=f==X86_FEATURE_APX_INV_BASE?"invept":f==X86_FEATURE_APX_INV_BASE+1?"invvpid":"invpcid";if(MCInst_getNumOperands(in)!=7||!get_feature_memory(in,1,&m))return false;type=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,0));seg=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,5));SStream_concat(s,"%s\t",mn);for(i=0;i<2;i++){unsigned k=att?1-i:i;if(i)SStream_concat0(s,", ");if(k==0)SStream_concat(s,att?"%%%s":"%s",feature_operand_register_name((csh)in->csh,type));else{if(!att)SStream_concat0(s,"xmmword ptr ");if(seg!=X86_REG_INVALID)SStream_concat(s,att?"%%%s:":"%s:",feature_register_name(seg));if(!print_feature_memory(s,&m,att))return false;}}if(!in->flat_insn->detail)return true;x=&in->flat_insn->detail->x86;for(i=0;i<2;i++){unsigned k=att?1-i:i;if(k==0){x->operands[i].type=X86_OP_REG;x->operands[i].reg=type;x->operands[i].size=8;x->operands[i].access=CS_AC_READ;}else{set_feature_memory_operand(&x->operands[i],&m,16,CS_AC_READ);x->operands[i].mem.segment=seg;}}x->op_count=2;return true;
 }
 
 static bool print_apx_rao(MCInst*in,SStream*s,bool att)
 {
-	unsigned op=MCInst_getOpcode(in);const char*mn=op==X86_FEATURE_APX_AADD?"aadd":op==X86_FEATURE_APX_AAND?"aand":op==X86_FEATURE_APX_AOR?"aor":op==X86_FEATURE_APX_AXOR?"axor":NULL;x86_reg reg,seg;x86_feature_memory m;uint8_t w,i;cs_x86*x;if(!mn)return false;if(MCInst_getNumOperands(in)!=8||!get_feature_memory(in,1,&m))return false;reg=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,0));seg=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,5));w=(uint8_t)MCOperand_getImm(MCInst_getOperand(in,7));SStream_concat(s,att?"%s%c\t":"%s\t",mn,w==4?'l':'q');for(i=0;i<2;i++){bool mem=att?i==1:i==0;if(i)SStream_concat0(s,", ");if(mem){if(!att)SStream_concat0(s,w==4?"dword ptr ":"qword ptr ");if(seg!=X86_REG_INVALID)SStream_concat(s,att?"%%%s:":"%s:",feature_register_name(seg));if(!print_feature_memory(s,&m,att))return false;}else SStream_concat(s,att?"%%%s":"%s",X86_reg_name((csh)in->csh,reg));}if(!in->flat_insn->detail)return true;x=&in->flat_insn->detail->x86;for(i=0;i<2;i++){bool mem=att?i==1:i==0;cs_x86_op*o=&x->operands[i];if(mem){set_feature_memory_operand(o,&m,w,CS_AC_READ_WRITE);o->mem.segment=seg;}else{o->type=X86_OP_REG;o->reg=reg;o->size=w;o->access=CS_AC_READ;}}x->op_count=2;return true;
+	unsigned op=MCInst_getOpcode(in);const char*mn=op==X86_FEATURE_APX_AADD?"aadd":op==X86_FEATURE_APX_AAND?"aand":op==X86_FEATURE_APX_AOR?"aor":op==X86_FEATURE_APX_AXOR?"axor":NULL;x86_reg reg,seg;x86_feature_memory m;uint8_t w,i;cs_x86*x;if(!mn)return false;if(MCInst_getNumOperands(in)!=8||!get_feature_memory(in,1,&m))return false;reg=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,0));seg=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,5));w=(uint8_t)MCOperand_getImm(MCInst_getOperand(in,7));SStream_concat(s,att?"%s%c\t":"%s\t",mn,w==4?'l':'q');for(i=0;i<2;i++){bool mem=att?i==1:i==0;if(i)SStream_concat0(s,", ");if(mem){if(!att)SStream_concat0(s,w==4?"dword ptr ":"qword ptr ");if(seg!=X86_REG_INVALID)SStream_concat(s,att?"%%%s:":"%s:",feature_register_name(seg));if(!print_feature_memory(s,&m,att))return false;}else SStream_concat(s,att?"%%%s":"%s",feature_operand_register_name((csh)in->csh,reg));}if(!in->flat_insn->detail)return true;x=&in->flat_insn->detail->x86;for(i=0;i<2;i++){bool mem=att?i==1:i==0;cs_x86_op*o=&x->operands[i];if(mem){set_feature_memory_operand(o,&m,w,CS_AC_READ_WRITE);o->mem.segment=seg;}else{o->type=X86_OP_REG;o->reg=reg;o->size=w;o->access=CS_AC_READ;}}x->op_count=2;return true;
 }
 
 static bool print_apx_enqueue(MCInst *instr, SStream *stream, bool att_syntax)
@@ -6636,7 +6649,7 @@ static bool print_apx_enqueue(MCInst *instr, SStream *stream, bool att_syntax)
 				return false;
 		} else {
 			SStream_concat(stream, att_syntax ? "%%%s" : "%s",
-				       X86_reg_name((csh)instr->csh, reg));
+				       feature_operand_register_name((csh)instr->csh, reg));
 		}
 	}
 	if (!instr->flat_insn->detail)
@@ -6675,7 +6688,7 @@ static bool print_apx_enqueue(MCInst *instr, SStream *stream, bool att_syntax)
 
 static bool print_apx_direct_store(MCInst*in,SStream*s,bool att)
 {
-	unsigned op=MCInst_getOpcode(in);const char*mn=op==X86_FEATURE_APX_MOVDIRI?"movdiri":op==X86_FEATURE_APX_WRSSD?"wrssd":op==X86_FEATURE_APX_WRSSQ?"wrssq":op==X86_FEATURE_APX_WRUSSD?"wrussd":op==X86_FEATURE_APX_WRUSSQ?"wrussq":NULL;x86_reg src,seg;x86_feature_memory m;uint8_t w,i;cs_x86*x;if(!mn)return false;if(MCInst_getNumOperands(in)!=8||!get_feature_memory(in,1,&m))return false;src=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,0));seg=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,5));w=(uint8_t)MCOperand_getImm(MCInst_getOperand(in,7));if(att&&op==X86_FEATURE_APX_MOVDIRI)SStream_concat(s,"%s%c\t",mn,w==4?'l':'q');else SStream_concat(s,"%s\t",mn);for(i=0;i<2;i++){bool mem=att?i==1:i==0;if(i)SStream_concat0(s,", ");if(mem){if(!att)SStream_concat0(s,w==4?"dword ptr ":"qword ptr ");if(seg!=X86_REG_INVALID)SStream_concat(s,att?"%%%s:":"%s:",feature_register_name(seg));if(!print_feature_memory(s,&m,att))return false;}else SStream_concat(s,att?"%%%s":"%s",X86_reg_name((csh)in->csh,src));}if(!in->flat_insn->detail)return true;x=&in->flat_insn->detail->x86;for(i=0;i<2;i++){bool mem=att?i==1:i==0;cs_x86_op*o=&x->operands[i];if(mem){set_feature_memory_operand(o,&m,w,CS_AC_WRITE);o->mem.segment=seg;}else{o->type=X86_OP_REG;o->reg=src;o->size=w;o->access=CS_AC_READ;}}x->op_count=2;return true;
+	unsigned op=MCInst_getOpcode(in);const char*mn=op==X86_FEATURE_APX_MOVDIRI?"movdiri":op==X86_FEATURE_APX_WRSSD?"wrssd":op==X86_FEATURE_APX_WRSSQ?"wrssq":op==X86_FEATURE_APX_WRUSSD?"wrussd":op==X86_FEATURE_APX_WRUSSQ?"wrussq":NULL;x86_reg src,seg;x86_feature_memory m;uint8_t w,i;cs_x86*x;if(!mn)return false;if(MCInst_getNumOperands(in)!=8||!get_feature_memory(in,1,&m))return false;src=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,0));seg=(x86_reg)MCOperand_getImm(MCInst_getOperand(in,5));w=(uint8_t)MCOperand_getImm(MCInst_getOperand(in,7));if(att&&op==X86_FEATURE_APX_MOVDIRI)SStream_concat(s,"%s%c\t",mn,w==4?'l':'q');else SStream_concat(s,"%s\t",mn);for(i=0;i<2;i++){bool mem=att?i==1:i==0;if(i)SStream_concat0(s,", ");if(mem){if(!att)SStream_concat0(s,w==4?"dword ptr ":"qword ptr ");if(seg!=X86_REG_INVALID)SStream_concat(s,att?"%%%s:":"%s:",feature_register_name(seg));if(!print_feature_memory(s,&m,att))return false;}else SStream_concat(s,att?"%%%s":"%s",feature_operand_register_name((csh)in->csh,src));}if(!in->flat_insn->detail)return true;x=&in->flat_insn->detail->x86;for(i=0;i<2;i++){bool mem=att?i==1:i==0;cs_x86_op*o=&x->operands[i];if(mem){set_feature_memory_operand(o,&m,w,CS_AC_WRITE);o->mem.segment=seg;}else{o->type=X86_OP_REG;o->reg=src;o->size=w;o->access=CS_AC_READ;}}x->op_count=2;return true;
 }
 
 static bool print_apx_rorx(MCInst *in, SStream *s, bool att)
@@ -6716,7 +6729,7 @@ static bool print_apx_rorx(MCInst *in, SStream *s, bool att)
 			SStream_concat0(s, ", ");
 		if (k == 0)
 			SStream_concat(s, att ? "%%%s" : "%s",
-				       X86_reg_name((csh)in->csh, dr));
+				       feature_operand_register_name((csh)in->csh, dr));
 		else if (k == 2)
 			print_apx_scalar_immediate(in, s, imm, 1, att);
 		else if (mem) {
@@ -6730,7 +6743,7 @@ static bool print_apx_rorx(MCInst *in, SStream *s, bool att)
 				return false;
 		} else
 			SStream_concat(s, att ? "%%%s" : "%s",
-				       X86_reg_name((csh)in->csh, src));
+				       feature_operand_register_name((csh)in->csh, src));
 	}
 	if (!in->flat_insn->detail)
 		return true;
@@ -6828,7 +6841,7 @@ static bool print_apx_bextr(MCInst *in, SStream *s, bool att)
 			if (!print_feature_memory(s, &m, att))
 				return false;
 		} else {
-			const char *n = X86_reg_name((csh)in->csh,
+			const char *n = feature_operand_register_name((csh)in->csh,
 				k == 0 ? dr : deposit_extract ?
 				(k == 1 ? cr : data) : (k == 1 ? data : cr));
 			SStream_concat(s, att ? "%%%s" : "%s", n);
@@ -6917,10 +6930,10 @@ static bool print_apx_bls(MCInst *instr, SStream *s, bool att)
 				return false;
 		} else
 			SStream_concat(s, "%%%s",
-				       X86_reg_name((csh)instr->csh, sr));
-		SStream_concat(s, ", %%%s", X86_reg_name((csh)instr->csh, dr));
+				       feature_operand_register_name((csh)instr->csh, sr));
+		SStream_concat(s, ", %%%s", feature_operand_register_name((csh)instr->csh, dr));
 	} else {
-		SStream_concat(s, "%s, ", X86_reg_name((csh)instr->csh, dr));
+		SStream_concat(s, "%s, ", feature_operand_register_name((csh)instr->csh, dr));
 		if (mem) {
 			SStream_concat0(s,
 					w == 2 ? "word ptr " :
@@ -6931,7 +6944,7 @@ static bool print_apx_bls(MCInst *instr, SStream *s, bool att)
 				return false;
 		} else
 			SStream_concat(s, "%s",
-				       X86_reg_name((csh)instr->csh, sr));
+				       feature_operand_register_name((csh)instr->csh, sr));
 	}
 	if (!instr->flat_insn->detail)
 		return true;
@@ -7091,7 +7104,7 @@ static bool print_apx_unary(MCInst *instr, SStream *s, bool att) {
     if (i)
       SStream_concat0(s, ", ");
     if (isdst) {
-      const char *n = X86_reg_name((csh)instr->csh, dst);
+      const char *n = feature_operand_register_name((csh)instr->csh, dst);
       if (!n)
         return false;
       SStream_concat(s, att ? "%%%s" : "%s", n);
@@ -7106,7 +7119,7 @@ static bool print_apx_unary(MCInst *instr, SStream *s, bool att) {
       if (!print_feature_memory(s, &m, att))
         return false;
     } else {
-      const char *n = X86_reg_name((csh)instr->csh, src);
+      const char *n = feature_operand_register_name((csh)instr->csh, src);
       if (!n)
         return false;
       SStream_concat(s, att ? "%%%s" : "%s", n);
@@ -7248,8 +7261,8 @@ static bool print_apx_imul(MCInst *instr, SStream *stream, bool att_syntax)
 		   (width != 2 && width != 4 && width != 8)) ||
 	    (nd ? ndd_field == X86_REG_INVALID :
 		  ndd_field != X86_REG_INVALID) ||
-	    !X86_reg_name((csh)instr->csh, reg_field) ||
-	    (!memory_form && !X86_reg_name((csh)instr->csh, rm_field))) {
+	    !feature_operand_register_name((csh)instr->csh, reg_field) ||
+	    (!memory_form && !feature_operand_register_name((csh)instr->csh, rm_field))) {
 		return false;
 	}
 
@@ -7314,7 +7327,7 @@ static bool print_apx_imul(MCInst *instr, SStream *stream, bool att_syntax)
 				return false;
 		} else {
 			const char *name =
-				X86_reg_name((csh)instr->csh, operand->reg);
+				feature_operand_register_name((csh)instr->csh, operand->reg);
 
 			if (!name)
 				return false;
@@ -7479,8 +7492,8 @@ static bool print_apx_imul_immediate(MCInst *instr, SStream *stream,
 	    (instr->imm_size != 1 &&
 	     !(instr->imm_size == 2 && width == 2) &&
 	     !(instr->imm_size == 4 && (width == 4 || width == 8))) ||
-	    !X86_reg_name((csh)instr->csh, destination) ||
-	    (!memory_form && !X86_reg_name((csh)instr->csh, source))) {
+	    !feature_operand_register_name((csh)instr->csh, destination) ||
+	    (!memory_form && !feature_operand_register_name((csh)instr->csh, source))) {
 		return false;
 	}
 	nf = MCOperand_getImm(nf_operand) != 0;
@@ -7499,7 +7512,7 @@ static bool print_apx_imul_immediate(MCInst *instr, SStream *stream,
 			SStream_concat0(stream, ", ");
 		if (logical == 0) {
 			SStream_concat(stream, att_syntax ? "%%%s" : "%s",
-				       X86_reg_name((csh)instr->csh,
+				       feature_operand_register_name((csh)instr->csh,
 						    destination));
 		} else if (logical == 2) {
 			print_apx_scalar_immediate(instr, stream, immediate, width,
@@ -7516,7 +7529,7 @@ static bool print_apx_imul_immediate(MCInst *instr, SStream *stream,
 				return false;
 		} else {
 			SStream_concat(stream, att_syntax ? "%%%s" : "%s",
-				       X86_reg_name((csh)instr->csh, source));
+				       feature_operand_register_name((csh)instr->csh, source));
 		}
 	}
 	if (!instr->flat_insn->detail)
@@ -7704,14 +7717,14 @@ static bool print_apx_arithmetic(MCInst *instr, SStream *stream,
 	if ((width != 1 && width != 2 && width != 4 && width != 8) ||
 	    (nf && reads_carry) ||
 	    (memory_position == 1 ? source1 != X86_REG_INVALID :
-				    !X86_reg_name((csh)instr->csh, source1)) ||
+				    !feature_operand_register_name((csh)instr->csh, source1)) ||
 	    (!immediate_form &&
 	     (memory_position == 2 ?
 		      source2 != X86_REG_INVALID :
-		      !X86_reg_name((csh)instr->csh, source2))) ||
+		      !feature_operand_register_name((csh)instr->csh, source2))) ||
 	    (immediate_form &&
 	     (source2 != X86_REG_INVALID || memory_position == 2)) ||
-	    (nd ? !X86_reg_name((csh)instr->csh, destination) :
+	    (nd ? !feature_operand_register_name((csh)instr->csh, destination) :
 	     memory_position == 1 ? destination != X86_REG_INVALID :
 				    destination != source1)) {
 		return false;
@@ -7784,7 +7797,7 @@ static bool print_apx_arithmetic(MCInst *instr, SStream *stream,
 						   width, att_syntax);
 		} else {
 			const char *name =
-				X86_reg_name((csh)instr->csh,
+				feature_operand_register_name((csh)instr->csh,
 					     logical_register[logical_index]);
 
 			if (!name)
@@ -7861,7 +7874,7 @@ static bool print_apx_setcc(MCInst *instr, SStream *stream, bool att_syntax)
 		if (!MCOperand_isImm(register_operand))
 			return false;
 		reg = (x86_reg)MCOperand_getImm(register_operand);
-		name = X86_reg_name((csh)instr->csh, reg);
+		name = feature_operand_register_name((csh)instr->csh, reg);
 		if (!name)
 			return false;
 		if (att_syntax)
@@ -7985,10 +7998,10 @@ static bool print_apx_evex_vector_gpr(MCInst *instr, SStream *stream,
 	     (mask < X86_REG_K1 || mask > X86_REG_K7)) ||
 	    (zeroing && mask == X86_REG_INVALID))
 		return false;
-	destination_name = X86_reg_name((csh)instr->csh, destination);
-	source_name = X86_reg_name((csh)instr->csh, source);
+	destination_name = feature_operand_register_name((csh)instr->csh, destination);
+	source_name = feature_operand_register_name((csh)instr->csh, source);
 	if (mask != X86_REG_INVALID)
-		mask_name = X86_reg_name((csh)instr->csh, mask);
+		mask_name = feature_operand_register_name((csh)instr->csh, mask);
 	if (!destination_name || !source_name ||
 	    (mask != X86_REG_INVALID && !mask_name))
 		return false;
@@ -8118,7 +8131,7 @@ static bool print_system_extension(MCInst *instr, SStream *stream, bool att)
 			operand.reg = (x86_reg)value;
 			operand.size = opcode == X86_FEATURE_LKGS ? 2 : 8;
 			SStream_concat(stream, att ? "%%%s" : "%s",
-				       X86_reg_name((csh)instr->csh,
+				       feature_operand_register_name((csh)instr->csh,
 						    operand.reg));
 		}
 	} else {
@@ -8199,9 +8212,9 @@ static bool print_apx_msr(MCInst *instr, SStream *stream, bool att_syntax)
 		immediate = (uint32_t)MCOperand_getImm(other_operand);
 	else
 		other_register = (x86_reg)MCOperand_getImm(other_operand);
-	if (!X86_reg_name((csh)instr->csh, b_register) ||
+	if (!feature_operand_register_name((csh)instr->csh, b_register) ||
 	    (!immediate_form &&
-	     !X86_reg_name((csh)instr->csh, other_register)))
+	     !feature_operand_register_name((csh)instr->csh, other_register)))
 		return false;
 
 	/* Intel writes the destination/data operand first for reads and the MSR
@@ -8216,13 +8229,13 @@ static bool print_apx_msr(MCInst *instr, SStream *stream, bool att_syntax)
 			SStream_concat0(stream, ", ");
 		if (is_b) {
 			SStream_concat(stream, att_syntax ? "%%%s" : "%s",
-				       X86_reg_name((csh)instr->csh, b_register));
+				       feature_operand_register_name((csh)instr->csh, b_register));
 		} else if (immediate_form) {
 			SStream_concat(stream, att_syntax ? "$0x%x" : "0x%x",
 				       immediate);
 		} else {
 			SStream_concat(stream, att_syntax ? "%%%s" : "%s",
-				       X86_reg_name((csh)instr->csh,
+				       feature_operand_register_name((csh)instr->csh,
 						    other_register));
 		}
 	}
@@ -8300,10 +8313,10 @@ static bool print_sha512_vex(MCInst *instr, SStream *stream, bool att_syntax)
 	     (source1 < X86_REG_YMM0 || source1 > X86_REG_YMM15)) ||
 	    (rounds && (source2 < X86_REG_XMM0 || source2 > X86_REG_XMM15)))
 		return false;
-	destination_name = X86_reg_name((csh)instr->csh, destination);
-	source1_name = X86_reg_name((csh)instr->csh, source1);
+	destination_name = feature_operand_register_name((csh)instr->csh, destination);
+	source1_name = feature_operand_register_name((csh)instr->csh, source1);
 	if (rounds)
-		source2_name = X86_reg_name((csh)instr->csh, source2);
+		source2_name = feature_operand_register_name((csh)instr->csh, source2);
 	if (!destination_name || !source1_name || (rounds && !source2_name))
 		return false;
 
@@ -8394,6 +8407,8 @@ bool X86_printFeatureExtension(MCInst *instr, SStream *stream, bool att_syntax)
 	       print_rex2_push_pop(instr, stream, att_syntax) ||
 	       print_rex2(instr, stream, att_syntax);
 }
+
+#undef feature_operand_register_name
 
 bool X86_mapFeatureExtension(cs_insn *insn, unsigned int opcode)
 {
