@@ -478,6 +478,14 @@ custom formatter can observe partial detail or change options, so it retains
 the earlier assignments as well; kernel and custom-runtime builds retain that
 path too. AT&T keeps its separate ordering and mask handling.
 
+The private x86 output stream initializes its empty string and scalar state
+without clearing the unused character tail when the active userspace formatter
+is the system `vsnprintf`. Its readers consume only the terminated text prefix.
+Custom formatters retain the complete clear because they can inspect the whole
+destination capacity. Other architectures, DIET and custom-runtime builds keep
+`SStream_Init`; the shared stream API and public output-array clearing are
+unchanged.
+
 ### Disassembling process
 
 Printers append text through the shared `SStream` helpers. In non-DIET builds with

@@ -176,9 +176,11 @@ static bool check_instruction_names(void)
 	bool ok = true;
 	for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
 		const char *name = cs_insn_name(handle, cases[i].id);
-		if (!name || strcmp(name, cases[i].name)) {
+		const char *expected =
+			cs_support(CS_SUPPORT_DIET) ? NULL : cases[i].name;
+		if (expected ? !name || strcmp(name, expected) : name != NULL) {
 			fprintf(stderr, "instruction %u: expected %s, got %s\n",
-				cases[i].id, cases[i].name,
+				cases[i].id, expected ? expected : "NULL",
 				name ? name : "NULL");
 			ok = false;
 		}
@@ -705,19 +707,29 @@ static struct {
 	cs_insn *insn;
 	csh handle;
 	cs_vsnprintf_t formatter;
-	bool disable_detail, observed, valid;
+	x86_reg reg;
+	bool att, disable_detail, observed, valid;
 } access_callback;
 
 static int inspect_operand_access(char *text, size_t size, const char *format,
 				  va_list args)
 {
-	if (access_callback.insn) {
+	if (access_callback.insn && !access_callback.observed) {
 		const cs_x86 *x86 = &access_callback.insn->detail->x86;
-		if (x86->op_count == 1) {
-			access_callback.observed = true;
+		access_callback.observed = true;
+		/* The first formatted append exposes the current NUL and the
+		 * entire unwritten destination tail to the callback. */
+		access_callback.valid &= size != 0;
+		for (size_t i = 0; i < size; ++i)
+			access_callback.valid &= text[i] == '\0';
+		if (access_callback.att) {
+			access_callback.valid &= x86->op_count == 0 &&
+						 x86->eflags == 0;
+		} else {
 			access_callback.valid &=
+				x86->op_count == 1 &&
 				x86->operands[0].type == X86_OP_REG &&
-				x86->operands[0].reg == X86_REG_EAX &&
+				x86->operands[0].reg == access_callback.reg &&
 				x86->operands[0].access == CS_AC_READ_WRITE &&
 				x86->eflags == (X86_EFLAGS_MODIFY_OF |
 						X86_EFLAGS_MODIFY_SF |
@@ -725,25 +737,25 @@ static int inspect_operand_access(char *text, size_t size, const char *format,
 						X86_EFLAGS_MODIFY_AF |
 						X86_EFLAGS_MODIFY_PF |
 						X86_EFLAGS_MODIFY_CF);
-			if (access_callback.disable_detail)
-				access_callback.valid &=
-					cs_option(access_callback.handle,
-						  CS_OPT_DETAIL,
-						  CS_OPT_OFF) == CS_ERR_OK;
 		}
+		if (access_callback.disable_detail)
+			access_callback.valid &=
+				cs_option(access_callback.handle, CS_OPT_DETAIL,
+					  CS_OPT_OFF) == CS_ERR_OK;
 	}
 	return access_callback.formatter(text, size, format, args);
 }
 
-/* Formatting the immediate can expose the preceding register's detail and
- * change the options used by the remainder of this decode. */
+/* A formatter observes the stream's unwritten tail and preceding detail, and
+ * can change the options used by the remainder of this decode. */
 static bool check_operand_access_callback(void)
 {
 	if (cs_support(CS_SUPPORT_DIET))
 		return true;
-	const uint8_t bytes[] = { 0x83, 0xc0, 1 }; // add eax, 1
-	const cs_mode modes[] = { CS_MODE_32, CS_MODE_64 };
-	const unsigned syntaxes[] = { CS_OPT_SYNTAX_INTEL, CS_OPT_SYNTAX_MASM };
+	const uint8_t bytes[] = { 0x83, 0xc0, 1 }; // add ax/eax, 1
+	const cs_mode modes[] = { CS_MODE_16, CS_MODE_32, CS_MODE_64 };
+	const unsigned syntaxes[] = { CS_OPT_SYNTAX_INTEL, CS_OPT_SYNTAX_MASM,
+				      CS_OPT_SYNTAX_ATT };
 	cs_opt_mem original = { cs_mem_malloc, cs_mem_calloc, cs_mem_realloc,
 				cs_mem_free, cs_vsnprintf };
 	cs_opt_mem hooks = original;
@@ -762,8 +774,16 @@ static bool check_operand_access_callback(void)
 				}
 				ok &= cs_option(handle, CS_OPT_DETAIL,
 						CS_OPT_ON) == CS_ERR_OK;
-				ok &= cs_option(handle, CS_OPT_SYNTAX,
-						syntaxes[s]) == CS_ERR_OK;
+				ok &= cs_option(handle, CS_OPT_TEXT,
+						CS_OPT_ON) == CS_ERR_OK;
+				cs_err syntax_error = cs_option(
+					handle, CS_OPT_SYNTAX, syntaxes[s]);
+				if (syntaxes[s] == CS_OPT_SYNTAX_ATT &&
+				    syntax_error == CS_ERR_X86_ATT) {
+					cs_close(&handle);
+					continue;
+				}
+				ok &= syntax_error == CS_ERR_OK;
 				cs_insn *insn = cs_malloc(handle);
 				if (!insn) {
 					ok = false;
@@ -772,21 +792,73 @@ static bool check_operand_access_callback(void)
 				}
 				access_callback.insn = insn;
 				access_callback.handle = handle;
+				access_callback.att = syntaxes[s] ==
+						      CS_OPT_SYNTAX_ATT;
+				access_callback.reg = modes[m] == CS_MODE_16 ?
+							      X86_REG_AX :
+							      X86_REG_EAX;
 				access_callback.disable_detail = disable != 0;
 				access_callback.observed = false;
 				access_callback.valid = true;
 				const uint8_t *cursor = bytes;
 				size_t remaining = sizeof(bytes);
 				uint64_t address = 0x1000;
+				cs_detail *detail = insn->detail;
 				bool match = cs_disasm_iter(handle, &cursor,
 							    &remaining,
 							    &address, insn);
+				bool att = access_callback.att;
+				const char *mnemonic =
+					att ? (modes[m] == CS_MODE_16 ?
+						       "addw" :
+						       "addl") :
+					      "add";
+				const char *operands =
+					att ? (modes[m] == CS_MODE_16 ?
+						       "$1, %ax" :
+						       "$1, %eax") :
+					      (modes[m] == CS_MODE_16 ?
+						       "ax, 1" :
+						       "eax, 1");
+				const cs_x86 *x86 = &detail->x86;
 				match &= access_callback.observed &&
 					 access_callback.valid &&
-					 insn->detail->x86.op_count ==
-						 (disable ? 1 : 2) &&
-					 insn->detail->x86.operands[0].access ==
-						 CS_AC_READ_WRITE;
+					 insn->detail == detail &&
+					 insn->id == X86_INS_ADD &&
+					 insn->size == sizeof(bytes) &&
+					 cursor == bytes + sizeof(bytes) &&
+					 remaining == 0 &&
+					 address == 0x1000 + sizeof(bytes) &&
+					 strcmp(insn->mnemonic, mnemonic) ==
+						 0 &&
+					 strcmp(insn->op_str, operands) == 0 &&
+					 x86->op_count ==
+						 (disable ? (att ? 0 : 1) : 2);
+				if (!disable || !att) {
+					const cs_x86_op *reg =
+						&x86->operands[att ? 1 : 0];
+					match &=
+						reg->type == X86_OP_REG &&
+						reg->reg ==
+							access_callback.reg &&
+						reg->size ==
+							(modes[m] == CS_MODE_16 ?
+								 2 :
+								 4) &&
+						reg->access == CS_AC_READ_WRITE;
+				}
+				if (!disable) {
+					const cs_x86_op *imm =
+						&x86->operands[att ? 0 : 1];
+					match &=
+						imm->type == X86_OP_IMM &&
+						imm->imm == 1 &&
+						imm->size ==
+							(modes[m] == CS_MODE_16 ?
+								 2 :
+								 4) &&
+						imm->access == CS_AC_INVALID;
+				}
 				if (!match)
 					fprintf(stderr,
 						"operand access callback: mode=%u syntax=%u disable=%u\n",

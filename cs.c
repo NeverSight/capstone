@@ -1016,7 +1016,22 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
 				       false);
 	} else {
 		SStream ss;
-		SStream_Init(&ss);
+#if defined(CAPSTONE_HAS_X86) && !defined(CAPSTONE_DIET) && \
+	defined(CAPSTONE_USE_SYS_DYN_MEM) && \
+	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
+	!defined(_WIN32_WCE)
+		if (handle->arch == CS_ARCH_X86 && cs_vsnprintf == vsnprintf) {
+			/* Only the private x86 stream can leave its unused tail
+			 * untouched; a custom formatter may inspect that tail. */
+			ss.buffer[0] = '\0';
+			ss.index = 0;
+			ss.is_closed = false;
+			ss.markup_stream = false;
+			ss.prefixed_by_markup = false;
+			ss.unsigned_num = false;
+		} else
+#endif
+			SStream_Init(&ss);
 		SStream_opt_unum(&ss, handle->imm_unsigned);
 		handle->printer(&mci, &ss, handle->printer_info);
 		fill_insn(handle, insn, &ss, &mci, handle->post_printer, code);
