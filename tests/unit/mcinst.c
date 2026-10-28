@@ -145,11 +145,35 @@ static bool test_alias_lookup(void)
 	       check_alias(NULL, empty, 0, NULL, NULL);
 }
 
+/* Partial private initialization must preserve every non-operand default. */
+static bool check_init_metadata(void)
+{
+	for (unsigned arch = 0; arch < CS_ARCH_MAX; ++arch) {
+		MCInst full, partial;
+		memset(&full, 0x5a, sizeof(full));
+		memset(&partial, 0xa5, sizeof(partial));
+		MCInst_Init(&full, (cs_arch)arch);
+		MCInst_InitStorage(&partial, (cs_arch)arch, false);
+		const size_t operands_end =
+			offsetof(MCInst, Operands) + sizeof(full.Operands);
+		if (memcmp(&full, &partial,
+			   offsetof(MCInst, Operands) +
+				   sizeof(full.Operands[0])) != 0 ||
+		    memcmp((char *)&full + operands_end,
+			   (char *)&partial + operands_end,
+			   sizeof(full) - operands_end) != 0)
+			return false;
+	}
+	return true;
+}
+
 /* Check the last valid slot, capacity rejection, and reuse after clearing.
  * Both operand tags matter: different backends inspect different tags. */
 static bool check_operands(bool registers_first)
 {
-	MCInst inst = { 0 };
+	MCInst inst;
+	memset(&inst, 0xa5, sizeof(inst));
+	MCInst_InitStorage(&inst, CS_ARCH_X86, false);
 	MCInst_setOpcode(&inst, UINT_MAX);
 	MCInst_setOpcodePub(&inst, UINT_MAX - 1);
 	for (unsigned i = 0; i < MAX_MC_OPS; ++i) {
@@ -192,8 +216,9 @@ static bool check_operands(bool registers_first)
 
 int main(void)
 {
-	return test_tie_membership() && test_alias_lookup() &&
-		       check_operands(false) && check_operands(true) ?
+	return check_init_metadata() && test_tie_membership() &&
+			       test_alias_lookup() && check_operands(false) &&
+			       check_operands(true) ?
 		       0 :
 		       1;
 }

@@ -1002,7 +1002,12 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
 		    cs_insn *insn, uint16_t *insn_size, bool batch)
 {
 	MCInst mci;
-	MCInst_Init(&mci, handle->arch);
+#ifdef CAPSTONE_HAS_X86
+	if (handle->arch == CS_ARCH_X86)
+		MCInst_InitStorage(&mci, handle->arch, false);
+	else
+#endif
+		MCInst_Init(&mci, handle->arch);
 	mci.csh = handle;
 	mci.address = insn->address;
 	mci.flat_insn = insn;

@@ -20,6 +20,8 @@
 #define CS_MCINST_H
 
 #include <assert.h>
+#include <stddef.h>
+#include <string.h>
 #include "include/capstone/capstone.h"
 #include "cs_assert.h"
 #include "MCAsmInfo.h"
@@ -195,6 +197,54 @@ CS_MCINST_INLINE void MCOperand_CreateImm0(MCInst *mcInst, int64_t Val)
 #endif
 	op->Kind = op->MachineOperandType;
 	op->ImmVal = Val;
+}
+
+/* The private x86 path constructs every operand before reading it. Other
+ * callers retain full operand initialization through MCInst_Init. */
+static inline void MCInst_InitStorage(MCInst *inst, cs_arch arch,
+				      bool clear_operands)
+{
+	if (clear_operands) {
+		memset(inst, 0, sizeof(*inst));
+	} else {
+		const size_t operands_end =
+			offsetof(MCInst, Operands) + sizeof(inst->Operands);
+		memset(inst, 0,
+		       offsetof(MCInst, Operands) + sizeof(inst->Operands[0]));
+		memset((char *)inst + operands_end, 0,
+		       sizeof(*inst) - operands_end);
+	}
+#ifdef __cplusplus
+	inst->Operands[0].Kind = MCOperand::kInvalid;
+#else
+	inst->Operands[0].Kind = kInvalid;
+#endif
+	inst->Operands[0].ImmVal = 0;
+
+	inst->Opcode = 0;
+	inst->OpcodePub = 0;
+	inst->size = 0;
+	inst->has_imm = false;
+	inst->op1_size = 0;
+	inst->ac_idx = 0;
+	inst->popcode_adjust = 0;
+	inst->assembly[0] = '\0';
+	inst->wasm_data.type = WASM_OP_INVALID;
+	inst->xAcquireRelease = 0;
+	for (int i = 0; i < MAX_MC_OPS; ++i)
+		inst->tied_op_idx[i] = -1;
+	inst->isAliasInstr = false;
+	inst->fillDetailOps = false;
+	memset(&inst->hppa_ext, 0, sizeof(inst->hppa_ext));
+
+	// Set default assembly dialect.
+	switch (arch) {
+	default:
+		break;
+	case CS_ARCH_SYSTEMZ:
+		inst->MAI.assemblerDialect = SYSTEMZASMDIALECT_AD_HLASM;
+		break;
+	}
 }
 
 void MCInst_Init(MCInst *inst, cs_arch arch);

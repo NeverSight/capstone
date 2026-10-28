@@ -130,6 +130,15 @@ Hot opcode accessors and checked operand append operations are defined in
 preserving their symbols. The shared assertion policy lives in `cs_assert.h`;
 operand capacity remains defined by `MAX_MC_OPS` in `MCInst.h`.
 
+The private full x86 path initializes all instruction metadata and the default
+first operand, leaving the other operand slots for the decoder's append helpers.
+Those helpers set both operand tags and the complete value; translation and
+feature decoders construct each operand before the printers read it. Readers
+must honor the constructed operand count. The shared initializer owns all
+metadata defaults, while `MCInst_Init` still clears the complete object for
+other callers. Public instruction/detail arrays retain their existing clearing
+and callback-visible state. This does not change decoding or legality checks.
+
 The `cs_insn` is meant to be used by the Capstone core.
 It is distinct from the `MCInst`. It uses different instruction identifiers, other operand representation
 and holds more details about an instruction.
@@ -145,8 +154,8 @@ construction share one implementation specialized for the two store policies.
 
 The core selects the scan policy for each instruction before any detail
 allocation. No allocation or callback intervenes after a scan selection; other
-selections call the normal backend with its live options and a fully initialized
-`MCInst`, even if an allocation callback changes those options. Full decoding
+selections call the normal backend with its live options and initialized
+`MCInst` metadata, even if an allocation callback changes those options. Full decoding
 and printing own their temporary objects in a separate function. Public ID
 mapping, byte copying, aliases, pseudo-opcode adjustments and cursor updates
 remain owned by the shared core helpers in `cs_disasm_internal.h`. When x86 is
