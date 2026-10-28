@@ -5,7 +5,9 @@
 #define CS_SSTREAM_H_
 
 #include "include/capstone/platform.h"
+#include <assert.h>
 #include <stdio.h>
+#include <string.h>
 
 typedef enum {
 	Markup_Immediate,
@@ -58,6 +60,33 @@ void SStream_concat(SStream *ss, const char *fmt, ...);
 void SStream_concat_hex64(SStream *ss, uint64_t value, bool negative);
 
 void SStream_concat0(SStream *ss, const char *s);
+
+#if defined(__GNUC__) && !defined(CAPSTONE_DIET)
+// Expose constant tokens to the compiler without expanding the general writer.
+static inline __attribute__((always_inline)) void
+SStream_concat0_inline(SStream *ss, const char *s)
+{
+	assert(ss && s);
+	if (ss->is_closed)
+		return;
+	const size_t len = __builtin_strlen(s);
+	if (len == 0)
+		return;
+	if (len < SSTREAM_BUF_LEN && ss->index < SSTREAM_BUF_LEN - len &&
+	    !(ss->markup_stream && ss->prefixed_by_markup)) {
+		memcpy(ss->buffer + ss->index, s, len);
+		ss->index += len;
+		ss->buffer[ss->index] = '\0';
+		return;
+	}
+	SStream_concat0(ss, s);
+}
+// Inline parameters can hide literal lengths; keep this test at the call site.
+#define SStream_concat0(ss, s) \
+	(__builtin_constant_p(__builtin_strlen(s)) ? \
+		 SStream_concat0_inline((ss), (s)) : \
+		 (SStream_concat0)((ss), (s)))
+#endif
 
 void SStream_concat1(SStream *ss, const char c);
 

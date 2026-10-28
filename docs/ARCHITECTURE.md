@@ -434,6 +434,14 @@ definition.
 
 ### Disassembling process
 
+Printers append text through the shared `SStream` helpers. In non-DIET builds with
+GCC or Clang, `SStream_concat0` exposes compile-time string lengths at the call site. A token
+that fits in an open stream without a pending markup close uses a fixed-length
+copy; other writes retain the external helper, including truncation and index
+repair. Empty strings remain no-ops. DIET and other compilers retain the external
+helper throughout. This applies to generated printers without changing their
+tables or the translator.
+
 There are two steps in disassembling an instruction.
 
 1. Decoding bytes to a `MCInst`.

@@ -225,7 +225,7 @@ void SStream_Close(SStream *ss)
 /**
  * Copy the string \p s to the buffer of \p ss and terminate it with a '\\0' byte.
  */
-void SStream_concat0(SStream *ss, const char *s)
+void(SStream_concat0)(SStream *ss, const char *s)
 {
 #ifndef CAPSTONE_DIET
 	assert(ss && s);

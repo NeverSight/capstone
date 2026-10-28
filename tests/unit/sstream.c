@@ -131,6 +131,60 @@ static bool test_aliased_appends(void)
 	return true;
 }
 
+static bool test_constant_appends(void)
+{
+	printf("Test test_constant_appends\n");
+	for (unsigned flags = 0; flags < 16; flags++) {
+		for (size_t index = 0; index < SSTREAM_BUF_LEN + 4; index++) {
+			SStream initial, actual, reference;
+			memset(&initial, 0x51, sizeof(initial));
+			initial.index =
+				index == SSTREAM_BUF_LEN + 3 ? SIZE_MAX : index;
+			initial.is_closed = flags & 1;
+			initial.markup_stream = flags & 2;
+			initial.prefixed_by_markup = flags & 4;
+			initial.unsigned_num = flags & 8;
+			initial.buffer[SSTREAM_BUF_LEN - 1] = '\0';
+			if (initial.index < SSTREAM_BUF_LEN)
+				initial.buffer[initial.index] = '\0';
+
+// Parentheses select the external writer even when the caller can inline tokens.
+#define CHECK_CONSTANT_APPEND(text) \
+	do { \
+		memcpy(&actual, &initial, sizeof(actual)); \
+		memcpy(&reference, &initial, sizeof(reference)); \
+		SStream_concat0(&actual, text); \
+		(SStream_concat0)(&reference, text); \
+		if (memcmp(&actual, &reference, sizeof(actual)) != 0) { \
+			printf("Constant append differs: flags=%u index=%zu\n", \
+			       flags, initial.index); \
+			return false; \
+		} \
+	} while (0)
+			CHECK_CONSTANT_APPEND("");
+			CHECK_CONSTANT_APPEND(",");
+			CHECK_CONSTANT_APPEND(", ");
+			CHECK_CONSTANT_APPEND("qword ptr ");
+			CHECK_CONSTANT_APPEND("x\0ignored");
+#undef CHECK_CONSTANT_APPEND
+		}
+	}
+
+	SStream streams[2];
+	SStream_Init(&streams[0]);
+	SStream_Init(&streams[1]);
+	SStream *stream = streams;
+	SStream_concat0(stream++, "abc");
+	CHECK_PTR_EQUAL_RET_FALSE(stream, streams + 1);
+	unsigned source_calls = 0;
+	SStream_concat0(stream, (source_calls++, "def"));
+	if (source_calls != 1)
+		return false;
+	CHECK_OS_EQUAL_RET_FALSE(streams[0], "abc");
+	CHECK_OS_EQUAL_RET_FALSE(streams[1], "def");
+	return true;
+}
+
 static bool test_hex64_formatting(void)
 {
 	const uint64_t values[] = { 0,
@@ -887,6 +941,7 @@ int main()
 	result &= test_overflow_check();
 	result &= test_truncating_appends();
 	result &= test_aliased_appends();
+	result &= test_constant_appends();
 	result &= test_hex64_formatting();
 	result &= test_hex64_custom_formatter();
 	result &= test_printint8();
