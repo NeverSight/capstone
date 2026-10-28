@@ -3000,16 +3000,16 @@ legacyTerminalDecision(const struct InternalInstruction *insn,
 					    [insn->opcode];
 }
 
-/* Private to the direct scan entry; existing decoder entries never return it. */
+/* Private result of the direct scan entry. */
 enum { X86_SCAN_UID_READY = 2 };
 
 /* Ordinary legacy terminals have no LOCK, REX2 or vector prefixes. Other
  * encodings retain generic ID selection and prefix validation before operands.
  * EVEX keeps its raw policy and backend restoration order. */
 X86_DECODE_INLINE int
-decodeInstructionScanImpl(struct InternalInstruction *insn, const uint8_t *code,
-			  size_t codeSize, cs_mode mode, MCInst *mcInst,
-			  uint16_t *size, bool directTerminal)
+decodeInstructionImpl(struct InternalInstruction *insn, const uint8_t *code,
+		      size_t codeSize, cs_mode mode, MCInst *mcInst,
+		      uint16_t *size, bool directTerminal, MCInst *fullMCInst)
 {
 	const PrefixReadStatus prefixResult =
 		readInstructionHeader(insn, code, codeSize, mode);
@@ -3026,9 +3026,11 @@ decodeInstructionScanImpl(struct InternalInstruction *insn, const uint8_t *code,
 			legacyTerminalDecision(insn, false, false);
 		if (decision) {
 			int result = decodeLegacyTerminal(
-				insn, directTerminal ? NULL : mcInst, size,
-				decision, directTerminal || mcInst != NULL,
-				NULL, false);
+				insn,
+				directTerminal ? NULL :
+						 (mcInst ? mcInst : fullMCInst),
+				size, decision,
+				directTerminal || mcInst != NULL, NULL, false);
 			return directTerminal && result == X86_SCAN_COMPLETE ?
 				       X86_SCAN_UID_READY :
 				       result;
@@ -3047,8 +3049,16 @@ int decodeInstructionScan(struct InternalInstruction *insn, const uint8_t *code,
 			  size_t codeSize, cs_mode mode, MCInst *mcInst,
 			  uint16_t *size)
 {
-	return decodeInstructionScanImpl(insn, code, codeSize, mode, mcInst,
-					 size, false);
+	return decodeInstructionImpl(insn, code, codeSize, mode, mcInst, size,
+				     false, NULL);
+}
+
+int decodeInstructionFull(struct InternalInstruction *insn, const uint8_t *code,
+			  size_t codeSize, cs_mode mode, MCInst *mcInst,
+			  uint16_t *size)
+{
+	return decodeInstructionImpl(insn, code, codeSize, mode, NULL, size,
+				     false, mcInst);
 }
 
 enum { X86_SCAN_NOT_HANDLED = 3 };
@@ -3099,8 +3109,8 @@ static bool decodeGenericScan(const uint8_t *code, size_t code_len,
 			      cs_mode mode, MCInst *instr, uint16_t *size)
 {
 	InternalInstruction insn = { 0 };
-	int ret = decodeInstructionScanImpl(&insn, code, code_len, mode, instr,
-					    size, true);
+	int ret = decodeInstructionImpl(&insn, code, code_len, mode, instr,
+					size, true, NULL);
 	if (ret == X86_SCAN_UID_READY) {
 		MCInst_clear(instr);
 		MCInst_setOpcode(instr, insn.instructionID);

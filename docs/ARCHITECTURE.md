@@ -293,6 +293,15 @@ from `X86MappingInsn*.inc` and `x86.h`. It uses the same operand readers and
 decision kinds, while avoiding a subsequent UID-to-public-ID lookup. Raw and
 operand-producing decoding retain internal IDs and their original state writes.
 
+Full decoding uses the same terminal groups to read, validate and construct
+MCInst operands in one handler, removing a second operand-shape dispatch.
+Generated handlers reuse the owning translation helpers and preserve duplicate
+operand order. Size is assigned after final read validation and before
+translation, including translation failure. The completed raw state still feeds
+prefix and public-detail metadata. Nonterminal instructions retain generic
+translation; EVEX keeps raw decoding so normalization, displacement repair and
+prefix restoration retain their order. Raw and scan entry contracts are unchanged.
+
 Public scans additionally admit three-operand scalar and ordinary XMM/MMX
 descriptors when their exact ordered reads already occur in the compact scan
 dispatch. Generation proves every descriptor's register/memory requirements

@@ -713,6 +713,15 @@ int decodeInstructionScan(struct InternalInstruction *insn, const uint8_t *code,
 			  size_t codeSize, cs_mode mode, struct MCInst *mcInst,
 			  uint16_t *size);
 
+/* The full entry returns OPERANDS_READY with both raw state and constructed
+ * MCInst operands for admitted legacy terminals. RAW_READY leaves translation
+ * to the caller; INVALID retains the original failure/size-write ordering.
+ * EVEX normalization callers keep the raw decoder. */
+enum { X86_DECODE_OPERANDS_READY = 2 };
+int decodeInstructionFull(struct InternalInstruction *insn, const uint8_t *code,
+			  size_t codeSize, cs_mode mode, struct MCInst *mcInst,
+			  uint16_t *size);
+
 //const char *x86DisassemblerGetInstrName(unsigned Opcode, const void *mii);
 
 #endif

@@ -993,6 +993,1610 @@ static int (*const x86LegacyHandlers[])(struct InternalInstruction *) = {
 	readLegacyShape81,
 };
 
+static int decodeLegacyFullShape1(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
+	    fixupRegisterOperand(insn, TYPE_R8))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_M };
+	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_R8 };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRegRegister(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape2(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM) ||
+	    fixupRegisterOperand(insn, TYPE_R8))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_R8 };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_R8 };
+	static const OperandSpecifier op2 = { ENCODING_REG, TYPE_R8 };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRegRegister(mcInst, &op2, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape3(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
+	    fixupRegisterOperand(insn, TYPE_Rv))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_M };
+	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_Rv };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRegRegister(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape4(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_Rv, ENCODING_RM) ||
+	    fixupRegisterOperand(insn, TYPE_Rv))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_Rv };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_Rv };
+	static const OperandSpecifier op2 = { ENCODING_REG, TYPE_Rv };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRegRegister(mcInst, &op2, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape5(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRegisterOperand(insn, TYPE_R8) ||
+	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_R8 };
+	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_R8 };
+	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_M };
+	if (translateRegRegister(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRegRegister(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op2, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape6(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRegisterOperand(insn, TYPE_R8) ||
+	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_R8 };
+	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_R8 };
+	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_R8 };
+	if (translateRegRegister(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRegRegister(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op2, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape7(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRegisterOperand(insn, TYPE_Rv) ||
+	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_Rv };
+	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_Rv };
+	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_M };
+	if (translateRegRegister(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRegRegister(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op2, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape8(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRegisterOperand(insn, TYPE_Rv) ||
+	    fixupRMOperand(insn, TYPE_Rv, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_Rv };
+	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_Rv };
+	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_Rv };
+	if (translateRegRegister(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRegRegister(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op2, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape9(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if (readImmediate(insn, 1))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_IB, TYPE_IMM };
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op0, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape10(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if (readImmediate(insn, insn->immediateSize))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_Iv, TYPE_IMM };
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op0, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape11(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape12(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM) ||
+	    fixupRegisterOperand(insn, TYPE_R8))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_R8 };
+	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_R8 };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRegRegister(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape13(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_Rv, ENCODING_RM) ||
+	    fixupRegisterOperand(insn, TYPE_Rv))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_Rv };
+	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_Rv };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRegRegister(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape14(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRegisterOperand(insn, TYPE_R8) ||
+	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_R8 };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_M };
+	if (translateRegRegister(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape15(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRegisterOperand(insn, TYPE_R8) ||
+	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_R8 };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_R8 };
+	if (translateRegRegister(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape16(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRegisterOperand(insn, TYPE_Rv) ||
+	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_Rv };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_M };
+	if (translateRegRegister(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape17(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRegisterOperand(insn, TYPE_Rv) ||
+	    fixupRMOperand(insn, TYPE_Rv, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_Rv };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_Rv };
+	if (translateRegRegister(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape18(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if (readOpcodeRegister(insn, 0))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_Rv, TYPE_Rv };
+	static const OperandSpecifier op1 = { ENCODING_Rv, TYPE_Rv };
+	if (translateOpcodeRegister(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateOpcodeRegister(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape19(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if (readOpcodeRegister(insn, 0))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_Rv, TYPE_Rv };
+	if (translateOpcodeRegister(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape20(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
+	    fixupRegisterOperand(insn, TYPE_R16))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_M };
+	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_R16 };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRegRegister(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape21(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_R16, ENCODING_RM) ||
+	    fixupRegisterOperand(insn, TYPE_R16))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_R16 };
+	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_R16 };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRegRegister(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape22(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if (readImmediate(insn, 1))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_IB, TYPE_REL };
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op0, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape23(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
+	    readImmediate(insn, 1))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_M };
+	static const OperandSpecifier op1 = { ENCODING_IB, TYPE_IMM };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op1, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape24(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM) ||
+	    readImmediate(insn, 1))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_R8 };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_R8 };
+	static const OperandSpecifier op2 = { ENCODING_IB, TYPE_IMM };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op2, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape25(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM) ||
+	    readImmediate(insn, 1))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_R8 };
+	static const OperandSpecifier op1 = { ENCODING_IB, TYPE_IMM };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op1, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape26(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
+	    readImmediate(insn, insn->immediateSize))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_M };
+	static const OperandSpecifier op1 = { ENCODING_Iv, TYPE_IMM };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op1, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape27(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_Rv, ENCODING_RM) ||
+	    readImmediate(insn, insn->immediateSize))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_Rv };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_Rv };
+	static const OperandSpecifier op2 = { ENCODING_Iv, TYPE_IMM };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op2, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape28(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_Rv, ENCODING_RM) ||
+	    readImmediate(insn, insn->immediateSize))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_Rv };
+	static const OperandSpecifier op1 = { ENCODING_Iv, TYPE_IMM };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op1, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape29(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_Rv, ENCODING_RM) ||
+	    readImmediate(insn, 1))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_Rv };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_Rv };
+	static const OperandSpecifier op2 = { ENCODING_IB, TYPE_IMM };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op2, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape30(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_Rv, ENCODING_RM) ||
+	    readImmediate(insn, 1))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_Rv };
+	static const OperandSpecifier op1 = { ENCODING_IB, TYPE_IMM };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op1, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape31(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_M };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape32(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_Rv, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_Rv };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape33(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if (readImmediate(insn, insn->immediateSize) ||
+	    readImmediate(insn, 2))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_Iv, TYPE_IMM };
+	static const OperandSpecifier op1 = { ENCODING_IW, TYPE_IMM };
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op0, insn, true);
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op1, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape34(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if (readMemoryOffset(insn, true))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_Ia, TYPE_MOFFS };
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op0, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape35(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if (readOpcodeRegister(insn, 1) ||
+	    readImmediate(insn, 1))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RB, TYPE_R8 };
+	static const OperandSpecifier op1 = { ENCODING_IB, TYPE_IMM };
+	if (translateOpcodeRegister(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op1, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape36(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if (readOpcodeRegister(insn, 0) ||
+	    readImmediate(insn, insn->immediateSize))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_Rv, TYPE_Rv };
+	static const OperandSpecifier op1 = { ENCODING_Iv, TYPE_IMM };
+	if (translateOpcodeRegister(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op1, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape37(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
+	    readImmediate(insn, 1))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_M };
+	static const OperandSpecifier op1 = { ENCODING_IB, TYPE_UIMM8 };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op1, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape38(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM) ||
+	    readImmediate(insn, 1))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_R8 };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_R8 };
+	static const OperandSpecifier op2 = { ENCODING_IB, TYPE_UIMM8 };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op2, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape39(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_Rv, ENCODING_RM) ||
+	    readImmediate(insn, 1))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_Rv };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_Rv };
+	static const OperandSpecifier op2 = { ENCODING_IB, TYPE_UIMM8 };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op2, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape40(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if (readImmediate(insn, 2))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_IW, TYPE_IMM };
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op0, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape41(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if (readImmediate(insn, 2) ||
+	    readImmediate(insn, 1))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_IW, TYPE_IMM };
+	static const OperandSpecifier op1 = { ENCODING_IB, TYPE_IMM };
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op0, insn, true);
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op1, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape42(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if (readImmediate(insn, 1))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_IB, TYPE_UIMM8 };
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op0, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape43(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_R8 };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_R8 };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape44(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_Rv, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_Rv };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_Rv };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape45(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if (readImmediate(insn, 4))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_ID, TYPE_REL };
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op0, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape46(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if (readImmediate(insn, insn->immediateSize))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_Iv, TYPE_REL };
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op0, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape47(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_R8 };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape48(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_R16, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_R16 };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape49(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
+	    fixupRegisterOperand(insn, TYPE_R32))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_M };
+	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_R32 };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRegRegister(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape50(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_R32, ENCODING_RM) ||
+	    fixupRegisterOperand(insn, TYPE_R32))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_R32 };
+	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_R32 };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRegRegister(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape51(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRegisterOperand(insn, TYPE_R32) ||
+	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_R32 };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_M };
+	if (translateRegRegister(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape52(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRegisterOperand(insn, TYPE_R32) ||
+	    fixupRMOperand(insn, TYPE_R32, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_R32 };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_R32 };
+	if (translateRegRegister(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape53(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRegisterOperand(insn, TYPE_Rv) ||
+	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_Rv };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_R8 };
+	if (translateRegRegister(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape54(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRegisterOperand(insn, TYPE_Rv) ||
+	    fixupRMOperand(insn, TYPE_R16, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_Rv };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_R16 };
+	if (translateRegRegister(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape55(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if (readOpcodeRegister(insn, 8))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RO, TYPE_R64 };
+	if (translateOpcodeRegister(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape56(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if (readImmediate(insn, 4))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_ID, TYPE_IMM };
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op0, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape57(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_R64 };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape58(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
+	    fixupRegisterOperand(insn, TYPE_R64))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_M };
+	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_R64 };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRegRegister(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape59(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM) ||
+	    fixupRegisterOperand(insn, TYPE_R64))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_R64 };
+	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_R64 };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRegRegister(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape60(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRegisterOperand(insn, TYPE_R64) ||
+	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_R64 };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_M };
+	if (translateRegRegister(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape61(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRegisterOperand(insn, TYPE_R64) ||
+	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_R64 };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_R64 };
+	if (translateRegRegister(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape62(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM) ||
+	    fixupRegisterOperand(insn, TYPE_R64))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_R64 };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_R64 };
+	static const OperandSpecifier op2 = { ENCODING_REG, TYPE_R64 };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRegRegister(mcInst, &op2, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape63(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRegisterOperand(insn, TYPE_R64) ||
+	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_R64 };
+	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_R64 };
+	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_M };
+	if (translateRegRegister(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRegRegister(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op2, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape64(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRegisterOperand(insn, TYPE_R64) ||
+	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_R64 };
+	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_R64 };
+	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_R64 };
+	if (translateRegRegister(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRegRegister(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op2, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape65(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRegisterOperand(insn, TYPE_R64) ||
+	    fixupRMOperand(insn, TYPE_R32, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_R64 };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_R32 };
+	if (translateRegRegister(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape66(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
+	    readImmediate(insn, 4))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_M };
+	static const OperandSpecifier op1 = { ENCODING_ID, TYPE_IMM };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op1, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape67(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM) ||
+	    readImmediate(insn, 4))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_R64 };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_R64 };
+	static const OperandSpecifier op2 = { ENCODING_ID, TYPE_IMM };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op2, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape68(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM) ||
+	    readImmediate(insn, 4))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_R64 };
+	static const OperandSpecifier op1 = { ENCODING_ID, TYPE_IMM };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op1, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape69(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM) ||
+	    readImmediate(insn, 1))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_R64 };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_R64 };
+	static const OperandSpecifier op2 = { ENCODING_IB, TYPE_IMM };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op2, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape70(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM) ||
+	    readImmediate(insn, 1))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_R64 };
+	static const OperandSpecifier op1 = { ENCODING_IB, TYPE_IMM };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op1, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape71(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if (readOpcodeRegister(insn, 8))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RO, TYPE_R64 };
+	static const OperandSpecifier op1 = { ENCODING_RO, TYPE_R64 };
+	if (translateOpcodeRegister(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateOpcodeRegister(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape72(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if (readOpcodeRegister(insn, 8) ||
+	    readImmediate(insn, 8))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RO, TYPE_R64 };
+	static const OperandSpecifier op1 = { ENCODING_IO, TYPE_IMM };
+	if (translateOpcodeRegister(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op1, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape73(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM) ||
+	    readImmediate(insn, 1))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_R64 };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_R64 };
+	static const OperandSpecifier op2 = { ENCODING_IB, TYPE_UIMM8 };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op2, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape74(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_R64 };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_R64 };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape75(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRegisterOperand(insn, TYPE_R64) ||
+	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_R64 };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_R8 };
+	if (translateRegRegister(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape76(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRegisterOperand(insn, TYPE_R64) ||
+	    fixupRMOperand(insn, TYPE_R16, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_R64 };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_R16 };
+	if (translateRegRegister(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape77(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if (readImmediate(insn, insn->immediateSize) ||
+	    readImmediate(insn, insn->immediateSize))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_Iv, TYPE_IMM };
+	static const OperandSpecifier op1 = { ENCODING_Iv, TYPE_IMM };
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op0, insn, true);
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op1, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape78(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if (readImmediate(insn, 2))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_IW, TYPE_REL };
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op0, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape79(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_R32, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_R32 };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape80(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRegisterOperand(insn, TYPE_R16) ||
+	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_R16 };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_M };
+	if (translateRegRegister(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape81(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRegisterOperand(insn, TYPE_R16) ||
+	    fixupRMOperand(insn, TYPE_R32, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_R16 };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_R32 };
+	if (translateRegRegister(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int (*const x86LegacyFullHandlers[])(struct InternalInstruction *, MCInst *, uint16_t *) = {
+	NULL,
+	decodeLegacyFullShape1,
+	decodeLegacyFullShape2,
+	decodeLegacyFullShape3,
+	decodeLegacyFullShape4,
+	decodeLegacyFullShape5,
+	decodeLegacyFullShape6,
+	decodeLegacyFullShape7,
+	decodeLegacyFullShape8,
+	decodeLegacyFullShape9,
+	decodeLegacyFullShape10,
+	decodeLegacyFullShape11,
+	decodeLegacyFullShape12,
+	decodeLegacyFullShape13,
+	decodeLegacyFullShape14,
+	decodeLegacyFullShape15,
+	decodeLegacyFullShape16,
+	decodeLegacyFullShape17,
+	decodeLegacyFullShape18,
+	decodeLegacyFullShape19,
+	decodeLegacyFullShape20,
+	decodeLegacyFullShape21,
+	decodeLegacyFullShape22,
+	decodeLegacyFullShape23,
+	decodeLegacyFullShape24,
+	decodeLegacyFullShape25,
+	decodeLegacyFullShape26,
+	decodeLegacyFullShape27,
+	decodeLegacyFullShape28,
+	decodeLegacyFullShape29,
+	decodeLegacyFullShape30,
+	decodeLegacyFullShape31,
+	decodeLegacyFullShape32,
+	decodeLegacyFullShape33,
+	decodeLegacyFullShape34,
+	decodeLegacyFullShape35,
+	decodeLegacyFullShape36,
+	decodeLegacyFullShape37,
+	decodeLegacyFullShape38,
+	decodeLegacyFullShape39,
+	decodeLegacyFullShape40,
+	decodeLegacyFullShape41,
+	decodeLegacyFullShape42,
+	decodeLegacyFullShape43,
+	decodeLegacyFullShape44,
+	decodeLegacyFullShape45,
+	decodeLegacyFullShape46,
+	decodeLegacyFullShape47,
+	decodeLegacyFullShape48,
+	decodeLegacyFullShape49,
+	decodeLegacyFullShape50,
+	decodeLegacyFullShape51,
+	decodeLegacyFullShape52,
+	decodeLegacyFullShape53,
+	decodeLegacyFullShape54,
+	decodeLegacyFullShape55,
+	decodeLegacyFullShape56,
+	decodeLegacyFullShape57,
+	decodeLegacyFullShape58,
+	decodeLegacyFullShape59,
+	decodeLegacyFullShape60,
+	decodeLegacyFullShape61,
+	decodeLegacyFullShape62,
+	decodeLegacyFullShape63,
+	decodeLegacyFullShape64,
+	decodeLegacyFullShape65,
+	decodeLegacyFullShape66,
+	decodeLegacyFullShape67,
+	decodeLegacyFullShape68,
+	decodeLegacyFullShape69,
+	decodeLegacyFullShape70,
+	decodeLegacyFullShape71,
+	decodeLegacyFullShape72,
+	decodeLegacyFullShape73,
+	decodeLegacyFullShape74,
+	decodeLegacyFullShape75,
+	decodeLegacyFullShape76,
+	decodeLegacyFullShape77,
+	decodeLegacyFullShape78,
+	decodeLegacyFullShape79,
+	decodeLegacyFullShape80,
+	decodeLegacyFullShape81,
+};
+
 X86_DECODE_INLINE int scanLegacyPublicOperands(struct InternalInstruction *insn,
 		uint16_t *size, unsigned int handler)
 {
@@ -5521,6 +7125,8 @@ X86_DECODE_INLINE int decodeLegacyTerminal(struct InternalInstruction *insn,
 	if (scan)
 		return scanLegacyOperands(insn, mcInst, size, terminal >> X86_TERMINAL_HANDLER_SHIFT);
 	insn->operands = x86OperandSets[(terminal >> X86_TERMINAL_OPERAND_SHIFT) & X86_TERMINAL_OPERAND_MASK];
+	if (mcInst)
+		return x86LegacyFullHandlers[terminal >> X86_TERMINAL_HANDLER_SHIFT](insn, mcInst, size);
 	return x86LegacyHandlers[terminal >> X86_TERMINAL_HANDLER_SHIFT](insn);
 }
 #else
@@ -6512,6 +8118,1610 @@ static int (*const x86LegacyHandlers[])(struct InternalInstruction *) = {
 	readLegacyShape79,
 	readLegacyShape80,
 	readLegacyShape81,
+};
+
+static int decodeLegacyFullShape1(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
+	    fixupRegisterOperand(insn, TYPE_R8))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_M };
+	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_R8 };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRegRegister(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape2(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM) ||
+	    fixupRegisterOperand(insn, TYPE_R8))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_R8 };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_R8 };
+	static const OperandSpecifier op2 = { ENCODING_REG, TYPE_R8 };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRegRegister(mcInst, &op2, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape3(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
+	    fixupRegisterOperand(insn, TYPE_Rv))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_M };
+	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_Rv };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRegRegister(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape4(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_Rv, ENCODING_RM) ||
+	    fixupRegisterOperand(insn, TYPE_Rv))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_Rv };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_Rv };
+	static const OperandSpecifier op2 = { ENCODING_REG, TYPE_Rv };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRegRegister(mcInst, &op2, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape5(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRegisterOperand(insn, TYPE_R8) ||
+	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_R8 };
+	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_R8 };
+	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_M };
+	if (translateRegRegister(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRegRegister(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op2, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape6(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRegisterOperand(insn, TYPE_R8) ||
+	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_R8 };
+	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_R8 };
+	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_R8 };
+	if (translateRegRegister(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRegRegister(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op2, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape7(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRegisterOperand(insn, TYPE_Rv) ||
+	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_Rv };
+	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_Rv };
+	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_M };
+	if (translateRegRegister(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRegRegister(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op2, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape8(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRegisterOperand(insn, TYPE_Rv) ||
+	    fixupRMOperand(insn, TYPE_Rv, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_Rv };
+	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_Rv };
+	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_Rv };
+	if (translateRegRegister(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRegRegister(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op2, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape9(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if (readImmediate(insn, 1))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_IB, TYPE_IMM };
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op0, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape10(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if (readImmediate(insn, insn->immediateSize))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_Iv, TYPE_IMM };
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op0, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape11(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape12(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM) ||
+	    fixupRegisterOperand(insn, TYPE_R8))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_R8 };
+	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_R8 };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRegRegister(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape13(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_Rv, ENCODING_RM) ||
+	    fixupRegisterOperand(insn, TYPE_Rv))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_Rv };
+	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_Rv };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRegRegister(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape14(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRegisterOperand(insn, TYPE_R8) ||
+	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_R8 };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_M };
+	if (translateRegRegister(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape15(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRegisterOperand(insn, TYPE_R8) ||
+	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_R8 };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_R8 };
+	if (translateRegRegister(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape16(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRegisterOperand(insn, TYPE_Rv) ||
+	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_Rv };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_M };
+	if (translateRegRegister(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape17(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRegisterOperand(insn, TYPE_Rv) ||
+	    fixupRMOperand(insn, TYPE_Rv, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_Rv };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_Rv };
+	if (translateRegRegister(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape18(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if (readOpcodeRegister(insn, 0))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_Rv, TYPE_Rv };
+	static const OperandSpecifier op1 = { ENCODING_Rv, TYPE_Rv };
+	if (translateOpcodeRegister(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateOpcodeRegister(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape19(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if (readOpcodeRegister(insn, 0))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_Rv, TYPE_Rv };
+	if (translateOpcodeRegister(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape20(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
+	    fixupRegisterOperand(insn, TYPE_R16))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_M };
+	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_R16 };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRegRegister(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape21(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_R16, ENCODING_RM) ||
+	    fixupRegisterOperand(insn, TYPE_R16))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_R16 };
+	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_R16 };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRegRegister(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape22(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if (readImmediate(insn, 1))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_IB, TYPE_REL };
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op0, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape23(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
+	    readImmediate(insn, 1))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_M };
+	static const OperandSpecifier op1 = { ENCODING_IB, TYPE_IMM };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op1, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape24(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM) ||
+	    readImmediate(insn, 1))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_R8 };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_R8 };
+	static const OperandSpecifier op2 = { ENCODING_IB, TYPE_IMM };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op2, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape25(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM) ||
+	    readImmediate(insn, 1))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_R8 };
+	static const OperandSpecifier op1 = { ENCODING_IB, TYPE_IMM };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op1, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape26(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
+	    readImmediate(insn, insn->immediateSize))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_M };
+	static const OperandSpecifier op1 = { ENCODING_Iv, TYPE_IMM };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op1, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape27(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_Rv, ENCODING_RM) ||
+	    readImmediate(insn, insn->immediateSize))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_Rv };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_Rv };
+	static const OperandSpecifier op2 = { ENCODING_Iv, TYPE_IMM };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op2, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape28(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_Rv, ENCODING_RM) ||
+	    readImmediate(insn, insn->immediateSize))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_Rv };
+	static const OperandSpecifier op1 = { ENCODING_Iv, TYPE_IMM };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op1, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape29(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_Rv, ENCODING_RM) ||
+	    readImmediate(insn, 1))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_Rv };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_Rv };
+	static const OperandSpecifier op2 = { ENCODING_IB, TYPE_IMM };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op2, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape30(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_Rv, ENCODING_RM) ||
+	    readImmediate(insn, 1))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_Rv };
+	static const OperandSpecifier op1 = { ENCODING_IB, TYPE_IMM };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op1, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape31(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_M };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape32(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_Rv, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_Rv };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape33(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if (readImmediate(insn, insn->immediateSize) ||
+	    readImmediate(insn, 2))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_Iv, TYPE_IMM };
+	static const OperandSpecifier op1 = { ENCODING_IW, TYPE_IMM };
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op0, insn, true);
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op1, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape34(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if (readMemoryOffset(insn, true))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_Ia, TYPE_MOFFS };
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op0, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape35(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if (readOpcodeRegister(insn, 1) ||
+	    readImmediate(insn, 1))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RB, TYPE_R8 };
+	static const OperandSpecifier op1 = { ENCODING_IB, TYPE_IMM };
+	if (translateOpcodeRegister(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op1, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape36(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if (readOpcodeRegister(insn, 0) ||
+	    readImmediate(insn, insn->immediateSize))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_Rv, TYPE_Rv };
+	static const OperandSpecifier op1 = { ENCODING_Iv, TYPE_IMM };
+	if (translateOpcodeRegister(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op1, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape37(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
+	    readImmediate(insn, 1))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_M };
+	static const OperandSpecifier op1 = { ENCODING_IB, TYPE_UIMM8 };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op1, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape38(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM) ||
+	    readImmediate(insn, 1))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_R8 };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_R8 };
+	static const OperandSpecifier op2 = { ENCODING_IB, TYPE_UIMM8 };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op2, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape39(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_Rv, ENCODING_RM) ||
+	    readImmediate(insn, 1))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_Rv };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_Rv };
+	static const OperandSpecifier op2 = { ENCODING_IB, TYPE_UIMM8 };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op2, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape40(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if (readImmediate(insn, 2))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_IW, TYPE_IMM };
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op0, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape41(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if (readImmediate(insn, insn->immediateSize))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_Iv, TYPE_REL };
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op0, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape42(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if (readImmediate(insn, 2) ||
+	    readImmediate(insn, 1))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_IW, TYPE_IMM };
+	static const OperandSpecifier op1 = { ENCODING_IB, TYPE_IMM };
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op0, insn, true);
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op1, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape43(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if (readImmediate(insn, 1))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_IB, TYPE_UIMM8 };
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op0, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape44(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_R8 };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_R8 };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape45(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_Rv, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_Rv };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_Rv };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape46(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if (readImmediate(insn, 4))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_ID, TYPE_REL };
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op0, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape47(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_R8 };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape48(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_R16, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_R16 };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape49(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
+	    fixupRegisterOperand(insn, TYPE_R32))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_M };
+	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_R32 };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRegRegister(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape50(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_R32, ENCODING_RM) ||
+	    fixupRegisterOperand(insn, TYPE_R32))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_R32 };
+	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_R32 };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRegRegister(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape51(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRegisterOperand(insn, TYPE_R32) ||
+	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_R32 };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_M };
+	if (translateRegRegister(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape52(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRegisterOperand(insn, TYPE_R32) ||
+	    fixupRMOperand(insn, TYPE_R32, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_R32 };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_R32 };
+	if (translateRegRegister(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape53(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRegisterOperand(insn, TYPE_Rv) ||
+	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_Rv };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_R8 };
+	if (translateRegRegister(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape54(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRegisterOperand(insn, TYPE_Rv) ||
+	    fixupRMOperand(insn, TYPE_R16, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_Rv };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_R16 };
+	if (translateRegRegister(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape55(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if (readOpcodeRegister(insn, 8))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RO, TYPE_R64 };
+	if (translateOpcodeRegister(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape56(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if (readImmediate(insn, 4))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_ID, TYPE_IMM };
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op0, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape57(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_R64 };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape58(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
+	    fixupRegisterOperand(insn, TYPE_R64))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_M };
+	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_R64 };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRegRegister(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape59(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM) ||
+	    fixupRegisterOperand(insn, TYPE_R64))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_R64 };
+	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_R64 };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRegRegister(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape60(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRegisterOperand(insn, TYPE_R64) ||
+	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_R64 };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_M };
+	if (translateRegRegister(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape61(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRegisterOperand(insn, TYPE_R64) ||
+	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_R64 };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_R64 };
+	if (translateRegRegister(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape62(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM) ||
+	    fixupRegisterOperand(insn, TYPE_R64))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_R64 };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_R64 };
+	static const OperandSpecifier op2 = { ENCODING_REG, TYPE_R64 };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRegRegister(mcInst, &op2, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape63(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRegisterOperand(insn, TYPE_R64) ||
+	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_R64 };
+	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_R64 };
+	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_M };
+	if (translateRegRegister(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRegRegister(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op2, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape64(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRegisterOperand(insn, TYPE_R64) ||
+	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_R64 };
+	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_R64 };
+	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_R64 };
+	if (translateRegRegister(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRegRegister(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op2, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape65(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRegisterOperand(insn, TYPE_R64) ||
+	    fixupRMOperand(insn, TYPE_R32, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_R64 };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_R32 };
+	if (translateRegRegister(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape66(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
+	    readImmediate(insn, 4))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_M };
+	static const OperandSpecifier op1 = { ENCODING_ID, TYPE_IMM };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op1, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape67(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM) ||
+	    readImmediate(insn, 4))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_R64 };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_R64 };
+	static const OperandSpecifier op2 = { ENCODING_ID, TYPE_IMM };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op2, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape68(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM) ||
+	    readImmediate(insn, 4))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_R64 };
+	static const OperandSpecifier op1 = { ENCODING_ID, TYPE_IMM };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op1, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape69(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM) ||
+	    readImmediate(insn, 1))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_R64 };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_R64 };
+	static const OperandSpecifier op2 = { ENCODING_IB, TYPE_IMM };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op2, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape70(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM) ||
+	    readImmediate(insn, 1))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_R64 };
+	static const OperandSpecifier op1 = { ENCODING_IB, TYPE_IMM };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op1, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape71(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if (readOpcodeRegister(insn, 8))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RO, TYPE_R64 };
+	static const OperandSpecifier op1 = { ENCODING_RO, TYPE_R64 };
+	if (translateOpcodeRegister(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateOpcodeRegister(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape72(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if (readOpcodeRegister(insn, 8) ||
+	    readImmediate(insn, 8))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RO, TYPE_R64 };
+	static const OperandSpecifier op1 = { ENCODING_IO, TYPE_IMM };
+	if (translateOpcodeRegister(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op1, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape73(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM) ||
+	    readImmediate(insn, 1))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_R64 };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_R64 };
+	static const OperandSpecifier op2 = { ENCODING_IB, TYPE_UIMM8 };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op2, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape74(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_R64 };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_R64 };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape75(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRegisterOperand(insn, TYPE_R64) ||
+	    fixupRMOperand(insn, TYPE_R8, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_R64 };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_R8 };
+	if (translateRegRegister(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape76(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRegisterOperand(insn, TYPE_R64) ||
+	    fixupRMOperand(insn, TYPE_R16, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_R64 };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_R16 };
+	if (translateRegRegister(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape77(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if (readImmediate(insn, insn->immediateSize) ||
+	    readImmediate(insn, insn->immediateSize))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_Iv, TYPE_IMM };
+	static const OperandSpecifier op1 = { ENCODING_Iv, TYPE_IMM };
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op0, insn, true);
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op1, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape78(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if (readImmediate(insn, 2))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_IW, TYPE_REL };
+	translateImmediate(
+		mcInst, insn->immediates[insn->numImmediatesTranslated++],
+		&op0, insn, true);
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape79(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRMOperand(insn, TYPE_R32, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_R32 };
+	if (translateRM(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape80(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRegisterOperand(insn, TYPE_R16) ||
+	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_R16 };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_M };
+	if (translateRegRegister(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int decodeLegacyFullShape81(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)
+{
+	if ((!insn->consumedModRM && readModRM(insn)) ||
+	    fixupRegisterOperand(insn, TYPE_R16) ||
+	    fixupRMOperand(insn, TYPE_R32, ENCODING_RM))
+		return X86_SCAN_INVALID;
+	if (finishDecodedInstruction(insn, false))
+		return X86_SCAN_INVALID;
+	*size = (uint16_t)insn->length;
+	if (beginTranslation(mcInst, insn))
+		return X86_SCAN_INVALID;
+	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_R16 };
+	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_R32 };
+	if (translateRegRegister(mcInst, &op0, insn, true))
+		return X86_SCAN_INVALID;
+	if (translateRM(mcInst, &op1, insn, true))
+		return X86_SCAN_INVALID;
+	return X86_DECODE_OPERANDS_READY;
+}
+static int (*const x86LegacyFullHandlers[])(struct InternalInstruction *, MCInst *, uint16_t *) = {
+	NULL,
+	decodeLegacyFullShape1,
+	decodeLegacyFullShape2,
+	decodeLegacyFullShape3,
+	decodeLegacyFullShape4,
+	decodeLegacyFullShape5,
+	decodeLegacyFullShape6,
+	decodeLegacyFullShape7,
+	decodeLegacyFullShape8,
+	decodeLegacyFullShape9,
+	decodeLegacyFullShape10,
+	decodeLegacyFullShape11,
+	decodeLegacyFullShape12,
+	decodeLegacyFullShape13,
+	decodeLegacyFullShape14,
+	decodeLegacyFullShape15,
+	decodeLegacyFullShape16,
+	decodeLegacyFullShape17,
+	decodeLegacyFullShape18,
+	decodeLegacyFullShape19,
+	decodeLegacyFullShape20,
+	decodeLegacyFullShape21,
+	decodeLegacyFullShape22,
+	decodeLegacyFullShape23,
+	decodeLegacyFullShape24,
+	decodeLegacyFullShape25,
+	decodeLegacyFullShape26,
+	decodeLegacyFullShape27,
+	decodeLegacyFullShape28,
+	decodeLegacyFullShape29,
+	decodeLegacyFullShape30,
+	decodeLegacyFullShape31,
+	decodeLegacyFullShape32,
+	decodeLegacyFullShape33,
+	decodeLegacyFullShape34,
+	decodeLegacyFullShape35,
+	decodeLegacyFullShape36,
+	decodeLegacyFullShape37,
+	decodeLegacyFullShape38,
+	decodeLegacyFullShape39,
+	decodeLegacyFullShape40,
+	decodeLegacyFullShape41,
+	decodeLegacyFullShape42,
+	decodeLegacyFullShape43,
+	decodeLegacyFullShape44,
+	decodeLegacyFullShape45,
+	decodeLegacyFullShape46,
+	decodeLegacyFullShape47,
+	decodeLegacyFullShape48,
+	decodeLegacyFullShape49,
+	decodeLegacyFullShape50,
+	decodeLegacyFullShape51,
+	decodeLegacyFullShape52,
+	decodeLegacyFullShape53,
+	decodeLegacyFullShape54,
+	decodeLegacyFullShape55,
+	decodeLegacyFullShape56,
+	decodeLegacyFullShape57,
+	decodeLegacyFullShape58,
+	decodeLegacyFullShape59,
+	decodeLegacyFullShape60,
+	decodeLegacyFullShape61,
+	decodeLegacyFullShape62,
+	decodeLegacyFullShape63,
+	decodeLegacyFullShape64,
+	decodeLegacyFullShape65,
+	decodeLegacyFullShape66,
+	decodeLegacyFullShape67,
+	decodeLegacyFullShape68,
+	decodeLegacyFullShape69,
+	decodeLegacyFullShape70,
+	decodeLegacyFullShape71,
+	decodeLegacyFullShape72,
+	decodeLegacyFullShape73,
+	decodeLegacyFullShape74,
+	decodeLegacyFullShape75,
+	decodeLegacyFullShape76,
+	decodeLegacyFullShape77,
+	decodeLegacyFullShape78,
+	decodeLegacyFullShape79,
+	decodeLegacyFullShape80,
+	decodeLegacyFullShape81,
 };
 
 X86_DECODE_INLINE int scanLegacyPublicOperands(struct InternalInstruction *insn,
@@ -11246,6 +14456,8 @@ X86_DECODE_INLINE int decodeLegacyTerminal(struct InternalInstruction *insn,
 	if (scan)
 		return scanLegacyOperands(insn, mcInst, size, terminal >> X86_TERMINAL_HANDLER_SHIFT);
 	insn->operands = x86OperandSets[(terminal >> X86_TERMINAL_OPERAND_SHIFT) & X86_TERMINAL_OPERAND_MASK];
+	if (mcInst)
+		return x86LegacyFullHandlers[terminal >> X86_TERMINAL_HANDLER_SHIFT](insn, mcInst, size);
 	return x86LegacyHandlers[terminal >> X86_TERMINAL_HANDLER_SHIFT](insn);
 }
 #endif

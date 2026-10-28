@@ -623,6 +623,7 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
 {
 	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
 	bool scalar_compare_p2_normalized = false;
+	bool operands_ready = false;
 	uint8_t original_scalar_compare_p2 = 0;
 	int ret;
 	bool result;
@@ -638,8 +639,14 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
 		if (ret != X86_SCAN_RAW_READY)
 			return ret == X86_SCAN_COMPLETE;
 		ret = 0;
-	} else
-		ret = decodeInstruction(&insn, code, code_len, handle->mode);
+	} else {
+		ret = decodeInstructionFull(&insn, code, code_len, handle->mode,
+					    instr, size);
+		if (ret == X86_DECODE_OPERANDS_READY) {
+			operands_ready = true;
+			ret = 0;
+		}
+	}
 
 	if (ret) {
 		return false;
@@ -649,7 +656,8 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
 		prepareTranslation(&insn);
 		if (scanOnly || (handle->no_text && !handle->detail_opt))
 			return !translateInstruction(instr, &insn, false);
-		result = !translateInstruction(instr, &insn, true);
+		result = operands_ready ||
+			 !translateInstruction(instr, &insn, true);
 		if (result) {
 			unsigned Flags = X86_IP_NO_PREFIX;
 			if (scalar_compare_p2_normalized)

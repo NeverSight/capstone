@@ -834,6 +834,39 @@ def emit_public_legacy_handlers(groups):
     return lines
 
 
+def emit_full_legacy_handlers(groups):
+    lines = []
+    for (read_ops, translations), handler in groups.items():
+        lines += [
+            f"static int decodeLegacyFullShape{handler}(struct InternalInstruction *insn, MCInst *mcInst, uint16_t *size)",
+            "{",
+        ]
+        calls = read_operand_calls(read_ops)
+        if calls:
+            lines += [
+                "\tif (" + " ||\n\t    ".join(calls) + ")",
+                "\t\treturn X86_SCAN_INVALID;",
+            ]
+        lines += [
+            "\tif (finishDecodedInstruction(insn, false))",
+            "\t\treturn X86_SCAN_INVALID;",
+            "\t*size = (uint16_t)insn->length;",
+            "\tif (beginTranslation(mcInst, insn))",
+            "\t\treturn X86_SCAN_INVALID;",
+        ]
+        lines += translation_body(
+            translations, emit_operands="true", failure_result="X86_SCAN_INVALID"
+        )
+        lines += ["\treturn X86_DECODE_OPERANDS_READY;", "}"]
+    lines += [
+        "static int (*const x86LegacyFullHandlers[])(struct InternalInstruction *, MCInst *, uint16_t *) = {",
+        "\tNULL,",
+    ]
+    lines += [f"\tdecodeLegacyFullShape{handler}," for handler in groups.values()]
+    lines += ["};", ""]
+    return lines
+
+
 def emit_terminal(suffix):
     groups, terminals, rows, selected_counts, words, kinds = legacy_terminal_model(
         suffix
@@ -940,6 +973,8 @@ def emit_terminal(suffix):
         "\tif (scan)",
         "\t\treturn scanLegacyOperands(insn, mcInst, size, terminal >> X86_TERMINAL_HANDLER_SHIFT);",
         "\tinsn->operands = x86OperandSets[(terminal >> X86_TERMINAL_OPERAND_SHIFT) & X86_TERMINAL_OPERAND_MASK];",
+        "\tif (mcInst)",
+        "\t\treturn x86LegacyFullHandlers[terminal >> X86_TERMINAL_HANDLER_SHIFT](insn, mcInst, size);",
         "\treturn x86LegacyHandlers[terminal >> X86_TERMINAL_HANDLER_SHIFT](insn);",
         "}",
     ]
@@ -1035,7 +1070,11 @@ def emit_terminal(suffix):
         "",
     ]
     return "\n".join(
-        handlers + emit_public_legacy_handlers(public_groups) + public_reader + lines
+        handlers
+        + emit_full_legacy_handlers(groups)
+        + emit_public_legacy_handlers(public_groups)
+        + public_reader
+        + lines
     )
 
 
