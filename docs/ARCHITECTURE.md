@@ -459,6 +459,15 @@ repair. Empty strings remain no-ops. For `SStream_concat0`, DIET and other
 compilers retain the external helper. This constant-token specialization applies
 to generated printers without changing their tables or the translator.
 
+Generated alias printers append the mnemonic prefix through
+`SStream_concat0_substr`. The prefix contains no NUL bytes and comes from a
+static table separate from the stream. With the default system malloc/free
+hooks, this copies the bounded prefix directly, including the usual truncation
+and markup handling. Custom allocator hooks retain the temporary allocation,
+copy, append and free in their original order, even for empty or closed streams.
+The owning emitter is `PrinterCapstone::asmWriterEmitPrintAliasInstrBody` in
+the source-built NeverSight LLVM generator branch described by Auto-Sync.
+
 The final public-output copy combines mnemonic extraction and the internal
 `|` prefix separator conversion. It retains the full output-buffer clearing,
 postprinter ordering and custom mnemonic replacement; the general stream

@@ -255,6 +255,28 @@ void(SStream_concat0)(SStream *ss, const char *s)
 #endif
 }
 
+CAPSTONE_INTERNAL void SStream_concat0_substr(SStream *ss, const char *s,
+					      size_t len)
+{
+#if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
+	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE)
+	if (cs_mem_malloc == malloc && cs_mem_free == free) {
+		assert(ss && s);
+		if (ss->is_closed || len == 0)
+			return;
+		SStream_concat_raw(ss, s, len);
+		SStream_close_markup(ss);
+		return;
+	}
+#endif
+	// Hooks may observe the stream or replace the free hook during allocation.
+	char *substr = cs_mem_malloc(len + 1);
+	memcpy(substr, s, len);
+	substr[len] = '\0';
+	SStream_concat0(ss, substr);
+	cs_mem_free(substr);
+}
+
 /**
  * Copy the single char \p c to the buffer of \p ss.
  */

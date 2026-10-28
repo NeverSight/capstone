@@ -61,6 +61,10 @@ void SStream_concat_hex64(SStream *ss, uint64_t value, bool negative);
 
 void SStream_concat0(SStream *ss, const char *s);
 
+// Append an alias mnemonic prefix containing no NUL bytes. The source is a
+// static table, disjoint from the stream. Preserve custom allocation callbacks.
+void SStream_concat0_substr(SStream *ss, const char *s, size_t len);
+
 // The caller supplies the exact length of the NUL-terminated string.
 // Source bytes must not overlap the append range.
 static inline void SStream_concat0_n(SStream *ss, const char *s, size_t len)

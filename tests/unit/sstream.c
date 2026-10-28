@@ -169,6 +169,119 @@ static bool test_known_length_appends(void)
 	return true;
 }
 
+static void append_substr_reference(SStream *stream, const char *source,
+				    size_t length)
+{
+	char *substr = cs_mem_malloc(length + 1);
+	memcpy(substr, source, length);
+	substr[length] = '\0';
+	(SStream_concat0)(stream, substr);
+	cs_mem_free(substr);
+}
+
+static bool test_substr_appends(void)
+{
+	printf("Test test_substr_appends\n");
+	const size_t lengths[] = { 0, 1, 2, 31, 32, 159, 510, 511, 512, 513 };
+	const size_t indexes[] = { 0, 1, 509, 510, 511, 512, SIZE_MAX };
+	char source[SSTREAM_BUF_LEN + 1];
+	memset(source, 'Q', sizeof(source));
+	for (unsigned flags = 0; flags < 16; ++flags) {
+		for (size_t li = 0; li < ARR_SIZE(lengths); ++li) {
+			for (size_t ii = 0; ii < ARR_SIZE(indexes); ++ii) {
+				SStream expected, actual;
+				memset(&expected, 0x5a, sizeof(expected));
+				expected.index = indexes[ii];
+				expected.is_closed = (flags & 1) != 0;
+				expected.markup_stream = (flags & 2) != 0;
+				expected.prefixed_by_markup = (flags & 4) != 0;
+				expected.unsigned_num = (flags & 8) != 0;
+				memcpy(&actual, &expected, sizeof(actual));
+				append_substr_reference(&expected, source,
+							lengths[li]);
+				SStream_concat0_substr(&actual, source,
+						       lengths[li]);
+				if (memcmp(&expected, &actual,
+					   sizeof(actual))) {
+					printf("Substring append differs: flags=%u index=%zu length=%zu\n",
+					       flags, indexes[ii], lengths[li]);
+					return false;
+				}
+			}
+		}
+	}
+	return true;
+}
+
+static unsigned substr_malloc_calls;
+static unsigned substr_free_calls;
+static unsigned substr_stale_free_calls;
+static size_t substr_allocation_size;
+static unsigned char substr_freed_bytes[4];
+
+static void CAPSTONE_API substr_free(void *ptr)
+{
+	++substr_free_calls;
+	memcpy(substr_freed_bytes, ptr, substr_allocation_size);
+	free(ptr);
+}
+
+static void CAPSTONE_API substr_stale_free(void *ptr)
+{
+	++substr_stale_free_calls;
+	free(ptr);
+}
+
+static void *CAPSTONE_API substr_malloc(size_t size)
+{
+	++substr_malloc_calls;
+	substr_allocation_size = size;
+	cs_mem_free = substr_free;
+	return malloc(size);
+}
+
+static bool test_substr_allocator_hooks(void)
+{
+	printf("Test test_substr_allocator_hooks\n");
+	const char source[] = { 'X', 'Y', 'Z' };
+	cs_malloc_t saved_malloc = cs_mem_malloc;
+	cs_free_t saved_free = cs_mem_free;
+	for (unsigned closed = 0; closed < 2; ++closed) {
+		for (size_t length = 0; length <= sizeof(source); ++length) {
+			SStream expected, actual;
+			SStream_Init(&expected);
+			expected.is_closed = closed != 0;
+			expected.markup_stream = true;
+			expected.prefixed_by_markup = true;
+			memcpy(&actual, &expected, sizeof(actual));
+			char terminated[sizeof(source) + 1] = { 0 };
+			memcpy(terminated, source, length);
+			(SStream_concat0)(&expected, terminated);
+			substr_malloc_calls = substr_free_calls =
+				substr_stale_free_calls = 0;
+			memset(substr_freed_bytes, 0xa5,
+			       sizeof(substr_freed_bytes));
+			cs_mem_malloc = substr_malloc;
+			cs_mem_free = substr_stale_free;
+			SStream_concat0_substr(&actual, source, length);
+			cs_mem_malloc = saved_malloc;
+			cs_mem_free = saved_free;
+			CS_ASSERT_RET_VAL(substr_malloc_calls == 1, false);
+			CS_ASSERT_RET_VAL(substr_free_calls == 1, false);
+			CS_ASSERT_RET_VAL(substr_stale_free_calls == 0, false);
+			CS_ASSERT_RET_VAL(substr_allocation_size == length + 1,
+					  false);
+			CS_ASSERT_RET_VAL(memcmp(&expected, &actual,
+						 sizeof(actual)) == 0,
+					  false);
+			CS_ASSERT_RET_VAL(memcmp(substr_freed_bytes, terminated,
+						 length + 1) == 0,
+					  false);
+		}
+	}
+	return true;
+}
+
 static bool test_constant_appends(void)
 {
 	printf("Test test_constant_appends\n");
@@ -981,6 +1094,8 @@ int main()
 	result &= test_aliased_appends();
 	result &= test_constant_appends();
 	result &= test_known_length_appends();
+	result &= test_substr_appends();
+	result &= test_substr_allocator_hooks();
 	result &= test_hex64_formatting();
 	result &= test_hex64_custom_formatter();
 	result &= test_printint8();
