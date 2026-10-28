@@ -61,6 +61,46 @@ void SStream_concat_hex64(SStream *ss, uint64_t value, bool negative);
 
 void SStream_concat0(SStream *ss, const char *s);
 
+// The caller supplies the exact length of the NUL-terminated string.
+// Source bytes must not overlap the append range.
+static inline void SStream_concat0_n(SStream *ss, const char *s, size_t len)
+{
+#ifndef CAPSTONE_DIET
+	assert(ss && s);
+	if (ss->is_closed || len == 0)
+		return;
+	if (len < SSTREAM_BUF_LEN && ss->index < SSTREAM_BUF_LEN - len &&
+	    !(ss->markup_stream && ss->prefixed_by_markup)) {
+		char *out = ss->buffer + ss->index;
+		// Two fixed-size copies cover short table names without a libc call.
+		// Both reads and writes stay within the exact string length.
+		if (len > 32) {
+			memcpy(out, s, len);
+		} else if (len >= 16) {
+			memcpy(out, s, 16);
+			memcpy(out + len - 16, s + len - 16, 16);
+		} else if (len >= 8) {
+			memcpy(out, s, 8);
+			memcpy(out + len - 8, s + len - 8, 8);
+		} else if (len >= 4) {
+			memcpy(out, s, 4);
+			memcpy(out + len - 4, s + len - 4, 4);
+		} else if (len >= 2) {
+			memcpy(out, s, 2);
+			memcpy(out + len - 2, s + len - 2, 2);
+		} else {
+			out[0] = s[0];
+		}
+		ss->index += len;
+		ss->buffer[ss->index] = '\0';
+		return;
+	}
+#else
+	(void)len;
+#endif
+	SStream_concat0(ss, s);
+}
+
 #if defined(__GNUC__) && !defined(CAPSTONE_DIET)
 // Expose constant tokens to the compiler without expanding the general writer.
 static inline __attribute__((always_inline)) void

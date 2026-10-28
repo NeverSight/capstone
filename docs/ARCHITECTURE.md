@@ -432,15 +432,37 @@ This check runs in the unit suite when Python is available. Edit the original
 tables, then regenerate; the packed tables are not a separate instruction
 definition.
 
+The legacy x86 full Intel and AT&T printer tables store mnemonic lengths in
+unused high bits of their existing opcode records. The string bytes and operand
+fragment masks remain authoritative. After updating `X86GenAsmWriter*.inc`, run
+`python3 suite/synctools/x86_mnemonic_sizes.py`; `--check` verifies every string
+length, offset and operand fragment, and rejects layouts without enough spare
+bits. Reduced writers retain their original append path. The known-length
+`SStream_concat0_n` helper copies exactly the supplied string bytes, with bounded
+fixed-size copies for short names; truncation, markup and index repair retain the
+general writer. It requires a NUL-terminated source whose bytes do not overlap
+the append range.
+
+With the default userspace formatter, the Intel/MASM printer fills operand
+access and flags once, after explicit and implicit operands are complete. A
+custom formatter can observe partial detail or change options, so it retains
+the earlier assignments as well; kernel and custom-runtime builds retain that
+path too. AT&T keeps its separate ordering and mask handling.
+
 ### Disassembling process
 
 Printers append text through the shared `SStream` helpers. In non-DIET builds with
 GCC or Clang, `SStream_concat0` exposes compile-time string lengths at the call site. A token
 that fits in an open stream without a pending markup close uses a fixed-length
 copy; other writes retain the external helper, including truncation and index
-repair. Empty strings remain no-ops. DIET and other compilers retain the external
-helper throughout. This applies to generated printers without changing their
-tables or the translator.
+repair. Empty strings remain no-ops. For `SStream_concat0`, DIET and other
+compilers retain the external helper. This constant-token specialization applies
+to generated printers without changing their tables or the translator.
+
+The final public-output copy combines mnemonic extraction and the internal
+`|` prefix separator conversion. It retains the full output-buffer clearing,
+postprinter ordering and custom mnemonic replacement; the general stream
+extraction helper retains its original behavior.
 
 There are two steps in disassembling an instruction.
 

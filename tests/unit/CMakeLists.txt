@@ -54,6 +54,8 @@ if(CAPSTONE_X86_SUPPORT)
             COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/suite/synctools/x86_disassembler_tables.py" --check)
         add_test(NAME unit_x86_immediate_sizes_generator
             COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/suite/synctools/x86_immediate_sizes.py" --check)
+        add_test(NAME unit_x86_mnemonic_sizes_generator
+            COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/suite/synctools/x86_mnemonic_sizes.py" --check)
     endif()
     list(APPEND UNIT_TEST_SOURCES x86_far_immediate_encoding.c)
     list(APPEND UNIT_TEST_SOURCES x86_buffer_bounds.c)

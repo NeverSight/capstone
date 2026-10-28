@@ -469,6 +469,21 @@ static void get_op_access(cs_struct *h, unsigned int id, uint8_t *access,
 	access[i] = 0;
 #endif
 }
+
+static inline void set_early_operand_access(MCInst *MI)
+{
+#if defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
+	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
+	// A custom formatter can observe detail or change options while printing.
+	if (cs_vsnprintf == vsnprintf)
+		return;
+#endif
+	uint8_t access[CS_X86_MAXIMUM_OPERAND_SIZE];
+	get_op_access(MI->csh, MCInst_getOpcode(MI), access,
+		      &MI->flat_insn->detail->x86.eflags);
+	MI->flat_insn->detail->x86.operands[MI->flat_insn->detail->x86.op_count]
+		.access = access[MI->flat_insn->detail->x86.op_count];
+}
 #endif
 
 static void printSrcIdx(MCInst *MI, unsigned Op, SStream *O)
@@ -477,10 +492,6 @@ static void printSrcIdx(MCInst *MI, unsigned Op, SStream *O)
 	int reg;
 
 	if (MI->csh->detail_opt) {
-#ifndef CAPSTONE_DIET
-		uint8_t access[CS_X86_MAXIMUM_OPERAND_SIZE];
-#endif
-
 		MI->flat_insn->detail->x86
 			.operands[MI->flat_insn->detail->x86.op_count]
 			.type = X86_OP_MEM;
@@ -504,11 +515,7 @@ static void printSrcIdx(MCInst *MI, unsigned Op, SStream *O)
 			.mem.disp = 0;
 
 #ifndef CAPSTONE_DIET
-		get_op_access(MI->csh, MCInst_getOpcode(MI), access,
-			      &MI->flat_insn->detail->x86.eflags);
-		MI->flat_insn->detail->x86
-			.operands[MI->flat_insn->detail->x86.op_count]
-			.access = access[MI->flat_insn->detail->x86.op_count];
+		set_early_operand_access(MI);
 #endif
 	}
 
@@ -536,10 +543,6 @@ static void printSrcIdx(MCInst *MI, unsigned Op, SStream *O)
 static void printDstIdx(MCInst *MI, unsigned Op, SStream *O)
 {
 	if (MI->csh->detail_opt) {
-#ifndef CAPSTONE_DIET
-		uint8_t access[CS_X86_MAXIMUM_OPERAND_SIZE];
-#endif
-
 		MI->flat_insn->detail->x86
 			.operands[MI->flat_insn->detail->x86.op_count]
 			.type = X86_OP_MEM;
@@ -563,11 +566,7 @@ static void printDstIdx(MCInst *MI, unsigned Op, SStream *O)
 			.mem.disp = 0;
 
 #ifndef CAPSTONE_DIET
-		get_op_access(MI->csh, MCInst_getOpcode(MI), access,
-			      &MI->flat_insn->detail->x86.eflags);
-		MI->flat_insn->detail->x86
-			.operands[MI->flat_insn->detail->x86.op_count]
-			.access = access[MI->flat_insn->detail->x86.op_count];
+		set_early_operand_access(MI);
 #endif
 	}
 
@@ -651,10 +650,6 @@ static void printMemOffset(MCInst *MI, unsigned Op, SStream *O)
 	int reg;
 
 	if (MI->csh->detail_opt) {
-#ifndef CAPSTONE_DIET
-		uint8_t access[CS_X86_MAXIMUM_OPERAND_SIZE];
-#endif
-
 		MI->flat_insn->detail->x86
 			.operands[MI->flat_insn->detail->x86.op_count]
 			.type = X86_OP_MEM;
@@ -678,11 +673,7 @@ static void printMemOffset(MCInst *MI, unsigned Op, SStream *O)
 			.mem.disp = 0;
 
 #ifndef CAPSTONE_DIET
-		get_op_access(MI->csh, MCInst_getOpcode(MI), access,
-			      &MI->flat_insn->detail->x86.eflags);
-		MI->flat_insn->detail->x86
-			.operands[MI->flat_insn->detail->x86.op_count]
-			.access = access[MI->flat_insn->detail->x86.op_count];
+		set_early_operand_access(MI);
 #endif
 	}
 
@@ -732,10 +723,6 @@ static void printU8Imm(MCInst *MI, unsigned Op, SStream *O)
 	printImm(MI, O, val, true);
 
 	if (MI->csh->detail_opt) {
-#ifndef CAPSTONE_DIET
-		uint8_t access[CS_X86_MAXIMUM_OPERAND_SIZE];
-#endif
-
 		MI->flat_insn->detail->x86
 			.operands[MI->flat_insn->detail->x86.op_count]
 			.type = X86_OP_IMM;
@@ -747,11 +734,7 @@ static void printU8Imm(MCInst *MI, unsigned Op, SStream *O)
 			.size = 1;
 
 #ifndef CAPSTONE_DIET
-		get_op_access(MI->csh, MCInst_getOpcode(MI), access,
-			      &MI->flat_insn->detail->x86.eflags);
-		MI->flat_insn->detail->x86
-			.operands[MI->flat_insn->detail->x86.op_count]
-			.access = access[MI->flat_insn->detail->x86.op_count];
+		set_early_operand_access(MI);
 #endif
 
 		MI->flat_insn->detail->x86.op_count++;
@@ -867,6 +850,7 @@ void X86_Intel_printInst(MCInst *MI, SStream *O, void *Info)
 		}
 
 #ifndef CAPSTONE_DIET
+		// Assign access once the implicit operands have their final positions.
 		get_op_access(MI->csh, MCInst_getOpcode(MI), access,
 			      &MI->flat_insn->detail->x86.eflags);
 		for (uint8_t i = 0; i < MI->flat_insn->detail->x86.op_count &&
@@ -896,10 +880,6 @@ static void printPCRelImm(MCInst *MI, unsigned OpNo, SStream *O)
 		printImm(MI, O, imm, true);
 
 		if (MI->csh->detail_opt) {
-#ifndef CAPSTONE_DIET
-			uint8_t access[CS_X86_MAXIMUM_OPERAND_SIZE];
-#endif
-
 			MI->flat_insn->detail->x86
 				.operands[MI->flat_insn->detail->x86.op_count]
 				.type = X86_OP_IMM;
@@ -926,12 +906,7 @@ static void printPCRelImm(MCInst *MI, unsigned OpNo, SStream *O)
 				.imm = imm;
 
 #ifndef CAPSTONE_DIET
-			get_op_access(MI->csh, MCInst_getOpcode(MI), access,
-				      &MI->flat_insn->detail->x86.eflags);
-			MI->flat_insn->detail->x86
-				.operands[MI->flat_insn->detail->x86.op_count]
-				.access =
-				access[MI->flat_insn->detail->x86.op_count];
+			set_early_operand_access(MI);
 #endif
 
 			MI->flat_insn->detail->x86.op_count++;
@@ -957,10 +932,6 @@ static void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
 							  .op_count]
 					.mem.base = X86_register_map(reg);
 			} else {
-#ifndef CAPSTONE_DIET
-				uint8_t access[CS_X86_MAXIMUM_OPERAND_SIZE];
-#endif
-
 				MI->flat_insn->detail->x86
 					.operands[MI->flat_insn->detail->x86
 							  .op_count]
@@ -977,15 +948,7 @@ static void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
 						reg)];
 
 #ifndef CAPSTONE_DIET
-				get_op_access(
-					MI->csh, MCInst_getOpcode(MI), access,
-					&MI->flat_insn->detail->x86.eflags);
-				MI->flat_insn->detail->x86
-					.operands[MI->flat_insn->detail->x86
-							  .op_count]
-					.access =
-					access[MI->flat_insn->detail->x86
-						       .op_count];
+				set_early_operand_access(MI);
 #endif
 
 				MI->flat_insn->detail->x86.op_count++;
@@ -1068,10 +1031,6 @@ static void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
 							  .op_count]
 					.mem.disp = imm;
 			} else {
-#ifndef CAPSTONE_DIET
-				uint8_t access[CS_X86_MAXIMUM_OPERAND_SIZE];
-#endif
-
 				MI->flat_insn->detail->x86
 					.operands[MI->flat_insn->detail->x86
 							  .op_count]
@@ -1118,15 +1077,7 @@ static void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
 					.imm = imm;
 
 #ifndef CAPSTONE_DIET
-				get_op_access(
-					MI->csh, MCInst_getOpcode(MI), access,
-					&MI->flat_insn->detail->x86.eflags);
-				MI->flat_insn->detail->x86
-					.operands[MI->flat_insn->detail->x86
-							  .op_count]
-					.access =
-					access[MI->flat_insn->detail->x86
-						       .op_count];
+				set_early_operand_access(MI);
 #endif
 
 				MI->flat_insn->detail->x86.op_count++;
@@ -1147,10 +1098,6 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
 	int reg;
 
 	if (MI->csh->detail_opt) {
-#ifndef CAPSTONE_DIET
-		uint8_t access[CS_X86_MAXIMUM_OPERAND_SIZE];
-#endif
-
 		MI->flat_insn->detail->x86
 			.operands[MI->flat_insn->detail->x86.op_count]
 			.type = X86_OP_MEM;
@@ -1177,11 +1124,7 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
 			.mem.disp = 0;
 
 #ifndef CAPSTONE_DIET
-		get_op_access(MI->csh, MCInst_getOpcode(MI), access,
-			      &MI->flat_insn->detail->x86.eflags);
-		MI->flat_insn->detail->x86
-			.operands[MI->flat_insn->detail->x86.op_count]
-			.access = access[MI->flat_insn->detail->x86.op_count];
+		set_early_operand_access(MI);
 #endif
 	}
 

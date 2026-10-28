@@ -929,9 +929,6 @@ static void fill_insn(struct cs_struct *handle, cs_insn *insn, SStream *OS,
 		      MCInst *mci, PostPrinter_t postprinter,
 		      const uint8_t *code)
 {
-#ifndef CAPSTONE_DIET
-	char *sp;
-#endif
 	SStream_trimls(OS);
 	uint16_t copy_size = MIN(sizeof(insn->bytes), insn->size);
 
@@ -952,12 +949,20 @@ static void fill_insn(struct cs_struct *handle, cs_insn *insn, SStream *OS,
 #ifndef CAPSTONE_DIET
 	memset(insn->mnemonic, '\0', sizeof(insn->mnemonic));
 	memset(insn->op_str, '\0', sizeof(insn->op_str));
-	SStream_extract_mnem_opstr(OS, insn->mnemonic, sizeof(insn->mnemonic),
-				   insn->op_str, sizeof(insn->op_str));
-	for (sp = insn->mnemonic; *sp; sp++) {
-		if (*sp == '|') // lock|rep prefix for x86
-			*sp = ' ';
+	size_t off = 0;
+	while (OS->buffer[off] && OS->buffer[off] != ' ' &&
+	       OS->buffer[off] != '\t') {
+		if (off < sizeof(insn->mnemonic) - 1) {
+			char c = OS->buffer[off];
+			insn->mnemonic[off] = c == '|' ? ' ' : c;
+		}
+		off++;
 	}
+	while (OS->buffer[off] == ' ' || OS->buffer[off] == '\t')
+		off++;
+	const char *operands = OS->buffer + off;
+	for (off = 0; operands[off] && off < sizeof(insn->op_str) - 1; off++)
+		insn->op_str[off] = operands[off];
 
 	// we might have customized mnemonic
 	if (handle->mnem_list) {

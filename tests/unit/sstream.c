@@ -131,6 +131,44 @@ static bool test_aliased_appends(void)
 	return true;
 }
 
+static bool test_known_length_appends(void)
+{
+	printf("Test test_known_length_appends\n");
+	const size_t lengths[] = { 0,  1,   2,	 7,   15,  30,	31,
+				   32, 127, 255, 510, 511, 512, 513 };
+	char text[SSTREAM_BUF_LEN + 2];
+	for (size_t length = 0; length < ARR_SIZE(lengths); length++) {
+		memset(text, 'a', sizeof(text));
+		text[lengths[length]] = '\0';
+		for (unsigned flags = 0; flags < 16; flags++) {
+			for (size_t index = 0; index <= SSTREAM_BUF_LEN + 1;
+			     index++) {
+				SStream expected, actual;
+				memset(&expected, 0x5a, sizeof(expected));
+				expected.index = index == SSTREAM_BUF_LEN + 1 ?
+							 SIZE_MAX :
+							 index;
+				expected.is_closed = (flags & 1) != 0;
+				expected.markup_stream = (flags & 2) != 0;
+				expected.prefixed_by_markup = (flags & 4) != 0;
+				expected.unsigned_num = (flags & 8) != 0;
+				memcpy(&actual, &expected, sizeof(actual));
+				(SStream_concat0)(&expected, text);
+				SStream_concat0_n(&actual, text,
+						  lengths[length]);
+				if (memcmp(&actual, &expected,
+					   sizeof(actual)) != 0) {
+					printf("Known-length append differs: flags=%u index=%zu length=%zu\n",
+					       flags, expected.index,
+					       lengths[length]);
+					return false;
+				}
+			}
+		}
+	}
+	return true;
+}
+
 static bool test_constant_appends(void)
 {
 	printf("Test test_constant_appends\n");
@@ -942,6 +980,7 @@ int main()
 	result &= test_truncating_appends();
 	result &= test_aliased_appends();
 	result &= test_constant_appends();
+	result &= test_known_length_appends();
 	result &= test_hex64_formatting();
 	result &= test_hex64_custom_formatter();
 	result &= test_printint8();

@@ -3,6 +3,7 @@
 
 #include <capstone/capstone.h>
 
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -700,6 +701,282 @@ struct ud1_case {
 	int64_t displacement;
 };
 
+static struct {
+	cs_insn *insn;
+	csh handle;
+	cs_vsnprintf_t formatter;
+	bool disable_detail, observed, valid;
+} access_callback;
+
+static int inspect_operand_access(char *text, size_t size, const char *format,
+				  va_list args)
+{
+	if (access_callback.insn) {
+		const cs_x86 *x86 = &access_callback.insn->detail->x86;
+		if (x86->op_count == 1) {
+			access_callback.observed = true;
+			access_callback.valid &=
+				x86->operands[0].type == X86_OP_REG &&
+				x86->operands[0].reg == X86_REG_EAX &&
+				x86->operands[0].access == CS_AC_READ_WRITE &&
+				x86->eflags == (X86_EFLAGS_MODIFY_OF |
+						X86_EFLAGS_MODIFY_SF |
+						X86_EFLAGS_MODIFY_ZF |
+						X86_EFLAGS_MODIFY_AF |
+						X86_EFLAGS_MODIFY_PF |
+						X86_EFLAGS_MODIFY_CF);
+			if (access_callback.disable_detail)
+				access_callback.valid &=
+					cs_option(access_callback.handle,
+						  CS_OPT_DETAIL,
+						  CS_OPT_OFF) == CS_ERR_OK;
+		}
+	}
+	return access_callback.formatter(text, size, format, args);
+}
+
+/* Formatting the immediate can expose the preceding register's detail and
+ * change the options used by the remainder of this decode. */
+static bool check_operand_access_callback(void)
+{
+	if (cs_support(CS_SUPPORT_DIET))
+		return true;
+	const uint8_t bytes[] = { 0x83, 0xc0, 1 }; // add eax, 1
+	const cs_mode modes[] = { CS_MODE_32, CS_MODE_64 };
+	const unsigned syntaxes[] = { CS_OPT_SYNTAX_INTEL, CS_OPT_SYNTAX_MASM };
+	cs_opt_mem original = { cs_mem_malloc, cs_mem_calloc, cs_mem_realloc,
+				cs_mem_free, cs_vsnprintf };
+	cs_opt_mem hooks = original;
+	hooks.vsnprintf = inspect_operand_access;
+	access_callback.formatter = original.vsnprintf;
+	bool ok = cs_option(0, CS_OPT_MEM, (uintptr_t)&hooks) == CS_ERR_OK;
+	for (size_t m = 0; m < sizeof(modes) / sizeof(modes[0]); ++m)
+		for (size_t s = 0; s < sizeof(syntaxes) / sizeof(syntaxes[0]);
+		     ++s)
+			for (unsigned disable = 0; disable < 2; ++disable) {
+				csh handle;
+				if (cs_open(CS_ARCH_X86, modes[m], &handle) !=
+				    CS_ERR_OK) {
+					ok = false;
+					continue;
+				}
+				ok &= cs_option(handle, CS_OPT_DETAIL,
+						CS_OPT_ON) == CS_ERR_OK;
+				ok &= cs_option(handle, CS_OPT_SYNTAX,
+						syntaxes[s]) == CS_ERR_OK;
+				cs_insn *insn = cs_malloc(handle);
+				if (!insn) {
+					ok = false;
+					cs_close(&handle);
+					continue;
+				}
+				access_callback.insn = insn;
+				access_callback.handle = handle;
+				access_callback.disable_detail = disable != 0;
+				access_callback.observed = false;
+				access_callback.valid = true;
+				const uint8_t *cursor = bytes;
+				size_t remaining = sizeof(bytes);
+				uint64_t address = 0x1000;
+				bool match = cs_disasm_iter(handle, &cursor,
+							    &remaining,
+							    &address, insn);
+				match &= access_callback.observed &&
+					 access_callback.valid &&
+					 insn->detail->x86.op_count ==
+						 (disable ? 1 : 2) &&
+					 insn->detail->x86.operands[0].access ==
+						 CS_AC_READ_WRITE;
+				if (!match)
+					fprintf(stderr,
+						"operand access callback: mode=%u syntax=%u disable=%u\n",
+						modes[m], syntaxes[s], disable);
+				ok &= match;
+				access_callback.insn = NULL;
+				cs_free(insn, 1);
+				cs_close(&handle);
+			}
+	ok &= cs_option(0, CS_OPT_MEM, (uintptr_t)&original) == CS_ERR_OK;
+	return ok;
+}
+
+static bool check_intel_operand_access(void)
+{
+	if (cs_support(CS_SUPPORT_DIET))
+		return true;
+	const uint64_t arithmetic =
+		X86_EFLAGS_MODIFY_OF | X86_EFLAGS_MODIFY_SF |
+		X86_EFLAGS_MODIFY_ZF | X86_EFLAGS_MODIFY_AF |
+		X86_EFLAGS_MODIFY_PF | X86_EFLAGS_MODIFY_CF;
+	const struct {
+		uint8_t bytes[5], size, count;
+		unsigned id;
+		x86_op_type types[2];
+		x86_reg regs[2];
+		uint8_t access[2];
+		uint64_t flags;
+	} cases[] = {
+		{ { 0x83, 0xc0, 1 },
+		  3,
+		  2,
+		  X86_INS_ADD,
+		  { X86_OP_REG, X86_OP_IMM },
+		  { X86_REG_EAX, 0 },
+		  { CS_AC_READ_WRITE, 0 },
+		  arithmetic },
+		{ { 0x01, 0x08 },
+		  2,
+		  2,
+		  X86_INS_ADD,
+		  { X86_OP_MEM, X86_OP_REG },
+		  { 0, X86_REG_ECX },
+		  { CS_AC_READ_WRITE, CS_AC_READ },
+		  arithmetic },
+		{ { 0x05, 1, 0, 0, 0 },
+		  5,
+		  2,
+		  X86_INS_ADD,
+		  { X86_OP_REG, X86_OP_IMM },
+		  { X86_REG_EAX, 0 },
+		  { CS_AC_READ_WRITE, 0 },
+		  arithmetic },
+		{ { 0xe5, 0x12 },
+		  2,
+		  2,
+		  X86_INS_IN,
+		  { X86_OP_REG, X86_OP_IMM },
+		  { X86_REG_EAX, 0 },
+		  { CS_AC_WRITE, 0 },
+		  0 },
+		{ { 0xed },
+		  1,
+		  2,
+		  X86_INS_IN,
+		  { X86_OP_REG, X86_OP_REG },
+		  { X86_REG_EAX, X86_REG_DX },
+		  { CS_AC_WRITE, CS_AC_READ },
+		  0 },
+		{ { 0xef },
+		  1,
+		  2,
+		  X86_INS_OUT,
+		  { X86_OP_REG, X86_OP_REG },
+		  { X86_REG_DX, X86_REG_EAX },
+		  { CS_AC_READ, CS_AC_READ },
+		  0 },
+		{ { 0x0f, 0x01, 0xdf },
+		  3,
+		  2,
+		  X86_INS_INVLPGA,
+		  { X86_OP_REG, X86_OP_REG },
+		  { X86_REG_EAX, X86_REG_ECX },
+		  { CS_AC_READ, CS_AC_READ },
+		  0 },
+		{ { 0xa1, 0x34, 0x12, 0, 0 },
+		  5,
+		  2,
+		  X86_INS_MOV,
+		  { X86_OP_REG, X86_OP_MEM },
+		  { X86_REG_EAX, 0 },
+		  { CS_AC_WRITE, CS_AC_READ },
+		  0 },
+		{ { 0xa3, 0x34, 0x12, 0, 0 },
+		  5,
+		  2,
+		  X86_INS_MOV,
+		  { X86_OP_MEM, X86_OP_REG },
+		  { 0, X86_REG_EAX },
+		  { CS_AC_WRITE, CS_AC_READ },
+		  0 },
+		{ { 0xa4 },
+		  1,
+		  2,
+		  X86_INS_MOVSB,
+		  { X86_OP_MEM, X86_OP_MEM },
+		  { 0, 0 },
+		  { CS_AC_WRITE, CS_AC_READ },
+		  X86_EFLAGS_TEST_DF },
+		{ { 0xa6 },
+		  1,
+		  2,
+		  X86_INS_CMPSB,
+		  { X86_OP_MEM, X86_OP_MEM },
+		  { 0, 0 },
+		  { CS_AC_READ, CS_AC_READ },
+		  arithmetic | X86_EFLAGS_TEST_DF },
+		{ { 0xe8, 0, 0, 0, 0 },
+		  5,
+		  1,
+		  X86_INS_CALL,
+		  { X86_OP_IMM, 0 },
+		  { 0, 0 },
+		  { 0, 0 },
+		  0 },
+		{ { 0x37 },
+		  1,
+		  0,
+		  X86_INS_AAA,
+		  { 0, 0 },
+		  { 0, 0 },
+		  { 0, 0 },
+		  X86_EFLAGS_UNDEFINED_OF | X86_EFLAGS_UNDEFINED_SF |
+			  X86_EFLAGS_UNDEFINED_ZF | X86_EFLAGS_MODIFY_AF |
+			  X86_EFLAGS_UNDEFINED_PF | X86_EFLAGS_MODIFY_CF },
+	};
+	const unsigned syntaxes[] = { CS_OPT_SYNTAX_INTEL, CS_OPT_SYNTAX_MASM };
+	const uint8_t empty_operand[sizeof(cs_x86_op)] = { 0 };
+	bool ok = true;
+	csh handle;
+	if (cs_open(CS_ARCH_X86, CS_MODE_32, &handle) != CS_ERR_OK)
+		return false;
+	cs_option(handle, CS_OPT_DETAIL, CS_OPT_ON);
+	cs_insn *insn = cs_malloc(handle);
+	if (!insn) {
+		cs_close(&handle);
+		return false;
+	}
+	for (size_t s = 0; s < sizeof(syntaxes) / sizeof(syntaxes[0]); ++s) {
+		ok &= cs_option(handle, CS_OPT_SYNTAX, syntaxes[s]) ==
+		      CS_ERR_OK;
+		for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+			const uint8_t *cursor = cases[i].bytes;
+			size_t remaining = cases[i].size;
+			uint64_t address = 0x1000;
+			memset(insn->detail, 0xa5, sizeof(*insn->detail));
+			bool match = cs_disasm_iter(handle, &cursor, &remaining,
+						    &address, insn);
+			const cs_x86 *x86 = &insn->detail->x86;
+			match &= insn->id == cases[i].id && remaining == 0 &&
+				 x86->op_count == cases[i].count &&
+				 x86->eflags == cases[i].flags;
+			for (unsigned op = 0; op < cases[i].count; ++op) {
+				match &= x86->operands[op].type ==
+						 cases[i].types[op] &&
+					 x86->operands[op].access ==
+						 cases[i].access[op];
+				if (cases[i].types[op] == X86_OP_REG)
+					match &= x86->operands[op].reg ==
+						 cases[i].regs[op];
+			}
+			for (unsigned op = cases[i].count;
+			     op <
+			     sizeof(x86->operands) / sizeof(x86->operands[0]);
+			     ++op)
+				match &= memcmp(&x86->operands[op],
+						empty_operand,
+						sizeof(empty_operand)) == 0;
+			if (!match)
+				fprintf(stderr,
+					"Intel operand access: case=%zu syntax=%u\n",
+					i, syntaxes[s]);
+			ok &= match;
+		}
+	}
+	cs_free(insn, 1);
+	cs_close(&handle);
+	return ok;
+}
+
 static bool check_ud1(csh handle, const struct ud1_case *test, unsigned syntax,
 		      bool detail, bool text)
 {
@@ -1023,7 +1300,8 @@ int main(void)
 	bool ok = check_operand_sets() && check_internal_scan_mode() &&
 		  check_inherited_moffs_size() &&
 		  check_inherited_three_operand_size() && check_id_cache() &&
-		  check_instruction_names();
+		  check_instruction_names() && check_intel_operand_access() &&
+		  check_operand_access_callback();
 	for (size_t m = 0; m < sizeof(modes) / sizeof(modes[0]); ++m)
 		for (size_t s = 0; s < sizeof(syntaxes) / sizeof(syntaxes[0]);
 		     ++s)
