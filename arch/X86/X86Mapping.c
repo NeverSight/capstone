@@ -3142,13 +3142,6 @@ decode_system_legacy_vex(csh handle, const uint8_t *code, size_t code_len,
 	if (encoding_offset == code_len)
 		return X86_FEATURE_NOT_HANDLED;
 
-	/* FRED returns still need their own nonlocal control-transfer contract.
-	 * Do not let the generated tables discard the prefix and report CLAC. */
-	if (code_len - encoding_offset >= 3 && code[encoding_offset] == 0x0f &&
-	    code[encoding_offset + 1] == 0x01 && mandatory_prefix &&
-	    code[encoding_offset + 2] == 0xca)
-		return X86_FEATURE_INVALID;
-
 	if (code_len - encoding_offset >= 3 && code[encoding_offset] == 0x0f) {
 		const uint8_t map = code[encoding_offset + 1];
 		const uint8_t last = code[encoding_offset + 2];
@@ -3163,7 +3156,10 @@ decode_system_legacy_vex(csh handle, const uint8_t *code, size_t code_len,
 		bool memory_form = false;
 		cs_x86 *x86;
 
-		if (map == 0x01 && mandatory_prefix == 0xf3) {
+		if (map == 0x01 && last == 0xca && mandatory_prefix) {
+			feature = mandatory_prefix == 0xf2 ? X86_FEATURE_ERETS :
+							     X86_FEATURE_ERETU;
+		} else if (map == 0x01 && mandatory_prefix == 0xf3) {
 			if (last == 0xee)
 				feature = X86_FEATURE_CLUI;
 			else if (last == 0xef)
@@ -3195,7 +3191,9 @@ decode_system_legacy_vex(csh handle, const uint8_t *code, size_t code_len,
 		if (feature) {
 			if (lock_prefix ||
 			    (!mode64 && (feature <= X86_FEATURE_LKGS ||
-					 feature == X86_FEATURE_UIRET)))
+					 feature == X86_FEATURE_UIRET ||
+					 feature == X86_FEATURE_ERETS ||
+					 feature == X86_FEATURE_ERETU)))
 				return X86_FEATURE_INVALID;
 			modrm = code[modrm_offset];
 			instruction_size =
@@ -8078,6 +8076,8 @@ static const struct {
 } system_extensions[] = {
 	{ X86_FEATURE_CLUI, X86_INS_CLUI, "clui" },
 	{ X86_FEATURE_UIRET, X86_INS_UIRET, "uiret" },
+	{ X86_FEATURE_ERETS, X86_INS_ERETS, "erets" },
+	{ X86_FEATURE_ERETU, X86_INS_ERETU, "eretu" },
 	{ X86_FEATURE_STUI, X86_INS_STUI, "stui" },
 	{ X86_FEATURE_TESTUI, X86_INS_TESTUI, "testui" },
 	{ X86_FEATURE_SENDUIPI, X86_INS_SENDUIPI, "senduipi" },
@@ -8820,6 +8820,8 @@ bool X86_mapFeatureExtension(cs_insn *insn, unsigned int opcode)
 		return true;
 	case X86_FEATURE_CLUI:
 	case X86_FEATURE_UIRET:
+	case X86_FEATURE_ERETS:
+	case X86_FEATURE_ERETU:
 	case X86_FEATURE_STUI:
 	case X86_FEATURE_TESTUI:
 	case X86_FEATURE_SENDUIPI:
@@ -8833,14 +8835,21 @@ bool X86_mapFeatureExtension(cs_insn *insn, unsigned int opcode)
 				insn->id = system_extensions[i].id;
 		if (insn->detail) {
 			cs_detail *d = insn->detail;
-			if (opcode == X86_FEATURE_UIRET) {
+			if (opcode == X86_FEATURE_ERETS ||
+			    opcode == X86_FEATURE_ERETU) {
+				d->groups[0] = X86_GRP_PRIVILEGE;
+				d->groups[1] = X86_GRP_IRET;
+				d->groups_count = 2;
+			} else if (opcode == X86_FEATURE_UIRET) {
 				d->groups[0] = X86_GRP_IRET;
 				d->groups_count = 1;
 			} else if (opcode >= X86_FEATURE_LKGS) {
 				d->groups[0] = X86_GRP_PRIVILEGE;
 				d->groups_count = 1;
 			}
-			if (opcode == X86_FEATURE_UIRET) {
+			if (opcode == X86_FEATURE_UIRET ||
+			    opcode == X86_FEATURE_ERETS ||
+			    opcode == X86_FEATURE_ERETU) {
 				d->regs_read[0] = d->regs_write[0] =
 					X86_REG_RSP;
 				d->regs_read[1] = d->regs_write[1] =
@@ -8857,6 +8866,17 @@ bool X86_mapFeatureExtension(cs_insn *insn, unsigned int opcode)
 						X86_EFLAGS_MODIFY_OF |
 						X86_EFLAGS_MODIFY_NT |
 						X86_EFLAGS_MODIFY_RF;
+				if (opcode != X86_FEATURE_UIRET)
+					d->x86.eflags |= X86_EFLAGS_MODIFY_IF;
+				if (opcode == X86_FEATURE_ERETS) {
+					d->regs_read[2] = X86_REG_CS;
+					d->regs_read[3] = X86_REG_SS;
+					d->regs_read_count = 4;
+				} else if (opcode == X86_FEATURE_ERETU) {
+					d->regs_write[2] = X86_REG_CS;
+					d->regs_write[3] = X86_REG_SS;
+					d->regs_write_count = 4;
+				}
 			} else if (opcode == X86_FEATURE_TESTUI) {
 				d->regs_write[0] = X86_REG_EFLAGS;
 				d->regs_write_count = 1;

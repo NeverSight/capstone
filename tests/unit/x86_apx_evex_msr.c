@@ -279,11 +279,14 @@ static bool check_unmodeled_system_refinements(void)
 		if (cs_open(CS_ARCH_X86, modes[mode], &handle) != CS_ERR_OK)
 			return false;
 		for (i = 0; i < sizeof(codes) / sizeof(codes[0]); ++i) {
-			if (i >= 2 && modes[mode] == CS_MODE_64)
-				ok &= decodes_as(
-					handle, codes[i], sizeof(codes[i]),
-					i == 2 ? X86_INS_CLUI : X86_INS_STUI,
-					4);
+			if (modes[mode] == CS_MODE_64)
+				ok &= decodes_as(handle, codes[i],
+						 sizeof(codes[i]),
+						 i == 0 ? X86_INS_ERETS :
+						 i == 1 ? X86_INS_ERETU :
+						 i == 2 ? X86_INS_CLUI :
+							  X86_INS_STUI,
+						 4);
 			else
 				ok &= rejects(handle, codes[i],
 					      sizeof(codes[i]));

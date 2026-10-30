@@ -91,6 +91,12 @@ static bool check_public_ids(csh handle, cs_insn *insn, size_t mode_index)
 		  { X86_INS_INVALID, X86_INS_INVALID, X86_INS_INVALID } },
 #endif
 		/* Source-owned refinements take precedence over generated terminals. */
+		{ { 0xf2, 0x0f, 0x01, 0xca },
+		  4,
+		  { X86_INS_INVALID, X86_INS_INVALID, X86_INS_ERETS } },
+		{ { 0xf3, 0x0f, 0x01, 0xca },
+		  4,
+		  { X86_INS_INVALID, X86_INS_INVALID, X86_INS_ERETU } },
 		{ { 0xf3, 0x0f, 0x01, 0xec },
 		  4,
 		  { X86_INS_INVALID, X86_INS_INVALID, X86_INS_UIRET } },

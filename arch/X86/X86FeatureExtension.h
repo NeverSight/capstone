@@ -154,6 +154,8 @@
 #define X86_FEATURE_INVLPGB 0x100f4U
 #define X86_FEATURE_TLBSYNC 0x100f5U
 #define X86_FEATURE_UIRET 0x100f6U
+#define X86_FEATURE_ERETS 0x100f7U
+#define X86_FEATURE_ERETU 0x100f8U
 
 // Generated x86 register identifiers stop at R15.  These private MC register
 // identifiers let the generated EVEX printer carry APX R16-R31 operands while

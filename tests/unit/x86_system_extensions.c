@@ -15,6 +15,8 @@ typedef struct system_case {
 } system_case;
 
 static const system_case cases[] = {
+	{ { 0xf2, 0x0f, 0x01, 0xca }, 4, X86_INS_ERETS, "erets", true, true },
+	{ { 0xf3, 0x0f, 0x01, 0xca }, 4, X86_INS_ERETU, "eretu", true, true },
 	{ { 0xf3, 0x0f, 0x01, 0xec }, 4, X86_INS_UIRET, "uiret", true, false },
 	{ { 0xf3, 0x0f, 0x01, 0xee }, 4, X86_INS_CLUI, "clui", true, false },
 	{ { 0xf3, 0x0f, 0x01, 0xef }, 4, X86_INS_STUI, "stui", true, false },
@@ -46,12 +48,14 @@ static bool check(csh h, cs_mode mode, const system_case *test, bool att)
 	if (valid && count) {
 		cs_detail *d = insn->detail;
 		cs_x86 *x = &d->x86;
+		const bool fred = test->id == X86_INS_ERETS ||
+				  test->id == X86_INS_ERETU;
 		ok &= insn->id == test->id && insn->size == test->size &&
 		      strcmp(insn->mnemonic, test->name) == 0 &&
 		      strcmp(cs_insn_name(h, insn->id), test->name) == 0 &&
-		      d->groups_count ==
-			      (unsigned)(test->privileged ||
-					 test->id == X86_INS_UIRET) &&
+		      d->groups_count == (unsigned)(test->privileged ||
+						    test->id == X86_INS_UIRET) +
+						 (unsigned)fred &&
 		      (!test->privileged || d->groups[0] == X86_GRP_PRIVILEGE);
 		if (test->id == X86_INS_TESTUI) {
 			ok &= d->regs_write_count == 1 &&
@@ -62,10 +66,12 @@ static bool check(csh h, cs_mode mode, const system_case *test, bool att)
 					    X86_EFLAGS_RESET_OF |
 					    X86_EFLAGS_RESET_PF |
 					    X86_EFLAGS_RESET_SF);
-		} else if (test->id == X86_INS_UIRET) {
-			ok &= d->groups[0] == X86_GRP_IRET &&
-			      d->regs_read_count == 2 &&
-			      d->regs_write_count == 2 &&
+		} else if (test->id == X86_INS_UIRET || fred) {
+			ok &= d->groups[fred ? 1 : 0] == X86_GRP_IRET &&
+			      d->regs_read_count ==
+				      (test->id == X86_INS_ERETS ? 4 : 2) &&
+			      d->regs_write_count ==
+				      (test->id == X86_INS_ERETU ? 4 : 2) &&
 			      d->regs_read[0] == X86_REG_RSP &&
 			      d->regs_read[1] == X86_REG_EFLAGS &&
 			      d->regs_write[0] == X86_REG_RSP &&
@@ -79,7 +85,14 @@ static bool check(csh h, cs_mode mode, const system_case *test, bool att)
 					    X86_EFLAGS_MODIFY_DF |
 					    X86_EFLAGS_MODIFY_OF |
 					    X86_EFLAGS_MODIFY_NT |
-					    X86_EFLAGS_MODIFY_RF);
+					    X86_EFLAGS_MODIFY_RF |
+					    (fred ? X86_EFLAGS_MODIFY_IF : 0));
+			if (test->id == X86_INS_ERETS)
+				ok &= d->regs_read[2] == X86_REG_CS &&
+				      d->regs_read[3] == X86_REG_SS;
+			if (test->id == X86_INS_ERETU)
+				ok &= d->regs_write[2] == X86_REG_CS &&
+				      d->regs_write[3] == X86_REG_SS;
 		} else {
 			ok &= x->eflags == 0;
 		}

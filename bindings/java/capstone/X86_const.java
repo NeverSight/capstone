@@ -2149,7 +2149,9 @@ public class X86_const {
 	public static final int X86_INS_INVLPGB = 1661;
 	public static final int X86_INS_TLBSYNC = 1662;
 	public static final int X86_INS_UIRET = 1663;
-	public static final int X86_INS_ENDING = 1664;
+	public static final int X86_INS_ERETS = 1664;
+	public static final int X86_INS_ERETU = 1665;
+	public static final int X86_INS_ENDING = 1666;
 
 	public static final int X86_GRP_INVALID = 0;
 	public static final int X86_GRP_JUMP = 1;

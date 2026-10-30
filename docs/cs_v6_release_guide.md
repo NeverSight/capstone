@@ -89,7 +89,13 @@ Details preserve ignored operand-size prefixes on mandatory-prefix forms,
 REX selection, segments, SIB/displacements and immediate offsets. LOCK,
 truncation, excessive length, invalid modes and reserved prefix forms fail.
 Decoder recognition does not assert that the runtime CPU or OS enables the
-instruction; FRED returns are still outside this addition.
+instruction.
+
+The next two appended IDs identify ERETS and ERETU in long mode. Their mandatory
+prefixes no longer alias CLAC. Both are privileged IRET-group instructions;
+implicit frame, flag and segment-register metadata is retained. The public
+register/flag API has no separate GS-base/MSR or complete RFLAGS-field mask, so
+that metadata does not claim complete FRED machine-state effects.
 
 UIRET has a new appended ID and decodes only in 64-bit mode, with the interrupt
 return group and implicit RSP/EFLAGS reads and writes. It is valid at any CPL,
