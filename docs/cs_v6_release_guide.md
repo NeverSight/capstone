@@ -89,7 +89,15 @@ Details preserve ignored operand-size prefixes on mandatory-prefix forms,
 REX selection, segments, SIB/displacements and immediate offsets. LOCK,
 truncation, excessive length, invalid modes and reserved prefix forms fail.
 Decoder recognition does not assert that the runtime CPU or OS enables the
-instruction; FRED/UIRET returns are still outside this addition.
+instruction; FRED returns are still outside this addition.
+
+UIRET has a new appended ID and decodes only in 64-bit mode, with the interrupt
+return group and implicit RSP/EFLAGS reads and writes. It is valid at any CPL,
+so it does not carry the privilege group. The flag mask reports every changed
+flag representable by the public API; that API has no MODIFY_AC/MODIFY_ID bits.
+UIF and cache-line monitoring remain hidden state. LOCK, truncation and
+overlength inputs reject. The encoding and flag contract follow Intel SDM
+325462-090, UIRET and Volume 3 section 9.7, including the UIRET_UIF feature.
 
 ## Overview
 

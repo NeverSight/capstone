@@ -153,6 +153,7 @@
 #define X86_FEATURE_HRESET 0x100f3U
 #define X86_FEATURE_INVLPGB 0x100f4U
 #define X86_FEATURE_TLBSYNC 0x100f5U
+#define X86_FEATURE_UIRET 0x100f6U
 
 // Generated x86 register identifiers stop at R15.  These private MC register
 // identifiers let the generated EVEX printer carry APX R16-R31 operands while
@@ -204,9 +205,9 @@ may_be_0f_feature_extension(const uint8_t *suffix, size_t size)
 		 (suffix[0] == 0xc7 && (suffix[1] & 0xf8) == 0xf0) ||
 		 (suffix[0] == 0x3a && suffix[1] == 0xf0))) ||
 	       (size >= 2 && suffix[0] == 0x01 &&
-		(suffix[1] == 0xc6 || suffix[1] == 0xca || suffix[1] == 0xed ||
-		 suffix[1] == 0xee || suffix[1] == 0xef || suffix[1] == 0xfe ||
-		 suffix[1] == 0xff));
+		(suffix[1] == 0xc6 || suffix[1] == 0xca || suffix[1] == 0xec ||
+		 suffix[1] == 0xed || suffix[1] == 0xee || suffix[1] == 0xef ||
+		 suffix[1] == 0xfe || suffix[1] == 0xff));
 }
 
 /* The selector and dispatcher share the source-owned VEX families. */

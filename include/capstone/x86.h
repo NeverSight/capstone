@@ -2320,6 +2320,7 @@ typedef enum x86_insn {
 	X86_INS_HRESET,
 	X86_INS_INVLPGB,
 	X86_INS_TLBSYNC,
+	X86_INS_UIRET,
 	X86_INS_ENDING, // mark the end of the list of insn
 } x86_insn;
 

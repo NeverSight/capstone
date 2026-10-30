@@ -3170,6 +3170,8 @@ decode_system_legacy_vex(csh handle, const uint8_t *code, size_t code_len,
 				feature = X86_FEATURE_STUI;
 			else if (last == 0xed)
 				feature = X86_FEATURE_TESTUI;
+			else if (last == 0xec)
+				feature = X86_FEATURE_UIRET;
 		} else if (map == 0x01 && (last == 0xfe || last == 0xff)) {
 			if (mandatory_prefix || operand_size ||
 			    (last == 0xfe && address_width == 2))
@@ -3192,7 +3194,8 @@ decode_system_legacy_vex(csh handle, const uint8_t *code, size_t code_len,
 		}
 		if (feature) {
 			if (lock_prefix ||
-			    (!mode64 && feature <= X86_FEATURE_LKGS))
+			    (!mode64 && (feature <= X86_FEATURE_LKGS ||
+					 feature == X86_FEATURE_UIRET)))
 				return X86_FEATURE_INVALID;
 			modrm = code[modrm_offset];
 			instruction_size =
@@ -8074,6 +8077,7 @@ static const struct {
 	const char *name;
 } system_extensions[] = {
 	{ X86_FEATURE_CLUI, X86_INS_CLUI, "clui" },
+	{ X86_FEATURE_UIRET, X86_INS_UIRET, "uiret" },
 	{ X86_FEATURE_STUI, X86_INS_STUI, "stui" },
 	{ X86_FEATURE_TESTUI, X86_INS_TESTUI, "testui" },
 	{ X86_FEATURE_SENDUIPI, X86_INS_SENDUIPI, "senduipi" },
@@ -8815,6 +8819,7 @@ bool X86_mapFeatureExtension(cs_insn *insn, unsigned int opcode)
 		}
 		return true;
 	case X86_FEATURE_CLUI:
+	case X86_FEATURE_UIRET:
 	case X86_FEATURE_STUI:
 	case X86_FEATURE_TESTUI:
 	case X86_FEATURE_SENDUIPI:
@@ -8828,11 +8833,31 @@ bool X86_mapFeatureExtension(cs_insn *insn, unsigned int opcode)
 				insn->id = system_extensions[i].id;
 		if (insn->detail) {
 			cs_detail *d = insn->detail;
-			if (opcode >= X86_FEATURE_LKGS) {
+			if (opcode == X86_FEATURE_UIRET) {
+				d->groups[0] = X86_GRP_IRET;
+				d->groups_count = 1;
+			} else if (opcode >= X86_FEATURE_LKGS) {
 				d->groups[0] = X86_GRP_PRIVILEGE;
 				d->groups_count = 1;
 			}
-			if (opcode == X86_FEATURE_TESTUI) {
+			if (opcode == X86_FEATURE_UIRET) {
+				d->regs_read[0] = d->regs_write[0] =
+					X86_REG_RSP;
+				d->regs_read[1] = d->regs_write[1] =
+					X86_REG_EFLAGS;
+				d->regs_read_count = d->regs_write_count = 2;
+				/* The public mask has no MODIFY_AC or MODIFY_ID bits. */
+				d->x86.eflags = X86_EFLAGS_MODIFY_CF |
+						X86_EFLAGS_MODIFY_PF |
+						X86_EFLAGS_MODIFY_AF |
+						X86_EFLAGS_MODIFY_ZF |
+						X86_EFLAGS_MODIFY_SF |
+						X86_EFLAGS_MODIFY_TF |
+						X86_EFLAGS_MODIFY_DF |
+						X86_EFLAGS_MODIFY_OF |
+						X86_EFLAGS_MODIFY_NT |
+						X86_EFLAGS_MODIFY_RF;
+			} else if (opcode == X86_FEATURE_TESTUI) {
 				d->regs_write[0] = X86_REG_EFLAGS;
 				d->regs_write_count = 1;
 				d->x86.eflags = X86_EFLAGS_MODIFY_CF |

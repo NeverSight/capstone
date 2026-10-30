@@ -15,6 +15,7 @@ typedef struct system_case {
 } system_case;
 
 static const system_case cases[] = {
+	{ { 0xf3, 0x0f, 0x01, 0xec }, 4, X86_INS_UIRET, "uiret", true, false },
 	{ { 0xf3, 0x0f, 0x01, 0xee }, 4, X86_INS_CLUI, "clui", true, false },
 	{ { 0xf3, 0x0f, 0x01, 0xef }, 4, X86_INS_STUI, "stui", true, false },
 	{ { 0xf3, 0x0f, 0x01, 0xed }, 4, X86_INS_TESTUI, "testui", true, false },
@@ -48,7 +49,9 @@ static bool check(csh h, cs_mode mode, const system_case *test, bool att)
 		ok &= insn->id == test->id && insn->size == test->size &&
 		      strcmp(insn->mnemonic, test->name) == 0 &&
 		      strcmp(cs_insn_name(h, insn->id), test->name) == 0 &&
-		      d->groups_count == (unsigned)test->privileged &&
+		      d->groups_count ==
+			      (unsigned)(test->privileged ||
+					 test->id == X86_INS_UIRET) &&
 		      (!test->privileged || d->groups[0] == X86_GRP_PRIVILEGE);
 		if (test->id == X86_INS_TESTUI) {
 			ok &= d->regs_write_count == 1 &&
@@ -59,6 +62,24 @@ static bool check(csh h, cs_mode mode, const system_case *test, bool att)
 					    X86_EFLAGS_RESET_OF |
 					    X86_EFLAGS_RESET_PF |
 					    X86_EFLAGS_RESET_SF);
+		} else if (test->id == X86_INS_UIRET) {
+			ok &= d->groups[0] == X86_GRP_IRET &&
+			      d->regs_read_count == 2 &&
+			      d->regs_write_count == 2 &&
+			      d->regs_read[0] == X86_REG_RSP &&
+			      d->regs_read[1] == X86_REG_EFLAGS &&
+			      d->regs_write[0] == X86_REG_RSP &&
+			      d->regs_write[1] == X86_REG_EFLAGS &&
+			      x->eflags == (X86_EFLAGS_MODIFY_CF |
+					    X86_EFLAGS_MODIFY_PF |
+					    X86_EFLAGS_MODIFY_AF |
+					    X86_EFLAGS_MODIFY_ZF |
+					    X86_EFLAGS_MODIFY_SF |
+					    X86_EFLAGS_MODIFY_TF |
+					    X86_EFLAGS_MODIFY_DF |
+					    X86_EFLAGS_MODIFY_OF |
+					    X86_EFLAGS_MODIFY_NT |
+					    X86_EFLAGS_MODIFY_RF);
 		} else {
 			ok &= x->eflags == 0;
 		}
