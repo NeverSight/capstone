@@ -100,8 +100,8 @@ static bool check_alias(cs_struct *handle, const PatternsForOpcode *table,
 	if (operand)
 		MCOperand_CreateImm0(&MI, *operand);
 	const char *actual = matchAliasPatterns(&MI, &data);
-	if ((!actual != !expected) ||
-	    (actual && strcmp(actual, expected) != 0)) {
+	if (actual && expected ? strcmp(actual, expected) != 0 :
+				 actual != expected) {
 		fprintf(stderr, "Unexpected alias for opcode %u\n", opcode);
 		return false;
 	}

@@ -196,7 +196,8 @@ int main(void)
 	const uint8_t truncated[] = { 0x0f, 0xc4, 0xc5 };
 	for (unsigned p = 0; p < sizeof(truncated); ++p)
 		for (unsigned allocated = 0; allocated < 2; ++allocated)
-			for (unsigned detail = 0; detail < 2; ++detail)
+			for (unsigned with_detail = 0; with_detail < 2;
+			     ++with_detail)
 				for (unsigned text = 0; text < 2; ++text)
 					for (unsigned replace = 0; replace < 3;
 					     ++replace)
@@ -204,8 +205,9 @@ int main(void)
 						     result < 3; ++result)
 							success &= test_skipdata_detail(
 								allocated,
-								detail, text,
-								replace, result,
+								with_detail,
+								text, replace,
+								result,
 								truncated[p]);
 	return success ? 0 : 1;
 }
