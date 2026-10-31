@@ -11,6 +11,11 @@ They contain all detail tests. As well as the LLVM regression tests (`MC` tests)
 
 Directories group tests by the category they intent to test.
 
+`unit_x86_stream_store_access` checks legacy MOVNTDQ memory-write and vector-read
+details in 32/64-bit modes, both syntaxes and both decode APIs. It also checks
+register access with address overrides and extended registers. Text-disabled
+scans retain instruction boundaries and omit operand details as before.
+
 _Legacy (integration)_
 
 Legacy tests which only printed to `stdout`. In practice they only test if the code segfaults.
