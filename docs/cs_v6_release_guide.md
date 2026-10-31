@@ -357,6 +357,9 @@ Nonetheless, we hope this additional information is useful to you.
 
 **x86-64**
 
+- Legacy `MOVNTDQ` reports its 16-byte memory destination as write-only and its
+  XMM source as read-only in 32/64-bit modes, in Intel and AT&T syntax.
+
 - `cs_insn_name()` in `CAPSTONE_X86_REDUCE` builds now uses the public
   instruction ID numbering, fixing incorrect names and missing names for
   decoded instructions such as `MOV` and `RDMSR`.

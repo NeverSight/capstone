@@ -7605,7 +7605,7 @@
 
 {	/* X86_MOVNTDQmr, X86_INS_MOVNTDQ: movntdq */
 	0,
-	{ CS_AC_READ, CS_AC_READ, 0 }
+	{ CS_AC_WRITE, CS_AC_READ, 0 }
 },
 
 {	/* X86_MOVNTI_64mr, X86_INS_MOVNTI: movnti */
