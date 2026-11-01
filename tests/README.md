@@ -19,7 +19,7 @@ scans retain instruction boundaries and omit operand details as before.
 `unit_x86_legacy_atomic` also checks BT/BTS/BTR/BTC register and immediate
 forms with F2/F3 and operand-size overrides, including HLE on locked forms.
 It checks widths, memory/register/flag effects and encoding offsets in both
-syntaxes and decode APIs for 32/64-bit modes. `unit_x86_vex_legacy_prefix`
+syntaxes and decode APIs for 16/32/64-bit modes. `unit_x86_vex_legacy_prefix`
 keeps adjacent mandatory-prefix opcodes and illegal LOCK forms distinct.
 
 `unit_x86_exchange_access` checks XADD and CMPXCHG register/memory effects

@@ -1514,11 +1514,22 @@ getIDForMode(struct InternalInstruction *insn, cs_mode mode,
 		 */
 		const struct InstructionSpecifier *spec;
 		uint16_t instructionIDWithOpsize;
+		uint16_t operandSizeMask = attrMask | ATTR_OPSIZE;
 
 		spec = specifierForUID(instructionID);
+		/* Ignore redundant REP/HLE for the tentative 16-bit lookup too.
+		 * Keep mandatory combinations for the size-equivalence probe,
+		 * including CRC32's fixed destination and sized source. */
+		if (operandSizeMask & (ATTR_XD | ATTR_XS)) {
+			const uint16_t resolvedMask =
+				resolveMandatoryPrefixConflict(insn,
+							       operandSizeMask);
+			if (resolvedMask & ATTR_OPSIZE)
+				operandSizeMask = resolvedMask;
+		}
 
 		if (getIDWithAttrMask(&instructionIDWithOpsize, insn,
-				      attrMask | ATTR_OPSIZE)) {
+				      operandSizeMask)) {
 			/*
 			 * ModRM required with OpSize but not present; give up and return version
 			 * without OpSize set

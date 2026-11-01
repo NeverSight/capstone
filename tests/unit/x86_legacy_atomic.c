@@ -268,7 +268,8 @@ static int check_bit_prefix(csh h, const bit_prefix_case *test)
 	const uint8_t opcodes[] = { 0xa3, 0xab, 0xb3, 0xbb };
 	const x86_reg sources[] = { X86_REG_CX, X86_REG_ECX, X86_REG_RCX };
 	const unsigned width = 2u << test->width;
-	const bool imm = test->immediate, opsize = width == 2;
+	const bool imm = test->immediate;
+	const bool opsize = width == (test->mode == 2 ? 4 : 2);
 	uint8_t code[15];
 	unsigned n = 0;
 	int bad = 0;
@@ -312,12 +313,16 @@ static int check_bit_prefix(csh h, const bit_prefix_case *test)
 			int mismatch =
 				in->id != ids[test->kind] || in->size != n ||
 				x->op_count != 2 ||
-				x->addr_size != (test->mode ? 8 : 4) ||
+				x->addr_size != (test->mode == 2 ? 2 :
+						 test->mode == 1 ? 8 :
+								   4) ||
 				m->type != X86_OP_MEM || m->size != width ||
 				m->access != (test->kind ? CS_AC_READ_WRITE :
 							   CS_AC_READ) ||
-				m->mem.base != (test->mode ? X86_REG_RDI :
-							     X86_REG_EDI) ||
+				m->mem.base !=
+					(test->mode == 2 ? X86_REG_BX :
+					 test->mode == 1 ? X86_REG_RDI :
+							   X86_REG_EDI) ||
 				m->mem.index != X86_REG_INVALID ||
 				x->encoding.modrm_offset != modoff ||
 				x->encoding.imm_size != imm ||
@@ -365,9 +370,12 @@ static int bit_prefixes(void)
 {
 	bit_prefix_case t = { 0 };
 	int bad = 0;
-	for (t.mode = 0; t.mode < 2; ++t.mode) {
+	for (t.mode = 0; t.mode < 3; ++t.mode) {
 		csh h;
-		if (cs_open(CS_ARCH_X86, t.mode ? CS_MODE_64 : CS_MODE_32,
+		if (cs_open(CS_ARCH_X86,
+			    t.mode == 2 ? CS_MODE_16 :
+			    t.mode == 1 ? CS_MODE_64 :
+					  CS_MODE_32,
 			    &h) != CS_ERR_OK)
 			return 1;
 		cs_option(h, CS_OPT_DETAIL, CS_OPT_ON);
@@ -375,7 +383,8 @@ static int bit_prefixes(void)
 			cs_option(h, CS_OPT_SYNTAX,
 				  t.att ? CS_OPT_SYNTAX_ATT :
 					  CS_OPT_SYNTAX_INTEL);
-			for (t.width = 0; t.width < 2 + t.mode; ++t.width)
+			for (t.width = 0; t.width < 2 + (t.mode == 1);
+			     ++t.width)
 				for (t.kind = 0; t.kind < 4; ++t.kind)
 					for (t.immediate = 0; t.immediate < 2;
 					     ++t.immediate)

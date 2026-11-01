@@ -474,6 +474,8 @@ combinations retain the size, mandatory-prefix and XCHG repair rules.
 For Group 8 and register BTC, F2/F3 do not replace the operand-size override.
 The handwritten mandatory-prefix resolver retains 66 while the prefix reader
 retains the HLE hint; adjacent POPCNT/TZCNT/LZCNT keep their opcode-selecting F3.
+The tentative 16-bit opcode lookup uses that same resolver, so ignored REP or
+HLE prefixes cannot select a 32-bit memory operand beside a 16-bit register.
 
 The decoder's packed decision tables derive from the original full/reduced
 `X86GenDisassemblerTables*.inc` inputs. Direct decisions embed one or two
