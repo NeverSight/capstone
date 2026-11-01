@@ -10297,6 +10297,28 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
 			switch (insn->id) {
 			default:
 				break;
+			case X86_INS_XADD:
+				insn->detail->regs_write[0] = X86_REG_EFLAGS;
+				insn->detail->regs_write_count = 1;
+				break;
+			case X86_INS_CMPXCHG8B:
+			case X86_INS_CMPXCHG16B: {
+				const bool wide = insn->id ==
+						  X86_INS_CMPXCHG16B;
+				cs_detail *d = insn->detail;
+				d->regs_read[0] = d->regs_write[0] =
+					wide ? X86_REG_RAX : X86_REG_EAX;
+				d->regs_read[1] = d->regs_write[1] =
+					wide ? X86_REG_RDX : X86_REG_EDX;
+				d->regs_read[2] = wide ? X86_REG_RBX :
+							 X86_REG_EBX;
+				d->regs_read[3] = wide ? X86_REG_RCX :
+							 X86_REG_ECX;
+				d->regs_write[2] = X86_REG_EFLAGS;
+				d->regs_read_count = 4;
+				d->regs_write_count = 3;
+				break;
+			}
 
 			case X86_INS_LOOP:
 			case X86_INS_LOOPE:
@@ -11824,6 +11846,20 @@ const uint8_t *X86_get_op_access(cs_struct *h, unsigned int id,
 	unsigned int i = find_insn_h(h, id);
 	if (i != -1) {
 		*eflags = insn_ops[i].flags;
+		/* Compare-exchange reads and conditionally replaces its destination;
+		 * memory destinations receive a write cycle even on mismatch. */
+		static const uint8_t compare_access[] = { CS_AC_READ_WRITE,
+							  CS_AC_READ, 0 };
+		static const uint8_t pair_access[] = { CS_AC_READ_WRITE, 0 };
+		switch (insns[i].mapid) {
+		case X86_INS_CMPXCHG:
+			return compare_access;
+		case X86_INS_CMPXCHG8B:
+		case X86_INS_CMPXCHG16B:
+			return pair_access;
+		default:
+			break;
+		}
 		return insn_ops[i].access;
 	}
 

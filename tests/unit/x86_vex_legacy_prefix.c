@@ -14,7 +14,7 @@ typedef struct prefix_case {
 	size_t size;
 	/* The decoded text, or NULL when the encoding is #UD. */
 	const char *text;
-	/* These generated vector opcodes are omitted by the reduced tables. */
+	/* These generated opcodes are omitted by the reduced tables. */
 	bool full_only;
 } prefix_case;
 
@@ -71,7 +71,8 @@ int main(void)
 		  "16-bit popcnt",
 		  { 0xf3, 0x66, 0x0f, 0xb8, 0xcf },
 		  5,
-		  "popcnt cx, di" },
+		  "popcnt cx, di",
+		  true },
 		{ CS_MODE_64,
 		  "lock bt",
 		  { 0xf3, 0xf0, 0x66, 0x0f, 0xba, 0x27, 1 },

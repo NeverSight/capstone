@@ -86,6 +86,13 @@ The mapping component has three different task:
 3. Adding additional detail to the Capstone instructions
 (e.g. operand `read/write` attributes etc.).
 
+The handwritten x86 mapping boundary corrects legacy exchange metadata in
+both full and reduced builds. XADD writes EFLAGS; CMPXCHG destinations are
+read/write, including the write cycle on a failed memory comparison.
+CMPXCHG8B/16B read both comparison and replacement register pairs and may
+write the comparison pair and EFLAGS. These rules live in `X86_get_insn_id`
+and `X86_get_op_access`, so regenerating the imported tables cannot remove them.
+
 For AArch64, ARM, Alpha, ARC, Mips, PPC, Sparc, LoongArch, and RISC-V, DIET retains
 the operand type classifications used to construct architectural operands,
 including memory components and AArch64 bound operands. Its compact

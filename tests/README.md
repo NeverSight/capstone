@@ -22,6 +22,11 @@ It checks widths, memory/register/flag effects and encoding offsets in both
 syntaxes and decode APIs for 32/64-bit modes. `unit_x86_vex_legacy_prefix`
 keeps adjacent mandatory-prefix opcodes and illegal LOCK forms distinct.
 
+`unit_x86_exchange_access` checks XADD and CMPXCHG register/memory effects
+and the complete CMPXCHG8B/16B implicit banks. The 320 combinations cover
+operand widths, plain/LOCK/HLE memory forms, 32/64-bit modes, both syntaxes
+and both decode APIs. HLE CMPXCHG16B is outside this corpus.
+
 _Legacy (integration)_
 
 Legacy tests which only printed to `stdout`. In practice they only test if the code segfaults.

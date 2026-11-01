@@ -827,6 +827,14 @@ Capstone still owns output, errors and iterator advancement. A mode change
 disables a mismatched adapter. Its owner must detach it before releasing the
 callback context or reusing the handle for another consumer.
 
+## x86 exchange access details
+
+Legacy exchange details now report XADD's EFLAGS write and CMPXCHG's
+read/write destination, including memory writes when the comparison fails.
+CMPXCHG8B/16B report all four implicit inputs (EAX/EDX/EBX/ECX or
+RAX/RDX/RBX/RCX) and the conditional accumulator-pair writes plus EFLAGS.
+Instruction IDs, encodings and public structure layouts are unchanged.
+
 ## x86 SNP and SEV-ES decoding
 
 Append instruction IDs for PSMASH, PVALIDATE, RMPADJUST, RMPUPDATE, RMPQUERY,
