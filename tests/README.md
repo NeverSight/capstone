@@ -16,6 +16,12 @@ details in 32/64-bit modes, both syntaxes and both decode APIs. It also checks
 register access with address overrides and extended registers. Text-disabled
 scans retain instruction boundaries and omit operand details as before.
 
+`unit_x86_legacy_atomic` also checks BT/BTS/BTR/BTC register and immediate
+forms with F2/F3 and operand-size overrides, including HLE on locked forms.
+It checks widths, memory/register/flag effects and encoding offsets in both
+syntaxes and decode APIs for 32/64-bit modes. `unit_x86_vex_legacy_prefix`
+keeps adjacent mandatory-prefix opcodes and illegal LOCK forms distinct.
+
 _Legacy (integration)_
 
 Legacy tests which only printed to `stdout`. In practice they only test if the code segfaults.

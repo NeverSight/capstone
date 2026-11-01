@@ -55,6 +55,33 @@ int main(void)
 	 * A segment or address-size prefix does not, and neither does a REX
 	 * prefix that a later prefix makes ineffective. */
 	static const prefix_case cases[] = {
+		/* Unlike HLE on BT/BTS/BTR/BTC, F3 selects these opcodes while
+		 * 66 continues to select their 16-bit operands. */
+		{ CS_MODE_64,
+		  "16-bit tzcnt",
+		  { 0xf3, 0x66, 0x0f, 0xbc, 0xcf },
+		  5,
+		  "tzcnt cx, di" },
+		{ CS_MODE_64,
+		  "16-bit lzcnt",
+		  { 0xf3, 0x66, 0x0f, 0xbd, 0xcf },
+		  5,
+		  "lzcnt cx, di" },
+		{ CS_MODE_64,
+		  "16-bit popcnt",
+		  { 0xf3, 0x66, 0x0f, 0xb8, 0xcf },
+		  5,
+		  "popcnt cx, di" },
+		{ CS_MODE_64,
+		  "lock bt",
+		  { 0xf3, 0xf0, 0x66, 0x0f, 0xba, 0x27, 1 },
+		  7,
+		  NULL },
+		{ CS_MODE_64,
+		  "lock btc register",
+		  { 0xf3, 0xf0, 0x66, 0x0f, 0xbb, 0xcf },
+		  6,
+		  NULL },
 		{ CS_MODE_64,
 		  "vex2",
 		  { 0xc5, 0xf8, 0x77 },

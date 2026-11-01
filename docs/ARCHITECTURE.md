@@ -464,6 +464,9 @@ Instruction ID selection specializes the existing rules for each bitness. In
 32- and 64-bit legacy encodings without operand/address-size or repeat prefixes,
 ordinary opcodes take the direct attribute lookup. Opcode 90 and other prefix
 combinations retain the size, mandatory-prefix and XCHG repair rules.
+For Group 8 and register BTC, F2/F3 do not replace the operand-size override.
+The handwritten mandatory-prefix resolver retains 66 while the prefix reader
+retains the HLE hint; adjacent POPCNT/TZCNT/LZCNT keep their opcode-selecting F3.
 
 The decoder's packed decision tables derive from the original full/reduced
 `X86GenDisassemblerTables*.inc` inputs. Direct decisions embed one or two

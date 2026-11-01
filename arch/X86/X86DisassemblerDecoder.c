@@ -1127,6 +1127,10 @@ static uint16_t resolveMandatoryPrefixConflict(struct InternalInstruction *insn,
 			// CMPXCHG, LSS, BTR, LFS, LGS, MOVZX
 			|| (insn->opcode & 0xF8) == 0xB0
 
+			// Group 8 (BT/BTS/BTR/BTC immediate), BTC register.
+			// F2/F3 may select HLE, but 66 still sets operand size.
+			|| insn->opcode == 0xBA || insn->opcode == 0xBB
+
 			// Group 16, various NOPs
 			|| (insn->opcode & 0xF8) == 0x18
 

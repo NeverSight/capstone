@@ -257,12 +257,147 @@ static int addressing(void)
 	}
 	return bad;
 }
+typedef struct bit_prefix_case {
+	unsigned mode, width, kind, immediate, repeat, order, att;
+} bit_prefix_case;
+
+static int check_bit_prefix(csh h, const bit_prefix_case *test)
+{
+	const unsigned ids[] = { X86_INS_BT, X86_INS_BTS, X86_INS_BTR,
+				 X86_INS_BTC };
+	const uint8_t opcodes[] = { 0xa3, 0xab, 0xb3, 0xbb };
+	const x86_reg sources[] = { X86_REG_CX, X86_REG_ECX, X86_REG_RCX };
+	const unsigned width = 2u << test->width;
+	const bool imm = test->immediate, opsize = width == 2;
+	uint8_t code[15];
+	unsigned n = 0;
+	int bad = 0;
+	if (opsize && test->order)
+		code[n++] = 0x66;
+	if (test->repeat)
+		code[n++] = test->repeat == 1 ? 0xf2 : 0xf3;
+	if (test->kind)
+		code[n++] = 0xf0;
+	if (opsize && !test->order)
+		code[n++] = 0x66;
+	if (width == 8)
+		code[n++] = 0x48;
+	code[n++] = 0x0f;
+	code[n++] = imm ? 0xba : opcodes[test->kind];
+	unsigned modoff = n;
+	code[n++] = 7 | ((imm ? test->kind + 4 : 1) << 3);
+	if (imm)
+		code[n++] = 1;
+	for (unsigned iter = 0; iter < 2; ++iter) {
+		cs_insn *in = iter ? cs_malloc(h) : NULL;
+		const uint8_t *cursor = code;
+		size_t remaining = n;
+		uint64_t address = 0x1000;
+		bool decoded = iter ? cs_disasm_iter(h, &cursor, &remaining,
+						     &address, in) :
+				      cs_disasm(h, code, n, address, 1, &in) ==
+					       1;
+		if (!decoded) {
+			fprintf(stderr,
+				"bit prefix decode: mode=%u width=%u kind=%u imm=%u rep=%u order=%u iter=%u\n",
+				test->mode, width, test->kind, imm,
+				test->repeat, test->order, iter);
+			bad++;
+		} else {
+			const cs_x86 *x = &in->detail->x86;
+			const cs_x86_op *m = &x->operands[test->att],
+					*r = &x->operands[!test->att];
+			cs_regs reads, writes;
+			uint8_t nr = 0, nw = 0;
+			int mismatch =
+				in->id != ids[test->kind] || in->size != n ||
+				x->op_count != 2 ||
+				x->addr_size != (test->mode ? 8 : 4) ||
+				m->type != X86_OP_MEM || m->size != width ||
+				m->access != (test->kind ? CS_AC_READ_WRITE :
+							   CS_AC_READ) ||
+				m->mem.base != (test->mode ? X86_REG_RDI :
+							     X86_REG_EDI) ||
+				m->mem.index != X86_REG_INVALID ||
+				x->encoding.modrm_offset != modoff ||
+				x->encoding.imm_size != imm ||
+				x->encoding.imm_offset != (imm ? n - 1 : 0) ||
+				in->detail->groups_count ||
+				x->eflags != (X86_EFLAGS_MODIFY_CF |
+					      X86_EFLAGS_UNDEFINED_OF |
+					      X86_EFLAGS_UNDEFINED_SF |
+					      X86_EFLAGS_UNDEFINED_PF |
+					      X86_EFLAGS_UNDEFINED_AF);
+			if (imm)
+				mismatch |= r->type != X86_OP_IMM ||
+					    r->imm != 1 ||
+					    r->size != (test->att ? width : 1);
+			else
+				mismatch |= r->type != X86_OP_REG ||
+					    r->reg != sources[test->width] ||
+					    r->size != width ||
+					    r->access != CS_AC_READ;
+			mismatch |= cs_regs_access(h, in, reads, &nr, writes,
+						   &nw) != CS_ERR_OK ||
+				    nr != (imm ? 1 : 2) || nw != 1 ||
+				    !cs_reg_write(h, in, X86_REG_EFLAGS);
+			if (test->kind && test->repeat)
+				mismatch |= strncmp(in->mnemonic,
+						    test->repeat == 1 ?
+							    "xacquire lock " :
+							    "xrelease lock ",
+						    14) != 0;
+			if (iter)
+				mismatch |= remaining != 0 ||
+					    cursor != code + n ||
+					    address != 0x1000 + n;
+			if (mismatch)
+				fprintf(stderr, "bit prefix detail: %s %s\n",
+					in->mnemonic, in->op_str);
+			bad += mismatch != 0;
+		}
+		cs_free(in, iter || decoded ? 1 : 0);
+	}
+	return bad;
+}
+
+static int bit_prefixes(void)
+{
+	bit_prefix_case t = { 0 };
+	int bad = 0;
+	for (t.mode = 0; t.mode < 2; ++t.mode) {
+		csh h;
+		if (cs_open(CS_ARCH_X86, t.mode ? CS_MODE_64 : CS_MODE_32,
+			    &h) != CS_ERR_OK)
+			return 1;
+		cs_option(h, CS_OPT_DETAIL, CS_OPT_ON);
+		for (t.att = 0; t.att < 2; ++t.att) {
+			cs_option(h, CS_OPT_SYNTAX,
+				  t.att ? CS_OPT_SYNTAX_ATT :
+					  CS_OPT_SYNTAX_INTEL);
+			for (t.width = 0; t.width < 2 + t.mode; ++t.width)
+				for (t.kind = 0; t.kind < 4; ++t.kind)
+					for (t.immediate = 0; t.immediate < 2;
+					     ++t.immediate)
+						for (t.repeat = 0; t.repeat < 3;
+						     ++t.repeat)
+							for (t.order = 0;
+							     t.order < 2;
+							     ++t.order)
+								bad += check_bit_prefix(
+									h, &t);
+		}
+		cs_close(&h);
+	}
+	return bad;
+}
+
 int main(void)
 {
 	const unsigned ids[] = { X86_INS_AADD, X86_INS_AAND, X86_INS_AOR,
 				 X86_INS_AXOR };
 	const uint8_t pp[] = { 0, 0x66, 0xf2, 0xf3 };
-	int bad = addressing();
+	int bad = addressing() + bit_prefixes();
 	for (unsigned mode = 0; mode < 3; ++mode) {
 		csh h;
 		const cs_mode modes[] = { CS_MODE_16, CS_MODE_32, CS_MODE_64 };
