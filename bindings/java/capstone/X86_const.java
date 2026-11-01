@@ -2151,7 +2151,16 @@ public class X86_const {
 	public static final int X86_INS_UIRET = 1663;
 	public static final int X86_INS_ERETS = 1664;
 	public static final int X86_INS_ERETU = 1665;
-	public static final int X86_INS_ENDING = 1666;
+	public static final int X86_INS_PSMASH = 1666;
+	public static final int X86_INS_PVALIDATE = 1667;
+	public static final int X86_INS_RMPADJUST = 1668;
+	public static final int X86_INS_RMPUPDATE = 1669;
+	public static final int X86_INS_RMPQUERY = 1670;
+	public static final int X86_INS_RMPREAD = 1671;
+	public static final int X86_INS_RMPOPT = 1672;
+	public static final int X86_INS_RMPCHKD = 1673;
+	public static final int X86_INS_VMGEXIT = 1674;
+	public static final int X86_INS_ENDING = 1675;
 
 	public static final int X86_GRP_INVALID = 0;
 	public static final int X86_GRP_JUMP = 1;

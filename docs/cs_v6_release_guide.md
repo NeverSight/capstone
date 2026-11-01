@@ -826,3 +826,25 @@ length profile. Zero or an out-of-range result retains ordinary decoding;
 Capstone still owns output, errors and iterator advancement. A mode change
 disables a mismatched adapter. Its owner must detach it before releasing the
 callback context or reusing the handle for another consumer.
+
+## x86 SNP and SEV-ES decoding
+
+Append instruction IDs for PSMASH, PVALIDATE, RMPADJUST, RMPUPDATE, RMPQUERY,
+RMPREAD, RMPOPT, RMPCHKD and VMGEXIT. Existing IDs and public layouts stay
+stable; Python, Java and OCaml constants are regenerated from the header.
+Both F2 and F3 VMGEXIT encodings have their own identity. Their runtime fallback
+to VMMCALL outside SEV-ES is an execution-mode property, not a decoder alias.
+
+All SNP operations except PVALIDATE require 64-bit mode. PVALIDATE and VMGEXIT
+also decode in 16/32-bit modes. Register access reports PVALIDATE's address-sized
+rAX and fixed ECX/EDX inputs, EAX status writes, RMPQUERY's RCX/RDX results and
+RMPCHKD's restartable RAX/RCX updates. RMPREAD/RMPUPDATE retain the selected
+implicit segment. RMPOPT changes only CF; RMPCHKD distinguishes CF/ZF outputs
+from undefined OF/SF/AF/PF. VMGEXIT has the VM group and no privilege restriction.
+
+The iterator, allocated-array API and batch scanner share this recognition.
+LOCK, truncations, excessive length and invalid code modes are refused before
+legacy CLZERO/INVLPGB/TLBSYNC/VMMCALL aliases can consume the bytes. These are
+decoding guarantees; the library does not execute RMP operations or implement
+GHCB services. The instruction authority is AMD APM Volume 3, 24594 revision
+3.39 (October 2026), sections PSMASH through RMPUPDATE and VMGEXIT.

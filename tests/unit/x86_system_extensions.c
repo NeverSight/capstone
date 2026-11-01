@@ -36,7 +36,117 @@ static const system_case cases[] = {
 	  true },
 	{ { 0x0f, 0x01, 0xfe }, 3, X86_INS_INVLPGB, "invlpgb", false, true },
 	{ { 0x0f, 0x01, 0xff }, 3, X86_INS_TLBSYNC, "tlbsync", false, true },
+	{ { 0xf3, 0x0f, 0x01, 0xff }, 4, X86_INS_PSMASH, "psmash", true, true },
+	{ { 0xf2, 0x0f, 0x01, 0xff },
+	  4,
+	  X86_INS_PVALIDATE,
+	  "pvalidate",
+	  false,
+	  true },
+	{ { 0xf3, 0x0f, 0x01, 0xfe },
+	  4,
+	  X86_INS_RMPADJUST,
+	  "rmpadjust",
+	  true,
+	  true },
+	{ { 0xf2, 0x0f, 0x01, 0xfe },
+	  4,
+	  X86_INS_RMPUPDATE,
+	  "rmpupdate",
+	  true,
+	  true },
+	{ { 0xf3, 0x0f, 0x01, 0xfd },
+	  4,
+	  X86_INS_RMPQUERY,
+	  "rmpquery",
+	  true,
+	  true },
+	{ { 0xf2, 0x0f, 0x01, 0xfd }, 4, X86_INS_RMPREAD, "rmpread", true, true },
+	{ { 0xf2, 0x0f, 0x01, 0xfc }, 4, X86_INS_RMPOPT, "rmpopt", true, true },
+	{ { 0xf3, 0x0f, 0x01, 0xfc }, 4, X86_INS_RMPCHKD, "rmpchkd", true, true },
+	{ { 0xf2, 0x0f, 0x01, 0xd9 },
+	  4,
+	  X86_INS_VMGEXIT,
+	  "vmgexit",
+	  false,
+	  false },
+	{ { 0xf3, 0x0f, 0x01, 0xd9 },
+	  4,
+	  X86_INS_VMGEXIT,
+	  "vmgexit",
+	  false,
+	  false },
 };
+
+static bool check_snp_detail(csh h, const cs_insn *insn)
+{
+	const cs_detail *d = insn->detail;
+	const cs_x86 *x = &d->x86;
+	cs_regs reads = { 0 }, writes = { 0 }, actual_reads, actual_writes;
+	uint8_t nr = 0, nw = 0, actual_nr = 0, actual_nw = 0;
+	uint64_t flags = X86_EFLAGS_MODIFY_OF | X86_EFLAGS_MODIFY_SF |
+			 X86_EFLAGS_MODIFY_ZF | X86_EFLAGS_MODIFY_AF |
+			 X86_EFLAGS_MODIFY_PF;
+	if (insn->id == X86_INS_VMGEXIT)
+		return x->eflags == 0 && d->groups_count == 1 &&
+		       d->groups[0] == X86_GRP_VM && d->regs_read_count == 0 &&
+		       d->regs_write_count == 0;
+	reads[nr++] = X86_REG_RAX;
+	writes[nw++] = X86_REG_EAX;
+	switch (insn->id) {
+	case X86_INS_PSMASH:
+		break;
+	case X86_INS_PVALIDATE:
+		reads[0] = x->addr_size == 8 ? X86_REG_RAX :
+			   x->addr_size == 4 ? X86_REG_EAX :
+					       X86_REG_AX;
+		reads[nr++] = X86_REG_ECX;
+		reads[nr++] = X86_REG_EDX;
+		flags |= X86_EFLAGS_MODIFY_CF;
+		break;
+	case X86_INS_RMPADJUST:
+		reads[nr++] = X86_REG_RCX;
+		reads[nr++] = X86_REG_RDX;
+		break;
+	case X86_INS_RMPQUERY:
+		reads[nr++] = X86_REG_RDX;
+		writes[nw++] = X86_REG_RCX;
+		writes[nw++] = X86_REG_RDX;
+		break;
+	case X86_INS_RMPREAD:
+	case X86_INS_RMPUPDATE:
+		reads[nr++] = X86_REG_RCX;
+		reads[nr++] = x->prefix[1] == 0x65 ? X86_REG_GS :
+			      x->prefix[1] == 0x64 ? X86_REG_FS :
+						     X86_REG_DS;
+		break;
+	case X86_INS_RMPOPT:
+		reads[nr++] = X86_REG_RCX;
+		nw = 0;
+		flags = X86_EFLAGS_MODIFY_CF;
+		break;
+	case X86_INS_RMPCHKD:
+		reads[nr++] = X86_REG_RCX;
+		writes[0] = X86_REG_RAX;
+		writes[nw++] = X86_REG_RCX;
+		flags = X86_EFLAGS_MODIFY_CF | X86_EFLAGS_MODIFY_ZF |
+			X86_EFLAGS_UNDEFINED_OF | X86_EFLAGS_UNDEFINED_SF |
+			X86_EFLAGS_UNDEFINED_AF | X86_EFLAGS_UNDEFINED_PF;
+		break;
+	default:
+		return false;
+	}
+	writes[nw++] = X86_REG_EFLAGS;
+	return x->eflags == flags && d->regs_read_count == nr &&
+	       d->regs_write_count == nw &&
+	       memcmp(d->regs_read, reads, nr * sizeof(reads[0])) == 0 &&
+	       memcmp(d->regs_write, writes, nw * sizeof(writes[0])) == 0 &&
+	       cs_regs_access(h, insn, actual_reads, &actual_nr, actual_writes,
+			      &actual_nw) == CS_ERR_OK &&
+	       actual_nr == nr && actual_nw == nw &&
+	       memcmp(actual_reads, reads, nr * sizeof(reads[0])) == 0 &&
+	       memcmp(actual_writes, writes, nw * sizeof(writes[0])) == 0;
+}
 
 static bool check(csh h, cs_mode mode, const system_case *test, bool att)
 {
@@ -53,11 +163,15 @@ static bool check(csh h, cs_mode mode, const system_case *test, bool att)
 		ok &= insn->id == test->id && insn->size == test->size &&
 		      strcmp(insn->mnemonic, test->name) == 0 &&
 		      strcmp(cs_insn_name(h, insn->id), test->name) == 0 &&
-		      d->groups_count == (unsigned)(test->privileged ||
-						    test->id == X86_INS_UIRET) +
-						 (unsigned)fred &&
+		      d->groups_count ==
+			      (unsigned)(test->privileged ||
+					 test->id == X86_INS_UIRET ||
+					 test->id == X86_INS_VMGEXIT) +
+				      (unsigned)fred &&
 		      (!test->privileged || d->groups[0] == X86_GRP_PRIVILEGE);
-		if (test->id == X86_INS_TESTUI) {
+		if (test->id >= X86_INS_PSMASH && test->id <= X86_INS_VMGEXIT) {
+			ok &= check_snp_detail(h, insn);
+		} else if (test->id == X86_INS_TESTUI) {
 			ok &= d->regs_write_count == 1 &&
 			      d->regs_write[0] == X86_REG_EFLAGS &&
 			      x->eflags == (X86_EFLAGS_MODIFY_CF |
@@ -156,6 +270,21 @@ static bool check_prefixes_and_memory(csh h, cs_mode mode)
 		if ((c->only64 && mode != CS_MODE_64) ||
 		    (c->id == X86_INS_INVLPGB && mode == CS_MODE_16))
 			continue;
+		if (c->id >= X86_INS_PSMASH && c->id <= X86_INS_VMGEXIT) {
+			system_case prefixed = *c;
+			memmove(prefixed.bytes + 1, prefixed.bytes,
+				prefixed.size++);
+			prefixed.bytes[0] = 0x67;
+			ok &= check(h, mode, &prefixed, false);
+			if (c->id == X86_INS_RMPREAD ||
+			    c->id == X86_INS_RMPUPDATE) {
+				for (unsigned segment = 0x64; segment <= 0x65;
+				     ++segment) {
+					prefixed.bytes[0] = segment;
+					ok &= check(h, mode, &prefixed, false);
+				}
+			}
+		}
 		for (size_t n = 1; n < c->size; ++n)
 			ok &= decodes(h, c->bytes, n, false);
 		bytes[0] = 0xf0;

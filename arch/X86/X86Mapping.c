@@ -3156,7 +3156,36 @@ decode_system_legacy_vex(csh handle, const uint8_t *code, size_t code_len,
 		bool memory_form = false;
 		cs_x86 *x86;
 
-		if (map == 0x01 && last == 0xca && mandatory_prefix) {
+		if (map == 0x01 && mandatory_prefix &&
+		    (last >= 0xfc || last == 0xd9)) {
+			/* These refining prefixes must precede the legacy CLZERO,
+			 * INVLPGB, TLBSYNC and VMMCALL terminals. */
+			const bool f3 = mandatory_prefix == 0xf3;
+			switch (last) {
+			case 0xff:
+				feature = f3 ? X86_FEATURE_PSMASH :
+					       X86_FEATURE_PVALIDATE;
+				break;
+			case 0xfe:
+				feature = f3 ? X86_FEATURE_RMPADJUST :
+					       X86_FEATURE_RMPUPDATE;
+				break;
+			case 0xfd:
+				feature = f3 ? X86_FEATURE_RMPQUERY :
+					       X86_FEATURE_RMPREAD;
+				break;
+			case 0xfc:
+				feature = f3 ? X86_FEATURE_RMPCHKD :
+					       X86_FEATURE_RMPOPT;
+				break;
+			case 0xd9:
+				feature = X86_FEATURE_VMGEXIT;
+				break;
+			}
+			if (!mode64 && feature != X86_FEATURE_PVALIDATE &&
+			    feature != X86_FEATURE_VMGEXIT)
+				return X86_FEATURE_INVALID;
+		} else if (map == 0x01 && last == 0xca && mandatory_prefix) {
 			feature = mandatory_prefix == 0xf2 ? X86_FEATURE_ERETS :
 							     X86_FEATURE_ERETU;
 		} else if (map == 0x01 && mandatory_prefix == 0xf3) {
@@ -8085,7 +8114,73 @@ static const struct {
 	{ X86_FEATURE_HRESET, X86_INS_HRESET, "hreset" },
 	{ X86_FEATURE_INVLPGB, X86_INS_INVLPGB, "invlpgb" },
 	{ X86_FEATURE_TLBSYNC, X86_INS_TLBSYNC, "tlbsync" },
+	{ X86_FEATURE_PSMASH, X86_INS_PSMASH, "psmash" },
+	{ X86_FEATURE_PVALIDATE, X86_INS_PVALIDATE, "pvalidate" },
+	{ X86_FEATURE_RMPADJUST, X86_INS_RMPADJUST, "rmpadjust" },
+	{ X86_FEATURE_RMPUPDATE, X86_INS_RMPUPDATE, "rmpupdate" },
+	{ X86_FEATURE_RMPQUERY, X86_INS_RMPQUERY, "rmpquery" },
+	{ X86_FEATURE_RMPREAD, X86_INS_RMPREAD, "rmpread" },
+	{ X86_FEATURE_RMPOPT, X86_INS_RMPOPT, "rmpopt" },
+	{ X86_FEATURE_RMPCHKD, X86_INS_RMPCHKD, "rmpchkd" },
+	{ X86_FEATURE_VMGEXIT, X86_INS_VMGEXIT, "vmgexit" },
 };
+
+static void set_snp_detail(unsigned int opcode, cs_detail *detail)
+{
+	cs_x86 *x86 = &detail->x86;
+	if (opcode == X86_FEATURE_VMGEXIT) {
+		detail->groups[0] = X86_GRP_VM;
+		detail->groups_count = 1;
+		return;
+	}
+	detail->groups[0] = X86_GRP_PRIVILEGE;
+	detail->groups_count = 1;
+	detail->regs_read[detail->regs_read_count++] = X86_REG_RAX;
+	if (opcode == X86_FEATURE_PVALIDATE) {
+		detail->regs_read[0] = x86->addr_size == 8 ? X86_REG_RAX :
+				       x86->addr_size == 4 ? X86_REG_EAX :
+							     X86_REG_AX;
+		detail->regs_read[detail->regs_read_count++] = X86_REG_ECX;
+		detail->regs_read[detail->regs_read_count++] = X86_REG_EDX;
+	} else if (opcode != X86_FEATURE_PSMASH) {
+		if (opcode != X86_FEATURE_RMPQUERY)
+			detail->regs_read[detail->regs_read_count++] =
+				X86_REG_RCX;
+		if (opcode == X86_FEATURE_RMPQUERY ||
+		    opcode == X86_FEATURE_RMPADJUST)
+			detail->regs_read[detail->regs_read_count++] =
+				X86_REG_RDX;
+	}
+	if (opcode == X86_FEATURE_RMPREAD || opcode == X86_FEATURE_RMPUPDATE) {
+		x86_reg segment = apx_segment_register(x86->prefix[1]);
+		detail->regs_read[detail->regs_read_count++] =
+			segment == X86_REG_INVALID ? X86_REG_DS : segment;
+	}
+	if (opcode == X86_FEATURE_RMPCHKD) {
+		detail->regs_write[detail->regs_write_count++] = X86_REG_RAX;
+		detail->regs_write[detail->regs_write_count++] = X86_REG_RCX;
+		x86->eflags = X86_EFLAGS_MODIFY_CF | X86_EFLAGS_MODIFY_ZF |
+			      X86_EFLAGS_UNDEFINED_OF |
+			      X86_EFLAGS_UNDEFINED_SF |
+			      X86_EFLAGS_UNDEFINED_AF | X86_EFLAGS_UNDEFINED_PF;
+	} else if (opcode == X86_FEATURE_RMPOPT) {
+		x86->eflags = X86_EFLAGS_MODIFY_CF;
+	} else {
+		detail->regs_write[detail->regs_write_count++] = X86_REG_EAX;
+		if (opcode == X86_FEATURE_RMPQUERY) {
+			detail->regs_write[detail->regs_write_count++] =
+				X86_REG_RCX;
+			detail->regs_write[detail->regs_write_count++] =
+				X86_REG_RDX;
+		}
+		x86->eflags = X86_EFLAGS_MODIFY_OF | X86_EFLAGS_MODIFY_SF |
+			      X86_EFLAGS_MODIFY_ZF | X86_EFLAGS_MODIFY_AF |
+			      X86_EFLAGS_MODIFY_PF;
+		if (opcode == X86_FEATURE_PVALIDATE)
+			x86->eflags |= X86_EFLAGS_MODIFY_CF;
+	}
+	detail->regs_write[detail->regs_write_count++] = X86_REG_EFLAGS;
+}
 
 static bool print_system_extension(MCInst *instr, SStream *stream, bool att)
 {
@@ -8828,6 +8923,15 @@ bool X86_mapFeatureExtension(cs_insn *insn, unsigned int opcode)
 	case X86_FEATURE_LKGS:
 	case X86_FEATURE_HRESET:
 	case X86_FEATURE_INVLPGB:
+	case X86_FEATURE_PSMASH:
+	case X86_FEATURE_PVALIDATE:
+	case X86_FEATURE_RMPADJUST:
+	case X86_FEATURE_RMPUPDATE:
+	case X86_FEATURE_RMPQUERY:
+	case X86_FEATURE_RMPREAD:
+	case X86_FEATURE_RMPOPT:
+	case X86_FEATURE_RMPCHKD:
+	case X86_FEATURE_VMGEXIT:
 	case X86_FEATURE_TLBSYNC: {
 		unsigned int i;
 		for (i = 0; i < ARR_SIZE(system_extensions); ++i)
@@ -8835,6 +8939,11 @@ bool X86_mapFeatureExtension(cs_insn *insn, unsigned int opcode)
 				insn->id = system_extensions[i].id;
 		if (insn->detail) {
 			cs_detail *d = insn->detail;
+			if (opcode >= X86_FEATURE_PSMASH &&
+			    opcode <= X86_FEATURE_VMGEXIT) {
+				set_snp_detail(opcode, d);
+				return true;
+			}
 			if (opcode == X86_FEATURE_ERETS ||
 			    opcode == X86_FEATURE_ERETU) {
 				d->groups[0] = X86_GRP_PRIVILEGE;
