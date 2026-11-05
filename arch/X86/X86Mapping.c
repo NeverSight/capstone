@@ -11851,7 +11851,12 @@ const uint8_t *X86_get_op_access(cs_struct *h, unsigned int id,
 		static const uint8_t compare_access[] = { CS_AC_READ_WRITE,
 							  CS_AC_READ, 0 };
 		static const uint8_t pair_access[] = { CS_AC_READ_WRITE, 0 };
+		static const uint8_t bound_access[] = { CS_AC_READ, CS_AC_READ, 0 };
 		switch (insns[i].mapid) {
+		case X86_INS_BOUND:
+			/* BOUND compares the index without modifying it or EFLAGS. */
+			*eflags = 0;
+			return bound_access;
 		case X86_INS_CMPXCHG:
 			return compare_access;
 		case X86_INS_CMPXCHG8B:

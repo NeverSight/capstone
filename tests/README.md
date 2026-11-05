@@ -27,6 +27,11 @@ and the complete CMPXCHG8B/16B implicit banks. The 320 combinations cover
 operand widths, plain/LOCK/HLE memory forms, 32/64-bit modes, both syntaxes
 and both decode APIs. HLE CMPXCHG16B is outside this corpus.
 
+`unit_x86_bound_access` checks 224 combinations of code, operand and address
+widths, all segment prefixes, both syntaxes and both decode APIs. Both operands
+are read-only; register-access results include the index and address registers
+and no writes. The same contract runs in full and reduced builds.
+
 _Legacy (integration)_
 
 Legacy tests which only printed to `stdout`. In practice they only test if the code segfaults.
