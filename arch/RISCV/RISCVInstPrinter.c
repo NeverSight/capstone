@@ -413,7 +413,7 @@ void RISCV_LLVM_printInstruction(MCInst *MI, SStream *O,
 	MI->flat_insn->usesAliasDetails = usesAliasDetails;
 
 	MCInst Uncompressed;
-	MCInst_Init(&Uncompressed, MI->csh->arch);
+	MCInst_InitStorage(&Uncompressed, MI->csh->arch, false);
 	MCInst *MIUncompressed = MI;
 	bool is_uncompressed = false;
 

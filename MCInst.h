@@ -215,8 +215,8 @@ CS_MCINST_INLINE void MCOperand_CreateImm0(MCInst *mcInst, int64_t Val)
 	op->ImmVal = Val;
 }
 
-/* The private x86 path constructs every operand before reading it. Other
- * callers retain full operand initialization through MCInst_Init. */
+/* Private x86 state and the RISC-V uncompressed printer temporary construct
+ * operands before reading them. MCInst_Init retains full initialization. */
 static inline void MCInst_InitStorage(MCInst *inst, cs_arch arch,
 				      bool clear_operands)
 {

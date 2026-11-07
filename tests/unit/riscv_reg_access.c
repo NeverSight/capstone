@@ -23,6 +23,15 @@ static bool test_reg_access(csh handle, const uint8_t *code, size_t code_size,
 
 	cs_err err = cs_regs_access(handle, insn, regs_read, &regs_read_count,
 				    regs_write, &regs_write_count);
+	if (cs_support(CS_SUPPORT_DIET)) {
+		cs_err last_error = cs_errno(handle);
+		bool success = err == CS_ERR_DIET && last_error == CS_ERR_DIET;
+		if (!success)
+			printf("Expected CS_ERR_DIET, got return %d and errno %d\n",
+			       err, last_error);
+		cs_free(insn, count);
+		return success;
+	}
 	if (err != CS_ERR_OK) {
 		printf("cs_regs_access failed with error: %d\n", err);
 		cs_free(insn, count);

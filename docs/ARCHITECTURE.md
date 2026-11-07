@@ -154,6 +154,14 @@ metadata defaults, while `MCInst_Init` still clears the complete object for
 other callers. Public instruction/detail arrays retain their existing clearing
 and callback-visible state. This does not change decoding or legality checks.
 
+The private RISC-V printer temporary for uncompressed instructions uses the
+same metadata initializer without clearing unused operand slots. The generated
+uncompressor constructs every operand before the alias matcher, printer or
+detail mapper reads it. Its existing feature and operand predicates still
+decide whether to use the temporary. During Auto-Sync, retain this
+Capstone-specific initialization in the `RISCV_LLVM_printInstruction` node
+through the Differ workflow; generated uncompression tables are unchanged.
+
 The `cs_insn` is meant to be used by the Capstone core.
 It is distinct from the `MCInst`. It uses different instruction identifiers, other operand representation
 and holds more details about an instruction.
