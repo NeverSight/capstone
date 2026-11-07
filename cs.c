@@ -930,11 +930,9 @@ static void fill_insn(struct cs_struct *handle, cs_insn *insn, SStream *OS,
 		      const uint8_t *code)
 {
 	SStream_trimls(OS);
-	uint16_t copy_size = MIN(sizeof(insn->bytes), insn->size);
-
 	// fill the instruction bytes.
 	// we might skip some redundant bytes in front in the case of X86
-	memcpy(insn->bytes, code + insn->size - copy_size, copy_size);
+	uint16_t copy_size = copy_insn_bytes(insn, code, false);
 	insn->op_str[0] = '\0';
 	insn->size = copy_size;
 

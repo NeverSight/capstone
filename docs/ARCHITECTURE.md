@@ -195,12 +195,17 @@ Ordinary generated C4 headers try that same reader before materializing an
 `MCInst`. The adapter still runs first, and the existing feature-family check
 excludes source-owned extensions before this shortcut. Admission misses enter
 the generic helper with the same decoding and output rules.
+The shared `copy_insn_bytes` helper owns byte-count normalization and copying
+for text and no-text output. Generic copies retain the last bytes of an
+instruction, bounded by the public byte-array capacity. Constant-size head and
+tail copies stay within that exact extent; the current 24-byte capacity needs
+at most two 16-byte chunks. The unused output tail remains untouched.
 Successful compact x86 results consume at most 15 bytes. The public iterator
 uses that validated bound to omit generic truncation, large-copy dispatch and
-a redundant size write. Allocated output retains the generic copy policy,
-keeping the shared core code unchanged in the qualification build; full decoding
-and other architectures also retain that policy. Copies still read only consumed
-input bytes and preserve the unused output tail. On GNU-compatible compilers, scan entries and their
+a redundant size write. Allocated output, full decoding and other architectures
+use the same helper with the generic capacity bound. Opcode overrides,
+postprinting and cursor updates retain their order.
+On GNU-compatible compilers, scan entries and their
 hot prefix, public-terminal and VEX tables have explicit 128-byte alignment so
 nearby cold-code changes do not move them to different alignment offsets.
 The private `X86_scanBatch` entry keeps the bounded classification loop in the

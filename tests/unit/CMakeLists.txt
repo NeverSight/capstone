@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.15)
 
 enable_testing()
-set(UNIT_TEST_SOURCES sstream.c utils.c api.c mcinst.c mapping.c feature_mode.c)
+set(UNIT_TEST_SOURCES sstream.c utils.c api.c instruction_bytes.c mcinst.c mapping.c feature_mode.c)
 if(CAPSTONE_AARCH64_SUPPORT OR CAPSTONE_ARM_SUPPORT OR CAPSTONE_ALPHA_SUPPORT
    OR CAPSTONE_ARC_SUPPORT OR CAPSTONE_MIPS_SUPPORT OR CAPSTONE_PPC_SUPPORT
    OR CAPSTONE_SPARC_SUPPORT OR CAPSTONE_LOONGARCH_SUPPORT OR CAPSTONE_RISCV_SUPPORT)
