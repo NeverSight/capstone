@@ -134,8 +134,8 @@ static bool test_aliased_appends(void)
 static bool test_known_length_appends(void)
 {
 	printf("Test test_known_length_appends\n");
-	const size_t lengths[] = { 0,  1,   2,	 7,   15,  30,	31,
-				   32, 127, 255, 510, 511, 512, 513 };
+	const size_t lengths[] = { 0,  1,  2,  3,   4,	 5,   6,   7,	15,
+				   30, 31, 32, 127, 255, 510, 511, 512, 513 };
 	char text[SSTREAM_BUF_LEN + 2];
 	for (size_t length = 0; length < ARR_SIZE(lengths); length++) {
 		memset(text, 'a', sizeof(text));
@@ -143,7 +143,7 @@ static bool test_known_length_appends(void)
 		for (unsigned flags = 0; flags < 16; flags++) {
 			for (size_t index = 0; index <= SSTREAM_BUF_LEN + 1;
 			     index++) {
-				SStream expected, actual;
+				SStream expected, actual, small;
 				memset(&expected, 0x5a, sizeof(expected));
 				expected.index = index == SSTREAM_BUF_LEN + 1 ?
 							 SIZE_MAX :
@@ -153,6 +153,9 @@ static bool test_known_length_appends(void)
 				expected.prefixed_by_markup = (flags & 4) != 0;
 				expected.unsigned_num = (flags & 8) != 0;
 				memcpy(&actual, &expected, sizeof(actual));
+				if (lengths[length] < 8)
+					memcpy(&small, &expected,
+					       sizeof(small));
 				(SStream_concat0)(&expected, text);
 				SStream_concat0_n(&actual, text,
 						  lengths[length]);
@@ -162,6 +165,17 @@ static bool test_known_length_appends(void)
 					       flags, expected.index,
 					       lengths[length]);
 					return false;
+				}
+				if (lengths[length] < 8) {
+					SStream_concat0_small(&small, text,
+							      lengths[length]);
+					if (memcmp(&small, &expected,
+						   sizeof(small)) != 0) {
+						printf("Small append differs: flags=%u index=%zu length=%zu\n",
+						       flags, expected.index,
+						       lengths[length]);
+						return false;
+					}
 				}
 			}
 		}
@@ -1233,6 +1247,7 @@ static bool test_diet_appends(void)
 		}
 		SStream_concat0(&OS, "text");
 		SStream_concat0_n(&OS, "text", 4);
+		SStream_concat0_small(&OS, "text", 4);
 		SStream_concat0_substr(&OS, "text suffix", 4);
 		SStream_concat1(&OS, 'x');
 		SStream_concat(&OS, "%s", "text");

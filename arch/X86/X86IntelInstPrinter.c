@@ -290,13 +290,16 @@ static void printf512mem(MCInst *MI, unsigned OpNo, SStream *O)
 #endif
 
 static const char *getRegisterName(unsigned RegNo);
+static inline unsigned getRegisterNameLength(unsigned RegNo);
 static void printRegName(SStream *OS, unsigned RegNo)
 {
-	const char *extension_name =
-		X86_featureExtensionMCRegisterName(RegNo);
+	const char *extension_name = X86_featureExtensionMCRegisterName(RegNo);
 
-	SStream_concat0(OS, extension_name ? extension_name :
-					 getRegisterName(RegNo));
+	if (extension_name)
+		SStream_concat0(OS, extension_name);
+	else
+		SStream_concat0_small(OS, getRegisterName(RegNo),
+				      getRegisterNameLength(RegNo));
 }
 
 // for MASM syntax, 0x123 = 123h, 0xA123 = 0A123h

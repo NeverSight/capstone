@@ -173,4 +173,38 @@ void printExpr(SStream *O, uint64_t val);
 
 SStream *markup_OS(SStream *OS, SStreamMarkup style);
 
+// Append a generated NUL-terminated name of length 0..7.
+// Source bytes must not overlap the append range.
+static inline void SStream_concat0_small(SStream *ss, const char *s, size_t len)
+{
+#ifndef CAPSTONE_DIET
+	assert(ss && s && len < 8);
+	if (ss->is_closed || len == 0)
+		return;
+	if (ss->index < SSTREAM_BUF_LEN - len &&
+	    !(ss->markup_stream && ss->prefixed_by_markup)) {
+		char *out = ss->buffer + ss->index;
+		// Include the source terminator in two exact-range copies.
+		if (len >= 3) {
+			uint32_t head, tail;
+			memcpy(&head, s, sizeof(head));
+			memcpy(&tail, s + len - 3, sizeof(tail));
+			memcpy(out, &head, sizeof(head));
+			memcpy(out + len - 3, &tail, sizeof(tail));
+		} else {
+			uint16_t head, tail;
+			memcpy(&head, s, sizeof(head));
+			memcpy(&tail, s + len - 1, sizeof(tail));
+			memcpy(out, &head, sizeof(head));
+			memcpy(out + len - 1, &tail, sizeof(tail));
+		}
+		ss->index += len;
+		return;
+	}
+#else
+	(void)len;
+#endif
+	SStream_concat0(ss, s);
+}
+
 #endif

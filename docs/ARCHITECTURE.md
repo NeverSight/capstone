@@ -530,6 +530,18 @@ fixed-size copies for short names; truncation, markup and index repair retain th
 general writer. It requires a NUL-terminated source whose bytes do not overlap
 the append range.
 
+
+The Intel register-name offsets also carry three length bits in their existing
+16-bit records. `suite/synctools/x86_register_name_sizes.py` derives them from
+`X86GenRegisterName1.inc`, preserving string bytes, suffix sharing and offsets;
+run it after regenerating that include. Its `--check` mode verifies freshness
+and register-enum cardinality, and rejects offsets or names outside the packed
+format. AT&T's register table and the public name API are unchanged. The Intel
+printer uses `SStream_concat0_small` for these names of at most seven bytes. This
+stream-owned helper copies the terminator with bounded scalar loads/stores,
+retains closed/markup/truncation behavior, and is a no-op in DIET. Other stream
+consumers retain their existing append implementation.
+
 With the default userspace formatter, the Intel/MASM printer fills operand
 access and flags once, after explicit and implicit operands are complete. A
 custom formatter can observe partial detail or change options, so it retains
