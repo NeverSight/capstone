@@ -92,6 +92,15 @@ its unit test checks the dense ordering and compares every 16-bit input against
 the generic cache lookup. The input's existing 16-bit conversion, out-of-range
 ID preservation, implicit details and handle/cache initialization are unchanged.
 
+In non-DIET builds, RISC-V privilege groups are assigned from the decoded opcode
+and, for CSR accesses, the CSR address's minimum-privilege bits. Group construction happens
+before the public instruction bytes are copied, so it must not inspect that
+output buffer. ECALL, EBREAK, WRS, MOP and user-CSR accesses remain unprivileged.
+This static classification does not predict traps controlled by runtime state.
+The architectural rules come from the RISC-V privileged instruction listings,
+CSR address mapping, and debug DRET definition. DIET keeps its existing empty
+group metadata and unsupported public group-query behavior.
+
 The handwritten x86 mapping boundary corrects legacy exchange and BOUND
 metadata in both full and reduced builds. BOUND reads its index and bounds
 without writing registers or EFLAGS. XADD writes EFLAGS; CMPXCHG destinations are

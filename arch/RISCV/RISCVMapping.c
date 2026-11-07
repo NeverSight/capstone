@@ -200,32 +200,51 @@ void RISCV_add_groups(MCInst *MI)
 	RISCV_add_adhoc_groups(MI);
 }
 
-enum {
-#define GET_ENUM_VALUES_RISCVOpcode
-#include "RISCVGenCSSystemOperandsEnum.inc"
-};
-
+/* Classify decoded instructions here: the public byte array is populated
+ * after the printer has already requested groups. SYSTEM also contains
+ * unprivileged instructions, including ECALL, EBREAK, WRS and MOP. */
 static inline void RISCV_add_privileged_group(MCInst *MI)
 {
-	const uint8_t *bytes = MI->flat_insn->bytes;
-	uint8_t opcode = bytes[0] & 0x80;
-	// no privileged instruction has a major opcode other than SYSTEM
-	if (opcode != RISCV_RISCVOPCODE_SYSTEM) {
-		return;
-	}
-	uint8_t func3 = (bytes[1] >> 4) & 0x7;
-	// no privileged instruction has a minor opcode other than PRIV or PRIVM
-	if (func3 != 0 && func3 != 0x4) {
-		return;
-	}
-	uint16_t func12 = readBytes16(MI, &(bytes[2])) >> 4;
-	// ecall and ebreak has SYSTEM and PRIV but aren't privileged
-	if (func12 == 0 || func12 == 1) {
-		return;
-	}
-	uint8_t func6 = func12 >> 6;
-	// a subspace under extension-defined custom SYSTEM instructions that is not privileged
-	if (func6 == 0x23 || func6 == 0x33) {
+	switch (MI->Opcode) {
+	case RISCV_DRET:
+	case RISCV_MRET:
+	case RISCV_SRET:
+	case RISCV_WFI:
+	case RISCV_SFENCE_VMA:
+	case RISCV_SFENCE_W_INVAL:
+	case RISCV_SFENCE_INVAL_IR:
+	case RISCV_SINVAL_VMA:
+	case RISCV_HFENCE_GVMA:
+	case RISCV_HFENCE_VVMA:
+	case RISCV_HINVAL_GVMA:
+	case RISCV_HINVAL_VVMA:
+	case RISCV_HLV_B:
+	case RISCV_HLV_BU:
+	case RISCV_HLV_H:
+	case RISCV_HLV_HU:
+	case RISCV_HLV_W:
+	case RISCV_HLV_WU:
+	case RISCV_HLV_D:
+	case RISCV_HLVX_HU:
+	case RISCV_HLVX_WU:
+	case RISCV_HSV_B:
+	case RISCV_HSV_H:
+	case RISCV_HSV_W:
+	case RISCV_HSV_D:
+		break;
+	case RISCV_CSRRW:
+	case RISCV_CSRRS:
+	case RISCV_CSRRC:
+	case RISCV_CSRRWI:
+	case RISCV_CSRRSI:
+	case RISCV_CSRRCI:
+		/* The validated CSR operand is at index 1. CSR address bits
+		 * 9:8 encode its minimum privilege; user CSRs remain unprivileged.
+		 * Runtime trap controls do not change this static classification. */
+		if ((MCOperand_getImm(MCInst_getOperand(MI, 1)) & 0x300) == 0)
+			return;
+		break;
+	default:
 		return;
 	}
 	add_group(MI, RISCV_GRP_PRIVILEGE);
