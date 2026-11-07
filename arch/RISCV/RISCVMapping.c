@@ -340,9 +340,11 @@ void RISCV_compact_operands(MCInst *MI)
 // given internal insn id, return public instruction info
 void RISCV_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
 {
-	insn_map const *insn_map = NULL;
-
-	if ((insn_map = lookup_insn_map(h, id))) {
+	// Generated mappings contain every opcode, including pseudo instructions.
+	// Retain the generic lookup's conversion to a 16-bit instruction ID.
+	id = (uint16_t)id;
+	if (id < ARR_SIZE(insns)) {
+		const insn_map *insn_map = &insns[id];
 		insn->id = insn_map->mapid;
 
 		if (h->detail_opt) {

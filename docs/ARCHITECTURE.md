@@ -86,6 +86,12 @@ The mapping component has three different task:
 3. Adding additional detail to the Capstone instructions
 (e.g. operand `read/write` attributes etc.).
 
+RISC-V's generated instruction mapping includes every opcode in order, including
+pseudo instructions. `RISCV_get_insn_id` indexes that original table directly;
+its unit test checks the dense ordering and compares every 16-bit input against
+the generic cache lookup. The input's existing 16-bit conversion, out-of-range
+ID preservation, implicit details and handle/cache initialization are unchanged.
+
 The handwritten x86 mapping boundary corrects legacy exchange and BOUND
 metadata in both full and reduced builds. BOUND reads its index and bounds
 without writing registers or EFLAGS. XADD writes EFLAGS; CMPXCHG destinations are
@@ -491,6 +497,13 @@ including read requirements, and rejects values outside the packed format.
 This check runs in the unit suite when Python is available. Edit the original
 tables, then regenerate; the packed tables are not a separate instruction
 definition.
+
+Implicit register and group counts are projected from `X86MappingInsn*.inc`
+by `suite/synctools/x86_mapping_counts.py`. Counts stop at the same first zero as
+the runtime helpers and use each array's declared capacity. Full-array copies,
+mode-dependent corrections and branch-group insertion remain unchanged. Run the
+generator after replacing either mapping table; `--check` and the native metadata
+unit test check the projection against the full/reduced source records.
 
 The legacy x86 full Intel and AT&T printer tables store mnemonic lengths in
 unused high bits of their existing opcode records. The string bytes and operand

@@ -10226,6 +10226,10 @@ static inline unsigned int find_insn_h(cs_struct *h, unsigned int id)
 	return find_insn(id);
 }
 
+#ifndef CAPSTONE_DIET
+#include "X86GenMappingCounts.inc"
+#endif
+
 // given internal insn id, return public instruction info
 void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
 {
@@ -10247,7 +10251,7 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
 			memcpy(insn->detail->regs_read, insns[i].regs_use,
 			       sizeof(insns[i].regs_use));
 			insn->detail->regs_read_count =
-				(uint8_t)count_positive(insns[i].regs_use);
+				(x86_mapping_counts[i] & 31);
 
 			// special cases when regs_write[] depends on arch
 			switch (id) {
@@ -10256,8 +10260,7 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
 				       insns[i].regs_mod,
 				       sizeof(insns[i].regs_mod));
 				insn->detail->regs_write_count =
-					(uint8_t)count_positive(
-						insns[i].regs_mod);
+					((x86_mapping_counts[i] >> 5) & 31);
 				break;
 			case X86_RDTSC:
 				if (mode == CS_MODE_64) {
@@ -10265,8 +10268,8 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
 					       insns[i].regs_mod,
 					       sizeof(insns[i].regs_mod));
 					insn->detail->regs_write_count =
-						(uint8_t)count_positive(
-							insns[i].regs_mod);
+						((x86_mapping_counts[i] >> 5) &
+						 31);
 				} else {
 					insn->detail->regs_write[0] =
 						X86_REG_EAX;
@@ -10281,8 +10284,8 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
 					       insns[i].regs_mod,
 					       sizeof(insns[i].regs_mod));
 					insn->detail->regs_write_count =
-						(uint8_t)count_positive(
-							insns[i].regs_mod);
+						((x86_mapping_counts[i] >> 5) &
+						 31);
 				} else {
 					insn->detail->regs_write[0] =
 						X86_REG_EAX;
@@ -10721,7 +10724,7 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
 			memcpy(insn->detail->groups, insns[i].groups,
 			       sizeof(insns[i].groups));
 			insn->detail->groups_count =
-				(uint8_t)count_positive8(insns[i].groups);
+				((x86_mapping_counts[i] >> 10) & 15);
 
 			if (insns[i].branch || insns[i].indirect_branch) {
 				// this insn also belongs to JUMP group. add JUMP group
