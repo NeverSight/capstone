@@ -59,6 +59,9 @@ void SStream_concat(SStream *ss, const char *fmt, ...);
 // Append a lowercase 0x-prefixed magnitude, optionally preceded by a minus sign.
 void SStream_concat_hex64(SStream *ss, uint64_t value, bool negative);
 
+// Append a decimal magnitude, optionally preceded by a minus sign.
+void SStream_concat_dec64(SStream *ss, uint64_t value, bool negative);
+
 void SStream_concat0(SStream *ss, const char *s);
 
 // Append an alias mnemonic prefix containing no NUL bytes. The source is a

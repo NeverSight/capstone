@@ -439,6 +439,132 @@ static bool test_hex64_custom_formatter(void)
 	return true;
 }
 
+static bool test_dec64_formatting(void)
+{
+	printf("Test test_dec64_formatting\n");
+	uint64_t values[3 * 20 + 6] = { 0,
+					UINT32_MAX,
+					(uint64_t)UINT32_MAX + 1,
+					INT64_MAX,
+					(uint64_t)INT64_MAX + 1,
+					UINT64_MAX };
+	size_t count = 6;
+	for (uint64_t power = 1;; power *= 10) {
+		values[count++] = power - 1;
+		values[count++] = power;
+		values[count++] = power + 1;
+		if (power > UINT64_MAX / 10)
+			break;
+	}
+	for (size_t v = 0; v < count; ++v) {
+		for (unsigned negative = 0; negative < 2; ++negative) {
+			for (unsigned flags = 0; flags < 16; ++flags) {
+				for (size_t index = 0;
+				     index < SSTREAM_BUF_LEN + 4; ++index) {
+					SStream actual, reference;
+					memset(&actual, 0x51, sizeof(actual));
+					actual.index =
+						index == SSTREAM_BUF_LEN + 3 ?
+							SIZE_MAX :
+							index;
+					actual.is_closed = flags & 1;
+					actual.markup_stream = flags & 2;
+					actual.prefixed_by_markup = flags & 4;
+					actual.unsigned_num = flags & 8;
+					memcpy(&reference, &actual,
+					       sizeof(actual));
+					SStream_concat(&reference,
+						       negative ? "-%" PRIu64 :
+								  "%" PRIu64,
+						       values[v]);
+					SStream_concat_dec64(&actual, values[v],
+							     negative);
+					if (memcmp(&actual, &reference,
+						   sizeof(actual))) {
+						printf("Decimal append differs: value=%" PRIu64
+						       " negative=%u flags=%u index=%zu\n",
+						       values[v], negative,
+						       flags, reference.index);
+						return false;
+					}
+				}
+			}
+		}
+	}
+	return true;
+}
+
+static unsigned dec64_hook_calls;
+static unsigned dec64_hook_behavior;
+static uint64_t dec64_hook_value;
+static char dec64_hook_format[32];
+
+static int dec64_vsnprintf(char *str, size_t size, const char *fmt, va_list ap)
+{
+	++dec64_hook_calls;
+	dec64_hook_value = va_arg(ap, uint64_t);
+	snprintf(dec64_hook_format, sizeof(dec64_hook_format), "%s", fmt);
+	memset(str, 0x5a, size);
+	if (dec64_hook_behavior == 1)
+		return -1;
+	int written = snprintf(str, size, "custom");
+	return dec64_hook_behavior == 2 ? written + 17 : written;
+}
+
+static bool test_dec64_custom_formatter(void)
+{
+	printf("Test test_dec64_custom_formatter\n");
+	const cs_opt_mem saved = { cs_mem_malloc, cs_mem_calloc, cs_mem_realloc,
+				   cs_mem_free, cs_vsnprintf };
+	cs_opt_mem custom = saved;
+	custom.vsnprintf = dec64_vsnprintf;
+	for (unsigned behavior = 0; behavior < 3; ++behavior) {
+		for (unsigned negative = 0; negative < 2; ++negative) {
+			for (size_t remaining = 0; remaining < 24;
+			     ++remaining) {
+				SStream actual, reference;
+				memset(&actual, 0x51, sizeof(actual));
+				actual.index = SSTREAM_BUF_LEN - remaining - 1;
+				actual.is_closed = false;
+				actual.markup_stream = true;
+				actual.prefixed_by_markup = true;
+				actual.unsigned_num = false;
+				memcpy(&reference, &actual, sizeof(actual));
+				dec64_hook_calls = 0;
+				dec64_hook_behavior = behavior;
+				const char *format = negative ? "-%" PRIu64 :
+								"%" PRIu64;
+				if (cs_option(0, CS_OPT_MEM,
+					      (uintptr_t)&custom) != CS_ERR_OK)
+					return false;
+				SStream_concat(&reference, format, UINT64_MAX);
+				SStream_concat_dec64(&actual, UINT64_MAX,
+						     negative);
+				bool restored = cs_option(0, CS_OPT_MEM,
+							  (uintptr_t)&saved) ==
+						CS_ERR_OK;
+				CS_ASSERT_RET_VAL(restored, false);
+				CS_ASSERT_RET_VAL(memcmp(&actual, &reference,
+							 sizeof(actual)) == 0,
+						  false);
+				CS_ASSERT_RET_VAL(dec64_hook_calls ==
+							  (remaining ? 2 : 0),
+						  false);
+				if (remaining) {
+					CS_ASSERT_RET_VAL(dec64_hook_value ==
+								  UINT64_MAX,
+							  false);
+					CS_ASSERT_RET_VAL(
+						strcmp(dec64_hook_format,
+						       format) == 0,
+						false);
+				}
+			}
+		}
+	}
+	return true;
+}
+
 static bool test_markup_os()
 {
 	printf("Test test_markup_os\n");
@@ -1111,6 +1237,8 @@ static bool test_diet_appends(void)
 		SStream_concat1(&OS, 'x');
 		SStream_concat(&OS, "%s", "text");
 		SStream_concat_hex64(&OS, UINT64_MAX, true);
+		SStream_concat_dec64(&OS, UINT64_MAX, true);
+		SStream_concat_dec64(&OS, 0, false);
 		printInt64(&OS, INT64_MIN);
 		printUInt64Bang(&OS, UINT64_MAX);
 		printfFloat(&OS, "%f", 1.5);
@@ -1139,6 +1267,8 @@ int main()
 	result &= test_substr_allocator_hooks();
 	result &= test_hex64_formatting();
 	result &= test_hex64_custom_formatter();
+	result &= test_dec64_formatting();
+	result &= test_dec64_custom_formatter();
 	result &= test_printint8();
 	result &= test_printint16();
 	result &= test_printint32();

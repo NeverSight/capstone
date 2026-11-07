@@ -541,6 +541,14 @@ repair. Empty strings remain no-ops. For `SStream_concat0`, DIET and other
 compilers retain the external helper. This constant-token specialization applies
 to generated printers without changing their tables or the translator.
 
+Decimal 64-bit magnitudes use `SStream_concat_dec64` with the default system
+formatter. It writes digits directly, preserving bounded appends, markup closure
+and stream state; one-digit values need no division. Custom formatters retain
+the original `PRIu64` format and argument, including the literal negative sign.
+The shared 64-bit number and expression printers and x86 Intel/MASM immediate
+printers use this helper. Narrower and composite format strings keep their
+original callback contract.
+
 Generated alias printers append the mnemonic prefix through
 `SStream_concat0_substr`. The prefix contains no NUL bytes and comes from a
 static table separate from the stream. With the default system malloc/free

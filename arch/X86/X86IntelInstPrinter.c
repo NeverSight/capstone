@@ -351,7 +351,7 @@ static void printImm(MCInst *MI, SStream *O, int64_t imm, bool positive)
 						SStream_concat(
 							O, "%" PRIx64 "h", imm);
 				} else
-					SStream_concat(O, "%" PRIu64, imm);
+					SStream_concat_dec64(O, imm, false);
 			}
 		} else { // Intel syntax
 			if (imm < 0) {
@@ -376,7 +376,7 @@ static void printImm(MCInst *MI, SStream *O, int64_t imm, bool positive)
 				if (imm > HEX_THRESHOLD)
 					SStream_concat_hex64(O, imm, false);
 				else
-					SStream_concat(O, "%" PRIu64, imm);
+					SStream_concat_dec64(O, imm, false);
 			}
 		}
 	} else {
@@ -394,7 +394,8 @@ static void printImm(MCInst *MI, SStream *O, int64_t imm, bool positive)
 							       "-%" PRIx64 "h",
 							       -imm);
 				} else
-					SStream_concat(O, "-%" PRIu64, -imm);
+					SStream_concat_dec64(O, (uint64_t)-imm,
+							     true);
 			} else {
 				if (imm > HEX_THRESHOLD) {
 					if (need_zero_prefix(imm))
@@ -405,7 +406,7 @@ static void printImm(MCInst *MI, SStream *O, int64_t imm, bool positive)
 						SStream_concat(
 							O, "%" PRIx64 "h", imm);
 				} else
-					SStream_concat(O, "%" PRIu64, imm);
+					SStream_concat_dec64(O, imm, false);
 			}
 		} else { // Intel syntax
 			if (imm < 0) {
@@ -416,13 +417,14 @@ static void printImm(MCInst *MI, SStream *O, int64_t imm, bool positive)
 					SStream_concat_hex64(O, (uint64_t)-imm,
 							     true);
 				else
-					SStream_concat(O, "-%" PRIu64, -imm);
+					SStream_concat_dec64(O, (uint64_t)-imm,
+							     true);
 
 			} else {
 				if (imm > HEX_THRESHOLD)
 					SStream_concat_hex64(O, imm, false);
 				else
-					SStream_concat(O, "%" PRIu64, imm);
+					SStream_concat_dec64(O, imm, false);
 			}
 		}
 	}

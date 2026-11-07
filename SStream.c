@@ -356,6 +356,37 @@ void SStream_concat_hex64(SStream *ss, uint64_t value, bool negative)
 	SStream_concat(ss, negative ? "-0x%" PRIx64 : "0x%" PRIx64, value);
 }
 
+void SStream_concat_dec64(SStream *ss, uint64_t value, bool negative)
+{
+#if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
+	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
+	!defined(_WIN32_WCE)
+	if (cs_vsnprintf == vsnprintf) {
+		assert(ss);
+		SSTREAM_RETURN_IF_CLOSED(ss);
+		if (SStream_remaining(ss) == 0)
+			return;
+		char buffer[21]; // sign and up to 20 decimal digits
+		char *end = buffer + sizeof(buffer);
+		char *p = end;
+		if (value < 10) {
+			*--p = (char)('0' + value);
+		} else {
+			do {
+				*--p = (char)('0' + value % 10);
+				value /= 10;
+			} while (value);
+		}
+		if (negative)
+			*--p = '-';
+		SStream_concat_raw(ss, p, (size_t)(end - p));
+		SStream_close_markup(ss);
+		return;
+	}
+#endif
+	SStream_concat(ss, negative ? "-%" PRIu64 : "%" PRIu64, value);
+}
+
 // print number with prefix #
 void printInt64Bang(SStream *ss, int64_t val)
 {
@@ -390,7 +421,7 @@ void printInt64(SStream *ss, int64_t val)
 		if (val > HEX_THRESHOLD)
 			SStream_concat_hex64(ss, val, false);
 		else
-			SStream_concat(ss, "%" PRIu64, val);
+			SStream_concat_dec64(ss, val, false);
 	} else {
 		if (val < -HEX_THRESHOLD) {
 			if (val == INT64_MIN)
@@ -399,7 +430,7 @@ void printInt64(SStream *ss, int64_t val)
 			else
 				SStream_concat_hex64(ss, (uint64_t)-val, true);
 		} else
-			SStream_concat(ss, "-%" PRIu64, -val);
+			SStream_concat_dec64(ss, (uint64_t)-val, true);
 	}
 }
 
@@ -410,7 +441,7 @@ void printUInt64(SStream *ss, uint64_t val)
 	if (val > HEX_THRESHOLD)
 		SStream_concat_hex64(ss, val, false);
 	else
-		SStream_concat(ss, "%" PRIu64, val);
+		SStream_concat_dec64(ss, val, false);
 }
 
 // print number in decimal mode
@@ -632,7 +663,7 @@ void printExpr(SStream *ss, uint64_t val)
 {
 	assert(ss);
 	SSTREAM_RETURN_IF_CLOSED(ss);
-	SStream_concat(ss, "%" PRIu64, val);
+	SStream_concat_dec64(ss, val, false);
 }
 
 SStream *markup_OS(SStream *OS, SStreamMarkup style)
