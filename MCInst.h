@@ -54,11 +54,34 @@ struct MCOperand {
 	};
 };
 
+/* MCInst.c emits the external definitions from these same bodies. */
+#ifdef CS_MCINST_DEFINE_INLINE
+#define CS_MCINST_INLINE
+#else
+#define CS_MCINST_INLINE static inline
+#endif
+
 bool MCOperand_isValid(const MCOperand *op);
 
-bool MCOperand_isReg(const MCOperand *op);
+CS_MCINST_INLINE bool MCOperand_isReg(const MCOperand *op)
+{
+#ifdef __cplusplus
+	const int tag = MCOperand::kRegister;
+#else
+	const int tag = kRegister;
+#endif
+	return op->Kind == tag || op->MachineOperandType == tag;
+}
 
-bool MCOperand_isImm(const MCOperand *op);
+CS_MCINST_INLINE bool MCOperand_isImm(const MCOperand *op)
+{
+#ifdef __cplusplus
+	const int tag = MCOperand::kImmediate;
+#else
+	const int tag = kImmediate;
+#endif
+	return op->Kind == tag || op->MachineOperandType == tag;
+}
 
 bool MCOperand_isFPImm(const MCOperand *op);
 
@@ -159,13 +182,6 @@ struct MCInst {
 	hppa_ext hppa_ext; ///< for HPPA operand. Contains info about modifiers and their effect on the instruction
 	MCAsmInfo MAI; ///< The equivalent to MCAsmInfo in LLVM. It holds flags relevant for the asm style to print.
 };
-
-/* MCInst.c emits the external definitions from these same bodies. */
-#ifdef CS_MCINST_DEFINE_INLINE
-#define CS_MCINST_INLINE
-#else
-#define CS_MCINST_INLINE static inline
-#endif
 
 // create Reg operand in the next slot
 CS_MCINST_INLINE void MCOperand_CreateReg0(MCInst *mcInst, unsigned Reg)

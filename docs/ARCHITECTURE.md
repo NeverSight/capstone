@@ -139,10 +139,11 @@ There exist two structs which represent an instruction:
 The `MCInst` is used by the disassembler component for storing the decoded instruction.
 The mapping component on the other hand, uses the `MCInst` to populate the `cs_insn`.
 
-Hot opcode accessors and checked operand append operations are defined in
-`MCInst.h` for inlining. `MCInst.c` emits the same bodies as external functions,
+Hot opcode accessors, operand predicates and checked append operations are defined
+in `MCInst.h` for inlining. `MCInst.c` emits the same bodies as external functions,
 preserving their symbols. The shared assertion policy lives in `cs_assert.h`;
 operand capacity remains defined by `MAX_MC_OPS` in `MCInst.h`.
+Register and immediate predicates retain the checks of both existing operand tags.
 
 The private full x86 path initializes all instruction metadata and the default
 first operand, leaving the other operand slots for the decoder's append helpers.

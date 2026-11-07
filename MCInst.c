@@ -51,16 +51,6 @@ bool MCOperand_isValid(const MCOperand *op)
 	return op->Kind != kInvalid;
 }
 
-bool MCOperand_isReg(const MCOperand *op)
-{
-	return op->Kind == kRegister || op->MachineOperandType == kRegister;
-}
-
-bool MCOperand_isImm(const MCOperand *op)
-{
-	return op->Kind == kImmediate || op->MachineOperandType == kImmediate;
-}
-
 bool MCOperand_isFPImm(const MCOperand *op)
 {
 	return op->Kind == kFPImmediate;
