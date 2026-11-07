@@ -1002,7 +1002,7 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
 	MCInst mci;
 #ifdef CAPSTONE_HAS_X86
 	if (handle->arch == CS_ARCH_X86)
-		MCInst_InitStorage(&mci, handle->arch, false);
+		MCInst_InitX86(&mci);
 	else
 #endif
 		MCInst_Init(&mci, handle->arch);

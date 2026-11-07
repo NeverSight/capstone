@@ -153,6 +153,9 @@ static bool check_init_metadata(void)
 		memset(&full, 0x5a, sizeof(full));
 		memset(&partial, 0xa5, sizeof(partial));
 		MCInst_Init(&full, (cs_arch)arch);
+		if (full.Operands[0].Kind != kInvalid ||
+		    full.wasm_data.type != WASM_OP_INVALID)
+			return false;
 		MCInst_InitStorage(&partial, (cs_arch)arch, false);
 		const size_t operands_end =
 			offsetof(MCInst, Operands) + sizeof(full.Operands);
@@ -167,13 +170,40 @@ static bool check_init_metadata(void)
 	return true;
 }
 
+/* Every field except the documented x86-unused storage keeps its default.
+ * Normalize only that storage so new metadata must still be initialized. */
+static bool check_x86_init_metadata(void)
+{
+	for (unsigned pattern = 0; pattern <= UINT8_MAX; ++pattern) {
+		MCInst full, partial;
+		MCInst_Init(&full, CS_ARCH_X86);
+		memset(&partial, pattern, sizeof(partial));
+		MCInst_InitX86(&partial);
+		memcpy(&full.Operands[1], &partial.Operands[1],
+		       sizeof(full.Operands) - sizeof(full.Operands[0]));
+		memcpy(full.tied_op_idx, partial.tied_op_idx,
+		       sizeof(full.tied_op_idx));
+		memcpy((char *)&full + offsetof(MCInst, evm_data),
+		       (char *)&partial + offsetof(MCInst, evm_data),
+		       offsetof(MCInst, MRI) - offsetof(MCInst, evm_data));
+		memcpy(&full.hppa_ext, &partial.hppa_ext,
+		       sizeof(full.hppa_ext));
+		if (memcmp(&full, &partial, sizeof(full)) != 0)
+			return false;
+	}
+	return true;
+}
+
 /* Check the last valid slot, capacity rejection, and reuse after clearing.
  * Both operand tags matter: different backends inspect different tags. */
-static bool check_operands(bool registers_first)
+static bool check_operands(bool registers_first, bool x86_private)
 {
 	MCInst inst;
 	memset(&inst, 0xa5, sizeof(inst));
-	MCInst_InitStorage(&inst, CS_ARCH_X86, false);
+	if (x86_private)
+		MCInst_InitX86(&inst);
+	else
+		MCInst_InitStorage(&inst, CS_ARCH_X86, false);
 	MCInst_setOpcode(&inst, UINT_MAX);
 	MCInst_setOpcodePub(&inst, UINT_MAX - 1);
 	for (unsigned i = 0; i < MAX_MC_OPS; ++i) {
@@ -216,9 +246,12 @@ static bool check_operands(bool registers_first)
 
 int main(void)
 {
-	return check_init_metadata() && test_tie_membership() &&
-			       test_alias_lookup() && check_operands(false) &&
-			       check_operands(true) ?
+	return check_init_metadata() && check_x86_init_metadata() &&
+			       test_tie_membership() && test_alias_lookup() &&
+			       check_operands(false, false) &&
+			       check_operands(true, false) &&
+			       check_operands(false, true) &&
+			       check_operands(true, true) ?
 		       0 :
 		       1;
 }

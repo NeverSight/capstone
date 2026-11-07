@@ -145,14 +145,19 @@ preserving their symbols. The shared assertion policy lives in `cs_assert.h`;
 operand capacity remains defined by `MAX_MC_OPS` in `MCInst.h`.
 Register and immediate predicates retain the checks of both existing operand tags.
 
-The private full x86 path initializes all instruction metadata and the default
-first operand, leaving the other operand slots for the decoder's append helpers.
-Those helpers set both operand tags and the complete value; translation and
-feature decoders construct each operand before the printers read it. Readers
-must honor the constructed operand count. The shared initializer owns all
-metadata defaults, while `MCInst_Init` still clears the complete object for
-other callers. Public instruction/detail arrays retain their existing clearing
-and callback-visible state. This does not change decoding or legality checks.
+The private full x86 path uses `MCInst_InitX86` to initialize common and x86
+metadata and the default first operand, leaving the other operand slots for
+the decoder's append helpers. Those helpers set both operand tags and the
+complete value; translation and feature decoders construct each operand before
+the printers read it. Readers must honor the constructed operand count. This
+path does not read tied-operand indices or EVM, WASM and HPPA payloads, so their
+storage remains untouched. Any new use must establish the needed defaults.
+
+The shared `MCInst_InitStorage` establishes all zero-valued defaults together,
+then sets tied indices and the architecture's dialect without repeating the
+zero writes. `MCInst_Init` still clears the complete object for other callers.
+Public instruction/detail arrays retain their existing clearing and
+callback-visible state. These choices do not change decoding or legality checks.
 
 The private RISC-V printer temporary for uncompressed instructions uses the
 same metadata initializer without clearing unused operand slots. The generated

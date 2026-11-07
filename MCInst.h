@@ -215,8 +215,8 @@ CS_MCINST_INLINE void MCOperand_CreateImm0(MCInst *mcInst, int64_t Val)
 	op->ImmVal = Val;
 }
 
-/* Private x86 state and the RISC-V uncompressed printer temporary construct
- * operands before reading them. MCInst_Init retains full initialization. */
+/* Callers that construct every operand before reading it may leave unused
+ * slots untouched. MCInst_Init retains complete initialization. */
 static inline void MCInst_InitStorage(MCInst *inst, cs_arch arch,
 				      bool clear_operands)
 {
@@ -230,28 +230,8 @@ static inline void MCInst_InitStorage(MCInst *inst, cs_arch arch,
 		memset((char *)inst + operands_end, 0,
 		       sizeof(*inst) - operands_end);
 	}
-#ifdef __cplusplus
-	inst->Operands[0].Kind = MCOperand::kInvalid;
-#else
-	inst->Operands[0].Kind = kInvalid;
-#endif
-	inst->Operands[0].ImmVal = 0;
-
-	inst->Opcode = 0;
-	inst->OpcodePub = 0;
-	inst->size = 0;
-	inst->has_imm = false;
-	inst->op1_size = 0;
-	inst->ac_idx = 0;
-	inst->popcode_adjust = 0;
-	inst->assembly[0] = '\0';
-	inst->wasm_data.type = WASM_OP_INVALID;
-	inst->xAcquireRelease = 0;
-	for (int i = 0; i < MAX_MC_OPS; ++i)
-		inst->tied_op_idx[i] = -1;
-	inst->isAliasInstr = false;
-	inst->fillDetailOps = false;
-	memset(&inst->hppa_ext, 0, sizeof(inst->hppa_ext));
+	/* All zero-valued defaults are established by the clear above. */
+	memset(inst->tied_op_idx, -1, sizeof(inst->tied_op_idx));
 
 	// Set default assembly dialect.
 	switch (arch) {
@@ -261,6 +241,24 @@ static inline void MCInst_InitStorage(MCInst *inst, cs_arch arch,
 		inst->MAI.assemblerDialect = SYSTEMZASMDIALECT_AD_HLASM;
 		break;
 	}
+}
+
+/* Private x86 decode state constructs operands before reading them. It does
+ * not use tied-operand indices or the EVM, WASM and HPPA payloads. Initialize
+ * all common and x86 metadata; MCInst_InitStorage retains every default for
+ * other callers. */
+static inline void MCInst_InitX86(MCInst *inst)
+{
+	memset(inst, 0, offsetof(MCInst, Operands) + sizeof(inst->Operands[0]));
+	memset((char *)inst + offsetof(MCInst, flat_insn), 0,
+	       offsetof(MCInst, tied_op_idx) - offsetof(MCInst, flat_insn));
+
+	memset((char *)inst + offsetof(MCInst, ac_idx), 0,
+	       offsetof(MCInst, evm_data) - offsetof(MCInst, ac_idx));
+	memset((char *)inst + offsetof(MCInst, MRI), 0,
+	       offsetof(MCInst, hppa_ext) - offsetof(MCInst, MRI));
+	memset((char *)inst + offsetof(MCInst, MAI), 0,
+	       sizeof(*inst) - offsetof(MCInst, MAI));
 }
 
 void MCInst_Init(MCInst *inst, cs_arch arch);
