@@ -559,6 +559,18 @@ fixed-size copies for short names; truncation, markup and index repair retain th
 general writer. It requires a NUL-terminated source whose bytes do not overlap
 the append range.
 
+The full Intel printer projects short, shared operand paths into
+`X86GenPrinterQuick.inc`. It selects a complete path once when that path has at
+most five helper calls and appears in at least sixteen opcode rows; other paths
+use the original fragment chain. Every helper, argument, literal and call order
+comes from the existing generated writer. The projection does not merge stream
+calls or move detail writes. DIET uses the same dispatch with its existing
+helpers; AT&T and reduced writers retain their original dispatch.
+
+Run `python3 suite/synctools/x86_printer_dispatch.py` after mnemonic-length
+generation. It inserts the table and dispatch includes and validates opcode
+alignment, terminal paths and supported fragment syntax. Its `--check` mode
+rejects stale output, and parser tests reject conditional or unowned work.
 
 The Intel register-name offsets also carry three length bits in their existing
 16-bit records. `suite/synctools/x86_register_name_sizes.py` derives them from

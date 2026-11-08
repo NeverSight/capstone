@@ -1334,6 +1334,9 @@ static void printInstruction(MCInst *MI, SStream *O)
   };
 #endif
 
+#define CAPSTONE_X86_QUICK_PRINTER_TABLE
+#include "X86GenPrinterQuick.inc"
+#undef CAPSTONE_X86_QUICK_PRINTER_TABLE
   static const uint32_t OpInfo0[] = {
     0U,	// PHI
     0U,	// INLINEASM
@@ -31931,6 +31934,7 @@ static void printInstruction(MCInst *MI, SStream *O)
 #endif
 
 
+#include "X86GenPrinterQuick.inc"
   // Fragment 0 encoded into 6 bits for 52 unique commands.
   // printf("Fragment 0: %"PRIu64"\n", ((Bits >> 14) & 63));
   switch ((uint32_t)((Bits >> 14) & 63)) {

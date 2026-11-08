@@ -109,6 +109,12 @@ After changing `X86ImmSize.inc` or either `X86GenInstrInfo*.inc` enum, run
 The generated immediate-size lookup preserves the original metadata and uses
 the separate opcode numbering of full and reduced builds.
 
+After regenerating `X86GenAsmWriter*.inc`, run
+`python3 suite/synctools/x86_mnemonic_sizes.py`, then
+`python3 suite/synctools/x86_printer_dispatch.py`. Run both again with `--check`.
+The second step restores the full Intel writer's short-path projection from its
+original opcode tables and fragment bodies. Unexpected fragment control flow
+requires review; the projection never infers a replacement instruction meaning.
 
 ## Post-processing steps
 

@@ -74,6 +74,10 @@ if(CAPSTONE_X86_SUPPORT)
             COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/suite/synctools/x86_immediate_sizes.py" --check)
         add_test(NAME unit_x86_mnemonic_sizes_generator
             COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/suite/synctools/x86_mnemonic_sizes.py" --check)
+        add_test(NAME unit_x86_printer_dispatch_generator
+            COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/suite/synctools/x86_printer_dispatch.py" --check)
+        add_test(NAME unit_x86_printer_dispatch_validation
+            COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/test_x86_printer_dispatch.py")
         add_test(NAME unit_x86_register_name_sizes_generator
             COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/suite/synctools/x86_register_name_sizes.py" --check)
         add_test(NAME unit_x86_register_name_sizes_validation
