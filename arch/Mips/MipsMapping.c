@@ -22,6 +22,9 @@
 #include "MipsLinkage.h"
 #include "MipsDisassembler.h"
 
+#define GET_SUBTARGETINFO_ENUM
+#include "MipsGenSubtargetInfo.inc"
+
 #define GET_REGINFO_ENUM
 #define GET_REGINFO_MC_DESC
 #include "MipsGenRegisterInfo.inc"
@@ -208,6 +211,18 @@ void Mips_set_instr_map_data(MCInst *MI)
 	map_implicit_reads(MI, mips_insns);
 	map_implicit_writes(MI, mips_insns);
 	map_groups(MI, mips_insns);
+#ifndef CAPSTONE_DIET
+	switch (MCInst_getOpcode(MI)) {
+	case Mips_Bteqz16:
+	case Mips_Btnez16:
+	case Mips_BteqzX16:
+	case Mips_BtnezX16:
+		add_group(MI, MIPS_GRP_BRANCH_RELATIVE);
+		break;
+	default:
+		break;
+	}
+#endif
 }
 
 bool Mips_getInstruction(csh handle, const uint8_t *code, size_t code_len,
@@ -395,7 +410,8 @@ static void Mips_set_detail_op_branch(MCInst *MI, unsigned OpNum)
 {
 	cs_op_type op_type = Mips_map_op_type(MI, OpNum) & ~CS_OP_MEM;
 	if (op_type == CS_OP_IMM) {
-		uint64_t Target = MI->address + MCInst_getOpVal(MI, OpNum);
+		uint64_t Target = Mips_getBranchTarget(
+			MI, MI->address, MCInst_getOpVal(MI, OpNum));
 		Mips_set_detail_op_uimm(MI, OpNum, Target);
 	} else if (op_type == CS_OP_REG) {
 		Mips_set_detail_op_reg(MI, OpNum, MCInst_getOpVal(MI, OpNum),
@@ -452,6 +468,16 @@ static void Mips_set_detail_op_unsigned_address(MCInst *MI, unsigned OpNum)
 {
 	uint64_t Target = MI->address + (uint64_t)MCInst_getOpVal(MI, OpNum);
 	Mips_set_detail_op_imm(MI, OpNum, Target);
+}
+
+uint64_t Mips_getBranchTarget(const MCInst *MI, uint64_t Address,
+			      int64_t Displacement)
+{
+	uint64_t Target = Address + (uint64_t)Displacement;
+	if ((MI->csh->mode & CS_MODE_MIPS16) &&
+	    !Mips_getFeatureBits(MI->csh->mode, Mips_FeatureGP64Bit))
+		return (uint32_t)Target;
+	return Target;
 }
 
 void Mips_add_cs_detail_0(MCInst *MI, mips_op_group op_group, size_t OpNum)

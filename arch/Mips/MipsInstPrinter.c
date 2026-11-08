@@ -281,6 +281,12 @@ void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
 
 	if (MCOperand_isImm(Op)) {
 		switch (MCInst_getOpcode(MI)) {
+		case Mips_Bteqz16:
+		case Mips_Btnez16:
+		case Mips_BteqzX16:
+		case Mips_BtnezX16:
+			printBranchOperand(MI, MI->address, OpNo, O);
+			break;
 		case Mips_LI48_NM:
 		case Mips_ANDI16_NM:
 		case Mips_ANDI_NM:
@@ -329,7 +335,8 @@ static void printBranchOperand(MCInst *MI, uint64_t Address, unsigned OpNo,
 	if (MCOperand_isReg(Op))
 		return printRegName(MI, O, MCOperand_getReg(Op));
 
-	uint64_t Target = Address + MCOperand_getImm(Op);
+	uint64_t Target =
+		Mips_getBranchTarget(MI, Address, MCOperand_getImm(Op));
 	printInt64(O, Target);
 }
 

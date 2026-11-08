@@ -54,6 +54,13 @@ no aliases must still return `false`. The TableGen regression is
 `llvm/test/TableGen/AsmWriterCapstoneDiet.td`; the C++ translator's class
 declaration test covers the corresponding forward declarations.
 
+Retain the MIPS16 I8 selection in `Mips_LLVM_getInstruction`, immediate/branch
+operand callbacks in `MipsDisassembler.c`, and T-branch routing in
+`MipsInstPrinter.c` when running the Differ. The imported MIPS16 descriptions
+do not yet distinguish these widths, scales and overlapping shift patterns.
+`unit_mips16_immediates` and `unit_mips16_word_order` check this boundary; no
+generated `.inc` is patched for these corrections.
+
 #### Install `llvm-mc` and `FileCheck`
 
 Additionally, we need `llvm-mc` and `FileCheck` to generate our regression tests.
