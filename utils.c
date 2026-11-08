@@ -89,14 +89,7 @@ bool arr_exist8(unsigned char *arr, unsigned char max, unsigned int id)
 
 bool arr_exist(uint16_t *arr, unsigned char max, unsigned int id)
 {
-	int i;
-
-	for (i = 0; i < max; i++) {
-		if (arr[i] == id)
-			return true;
-	}
-
-	return false;
+	return arr_exist_inline(arr, max, id);
 }
 
 /// @brief Checks if the @id is in the @table. @table has @table_size elements.

@@ -485,16 +485,18 @@ void RISCV_reg_access(const cs_insn *insn, cs_regs regs_read,
 
 		if (op->type == RISCV_OP_REG) {
 			if ((op->access & CS_AC_WRITE) &&
-			    !arr_exist(regs_write, write_count, op->reg)) {
+			    !arr_exist_inline(regs_write, write_count,
+					      op->reg)) {
 				regs_write[write_count++] = (uint16_t)op->reg;
 			}
 			if ((op->access & CS_AC_READ) &&
-			    !arr_exist(regs_read, read_count, op->reg)) {
+			    !arr_exist_inline(regs_read, read_count, op->reg)) {
 				regs_read[read_count++] = (uint16_t)op->reg;
 			}
 		} else if (op->type == RISCV_OP_MEM) {
 			if (op->mem.base != RISCV_REG_INVALID &&
-			    !arr_exist(regs_read, read_count, op->mem.base)) {
+			    !arr_exist_inline(regs_read, read_count,
+					      op->mem.base)) {
 				regs_read[read_count++] =
 					(uint16_t)op->mem.base;
 			}

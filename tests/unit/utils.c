@@ -3,8 +3,50 @@
 
 #include "unit_test.h"
 #include "../utils.h"
+#include <limits.h>
 #include <stdio.h>
 #include <string.h>
+
+static bool test_register_membership(void)
+{
+	printf("Test test_register_membership\n");
+	uint16_t values[] = { 0, 1, UINT16_MAX, 17, 17 };
+	bool (*external)(uint16_t *, unsigned char, unsigned int) = arr_exist;
+	static const struct {
+		unsigned char count;
+		unsigned int query;
+		bool found;
+	} cases[] = {
+		{ 0, 0, false },	 { 0, UINT_MAX, false },
+		{ 1, 0, true },		 { 1, 1, false },
+		{ 2, 1, true },		 { 2, UINT16_MAX, false },
+		{ 3, UINT16_MAX, true }, { 3, 65536u, false },
+		{ 3, 65537u, false },	 { 3, UINT_MAX, false },
+		{ 3, 17, false },	 { 4, 17, true },
+		{ 5, 17, true },
+	};
+	for (size_t i = 0; i < ARR_SIZE(cases); ++i) {
+		if (arr_exist_inline(values, cases[i].count, cases[i].query) !=
+			    cases[i].found ||
+		    external(values, cases[i].count, cases[i].query) !=
+			    cases[i].found)
+			return false;
+	}
+	if (arr_exist_inline(NULL, 0, UINT_MAX) || external(NULL, 0, UINT_MAX))
+		return false;
+	uint16_t full[UCHAR_MAX] = { 0 };
+	full[UCHAR_MAX - 1] = 4242;
+	if (arr_exist_inline(full, UCHAR_MAX - 1, 4242) ||
+	    !arr_exist_inline(full, UCHAR_MAX, 4242) ||
+	    external(full, UCHAR_MAX - 1, 4242) ||
+	    !external(full, UCHAR_MAX, 4242))
+		return false;
+	uint16_t *cursor = values;
+	unsigned char count = 1;
+	unsigned int query = 0;
+	return arr_exist_inline(cursor++, count++, query++) &&
+	       cursor == values + 1 && count == 2 && query == 1;
+}
 
 static bool test_str_append_no_realloc()
 {
@@ -64,6 +106,7 @@ static bool test_str_append()
 int main()
 {
 	bool result = true;
+	result &= test_register_membership();
 	result &= test_str_append();
 	result &= test_str_append_no_realloc();
 

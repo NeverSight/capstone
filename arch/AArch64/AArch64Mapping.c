@@ -1105,12 +1105,13 @@ void AArch64_reg_access(const cs_insn *insn, cs_regs regs_read,
 		switch ((int)op->type) {
 		case AARCH64_OP_REG:
 			if ((op->access & CS_AC_READ) &&
-			    !arr_exist(regs_read, read_count, op->reg)) {
+			    !arr_exist_inline(regs_read, read_count, op->reg)) {
 				regs_read[read_count] = (uint16_t)op->reg;
 				read_count++;
 			}
 			if ((op->access & CS_AC_WRITE) &&
-			    !arr_exist(regs_write, write_count, op->reg)) {
+			    !arr_exist_inline(regs_write, write_count,
+					      op->reg)) {
 				regs_write[write_count] = (uint16_t)op->reg;
 				write_count++;
 			}
@@ -1118,18 +1119,21 @@ void AArch64_reg_access(const cs_insn *insn, cs_regs regs_read,
 		case AARCH64_OP_MEM:
 			// registers appeared in memory references always being read
 			if ((op->mem.base != AARCH64_REG_INVALID) &&
-			    !arr_exist(regs_read, read_count, op->mem.base)) {
+			    !arr_exist_inline(regs_read, read_count,
+					      op->mem.base)) {
 				regs_read[read_count] = (uint16_t)op->mem.base;
 				read_count++;
 			}
 			if ((op->mem.index != AARCH64_REG_INVALID) &&
-			    !arr_exist(regs_read, read_count, op->mem.index)) {
+			    !arr_exist_inline(regs_read, read_count,
+					      op->mem.index)) {
 				regs_read[read_count] = (uint16_t)op->mem.index;
 				read_count++;
 			}
 			if ((insn->detail->writeback) &&
 			    (op->mem.base != AARCH64_REG_INVALID) &&
-			    !arr_exist(regs_write, write_count, op->mem.base)) {
+			    !arr_exist_inline(regs_write, write_count,
+					      op->mem.base)) {
 				regs_write[write_count] =
 					(uint16_t)op->mem.base;
 				write_count++;
@@ -1138,20 +1142,22 @@ void AArch64_reg_access(const cs_insn *insn, cs_regs regs_read,
 		case AARCH64_OP_SME:
 			if ((op->access & CS_AC_READ) &&
 			    (op->sme.tile != AARCH64_REG_INVALID) &&
-			    !arr_exist(regs_read, read_count, op->sme.tile)) {
+			    !arr_exist_inline(regs_read, read_count,
+					      op->sme.tile)) {
 				regs_read[read_count] = (uint16_t)op->sme.tile;
 				read_count++;
 			}
 			if ((op->access & CS_AC_WRITE) &&
 			    (op->sme.tile != AARCH64_REG_INVALID) &&
-			    !arr_exist(regs_write, write_count, op->sme.tile)) {
+			    !arr_exist_inline(regs_write, write_count,
+					      op->sme.tile)) {
 				regs_write[write_count] =
 					(uint16_t)op->sme.tile;
 				write_count++;
 			}
 			if ((op->sme.slice_reg != AARCH64_REG_INVALID) &&
-			    !arr_exist(regs_read, read_count,
-				       op->sme.slice_reg)) {
+			    !arr_exist_inline(regs_read, read_count,
+					      op->sme.slice_reg)) {
 				regs_read[read_count] =
 					(uint16_t)op->sme.slice_reg;
 				read_count++;
@@ -1160,20 +1166,22 @@ void AArch64_reg_access(const cs_insn *insn, cs_regs regs_read,
 		case AARCH64_OP_PRED:
 			if ((op->access & CS_AC_READ) &&
 			    (op->pred.reg != AARCH64_REG_INVALID) &&
-			    !arr_exist(regs_read, read_count, op->pred.reg)) {
+			    !arr_exist_inline(regs_read, read_count,
+					      op->pred.reg)) {
 				regs_read[read_count] = (uint16_t)op->pred.reg;
 				read_count++;
 			}
 			if ((op->access & CS_AC_WRITE) &&
 			    (op->pred.reg != AARCH64_REG_INVALID) &&
-			    !arr_exist(regs_write, write_count, op->pred.reg)) {
+			    !arr_exist_inline(regs_write, write_count,
+					      op->pred.reg)) {
 				regs_write[write_count] =
 					(uint16_t)op->pred.reg;
 				write_count++;
 			}
 			if ((op->pred.vec_select != AARCH64_REG_INVALID) &&
-			    !arr_exist(regs_read, read_count,
-				       op->pred.vec_select)) {
+			    !arr_exist_inline(regs_read, read_count,
+					      op->pred.vec_select)) {
 				regs_read[read_count] =
 					(uint16_t)op->pred.vec_select;
 				read_count++;
@@ -1183,8 +1191,8 @@ void AArch64_reg_access(const cs_insn *insn, cs_regs regs_read,
 			break;
 		}
 		if (op->shift.type >= AARCH64_SFT_LSL_REG) {
-			if (!arr_exist(regs_read, read_count,
-				       op->shift.value)) {
+			if (!arr_exist_inline(regs_read, read_count,
+					      op->shift.value)) {
 				regs_read[read_count] =
 					(uint16_t)op->shift.value;
 				read_count++;

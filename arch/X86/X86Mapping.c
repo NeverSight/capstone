@@ -11897,12 +11897,13 @@ void X86_reg_access(const cs_insn *insn, cs_regs regs_read,
 		switch ((int)op->type) {
 		case X86_OP_REG:
 			if ((op->access & CS_AC_READ) &&
-			    !arr_exist(regs_read, read_count, op->reg)) {
+			    !arr_exist_inline(regs_read, read_count, op->reg)) {
 				regs_read[read_count] = op->reg;
 				read_count++;
 			}
 			if ((op->access & CS_AC_WRITE) &&
-			    !arr_exist(regs_write, write_count, op->reg)) {
+			    !arr_exist_inline(regs_write, write_count,
+					      op->reg)) {
 				regs_write[write_count] = op->reg;
 				write_count++;
 			}
@@ -11914,12 +11915,14 @@ void X86_reg_access(const cs_insn *insn, cs_regs regs_read,
 				read_count++;
 			}
 			if ((op->mem.base != X86_REG_INVALID) &&
-			    !arr_exist(regs_read, read_count, op->mem.base)) {
+			    !arr_exist_inline(regs_read, read_count,
+					      op->mem.base)) {
 				regs_read[read_count] = op->mem.base;
 				read_count++;
 			}
 			if ((op->mem.index != X86_REG_INVALID) &&
-			    !arr_exist(regs_read, read_count, op->mem.index)) {
+			    !arr_exist_inline(regs_read, read_count,
+					      op->mem.index)) {
 				regs_read[read_count] = op->mem.index;
 				read_count++;
 			}

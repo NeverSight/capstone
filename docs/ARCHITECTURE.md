@@ -86,6 +86,12 @@ The mapping component has three different task:
 3. Adding additional detail to the Capstone instructions
 (e.g. operand `read/write` attributes etc.).
 
+Register-list builders use the shared `arr_exist_inline` loop in `utils.h`.
+The external `arr_exist` entry point delegates to that same implementation;
+standalone register queries retain their existing external calls. Queries keep
+their unsigned width and empty lists require no array access. Architecture
+mapping functions still own insertion order and duplicate handling.
+
 RISC-V's generated instruction mapping includes every opcode in order, including
 pseudo instructions. `RISCV_get_insn_id` indexes that original table directly;
 its unit test checks the dense ordering and compares every 16-bit input against

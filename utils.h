@@ -43,6 +43,20 @@ bool arr_exist8(unsigned char *arr, unsigned char max, unsigned int id);
 bool arr_exist(uint16_t *arr, unsigned char max, unsigned int id);
 bool arr_exist_int(int *table, size_t table_size, int id);
 
+// Keep the short membership loop visible to register-list builders.
+static inline bool arr_exist_inline(uint16_t *arr, unsigned char max,
+				    unsigned int id)
+{
+	int i;
+
+	for (i = 0; i < max; i++) {
+		if (arr[i] == id)
+			return true;
+	}
+
+	return false;
+}
+
 uint16_t readBytes16(MCInst *MI, const uint8_t *Bytes);
 uint32_t readBytes24(MCInst *MI, const uint8_t *Bytes);
 uint32_t readBytes32(MCInst *MI, const uint8_t *Bytes);

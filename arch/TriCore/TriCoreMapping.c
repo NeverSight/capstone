@@ -158,12 +158,13 @@ void TriCore_reg_access(const cs_insn *insn, cs_regs regs_read,
 		switch ((int)op->type) {
 		case TRICORE_OP_REG:
 			if ((op->access & CS_AC_READ) &&
-			    !arr_exist(regs_read, read_count, op->reg)) {
+			    !arr_exist_inline(regs_read, read_count, op->reg)) {
 				regs_read[read_count] = (uint16_t)op->reg;
 				read_count++;
 			}
 			if ((op->access & CS_AC_WRITE) &&
-			    !arr_exist(regs_write, write_count, op->reg)) {
+			    !arr_exist_inline(regs_write, write_count,
+					      op->reg)) {
 				regs_write[write_count] = (uint16_t)op->reg;
 				write_count++;
 			}
@@ -171,7 +172,8 @@ void TriCore_reg_access(const cs_insn *insn, cs_regs regs_read,
 		case TRICORE_OP_MEM:
 			// registers appeared in memory references always being read
 			if ((op->mem.base != ARM_REG_INVALID) &&
-			    !arr_exist(regs_read, read_count, op->mem.base)) {
+			    !arr_exist_inline(regs_read, read_count,
+					      op->mem.base)) {
 				regs_read[read_count] = (uint16_t)op->mem.base;
 				read_count++;
 			}
