@@ -1380,7 +1380,7 @@ static DecodeStatus readInstruction16(const uint8_t *Bytes, size_t BytesLen,
 static DecodeStatus readInstruction32(const uint8_t *Bytes, size_t BytesLen,
 				      uint64_t Address, uint64_t *Size,
 				      uint64_t *Insn, bool IsBigEndian,
-				      bool IsMicroMips)
+				      bool IsHalfwordOrdered)
 {
 	// We want to read exactly 4 Bytes of data.
 	if (BytesLen < 4) {
@@ -1388,11 +1388,11 @@ static DecodeStatus readInstruction32(const uint8_t *Bytes, size_t BytesLen,
 		return MCDisassembler_Fail;
 	}
 
-	// High 16 bits of a 32-bit microMIPS instruction (where the opcode is)
+	// High 16 bits of a MIPS16, microMIPS or nanoMIPS 32-bit instruction
 	// always precede the low 16 bits in the instruction stream (that is, they
 	// are placed at lower addresses in the instruction stream).
 	//
-	// microMIPS byte ordering:
+	// Compressed instruction byte ordering:
 	//   Big-endian:    0 | 1 | 2 | 3
 	//   Little-endian: 1 | 0 | 3 | 2
 
@@ -1401,7 +1401,7 @@ static DecodeStatus readInstruction32(const uint8_t *Bytes, size_t BytesLen,
 		*Insn = (Bytes[3] << 0) | (Bytes[2] << 8) | (Bytes[1] << 16) |
 			((unsigned)Bytes[0] << 24);
 	} else {
-		if (IsMicroMips) {
+		if (IsHalfwordOrdered) {
 			*Insn = (Bytes[2] << 0) | (Bytes[3] << 8) |
 				(Bytes[0] << 16) | ((unsigned)Bytes[1] << 24);
 		} else {
@@ -1608,7 +1608,7 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
 
 	if (IsMips16) {
 		Result = readInstruction32(Bytes, BytesLen, Address, Size,
-					   &Insn, IsBigEndian, IsMicroMips);
+					   &Insn, IsBigEndian, IsMips16);
 		if (Result != MCDisassembler_Fail) {
 			Result = decodeInstruction_4(DecoderTable32, Instr,
 						     Insn, Address, NULL);
