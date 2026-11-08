@@ -22,6 +22,8 @@ static inline uint64_t X86_relativeBranchTarget(cs_mode mode, uint64_t address,
 	return target;
 }
 
+void X86_printMemoryScale(SStream *O, uint64_t scale, bool att);
+
 void printSSEAVXCC(MCInst *MI, unsigned Op, SStream *O);
 void printXOPCC(MCInst *MI, unsigned Op, SStream *O);
 void printRoundingControl(MCInst *MI, unsigned Op, SStream *O);

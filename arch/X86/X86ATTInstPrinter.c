@@ -970,7 +970,7 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
 							  .op_count]
 					.mem.scale = (int)ScaleVal;
 			if (ScaleVal != 1) {
-				SStream_concat(O, ", %" PRIu64, ScaleVal);
+				X86_printMemoryScale(O, ScaleVal, true);
 			}
 		}
 

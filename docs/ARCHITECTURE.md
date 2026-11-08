@@ -604,6 +604,10 @@ The shared 64-bit number and expression printers and x86 Intel/MASM immediate
 printers use this helper. Narrower and composite format strings keep their
 original callback contract.
 
+Single-digit x86 memory scales also append their complete Intel/MASM or AT&T
+token directly. Custom formatters and larger values retain the original single
+composite format call, preserving callback arguments, order and stream state.
+
 Generated alias printers append the mnemonic prefix through
 `SStream_concat0_substr`. The prefix contains no NUL bytes and comes from a
 static table separate from the stream. With the default system malloc/free
