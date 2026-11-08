@@ -64,7 +64,7 @@ static bool check(csh handle, bool big, bool detail, unsigned value)
 		ok = cs_disasm_iter(handle, &cursor, &left, &address, one) &&
 		     instruction(one, sizes[i], regs[i], values[i], detail) &&
 		     one->address == start && address == start + sizes[i] &&
-		     !memcmp(one->bytes, bytes + start - 0x1000, sizes[i]);
+		     !memcmp(one->bytes, bytes + (start - 0x1000), sizes[i]);
 	}
 	ok &= left == 0 && cursor == bytes + sizeof(bytes);
 	// An incomplete prefix/suffix must not turn into a two-byte instruction.
