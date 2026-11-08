@@ -562,6 +562,12 @@ custom formatter can observe partial detail or change options, so it retains
 the earlier assignments as well; kernel and custom-runtime builds retain that
 path too. AT&T keeps its separate ordering and mask handling.
 
+The x86 postprinter finds the first memory operand and presence of mask
+registers in one pass. Broadcast and mask-only repairs reuse these facts, while
+narrowing, x87 and RCL repairs retain their original order and conditions.
+Broadcast decorators still come from the formatted text, including custom
+formatter output; eligibility does not assume an encoding or instruction class.
+
 The private x86 output stream initializes its empty string and scalar state
 without clearing the unused character tail when the active userspace formatter
 is the system `vsnprintf`. Its readers consume only the terminated text prefix.
@@ -600,7 +606,14 @@ the source-built NeverSight LLVM generator branch described by Auto-Sync.
 The final public-output copy combines mnemonic extraction and the internal
 `|` prefix separator conversion. It retains the full output-buffer clearing,
 postprinter ordering and custom mnemonic replacement; the general stream
-extraction helper retains its original behavior.
+extraction helper retains its original behavior. Mnemonic copying stops at the
+public array limit, then consumes any remaining token before locating operands.
+For the private default-runtime x86 stream, the finalizer reuses the exact text
+extent and performs bounded copies instead of scanning each operand character.
+This eligibility is selected before printing: a custom formatter can restore
+`vsnprintf` while returning a count beyond its first NUL. Assembly shortcuts and
+custom postprinters retain text-based copying. Other architectures, DIET and
+custom-runtime streams keep the generic operand loop.
 
 There are two steps in disassembling an instruction.
 

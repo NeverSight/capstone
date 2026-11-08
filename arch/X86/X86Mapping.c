@@ -12283,19 +12283,7 @@ static void repair_vector_mask_sizes(cs_x86 *x86, const SStream *assembly,
 	uint8_t element_size;
 	uint8_t mask_size;
 	bool scalar = false;
-	bool has_mask_operand = false;
 	uint8_t i;
-
-	// Every repair below changes only explicit mask-register operand sizes.
-	for (i = 0; i < x86->op_count; ++i) {
-		if (x86->operands[i].type == X86_OP_REG &&
-		    is_mask_register(x86->operands[i].reg)) {
-			has_mask_operand = true;
-			break;
-		}
-	}
-	if (!has_mask_operand)
-		return;
 
 	element_size = vector_narrow_source_element_size(instruction_id);
 	if (element_size != 0) {
@@ -12453,11 +12441,10 @@ static void repair_vfpclass_mask_access(csh handle, cs_insn *insn)
 	detail->regs_write[detail->regs_write_count++] = destination_reg;
 }
 
-static void repair_avx_broadcast(cs_x86 *x86, const SStream *assembly)
+static void repair_avx_broadcast(cs_x86_op *memory, const SStream *assembly)
 {
 	x86_avx_bcast broadcast = X86_AVX_BCAST_INVALID;
 	const char *decorators = strchr(assembly->buffer, '{');
-	uint8_t i;
 
 	if (!decorators)
 		return;
@@ -12469,14 +12456,8 @@ static void repair_avx_broadcast(cs_x86 *x86, const SStream *assembly)
 		broadcast = X86_AVX_BCAST_4;
 	else if (strstr(decorators, "{1to2}") != NULL)
 		broadcast = X86_AVX_BCAST_2;
-	if (broadcast == X86_AVX_BCAST_INVALID)
-		return;
-	for (i = 0; i < x86->op_count; ++i) {
-		if (x86->operands[i].type == X86_OP_MEM) {
-			x86->operands[i].avx_bcast = broadcast;
-			return;
-		}
-	}
+	if (broadcast != X86_AVX_BCAST_INVALID)
+		memory->avx_bcast = broadcast;
 }
 
 static void repair_vpcmp_id(cs_insn *insn, const SStream *assembly, MCInst *mci)
@@ -12684,28 +12665,46 @@ static void repair_x87_environment_detail(csh handle, cs_insn *insn)
 /// of certain instructions.
 void X86_postprinter(csh handle, cs_insn *insn, SStream *mnem, MCInst *mci)
 {
-	uint8_t mask_operand_size;
+	cs_x86_op *memory = NULL;
+	bool has_mask = false;
+	uint8_t i;
 
-	if (!insn) {
+	if (!insn)
 		return;
-	}
 	repair_vpcmp_id(insn, mnem, mci);
-	if (!insn->detail) {
+	if (!insn->detail)
 		return;
+
+	cs_x86 *x86 = &insn->detail->x86;
+	// Find the operands that these repairs can change once, in output order.
+	for (i = 0; i < x86->op_count; ++i) {
+		cs_x86_op *operand = &x86->operands[i];
+		if (!memory && operand->type == X86_OP_MEM)
+			memory = operand;
+		else if (operand->type == X86_OP_REG &&
+			 is_mask_register(operand->reg))
+			has_mask = true;
+		if (memory && has_mask)
+			break;
 	}
-	repair_avx_broadcast(&insn->detail->x86, mnem);
-	mask_operand_size = mask_instruction_operand_size(insn->id);
-	if (mask_operand_size != 0) {
-		set_mask_register_operand_size(&insn->detail->x86,
-					       mask_operand_size);
-	} else {
-		repair_vector_mask_sizes(&insn->detail->x86, mnem, insn->id);
+	if (memory)
+		repair_avx_broadcast(memory, mnem);
+	if (has_mask) {
+		uint8_t mask_operand_size =
+			mask_instruction_operand_size(insn->id);
+		if (mask_operand_size)
+			set_mask_register_operand_size(x86, mask_operand_size);
+		else
+			repair_vector_mask_sizes(x86, mnem, insn->id);
+		repair_vector_mask_conversion_access(x86, insn->id);
 	}
-	repair_vector_mask_conversion_access(&insn->detail->x86, insn->id);
-	repair_vector_narrow_access(&insn->detail->x86, insn->id);
-	repair_kmask_access(handle, insn);
-	repair_x87_environment_detail(handle, insn);
-	repair_vfpclass_mask_access(handle, insn);
+	repair_vector_narrow_access(x86, insn->id);
+	if (has_mask)
+		repair_kmask_access(handle, insn);
+	if (memory)
+		repair_x87_environment_detail(handle, insn);
+	if (has_mask)
+		repair_vfpclass_mask_access(handle, insn);
 	switch (insn->id) {
 	default:
 		break;

@@ -579,6 +579,166 @@ static bool test_dec64_custom_formatter(void)
 	return true;
 }
 
+static cs_opt_mem formatter_switch_memory;
+static unsigned formatter_switch_calls;
+static cs_err formatter_switch_error;
+
+static int switching_vsnprintf(char *str, size_t size, const char *fmt,
+			       va_list ap)
+{
+	++formatter_switch_calls;
+	formatter_switch_error =
+		cs_option(0, CS_OPT_MEM, (uintptr_t)&formatter_switch_memory);
+	memset(str, 0x5a, size);
+	int written = vsnprintf(str, size, fmt, ap);
+	/* Leave nonzero bytes after the first NUL and report a longer extent. */
+	return written >= 0 && (size_t)written + 2 < size ? written + 2 :
+							    written;
+}
+
+static bool check_formatter_switch(cs_mode mode, unsigned syntax, bool detail)
+{
+	const uint8_t bytes[] = { 0x83, 0xc0, 0x01 }; // add eax, 1
+	const uint8_t *cursor = bytes;
+	size_t remaining = sizeof(bytes);
+	uint64_t address = 0x1000;
+	csh handle = 0;
+	cs_insn *instruction = NULL;
+	const cs_opt_mem saved = { cs_mem_malloc, cs_mem_calloc, cs_mem_realloc,
+				   cs_mem_free, cs_vsnprintf };
+	bool result = false;
+	if (cs_open(CS_ARCH_X86, mode, &handle) != CS_ERR_OK)
+		goto cleanup;
+	if (cs_option(handle, CS_OPT_SYNTAX, syntax) != CS_ERR_OK ||
+	    cs_option(handle, CS_OPT_DETAIL, detail ? CS_OPT_ON : CS_OPT_OFF) !=
+		    CS_ERR_OK)
+		goto cleanup;
+	instruction = cs_malloc(handle);
+	if (!instruction)
+		goto cleanup;
+	memset(instruction->mnemonic, 0xa5, sizeof(instruction->mnemonic));
+	memset(instruction->op_str, 0xa5, sizeof(instruction->op_str));
+	formatter_switch_memory = saved;
+	formatter_switch_memory.vsnprintf = vsnprintf;
+	formatter_switch_calls = 0;
+	formatter_switch_error = CS_ERR_OK;
+	cs_opt_mem custom = saved;
+	custom.vsnprintf = switching_vsnprintf;
+	if (cs_option(0, CS_OPT_MEM, (uintptr_t)&custom) != CS_ERR_OK)
+		goto cleanup;
+	bool decoded = cs_disasm_iter(handle, &cursor, &remaining, &address,
+				      instruction);
+	const char expected_operands[sizeof(instruction->op_str)] = "eax, 1";
+	const char expected_mnemonic[CS_MNEMONIC_SIZE] = "add";
+	result = decoded && formatter_switch_calls > 0 &&
+		 formatter_switch_error == CS_ERR_OK && remaining == 0 &&
+		 cursor == bytes + sizeof(bytes) &&
+		 address == 0x1000 + sizeof(bytes) &&
+		 memcmp(instruction->mnemonic, expected_mnemonic,
+			sizeof(expected_mnemonic)) == 0 &&
+		 memcmp(instruction->op_str, expected_operands,
+			sizeof(expected_operands)) == 0;
+
+cleanup:
+	result &= cs_option(0, CS_OPT_MEM, (uintptr_t)&saved) == CS_ERR_OK;
+	if (instruction)
+		cs_free(instruction, 1);
+	if (handle)
+		result &= cs_close(&handle) == CS_ERR_OK;
+	return result;
+}
+
+static bool test_formatter_switch(void)
+{
+	printf("Test test_formatter_switch\n");
+	if (!cs_support(CS_ARCH_X86))
+		return true;
+	const cs_mode modes[] = { CS_MODE_32, CS_MODE_64 };
+	const unsigned syntaxes[] = { CS_OPT_SYNTAX_INTEL, CS_OPT_SYNTAX_MASM };
+	for (size_t mode = 0; mode < ARR_SIZE(modes); ++mode)
+		for (size_t syntax = 0; syntax < ARR_SIZE(syntaxes); ++syntax)
+			for (unsigned detail = 0; detail < 2; ++detail)
+				CS_ASSERT_RET_VAL(
+					check_formatter_switch(modes[mode],
+							       syntaxes[syntax],
+							       detail != 0),
+					false);
+	return true;
+}
+
+static const char *finalizer_test_text;
+
+static void finalizer_test_postprinter(csh handle, cs_insn *instruction,
+				       SStream *stream, MCInst *mci)
+{
+	(void)handle;
+	(void)instruction;
+	(void)mci;
+	strcpy(stream->buffer, finalizer_test_text);
+	/* The generic finalizer must use the text, not a postprinter's index. */
+	stream->index = SIZE_MAX;
+}
+
+static bool test_finalizer_mnemonic_limit(void)
+{
+	printf("Test test_finalizer_mnemonic_limit\n");
+	if (!cs_support(CS_ARCH_X86))
+		return true;
+	static const struct {
+		const char *text;
+		char mnemonic[CS_MNEMONIC_SIZE];
+		char operands[sizeof(((cs_insn *)0)->op_str)];
+	} cases[] = {
+		{ "", "", "" },
+		{ "lock|add \t eax, 1", "lock add", "eax, 1" },
+		{ "012345678901234567890123456789\top",
+		  "012345678901234567890123456789", "op" },
+		{ "0123456789012345678901234567890\tleft|right",
+		  "0123456789012345678901234567890", "left|right" },
+		{ "01234567890123456789012345678901\tleft|right",
+		  "0123456789012345678901234567890", "left|right" },
+		{ "0123456789012345678901234567890|more\t  left|right",
+		  "0123456789012345678901234567890", "left|right" },
+		{ "0123456789012345678901234567890|more",
+		  "0123456789012345678901234567890", "" },
+		{ " \t op", "", "op" },
+	};
+	csh handle = 0;
+	cs_insn *instruction = NULL;
+	bool result = false;
+	if (cs_open(CS_ARCH_X86, CS_MODE_64, &handle) != CS_ERR_OK)
+		goto cleanup;
+	((cs_struct *)(uintptr_t)handle)->post_printer =
+		finalizer_test_postprinter;
+	instruction = cs_malloc(handle);
+	if (!instruction)
+		goto cleanup;
+	for (size_t i = 0; i < ARR_SIZE(cases); ++i) {
+		const uint8_t bytes[] = { 0x90 };
+		const uint8_t *cursor = bytes;
+		size_t remaining = sizeof(bytes);
+		uint64_t address = 0x1000;
+		finalizer_test_text = cases[i].text;
+		memset(instruction->mnemonic, 0xa5,
+		       sizeof(instruction->mnemonic));
+		memset(instruction->op_str, 0xa5, sizeof(instruction->op_str));
+		if (!cs_disasm_iter(handle, &cursor, &remaining, &address,
+				    instruction) ||
+		    memcmp(instruction->mnemonic, cases[i].mnemonic,
+			   sizeof(instruction->mnemonic)) ||
+		    memcmp(instruction->op_str, cases[i].operands,
+			   sizeof(instruction->op_str)))
+			goto cleanup;
+	}
+	result = true;
+cleanup:
+	if (instruction)
+		cs_free(instruction, 1);
+	if (handle)
+		result &= cs_close(&handle) == CS_ERR_OK;
+	return result;
+}
+
 static bool test_markup_os()
 {
 	printf("Test test_markup_os\n");
@@ -1282,6 +1442,8 @@ int main()
 	result &= test_substr_allocator_hooks();
 	result &= test_hex64_formatting();
 	result &= test_hex64_custom_formatter();
+	result &= test_formatter_switch();
+	result &= test_finalizer_mnemonic_limit();
 	result &= test_dec64_formatting();
 	result &= test_dec64_custom_formatter();
 	result &= test_printint8();

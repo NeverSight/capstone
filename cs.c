@@ -925,13 +925,17 @@ static int str_replace(char *result, char *target, const char *str1, char *str2)
 
 #include "cs_disasm_internal.h"
 
-static void fill_insn(struct cs_struct *handle, cs_insn *insn, SStream *OS,
-		      MCInst *mci, PostPrinter_t postprinter,
-		      const uint8_t *code)
+/* Keep the generic copy specialized without the private x86 length checks. */
+#if defined(__GNUC__)
+__attribute__((always_inline))
+#endif
+static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
+			     SStream *OS, MCInst *mci,
+			     PostPrinter_t postprinter, const uint8_t *code,
+			     bool stream_length_valid)
 {
 	SStream_trimls(OS);
-	// fill the instruction bytes.
-	// we might skip some redundant bytes in front in the case of X86
+	// Copy only decoded instruction bytes before the postprinter observes them.
 	uint16_t copy_size = copy_insn_bytes(insn, code, false);
 	insn->op_str[0] = '\0';
 	insn->size = copy_size;
@@ -948,19 +952,48 @@ static void fill_insn(struct cs_struct *handle, cs_insn *insn, SStream *OS,
 	memset(insn->mnemonic, '\0', sizeof(insn->mnemonic));
 	memset(insn->op_str, '\0', sizeof(insn->op_str));
 	size_t off = 0;
-	while (OS->buffer[off] && OS->buffer[off] != ' ' &&
-	       OS->buffer[off] != '\t') {
-		if (off < sizeof(insn->mnemonic) - 1) {
-			char c = OS->buffer[off];
-			insn->mnemonic[off] = c == '|' ? ' ' : c;
-		}
+	while (off < sizeof(insn->mnemonic) - 1 && OS->buffer[off] &&
+	       OS->buffer[off] != ' ' && OS->buffer[off] != '\t') {
+		char c = OS->buffer[off];
+		insn->mnemonic[off] = c == '|' ? ' ' : c;
 		off++;
 	}
+	while (OS->buffer[off] && OS->buffer[off] != ' ' &&
+	       OS->buffer[off] != '\t')
+		off++;
 	while (OS->buffer[off] == ' ' || OS->buffer[off] == '\t')
 		off++;
 	const char *operands = OS->buffer + off;
-	for (off = 0; operands[off] && off < sizeof(insn->op_str) - 1; off++)
-		insn->op_str[off] = operands[off];
+	if (stream_length_valid) {
+		/* The private x86 stream's index is its terminating NUL. */
+		const size_t length =
+			MIN(OS->index - off, sizeof(insn->op_str) - 1);
+		if (length > 32) {
+			memcpy(insn->op_str, operands, length);
+		} else if (length >= 16) {
+			memcpy(insn->op_str, operands, 16);
+			memcpy(insn->op_str + length - 16,
+			       operands + length - 16, 16);
+		} else if (length >= 8) {
+			memcpy(insn->op_str, operands, 8);
+			memcpy(insn->op_str + length - 8, operands + length - 8,
+			       8);
+		} else if (length >= 4) {
+			memcpy(insn->op_str, operands, 4);
+			memcpy(insn->op_str + length - 4, operands + length - 4,
+			       4);
+		} else if (length >= 2) {
+			memcpy(insn->op_str, operands, 2);
+			memcpy(insn->op_str + length - 2, operands + length - 2,
+			       2);
+		} else if (length) {
+			insn->op_str[0] = operands[0];
+		}
+	} else {
+		for (off = 0; operands[off] && off < sizeof(insn->op_str) - 1;
+		     off++)
+			insn->op_str[off] = operands[off];
+	}
 
 	// we might have customized mnemonic
 	if (handle->mnem_list) {
@@ -1023,21 +1056,31 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
 	defined(CAPSTONE_USE_SYS_DYN_MEM) && \
 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
 	!defined(_WIN32_WCE)
+		/* Choose before printing: a custom formatter can restore vsnprintf
+		 * while returning a count inconsistent with its first NUL. */
 		if (handle->arch == CS_ARCH_X86 && cs_vsnprintf == vsnprintf) {
-			/* Only the private x86 stream can leave its unused tail
-			 * untouched; a custom formatter may inspect that tail. */
+			/* Only this private stream can leave the unused tail untouched. */
 			ss.buffer[0] = '\0';
 			ss.index = 0;
 			ss.is_closed = false;
 			ss.markup_stream = false;
 			ss.prefixed_by_markup = false;
 			ss.unsigned_num = false;
+			SStream_opt_unum(&ss, handle->imm_unsigned);
+			handle->printer(&mci, &ss, handle->printer_info);
+			fill_insn(handle, insn, &ss, &mci, handle->post_printer,
+				  code,
+				  !mci.assembly[0] && handle->post_printer ==
+							      X86_postprinter);
 		} else
 #endif
+		{
 			SStream_Init(&ss);
-		SStream_opt_unum(&ss, handle->imm_unsigned);
-		handle->printer(&mci, &ss, handle->printer_info);
-		fill_insn(handle, insn, &ss, &mci, handle->post_printer, code);
+			SStream_opt_unum(&ss, handle->imm_unsigned);
+			handle->printer(&mci, &ss, handle->printer_info);
+			fill_insn(handle, insn, &ss, &mci, handle->post_printer,
+				  code, false);
+		}
 	}
 	if (handle->arch == CS_ARCH_X86 && (!batch || insn->id != X86_INS_VCMP))
 		insn->id += mci.popcode_adjust;
