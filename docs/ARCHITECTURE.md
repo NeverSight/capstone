@@ -539,10 +539,14 @@ definition.
 
 Implicit register and group counts are projected from `X86MappingInsn*.inc`
 by `suite/synctools/x86_mapping_counts.py`. Counts stop at the same first zero as
-the runtime helpers and use each array's declared capacity. Full-array copies,
-mode-dependent corrections and branch-group insertion remain unchanged. Run the
-generator after replacing either mapping table; `--check` and the native metadata
-unit test check the projection against the full/reduced source records.
+the runtime helpers and use each array's declared capacity. Bit 14 of the same
+record marks public IDs handled by the implicit-register repair switches in
+`X86_get_insn_id`. The generator derives eligibility from those switches and
+requires their defaults to do no work; other IDs skip the entire repair block.
+Full-array copies, correction order and branch-group insertion remain unchanged.
+Run the generator after changing either mapping table or the repair switches.
+Its `--check` mode and unit checks validate the full/reduced projection and reject
+statements that cannot be skipped under this guard.
 
 The legacy x86 full Intel and AT&T printer tables store mnemonic lengths in
 unused high bits of their existing opcode records. The string bytes and operand

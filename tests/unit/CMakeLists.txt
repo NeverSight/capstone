@@ -64,6 +64,8 @@ if(CAPSTONE_X86_SUPPORT)
     if(Python3_Interpreter_FOUND)
         add_test(NAME unit_x86_mapping_counts_generator
             COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/suite/synctools/x86_mapping_counts.py" --check)
+        add_test(NAME unit_x86_mapping_counts_validation
+            COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/test_x86_mapping_counts.py")
         add_test(NAME unit_x86_operand_specializations
             COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/suite/synctools/x86_operand_specializations.py" --check)
         add_test(NAME unit_x86_disassembler_tables

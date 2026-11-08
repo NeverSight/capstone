@@ -10297,6 +10297,11 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
 				}
 				break;
 			}
+			/* The generator derives eligibility from the switches below. */
+			if (!(x86_mapping_counts[i] &
+			      X86_MAPPING_IMPLICIT_REPAIR))
+				goto implicit_registers_done;
+
 			switch (insn->id) {
 			default:
 				break;
@@ -10721,6 +10726,7 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
 			} break;
 			}
 
+implicit_registers_done:
 			memcpy(insn->detail->groups, insns[i].groups,
 			       sizeof(insns[i].groups));
 			insn->detail->groups_count =
