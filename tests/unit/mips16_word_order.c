@@ -85,7 +85,9 @@ static bool check(csh handle, bool big, bool detail, unsigned value)
 
 int main(void)
 {
-	const unsigned values[] = { 0, 1, 31, 32, 0x1234, 0x7fff };
+	const unsigned values[] = {
+		0, 1, 31, 32, 0x1234, 0x7fff, 0x8000, 0xffff
+	};
 	for (unsigned big = 0; big < 2; ++big)
 		for (unsigned output = 0; output < 4; ++output) {
 			csh handle;

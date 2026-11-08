@@ -41,6 +41,9 @@ void Mips_set_mem_access(MCInst *MI, bool status);
 
 unsigned Mips_getRegisterListCount(const MCInst *MI);
 
+uint64_t Mips_getBranchTarget(const MCInst *MI, uint64_t Address,
+			      int64_t Displacement);
+
 void Mips_add_cs_detail_0(MCInst *MI, mips_op_group op_group, size_t op_num);
 
 static inline void set_mem_access(MCInst *MI, bool status)

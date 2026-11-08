@@ -1610,6 +1610,33 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
 		Result = readInstruction32(Bytes, BytesLen, Address, Size,
 					   &Insn, IsBigEndian, IsMips16);
 		if (Result != MCDisassembler_Fail) {
+			// Imported shift patterns overlap EXTEND + I8 when the
+			// upper immediate bits are zero. Select I8 by its actual
+			// major opcode before entering that generated table.
+			if ((Insn & 0xf800f800) == 0xf0006000) {
+				*Size = 4;
+				if (Insn & 0xe0)
+					return MCDisassembler_Fail;
+				switch ((Insn >> 8) & 7) {
+				case 0:
+					MCInst_setOpcode(Instr, Mips_BteqzX16);
+					break;
+				case 1:
+					MCInst_setOpcode(Instr, Mips_BtnezX16);
+					break;
+				case 3:
+					MCInst_setOpcode(Instr,
+							 Mips_AddiuSpImmX16);
+					break;
+				default:
+					return MCDisassembler_Fail;
+				}
+				unsigned Imm = (Insn & 31) |
+					       ((Insn >> 16) & 31) << 11 |
+					       ((Insn >> 21) & 63) << 5;
+				return DecodeSImmWithOffsetAndScale_16_0_1(
+					Instr, Imm, Address, NULL);
+			}
 			Result = decodeInstruction_4(DecoderTable32, Instr,
 						     Insn, Address, NULL);
 			if (Result != MCDisassembler_Fail) {
@@ -2781,7 +2808,27 @@ static DecodeStatus DecodeCOP2RegisterClass(MCInst *Inst, unsigned RegNo,
 static DecodeStatus DecodeBranchTarget(MCInst *Inst, unsigned Offset,
 				       uint64_t Address, const void *Decoder)
 {
-	int32_t BranchOffset = (SignExtend32((Offset), 16) * 4) + 4;
+	unsigned Bits = 16;
+	int32_t Scale = 4, Bias = 4;
+	switch (MCInst_getOpcode(Inst)) {
+	case Mips_Bimm16:
+		Bits = 11;
+		Scale = Bias = 2;
+		break;
+	case Mips_BeqzRxImm16:
+	case Mips_BnezRxImm16:
+		Bits = 8;
+		Scale = Bias = 2;
+		break;
+	case Mips_BimmX16:
+	case Mips_BeqzRxImmX16:
+	case Mips_BnezRxImmX16:
+		Scale = 2;
+		break;
+	default:
+		break;
+	}
+	int32_t BranchOffset = SignExtend32(Offset, Bits) * Scale + Bias;
 	MCOperand_CreateImm0(Inst, (BranchOffset));
 	return MCDisassembler_Success;
 }
@@ -2967,7 +3014,41 @@ DEFINE_DecodeUImmWithOffsetAndScale(21, 0, 1);
 #define DEFINE_DecodeSImmWithOffsetAndScale_3(Bits) \
 	DEFINE_DecodeSImmWithOffsetAndScale(Bits, 0, 1)
 
-DEFINE_DecodeSImmWithOffsetAndScale_3(16);
+static DecodeStatus DecodeSImmWithOffsetAndScale_16_0_1(MCInst *Inst,
+							unsigned Value,
+							uint64_t Address,
+							const void *Decoder)
+{
+	int32_t Imm;
+	// The imported MIPS16 tables share this callback with signed 16-bit
+	// operands, including unsigned constants and short scaled immediates.
+	switch (MCInst_getOpcode(Inst)) {
+	case Mips_LiRxImmX16:
+	case Mips_CmpiRxImmX16:
+		Imm = Value;
+		break;
+	case Mips_AddiuRxRxImm16:
+		Imm = SignExtend32(Value, 8);
+		break;
+	case Mips_AddiuSpImm16:
+		Imm = SignExtend32(Value, 8) * 8;
+		break;
+	case Mips_Bteqz16:
+	case Mips_Btnez16:
+		Imm = SignExtend32(Value, 8) * 2 + 2;
+		break;
+	case Mips_BteqzX16:
+	case Mips_BtnezX16:
+		Imm = SignExtend32(Value, 16) * 2 + 4;
+		break;
+	default:
+		Imm = SignExtend32(Value, 16);
+		break;
+	}
+	MCOperand_CreateImm0(Inst, Imm);
+	return MCDisassembler_Success;
+}
+
 DEFINE_DecodeSImmWithOffsetAndScale_3(10);
 DEFINE_DecodeSImmWithOffsetAndScale_3(4);
 DEFINE_DecodeSImmWithOffsetAndScale_3(6);

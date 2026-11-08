@@ -58,6 +58,18 @@ feature enum include, including after Auto-Sync regeneration.
 
 ### Operand postprocessing
 
+MIPS16 immediate widths, scaling and branch bases are corrected in the owning
+operand callbacks in `MipsDisassembler.c`. Extended I8 forms are selected before
+the imported table because its shift patterns overlap that major opcode.
+`MipsInstPrinter.c` routes T-register branches through the same absolute-target
+printer as other branches; `MipsMapping.c` supplies their relative-branch group.
+MIPS16 text and detail share its target calculation, including 32-bit address
+wraparound; 64-bit MIPS16 retains the full target width.
+These handwritten corrections must be retained during Auto-Sync translation.
+The native MIPS16 tests cover both byte orders, both decode APIs, output options,
+signed/unsigned boundaries, truncated prefixes and reserved I8 suffix fields.
+This does not add the missing MIPS16 call or general memory instructions.
+
 AArch64 projects descriptor requirements with
 `suite/synctools/aarch64_postprocess.py`. Per-opcode flags skip implicit operand
 insertion and tied-operand traversals only when those traversals perform no
