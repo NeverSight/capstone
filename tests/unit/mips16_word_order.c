@@ -42,9 +42,14 @@ static bool check(csh handle, bool big, bool detail, unsigned value)
 	size_t count =
 		cs_disasm(handle, bytes, sizeof(bytes), 0x1000, 0, &result);
 	bool ok = count == 3;
-	for (unsigned i = 0; ok && i < count; ++i)
+	unsigned offset = 0;
+	for (unsigned i = 0; ok && i < count; ++i) {
 		ok = instruction(&result[i], sizes[i], regs[i], values[i],
-				 detail);
+				 detail) &&
+		     result[i].address == 0x1000 + offset &&
+		     !memcmp(result[i].bytes, bytes + offset, sizes[i]);
+		offset += sizes[i];
+	}
 	cs_free(result, count);
 	if (!ok)
 		return false;
