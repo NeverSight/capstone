@@ -80,15 +80,14 @@ DECLARE_printComplexRotationOp(90, 0);
 
 void printRegName(SStream *OS, unsigned Reg)
 {
-	SStream_concat(OS, "%s%s", markup("<reg:"),
-		       getRegisterName(Reg, AArch64_NoRegAltName));
+	SStream_concat2(OS, markup("<reg:"),
+			getRegisterName(Reg, AArch64_NoRegAltName));
 	SStream_concat0(OS, markup(">"));
 }
 
 void printRegNameAlt(SStream *OS, unsigned Reg, unsigned AltIdx)
 {
-	SStream_concat(OS, "%s%s", markup("<reg:"),
-		       getRegisterName(Reg, AltIdx));
+	SStream_concat2(OS, markup("<reg:"), getRegisterName(Reg, AltIdx));
 	SStream_concat0(OS, markup(">"));
 }
 

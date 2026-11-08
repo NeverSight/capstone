@@ -108,8 +108,8 @@ static void printPredicateOperand(MCInst *MI, unsigned OpNum, SStream *O)
 
 static void printRegName(SStream *OS, unsigned RegNo)
 {
-	SStream_concat(OS, "%s%s", markup("<reg:"),
-		       getRegisterName(RegNo, ARM_NoRegAltName));
+	SStream_concat2(OS, markup("<reg:"),
+			getRegisterName(RegNo, ARM_NoRegAltName));
 	SStream_concat0(OS, markup(">"));
 }
 

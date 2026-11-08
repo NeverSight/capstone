@@ -8,6 +8,174 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
+#if defined(__unix__) || defined(__APPLE__)
+#include <sys/mman.h>
+#include <unistd.h>
+#endif
+
+typedef void (*concat2_writer)(SStream *, const char *, const char *);
+static void concat2_reference(SStream *s, const char *a, const char *b)
+{
+	SStream_concat(s, "%s%s", a, b);
+}
+static void concat2_candidate(SStream *s, const char *a, const char *b)
+{
+	SStream_concat2(s, a, b);
+}
+static unsigned concat2_hook_mode, concat2_calls;
+static const char *concat2_hook_first, *concat2_hook_second;
+static char concat2_hook_format[16];
+static int concat2_hook(char *out, size_t size, const char *fmt, va_list ap)
+{
+	++concat2_calls;
+	strcpy(concat2_hook_format, fmt);
+	va_list copy;
+	va_copy(copy, ap);
+	concat2_hook_first = va_arg(copy, const char *);
+	concat2_hook_second = va_arg(copy, const char *);
+	va_end(copy);
+	if (concat2_hook_mode == 3)
+		cs_vsnprintf = vsnprintf;
+	memset(out, 0x5a, size);
+	int n = vsnprintf(out, size, fmt, ap);
+	if (concat2_hook_mode == 1)
+		return -1;
+	if (concat2_hook_mode == 2)
+		return 1000;
+	return n;
+}
+static bool concat2_compare(concat2_writer candidate, const char *first,
+			    const char *second, unsigned flags, size_t index,
+			    unsigned h)
+{
+	SStream a, b;
+	memset(&a, 0xa5, sizeof(a));
+	a.index = index;
+	a.is_closed = (flags & 1) != 0;
+	a.markup_stream = (flags & 2) != 0;
+	a.prefixed_by_markup = (flags & 4) != 0;
+	a.unsigned_num = (flags & 8) != 0;
+	if (index < SSTREAM_BUF_LEN)
+		a.buffer[index] = 0;
+	memcpy(&b, &a, sizeof(a));
+	concat2_hook_mode = h - 1;
+	concat2_calls = 0;
+	concat2_hook_format[0] = 0;
+	concat2_hook_first = concat2_hook_second = NULL;
+	cs_vsnprintf = h ? concat2_hook : vsnprintf;
+	concat2_reference(&a, first, second);
+	unsigned old_calls = concat2_calls;
+	const char *old_first = concat2_hook_first,
+		   *old_second = concat2_hook_second;
+	char old_format[16];
+	strcpy(old_format, concat2_hook_format);
+	bool old_default = cs_vsnprintf == vsnprintf;
+	concat2_calls = 0;
+	concat2_hook_format[0] = 0;
+	concat2_hook_first = concat2_hook_second = NULL;
+	cs_vsnprintf = h ? concat2_hook : vsnprintf;
+	candidate(&b, first, second);
+	bool match = !memcmp(&a, &b, sizeof(a)) && old_calls == concat2_calls &&
+		     old_first == concat2_hook_first &&
+		     old_second == concat2_hook_second &&
+		     !strcmp(old_format, concat2_hook_format) &&
+		     old_default == (cs_vsnprintf == vsnprintf);
+	cs_vsnprintf = vsnprintf;
+	return match;
+}
+static int concat2_verify(concat2_writer candidate)
+{
+	const size_t lengths[] = {
+		0, 1, 2, 3, 7, 15, 16, 31, 32, 511, 512, 600
+	};
+	char strings[12][601];
+	for (unsigned i = 0; i < 12; ++i) {
+		for (size_t j = 0; j < lengths[i]; ++j)
+			strings[i][j] = (char)(1 + j % 255);
+		strings[i][lengths[i]] = 0;
+	}
+	uint64_t count = 0;
+	for (unsigned h = 0; h < 5; ++h)
+		for (unsigned flags = 0; flags < 16; ++flags)
+			for (size_t index = 0;
+			     index < (cs_support(CS_SUPPORT_DIET) ?
+					      SSTREAM_BUF_LEN :
+					      SSTREAM_BUF_LEN + 4);
+			     ++index)
+				for (unsigned first = 0; first < 12; ++first)
+					for (unsigned second = 0; second < 12;
+					     ++second) {
+						size_t offset =
+							index == SSTREAM_BUF_LEN +
+										3 ?
+								SIZE_MAX :
+								index;
+						if (!concat2_compare(
+							    candidate,
+							    strings[first],
+							    strings[second],
+							    flags, offset, h)) {
+							fprintf(stderr,
+								"mismatch h=%u flags=%u index=%zu first=%zu second=%zu\n",
+								h, flags,
+								offset,
+								lengths[first],
+								lengths[second]);
+							return 1;
+						}
+						++count;
+					}
+#if defined(__unix__) || defined(__APPLE__)
+	long native_page_size = sysconf(_SC_PAGESIZE);
+	if (native_page_size <= 0)
+		return 2;
+	size_t page = (size_t)native_page_size;
+	char *pages = mmap(NULL, 2 * page, PROT_READ | PROT_WRITE,
+			   MAP_PRIVATE | MAP_ANON, -1, 0);
+	if (pages == MAP_FAILED)
+		return 2;
+	if (mprotect(pages + page, page, PROT_NONE)) {
+		munmap(pages, 2 * page);
+		return 2;
+	}
+	memset(pages, 'Q', page);
+	pages[page - 1] = 0;
+	const size_t tails[] = { 0,  1,	 2,   3,   7,	15,  31,
+				 32, 63, 127, 511, 512, 513, 4095 };
+	for (unsigned n = 0; n < sizeof(tails) / sizeof(tails[0]); ++n) {
+		if (tails[n] >= page)
+			continue;
+		const char *tail = pages + page - tails[n] - 1;
+		for (unsigned flags = 0; flags < 16; ++flags)
+			for (size_t index = 0;
+			     index < (cs_support(CS_SUPPORT_DIET) ?
+					      SSTREAM_BUF_LEN :
+					      SSTREAM_BUF_LEN + 1);
+			     ++index)
+				for (unsigned reverse = 0; reverse < 2;
+				     ++reverse) {
+					if (!concat2_compare(
+						    candidate,
+						    reverse ? tail : "<reg:",
+						    reverse ? "x29" : tail,
+						    flags, index, 0))
+						return 1;
+					++count;
+				}
+	}
+	munmap(pages, 2 * page);
+#endif
+	printf("{\"comparisons\":%" PRIu64 "}\n", count);
+	return 0;
+}
+static bool test_concat2_appends(void)
+{
+	const cs_opt_mem saved = { cs_mem_malloc, cs_mem_calloc, cs_mem_realloc,
+				   cs_mem_free, cs_vsnprintf };
+	int result = concat2_verify(concat2_candidate);
+	cs_vsnprintf = saved.vsnprintf;
+	return result == 0;
+}
 
 static void overflow_SStream_concat0(SStream *OS, bool *returned_in_time)
 {
@@ -1429,9 +1597,9 @@ static bool test_diet_appends(void)
 
 int main()
 {
+	bool result = test_concat2_appends();
 	if (cs_support(CS_SUPPORT_DIET))
-		return test_diet_appends() ? 0 : -1;
-	bool result = true;
+		return result && test_diet_appends() ? 0 : -1;
 	result &= test_markup_os();
 	result &= test_overflow_check();
 	result &= test_truncating_appends();

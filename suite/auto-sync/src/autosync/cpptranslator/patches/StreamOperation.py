@@ -30,6 +30,21 @@ class StreamOperations(Patch):
     def get_main_capture_name(self) -> str:
         return "stream"
 
+    @staticmethod
+    def _concat_strings(s_name: bytes, ops: list[Node], src: bytes) -> bytes:
+        args = b", ".join(get_text_from_node(src, op) for op in ops)
+        if len(ops) == 2:
+            return b"SStream_concat2(" + s_name + b", " + args + b");\n"
+        return (
+            b"SStream_concat("
+            + s_name
+            + b', "'
+            + b"%s" * len(ops)
+            + b'", '
+            + args
+            + b");\n"
+        )
+
     def get_patch(self, captures: [(Node, str)], src: bytes, **kwargs) -> bytes:
         bin_expr = captures[1][0]
         # Extract operands passed to the stream into a list.
@@ -45,6 +60,7 @@ class StreamOperations(Patch):
         res = b""
         # Capstone uses the following functions to copy the strings to a buffer:
         # SStream_concat  - Copies multiple strings.
+        # SStream_concat2 - Copies two strings with a single markup close.
         # SStream_concat1 - Copies a char.
         # SStream_concat0 - Copies a string and null terminates the buffer.
         last_op: Node = ops[-1]
@@ -54,21 +70,7 @@ class StreamOperations(Patch):
         while op != last_op:
             if op.type == "char_literal":
                 if len(string_ops) != 0:
-                    # Make a SStream_concat call with all string literals collected before.
-                    res += (
-                        b"SStream_concat("
-                        + s_name
-                        + b', "'
-                        + b"%s" * len(string_ops)
-                        + b'", '
-                        + b", ".join(
-                            [
-                                get_text(src, o.start_byte, o.end_byte)
-                                for o in string_ops
-                            ]
-                        )
-                        + b");\n"
-                    )
+                    res += self._concat_strings(s_name, string_ops, src)
                     string_ops.clear()
                 res += (
                     b"SStream_concat1("
@@ -83,17 +85,7 @@ class StreamOperations(Patch):
             op = ops[i]
 
         if len(string_ops) != 0:
-            res += (
-                b"SStream_concat("
-                + s_name
-                + b', "'
-                + b"%s" * len(string_ops)
-                + b'", '
-                + b", ".join(
-                    [get_text(src, o.start_byte, o.end_byte) for o in string_ops]
-                )
-                + b");\n"
-            )
+            res += self._concat_strings(s_name, string_ops, src)
             string_ops.clear()
 
         last_op_text = get_text(src, last_op.start_byte, last_op.end_byte)

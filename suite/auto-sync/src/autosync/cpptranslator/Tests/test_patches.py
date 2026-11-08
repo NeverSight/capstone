@@ -619,7 +619,7 @@ public:
         self.check_patching_result(
             patch,
             syntax,
-            b'SStream_concat(OS, "%s%s", "aaaa", "bbbb");\nSStream_concat0(OS, "cccc");',
+            b'SStream_concat2(OS, "aaaa", "bbbb");\nSStream_concat0(OS, "cccc");',
         )
 
         syntax = b'{ OS << "aaaa" << \'a\' << "cccc"; }'
@@ -633,6 +633,34 @@ public:
 
         syntax = b"{ int y = 1; int x = 1; OS << x; }"
         self.check_patching_result(patch, syntax, b"printInt32(OS, x);")
+
+    def test_streamoperation_string_groups(self):
+        patch = StreamOperations(0)
+        for syntax, expected in [
+            (
+                b'{ OS << markup("<reg:") << getRegisterName(Reg) << markup(">"); }',
+                b'SStream_concat2(OS, markup("<reg:"), getRegisterName(Reg));\n'
+                b'SStream_concat0(OS, markup(">"));',
+            ),
+            (
+                b"{ OS << first << second << ',' << last; }",
+                b"SStream_concat2(OS, first, second);\n"
+                b"SStream_concat1(OS, ',');\n"
+                b"SStream_concat0(OS, last);",
+            ),
+            (
+                b"{ OS << first << second << third << last; }",
+                b'SStream_concat(OS, "%s%s%s", first, second, third);\n'
+                b"SStream_concat0(OS, last);",
+            ),
+            (
+                b"if (enabled) OS << first << second << last;",
+                b"{ SStream_concat2(OS, first, second);\n"
+                b"SStream_concat0(OS, last); }",
+            ),
+        ]:
+            with self.subTest(syntax=syntax):
+                self.check_patching_result(patch, syntax, expected)
 
     def test_templatedeclaration(self):
         patch = TemplateDeclaration(0, self.template_collector)

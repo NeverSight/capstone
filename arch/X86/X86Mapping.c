@@ -11886,10 +11886,16 @@ void X86_reg_access(const cs_insn *insn, cs_regs regs_read,
 	write_count = insn->detail->regs_write_count;
 
 	// implicit registers
-	memcpy(regs_read, insn->detail->regs_read,
-	       read_count * sizeof(insn->detail->regs_read[0]));
-	memcpy(regs_write, insn->detail->regs_write,
-	       write_count * sizeof(insn->detail->regs_write[0]));
+	if (read_count == 1)
+		regs_read[0] = insn->detail->regs_read[0];
+	else if (read_count != 0)
+		memcpy(regs_read, insn->detail->regs_read,
+		       read_count * sizeof(insn->detail->regs_read[0]));
+	if (write_count == 1)
+		regs_write[0] = insn->detail->regs_write[0];
+	else if (write_count != 0)
+		memcpy(regs_write, insn->detail->regs_write,
+		       write_count * sizeof(insn->detail->regs_write[0]));
 
 	// explicit registers
 	for (i = 0; i < x86->op_count; i++) {

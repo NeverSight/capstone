@@ -695,3 +695,26 @@ SStream *markup_OS(SStream *OS, SStreamMarkup style)
 	OS->prefixed_by_markup = true;
 	return OS;
 }
+
+void SStream_concat2(SStream *ss, const char *first, const char *second)
+{
+#if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
+	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
+	!defined(_WIN32_WCE)
+	if (cs_vsnprintf == vsnprintf && first && second) {
+		assert(ss);
+		SSTREAM_RETURN_IF_CLOSED(ss);
+		if (SStream_remaining(ss) == 0)
+			return;
+		size_t first_len = strlen(first), second_len = strlen(second);
+		if (first_len <= INT_MAX && second_len <= INT_MAX - first_len) {
+			SStream_concat_raw(ss, first, first_len);
+			SStream_concat_raw(ss, second, second_len);
+			SStream_close_markup(ss);
+			return;
+		}
+		// Keep the system formatter's int-count overflow/error behavior.
+	}
+#endif
+	SStream_concat(ss, "%s%s", first, second);
+}

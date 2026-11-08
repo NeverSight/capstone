@@ -92,6 +92,11 @@ standalone register queries retain their existing external calls. Queries keep
 their unsigned width and empty lists require no array access. Architecture
 mapping functions still own insertion order and duplicate handling.
 
+x86 register-access queries skip empty implicit-register copies and assign
+single entries directly. Longer lists retain the existing bounded `memcpy`.
+The read list is copied before the write list; explicit-operand insertion,
+duplicate handling, and unused output entries keep their existing behavior.
+
 RISC-V's generated instruction mapping includes every opcode in order, including
 pseudo instructions. `RISCV_get_insn_id` indexes that original table directly;
 its unit test checks the dense ordering and compares every 16-bit input against
@@ -595,6 +600,15 @@ copy; other writes retain the external helper, including truncation and index
 repair. Empty strings remain no-ops. For `SStream_concat0`, DIET and other
 compilers retain the external helper. This constant-token specialization applies
 to generated printers without changing their tables or the translator.
+
+Two-string groups use `SStream_concat2` with the default system formatter.
+Both strings are appended with one markup close, including empty strings;
+truncation and stream flags match the original `%s%s` call. Custom formatters
+receive that original format and both arguments in one call. DIET, kernel and
+custom-runtime configurations retain the formatting path. The C++ translator's
+`StreamOperations` patch emits this helper for groups of exactly two strings,
+including ARM and AArch64 register names; other group sizes keep their existing
+callback boundaries.
 
 Decimal 64-bit magnitudes use `SStream_concat_dec64` with the default system
 formatter. It writes digits directly, preserving bounded appends, markup closure

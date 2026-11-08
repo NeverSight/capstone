@@ -56,6 +56,10 @@ void SStream_Close(SStream *ss);
 
 void SStream_concat(SStream *ss, const char *fmt, ...);
 
+// Append two strings with the same single markup close and callback as "%s%s".
+// Source strings must not overlap the destination append range.
+void SStream_concat2(SStream *ss, const char *first, const char *second);
+
 // Append a lowercase 0x-prefixed magnitude, optionally preceded by a minus sign.
 void SStream_concat_hex64(SStream *ss, uint64_t value, bool negative);
 
