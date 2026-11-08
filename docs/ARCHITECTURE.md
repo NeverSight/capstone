@@ -562,6 +562,10 @@ stream-owned helper copies the terminator with bounded scalar loads/stores,
 retains closed/markup/truncation behavior, and is a no-op in DIET. Other stream
 consumers retain their existing append implementation.
 
+The Intel and AT&T printers skip the extension-name query for MC register
+numbers below the source-owned extension bank. Numbers at or above its base
+still use the existing mapping and name query, which owns full bank validation.
+
 With the default userspace formatter, the Intel/MASM printer fills operand
 access and flags once, after explicit and implicit operands are complete. A
 custom formatter can observe partial detail or change options, so it retains

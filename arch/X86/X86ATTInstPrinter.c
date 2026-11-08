@@ -1030,10 +1030,13 @@ static void printanymem(MCInst *MI, unsigned OpNo, SStream *O)
 static void printRegName(SStream *OS, unsigned RegNo)
 {
 	const char *extension_name =
-		X86_featureExtensionMCRegisterName(RegNo);
+		RegNo >= X86_FEATURE_MC_GPR_BASE ?
+			X86_featureExtensionMCRegisterName(RegNo) :
+			NULL;
 
-	SStream_concat(OS, "%%%s", extension_name ? extension_name :
-					 getRegisterName(RegNo));
+	SStream_concat(OS, "%%%s",
+		       extension_name ? extension_name :
+					getRegisterName(RegNo));
 }
 
 void X86_ATT_printInst(MCInst *MI, SStream *OS, void *info)

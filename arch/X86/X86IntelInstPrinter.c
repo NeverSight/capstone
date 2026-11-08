@@ -293,7 +293,10 @@ static const char *getRegisterName(unsigned RegNo);
 static inline unsigned getRegisterNameLength(unsigned RegNo);
 static void printRegName(SStream *OS, unsigned RegNo)
 {
-	const char *extension_name = X86_featureExtensionMCRegisterName(RegNo);
+	const char *extension_name =
+		RegNo >= X86_FEATURE_MC_GPR_BASE ?
+			X86_featureExtensionMCRegisterName(RegNo) :
+			NULL;
 
 	if (extension_name)
 		SStream_concat0(OS, extension_name);
