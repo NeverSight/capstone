@@ -1439,6 +1439,8 @@ static DecodeStatus readInstruction48(const uint8_t *Bytes, size_t BytesLen,
 	return MCDisassembler_Success;
 }
 
+#include "Mips16DisassemblerExtension.h"
+
 static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
 				   const uint8_t *Bytes, size_t BytesLen,
 				   uint64_t Address, SStream *CStream)
@@ -1606,55 +1608,9 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
 		return MCDisassembler_Fail;
 	}
 
-	if (IsMips16) {
-		Result = readInstruction32(Bytes, BytesLen, Address, Size,
-					   &Insn, IsBigEndian, IsMips16);
-		if (Result != MCDisassembler_Fail) {
-			// Imported shift patterns overlap EXTEND + I8 when the
-			// upper immediate bits are zero. Select I8 by its actual
-			// major opcode before entering that generated table.
-			if ((Insn & 0xf800f800) == 0xf0006000) {
-				*Size = 4;
-				if (Insn & 0xe0)
-					return MCDisassembler_Fail;
-				switch ((Insn >> 8) & 7) {
-				case 0:
-					MCInst_setOpcode(Instr, Mips_BteqzX16);
-					break;
-				case 1:
-					MCInst_setOpcode(Instr, Mips_BtnezX16);
-					break;
-				case 3:
-					MCInst_setOpcode(Instr,
-							 Mips_AddiuSpImmX16);
-					break;
-				default:
-					return MCDisassembler_Fail;
-				}
-				unsigned Imm = (Insn & 31) |
-					       ((Insn >> 16) & 31) << 11 |
-					       ((Insn >> 21) & 63) << 5;
-				return DecodeSImmWithOffsetAndScale_16_0_1(
-					Instr, Imm, Address, NULL);
-			}
-			Result = decodeInstruction_4(DecoderTable32, Instr,
-						     Insn, Address, NULL);
-			if (Result != MCDisassembler_Fail) {
-				*Size = 4;
-				return Result;
-			}
-		}
-
-		Result = readInstruction16(Bytes, BytesLen, Address, Size,
-					   &Insn, IsBigEndian);
-		if (Result == MCDisassembler_Fail) {
-			return MCDisassembler_Fail;
-		}
-
-		*Size = 2;
-		return decodeInstruction_2(DecoderTable16, Instr, Insn, Address,
-					   NULL);
-	}
+	if (IsMips16)
+		return decodeMips16Instruction(Instr, Size, Bytes, BytesLen,
+					       Address, IsBigEndian);
 
 	// Attempt to read the instruction so that we can attempt to decode it. If
 	// the buffer is not 4 bytes long, let the higher level logic figure out

@@ -1,0 +1,13 @@
+/* Raw MD00076 revision 2.63 encodings; no decoder/assembler-generated values. */
+M16_MEMORY(0x8443, LB, V0, A0, 3, false)
+M16_MEMORY(0x8c43, LH, V0, A0, 6, false)
+M16_MEMORY(0x9c43, LW, V0, A0, 12, false)
+M16_MEMORY(0xa443, LBU, V0, A0, 3, false)
+M16_MEMORY(0xac43, LHU, V0, A0, 6, false)
+M16_MEMORY(0xc443, SB, V0, A0, 3, true)
+M16_MEMORY(0xcc43, SH, V0, A0, 6, true)
+M16_MEMORY(0xdc43, SW, V0, A0, 12, true)
+M16_MEMORY(0x9203, LW, V0, SP, 12, false)
+M16_MEMORY(0xd203, SW, V0, SP, 12, true)
+M16_MEMORY(0x6203, SW, RA, SP, 12, true)
+M16_MEMORY(0xb203, LW, V0, PC, 12, false)

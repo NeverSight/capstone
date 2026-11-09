@@ -212,6 +212,12 @@ void Mips_set_instr_map_data(MCInst *MI)
 	map_implicit_writes(MI, mips_insns);
 	map_groups(MI, mips_insns);
 #ifndef CAPSTONE_DIET
+	if ((MI->csh->mode & CS_MODE_MIPS16) && detail_is_set(MI)) {
+		cs_detail *detail = get_detail(MI);
+		for (unsigned i = 0; i < detail->groups_count; ++i)
+			if (detail->groups[i] == MIPS_FEATURE_HASSTDENC)
+				detail->groups[i] = MIPS_FEATURE_INMIPS16MODE;
+	}
 	switch (MCInst_getOpcode(MI)) {
 	case Mips_Bteqz16:
 	case Mips_Btnez16:
@@ -258,22 +264,12 @@ void Mips_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
 #endif
 }
 
-static void Mips_setup_op(cs_mips_op *op)
-{
-	memset(op, 0, sizeof(cs_mips_op));
-	op->type = MIPS_OP_INVALID;
-}
-
 void Mips_init_cs_detail(MCInst *MI)
 {
 	if (detail_is_set(MI)) {
-		unsigned int i;
-
+		// MIPS_OP_INVALID is zero; the complete reset includes every operand.
 		memset(get_detail(MI), 0,
 		       offsetof(cs_detail, mips) + sizeof(cs_mips));
-
-		for (i = 0; i < ARR_SIZE(Mips_get_detail(MI)->operands); i++)
-			Mips_setup_op(&Mips_get_detail(MI)->operands[i]);
 	}
 }
 
@@ -392,12 +388,23 @@ static void Mips_set_detail_op_operand(MCInst *MI, unsigned OpNum)
 	}
 }
 
+uint64_t Mips_getJumpTarget(const MCInst *MI, uint64_t Target)
+{
+	uint64_t Base = MI->address;
+	if (MI->csh->mode & CS_MODE_MIPS16) {
+		Base += 4;
+		if (!Mips_getFeatureBits(MI->csh->mode, Mips_FeatureGP64Bit))
+			Base = (uint32_t)Base;
+	}
+	return (Base & ~0x0fffffffull) | Target;
+}
+
 static void Mips_set_detail_op_jump(MCInst *MI, unsigned OpNum)
 {
 	cs_op_type op_type = Mips_map_op_type(MI, OpNum) & ~CS_OP_MEM;
 	if (op_type == CS_OP_IMM) {
-		uint64_t Base = MI->address & ~0x0fffffffull;
-		uint64_t Target = Base | (uint64_t)MCInst_getOpVal(MI, OpNum);
+		uint64_t Target =
+			Mips_getJumpTarget(MI, MCInst_getOpVal(MI, OpNum));
 		Mips_set_detail_op_uimm(MI, OpNum, Target);
 	} else if (op_type == CS_OP_REG) {
 		Mips_set_detail_op_reg(MI, OpNum, MCInst_getOpVal(MI, OpNum),
@@ -555,7 +562,7 @@ void Mips_add_cs_detail_0(MCInst *MI, mips_op_group op_group, size_t OpNum)
 
 void Mips_set_mem_access(MCInst *MI, bool status)
 {
-	if (!detail_is_set(MI))
+	if (!detail_is_set(MI) || !map_fill_detail_ops(MI))
 		return;
 	set_doing_mem(MI, status);
 	if (status) {
