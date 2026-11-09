@@ -112,7 +112,39 @@ static DecodeStatus decodeMips16Instruction(MCInst *MI, uint64_t *Size,
 		scale = 2;
 		break;
 	case 0x0c:
-		if (((half >> 8) & 7) == 2) {
+		if (((half >> 8) & 7) == 4) {
+			unsigned ar = extended ? first & 15 : 0;
+			if (ar == 15)
+				return MCDisassembler_Fail;
+			bool save = half & 0x80;
+			MCInst_setOpcode(MI,
+					 save ? (extended ? Mips_SaveX16 :
+							    Mips_Save16) :
+						(extended ? Mips_RestoreX16 :
+							    Mips_Restore16));
+			unsigned args = ar == 14 ? 4 : ar == 11 ? 0 : ar >> 2;
+			unsigned statics = ar == 11 ? 4 : ar == 14 ? 0 : ar & 3;
+			// The frame operand separates incoming arguments from statics.
+			if (save)
+				for (unsigned n = 0; n < args; ++n)
+					mips16GPR(MI, 4 + n);
+			unsigned frame = (half & 15) |
+					 (extended ? first & 0xf0 : 0);
+			MCOperand_CreateImm0(
+				MI, !extended && !frame ? 128 : frame * 8);
+			for (unsigned n = 8 - statics; n < 8; ++n)
+				mips16GPR(MI, n);
+			if (half & 0x20)
+				mips16GPR(MI, 16);
+			if (half & 0x10)
+				mips16GPR(MI, 17);
+			unsigned xs = extended ? (first >> 8) & 7 : 0;
+			for (unsigned n = 0; n < xs; ++n)
+				mips16GPR(MI, n == 6 ? 30 : 18 + n);
+			if (half & 0x40)
+				mips16GPR(MI, 31);
+			return MCDisassembler_Success;
+		} else if (((half >> 8) & 7) == 2) {
 			opcode = Mips_SW;
 			stack = true;
 			reg = 31;

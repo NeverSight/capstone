@@ -867,3 +867,13 @@ the EnhancedTlbi control and reserved-bit rules in AMD APM volume 3 revision
 3.38, page 496. The decoder does not execute synchronization or qualify hardware
 completion. `unit_x86_system_extensions` checks mode, syntax, prefix and both
 API paths while retaining the existing invalid-encoding coverage.
+
+## MIPS16 stack frames
+
+Short and extended SAVE/RESTORE now decode with the existing public instruction
+IDs. Register operands before the frame-size immediate are saved incoming
+arguments; those after it are static registers. RESTORE omits incoming arguments
+because it does not load them. Operand access and the implicit SP read/write are
+reported in non-DIET detail. Short frame zero denotes 128 bytes, extended zero
+denotes zero bytes; the reserved aregs encoding is refused. Public layouts and
+IDs are unchanged. Encoding authority: MD00076 revision 2.63, pages 118–127.

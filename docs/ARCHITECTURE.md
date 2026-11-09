@@ -87,6 +87,13 @@ Direct-call text and detail share the region calculation from the end of the
 four-byte instruction. The extension is included after the generated decoder
 and byte readers; preserve that include and the MIPS16 dispatch on Auto-Sync.
 `unit_mips16_memory_calls` covers canonical operands and poisoned iterator reuse.
+MIPS16 SAVE/RESTORE use the existing private frame opcodes with handwritten
+mapping and printing in `MipsMapping.c`; compiler pseudo descriptors have no
+physical operands. Incoming argument registers precede the frame-size immediate,
+static registers follow it, and SP is an implicit read/write. The extended zero
+frame differs from the short zero frame. Reserved aregs 15 is rejected before
+producing operands. `unit_mips16_frames` covers field combinations, both output
+APIs, byte orders and detail modes, including DIET.
 MIPS detail initialization clears the whole active detail once (INVALID is zero).
 The second alias print in DETAIL_REAL must not append memory operands: both
 operand callbacks and memory-group bookkeeping honor `fillDetailOps`.
