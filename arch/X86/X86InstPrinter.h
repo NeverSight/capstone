@@ -21,6 +21,14 @@
 #include "../../SStream.h"
 
 void X86_Intel_printInst(MCInst *MI, SStream *OS, void *Info);
+#if defined(__GNUC__) && !defined(CAPSTONE_DIET) && \
+	!defined(CAPSTONE_X86_REDUCE) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
+	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
+	!defined(_WIN32_WCE)
+#define CAPSTONE_X86_PRECHECKED_PRINTER
+void X86_Intel_printInstructionPrechecked(MCInst *MI, SStream *OS);
+#endif
+
 void X86_ATT_printInst(MCInst *MI, SStream *OS, void *Info);
 
 #endif

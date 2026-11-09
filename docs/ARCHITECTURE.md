@@ -612,6 +612,27 @@ generation. It inserts the table and dispatch includes and validates opcode
 alignment, terminal paths and supported fragment syntax. Its `--check` mode
 rejects stale output, and parser tests reject conditional or unowned work.
 
+The full Intel printer can preflight its generated body once, after lock/rep
+prefixes have been emitted. With the standard formatter, an open plain stream
+and sufficient remaining capacity, it uses a second instantiation of the same
+printer and the same stream copy bodies without per-token state/capacity checks.
+Custom formatters, markup, closed/full streams, DIET and reduced builds retain
+the original path. The decode, operand/detail writes and public interfaces are
+unchanged. This instantiation is confined to GCC-compatible user-space builds.
+
+The projection also generates the maximum body extent from every original
+opcode path, including dynamic mnemonic suffixes and literals. Scalar helpers
+are bounded by 32 bytes: signed 64-bit decimal needs at most 21, and register,
+hexadecimal and predicate tokens are shorter. A memory helper is bounded by
+192: four scalar components, scale, brackets and separators need at most 159,
+plus at most 12 qualifier bytes. The current longest generated path is 392
+bytes, including two memory operands. A compile-time check ensures it fits the
+stream; the entry reserves its terminator too. New helpers require a bound in
+`path_extent`; changes to existing helpers must preserve or revise that bound.
+The prechecked append bodies assert their contracts in debug builds. Direct
+printer tests compare complete streams and instruction/detail state with the
+generic path at every stream index, including capacity and markup boundaries.
+
 The Intel register-name offsets also carry three length bits in their existing
 16-bit records. `suite/synctools/x86_register_name_sizes.py` derives them from
 `X86GenRegisterName1.inc`, preserving string bytes, suffix sharing and offsets;

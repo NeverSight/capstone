@@ -779,6 +779,19 @@ static void printMemOffs64(MCInst *MI, unsigned OpNo, SStream *O)
 
 static void printInstruction(MCInst *MI, SStream *O);
 
+#ifdef CAPSTONE_X86_PRECHECKED_PRINTER
+#define CAPSTONE_X86_PRINTER_EXTENT
+#include "X86GenPrinterQuick.inc"
+#undef CAPSTONE_X86_PRINTER_EXTENT
+#endif
+
+#ifdef CAPSTONE_SSTREAM_PRECHECKED
+void X86_Intel_printInstructionPrechecked(MCInst *MI, SStream *O)
+{
+	printInstruction(MI, O);
+}
+#else
+
 void X86_Intel_printInst(MCInst *MI, SStream *O, void *Info)
 {
 	x86_reg reg = X86_REG_INVALID, reg2;
@@ -805,7 +818,16 @@ void X86_Intel_printInst(MCInst *MI, SStream *O, void *Info)
 		else
 			printi32mem(MI, 1, O);
 	} else {
-		printInstruction(MI, O);
+#ifdef CAPSTONE_X86_PRECHECKED_PRINTER
+		// Prefixes have already been printed. These fixed generated paths
+		// neither call a custom formatter nor change the stream flags.
+		if (cs_vsnprintf == vsnprintf && !O->is_closed &&
+		    !O->markup_stream && !O->prefixed_by_markup &&
+		    O->index <= SSTREAM_BUF_LEN - 1 - X86_PRINTER_MAX_LENGTH)
+			X86_Intel_printInstructionPrechecked(MI, O);
+		else
+#endif
+			printInstruction(MI, O);
 	}
 
 	if (MI->csh->detail_opt) {
@@ -873,6 +895,8 @@ void X86_Intel_printInst(MCInst *MI, SStream *O, void *Info)
 	if (MI->op1_size == 0 && reg)
 		MI->op1_size = MI->csh->regsize_map[reg];
 }
+
+#endif // CAPSTONE_SSTREAM_PRECHECKED
 
 /// printPCRelImm - This is used to print an immediate value that ends up
 /// being encoded as a pc-relative value.

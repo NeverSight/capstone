@@ -72,16 +72,28 @@ void SStream_concat0(SStream *ss, const char *s);
 // static table, disjoint from the stream. Preserve custom allocation callbacks.
 void SStream_concat0_substr(SStream *ss, const char *s, size_t len);
 
+// CAPSTONE_SSTREAM_PRECHECKED is private to the x86 printer instantiation.
+// Its caller validates stream state and the complete generated output extent.
 // The caller supplies the exact length of the NUL-terminated string.
 // Source bytes must not overlap the append range.
 static inline void SStream_concat0_n(SStream *ss, const char *s, size_t len)
 {
 #ifndef CAPSTONE_DIET
 	assert(ss && s);
+#ifdef CAPSTONE_SSTREAM_PRECHECKED
+	assert(!ss->is_closed && !ss->markup_stream && !ss->prefixed_by_markup);
+	assert(len < SSTREAM_BUF_LEN && ss->index < SSTREAM_BUF_LEN - len);
+	if (len == 0)
+#else
 	if (ss->is_closed || len == 0)
+#endif
 		return;
+#ifdef CAPSTONE_SSTREAM_PRECHECKED
+	{
+#else
 	if (len < SSTREAM_BUF_LEN && ss->index < SSTREAM_BUF_LEN - len &&
 	    !(ss->markup_stream && ss->prefixed_by_markup)) {
+#endif
 		char *out = ss->buffer + ss->index;
 		// Two fixed-size copies cover short table names without a libc call.
 		// Both reads and writes stay within the exact string length.
@@ -118,13 +130,23 @@ static inline __attribute__((always_inline)) void
 SStream_concat0_inline(SStream *ss, const char *s)
 {
 	assert(ss && s);
+#ifndef CAPSTONE_SSTREAM_PRECHECKED
 	if (ss->is_closed)
 		return;
+#endif
 	const size_t len = __builtin_strlen(s);
+#ifdef CAPSTONE_SSTREAM_PRECHECKED
+	assert(!ss->is_closed && !ss->markup_stream && !ss->prefixed_by_markup);
+	assert(len < SSTREAM_BUF_LEN && ss->index < SSTREAM_BUF_LEN - len);
+#endif
 	if (len == 0)
 		return;
+#ifdef CAPSTONE_SSTREAM_PRECHECKED
+	{
+#else
 	if (len < SSTREAM_BUF_LEN && ss->index < SSTREAM_BUF_LEN - len &&
 	    !(ss->markup_stream && ss->prefixed_by_markup)) {
+#endif
 		memcpy(ss->buffer + ss->index, s, len);
 		ss->index += len;
 		ss->buffer[ss->index] = '\0';
@@ -183,10 +205,20 @@ static inline void SStream_concat0_small(SStream *ss, const char *s, size_t len)
 {
 #ifndef CAPSTONE_DIET
 	assert(ss && s && len < 8);
+#ifdef CAPSTONE_SSTREAM_PRECHECKED
+	assert(!ss->is_closed && !ss->markup_stream && !ss->prefixed_by_markup);
+	assert(len < SSTREAM_BUF_LEN && ss->index < SSTREAM_BUF_LEN - len);
+	if (len == 0)
+#else
 	if (ss->is_closed || len == 0)
+#endif
 		return;
+#ifdef CAPSTONE_SSTREAM_PRECHECKED
+	{
+#else
 	if (ss->index < SSTREAM_BUF_LEN - len &&
 	    !(ss->markup_stream && ss->prefixed_by_markup)) {
+#endif
 		char *out = ss->buffer + ss->index;
 		// Include the source terminator in two exact-range copies.
 		if (len >= 3) {

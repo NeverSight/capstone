@@ -32,6 +32,27 @@ FRAGMENT = """switch ((uint32_t)((Bits >> 14) & 3)) {
 
 
 class PrinterProjection(unittest.TestCase):
+    def test_extent_includes_prefix_literals_and_helper_output(self):
+        path = (
+            "printOperand(MI, 0, O);",
+            'SStream_concat0(O, ", ");',
+            "printi64mem(MI, 1, O);",
+            "op_addAvxSae(MI);",
+            "return;",
+        )
+        self.assertEqual(PRINTER.path_extent(path, 13), 13 + 32 + 2 + 192)
+        self.assertEqual(PRINTER.path_extent(('SStream_concat0(O, "\\t");',), 0), 1)
+
+    def test_new_helpers_cannot_silently_escape_the_extent(self):
+        for call in [
+            "printSymbol(MI, 0, O);",
+            "op_addUnknown(MI);",
+            "SStream_concat0(O, symbol);",
+            "if (MI->flags) return;",
+        ]:
+            with self.subTest(call=call), self.assertRaises(ValueError):
+                PRINTER.path_extent((call,), 0)
+
     def test_changed_opcode_setup_cannot_use_precomputed_paths(self):
         directory = ROOT / "arch/X86"
         source = (directory / "X86GenAsmWriter1.inc").read_text()
