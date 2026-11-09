@@ -94,6 +94,17 @@ static registers follow it, and SP is an implicit read/write. The extended zero
 frame differs from the short zero frame. Reserved aregs 15 is rejected before
 producing operands. `unit_mips16_frames` covers field combinations, both output
 APIs, byte orders and detail modes, including DIET.
+MIPS16e2 integer and memory EXTEND forms are selected before overlapping old
+patterns. `Mips16E2Encodings.inc` owns immediate/GP-memory selectors and T-move
+spellings. Public MOVZ/MOVN IDs retain all three semantic register operands;
+the T-register variants print the physical two-operand MOVTZ/MOVTN spellings,
+with no Capstone alias ID or alternate alias-detail layout.
+Merge loads and conditional/bitfield destinations carry read/write access,
+whereas merge-store memory is write-only. `unit_mips16e2` checks independent
+GNU encodings, all compact move fields, bitfield bounds, reserved bits, physical
+truncations, both APIs, output modes, syntax options and poisoned detail reuse.
+As with other Capstone features, decoding does not attest an image's ASE flags;
+consumers must enforce the selected machine profile.
 MIPS detail initialization clears the whole active detail once (INVALID is zero).
 The second alias print in DETAIL_REAL must not append memory operands: both
 operand callbacks and memory-group bookkeeping honor `fillDetailOps`.

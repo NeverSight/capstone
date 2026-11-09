@@ -235,3 +235,10 @@ You can set the `skip` field for those tests and add a `skip_reason`.
 
 Once https://github.com/capstone-engine/capstone/issues/1992 is resolved, we can
 test all variants.
+
+`unit_mips16e2` exercises the MD01172 rev 1.00 integer and memory EXTEND forms
+using literal GNU binutils encodings in `unit/mips16e2_cases.inc`. Build with
+`CAPSTONE_MIPS_SUPPORT=ON` and `CAPSTONE_BUILD_CSTEST=ON`, then run
+`ctest --test-dir <build> -R '^unit_mips' --output-on-failure` in both Release
+and `CAPSTONE_BUILD_DIET=ON` configurations. This does not cover e2 privileged,
+atomic, cache or hint instructions.

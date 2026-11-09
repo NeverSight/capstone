@@ -297,10 +297,50 @@ bool Mips_getInstruction(csh handle, const uint8_t *code, size_t code_len,
 	return Result != MCDisassembler_Fail;
 }
 
+static void Mips_set_detail_op_reg(MCInst *MI, unsigned OpNum, mips_reg Reg,
+				   bool is_reglist);
+
 void Mips_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
 {
 	MCRegisterInfo *MRI = (MCRegisterInfo *)info;
 	MI->MRI = MRI;
+	const char *tmove = NULL;
+	if ((MI->csh->mode & CS_MODE_MIPS16) &&
+	    MCInst_getNumOperands(MI) == 4 &&
+	    MCInst_getOpVal(MI, 2) == MIPS_REG_T8) {
+		switch (MCInst_getOpcode(MI)) {
+#define M16E2_TMOVE(Opcode, Text) \
+	case Mips_##Opcode: \
+		tmove = Text; \
+		break;
+#include "Mips16E2Encodings.inc"
+#undef M16E2_TMOVE
+		default:
+			break;
+		}
+	}
+	if (tmove) {
+		// A physical MIPS16e2 spelling with canonical MOVZ/MOVN semantics,
+		// not a Capstone alias ID or a different alias operand layout.
+		SStream_concat0(O, tmove);
+		for (unsigned n = 0; n < 2; ++n) {
+			if (n)
+				SStream_concat0(O, ", ");
+			if (!(MI->csh->syntax & CS_OPT_SYNTAX_NO_DOLLAR))
+				SStream_concat1(O, '$');
+			SStream_concat0(
+				O, Mips_LLVM_getRegisterName(
+					   MCInst_getOpVal(MI, n),
+					   MI->csh->syntax &
+						   CS_OPT_SYNTAX_NOREGNAME));
+		}
+		// Canonical MOVN/MOVZ detail retains the explicit T dependency.
+		if (map_fill_detail_ops(MI))
+			for (unsigned n = 0; n < 3; ++n)
+				Mips_set_detail_op_reg(
+					MI, n, MCInst_getOpVal(MI, n), false);
+		return;
+	}
 	unsigned frame_id = Mips_frame_id(MI);
 	if (frame_id) {
 		SStream_concat0(O, frame_id == MIPS_INS_SAVE ? "save\t" :
@@ -334,6 +374,8 @@ void Mips_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
 
 void Mips_init_cs_detail(MCInst *MI)
 {
+	map_set_is_alias_insn(MI, false, 0);
+	MI->flat_insn->usesAliasDetails = false;
 	if (detail_is_set(MI)) {
 		// MIPS_OP_INVALID is zero; the complete reset includes every operand.
 		memset(get_detail(MI), 0,
@@ -363,6 +405,28 @@ static cs_op_type Mips_map_op_type(MCInst *MI, unsigned OpNum)
 
 static cs_ac_type Mips_map_op_access(MCInst *MI, unsigned OpNum)
 {
+#ifndef CAPSTONE_DIET
+	if (MI->csh->mode & CS_MODE_MIPS16) {
+		switch (MCInst_getOpcode(MI)) {
+		case Mips_LWL:
+		case Mips_LWR:
+			return OpNum == 0 ? CS_AC_READ | CS_AC_WRITE :
+					    CS_AC_READ;
+		case Mips_SWL:
+		case Mips_SWR:
+			return OpNum == 0 ? CS_AC_READ : CS_AC_WRITE;
+		case Mips_INS:
+		case Mips_MOVN_I_I:
+		case Mips_MOVZ_I_I:
+			// The printed destination also carries the tied old value.
+			if (OpNum == 0)
+				return CS_AC_READ | CS_AC_WRITE;
+			break;
+		default:
+			break;
+		}
+	}
+#endif
 	return map_get_op_access(MI, Mips_map_op_index(MI, OpNum));
 }
 

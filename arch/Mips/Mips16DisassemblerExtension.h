@@ -5,7 +5,7 @@
 #define CS_MIPS16_DISASSEMBLER_EXTENSION_H
 
 /* Physical MIPS16 forms missing from the imported compiler descriptions.
- * MD00076 revision 2.63 is the encoding authority. Keep these corrections
+ * MD00076 revision 2.63 and MD01172 revision 1.00 own these encodings. Keep
  * outside translated/generated files; see docs/ARCHITECTURE.md. */
 static unsigned mips16CompactReg(unsigned field)
 {
@@ -50,6 +50,89 @@ static DecodeStatus decodeMips16Instruction(MCInst *MI, uint64_t *Size,
 				(half & 31);
 	unsigned opcode = 0, scale = 0, base = rx, reg = ry;
 	bool stack = false, pc = false;
+	if (extended) {
+		unsigned selector = (half >> 5) & 7;
+		switch ((major << 3) | selector) {
+#define M16E2_IMMEDIATE(Major, Selector, Opcode, Source) \
+	case ((Major) << 3) | (Selector): \
+		MCInst_setOpcode(MI, Mips_##Opcode); \
+		mips16GPR(MI, rx); \
+		if (Mips_##Opcode != Mips_LUi) \
+			mips16GPR(MI, Source); \
+		MCOperand_CreateImm0(MI, Mips_##Opcode == Mips_ADDiu ? \
+						 offset : \
+						 (uint16_t)offset); \
+		return MCDisassembler_Success;
+#define M16E2_MEMORY(Major, Selector, Opcode) \
+	case ((Major) << 3) | (Selector): \
+		MCInst_setOpcode(MI, Mips_##Opcode); \
+		mips16GPR(MI, rx); \
+		mips16GPR(MI, 28); \
+		MCOperand_CreateImm0(MI, offset); \
+		return MCDisassembler_Success;
+#include "Mips16E2Encodings.inc"
+#undef M16E2_IMMEDIATE
+#undef M16E2_MEMORY
+		case (0x12 << 3) | 7:
+		case (0x1a << 3) | 7:
+			if (first & 0x608)
+				return MCDisassembler_Fail;
+			opcode = major == 0x12 ?
+					 (first & 16 ? Mips_LWR : Mips_LWL) :
+					 (first & 16 ? Mips_SWR : Mips_SWL);
+			MCInst_setOpcode(MI, opcode);
+			mips16GPR(MI, rx);
+			mips16GPR(MI, mips16CompactReg(first & 7));
+			MCOperand_CreateImm0(
+				MI,
+				(int)(((first & 0x1e0) | (half & 31)) ^ 0x100) -
+					0x100);
+			if (major == 0x12)
+				mips16GPR(MI, rx);
+			return MCDisassembler_Success;
+		}
+		if (major == 6 && (half & 0x1c)) {
+			unsigned sel = (half >> 2) & 7;
+			unsigned function = half & 3;
+			if (!function && (sel == 1 || sel == 2)) {
+				bool insert = sel == 1;
+				unsigned pos = (first >> 6) & 31;
+				unsigned limit = first & 31;
+				bool source = first & 32;
+				if ((!source && (!insert || (half & 0x700))) ||
+				    (insert ? limit < pos : limit + pos > 31))
+					return MCDisassembler_Fail;
+				MCInst_setOpcode(MI,
+						 insert ? Mips_INS : Mips_EXT);
+				mips16GPR(MI, ry);
+				mips16GPR(MI, source ? rx : 0);
+				MCOperand_CreateImm0(MI, pos);
+				MCOperand_CreateImm0(MI,
+						     insert ? limit - pos + 1 :
+							      limit + 1);
+				if (insert)
+					mips16GPR(MI, ry);
+				return MCDisassembler_Success;
+			}
+			if (function == 2 &&
+			    (sel == 1 || sel == 2 || sel == 5 || sel == 6)) {
+				if ((first & 0x7d8) ||
+				    (!(first & 32) && (first & 7)) ||
+				    (sel >= 5 && (half & 0xe0)))
+					return MCDisassembler_Fail;
+				MCInst_setOpcode(MI, sel & 1 ? Mips_MOVZ_I_I :
+							       Mips_MOVN_I_I);
+				mips16GPR(MI, rx);
+				mips16GPR(MI, first & 32 ? mips16CompactReg(
+								   first & 7) :
+							   0);
+				mips16GPR(MI, sel >= 5 ? 24 : ry);
+				mips16GPR(MI, rx);
+				return MCDisassembler_Success;
+			}
+			return MCDisassembler_Fail;
+		}
+	}
 	switch (major) {
 	case 0:
 	case 1:
