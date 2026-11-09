@@ -15,8 +15,9 @@ static bool check(csh h, bool big, unsigned output, unsigned rx, unsigned ry,
 		  unsigned kind, unsigned amount, bool extended)
 {
 	const unsigned ids[] = { MIPS_INS_SLL, MIPS_INS_SRL,  MIPS_INS_SRA,
-				 MIPS_INS_NEG, MIPS_INS_MULT, MIPS_INS_MULTU };
-	const unsigned functions[] = { 0, 2, 3, 11, 24, 25 };
+				 MIPS_INS_NEG, MIPS_INS_MULT, MIPS_INS_MULTU,
+				 MIPS_INS_DIV, MIPS_INS_DIVU };
+	const unsigned functions[] = { 0, 2, 3, 11, 24, 25, 26, 27 };
 	unsigned half = (kind < 3 ? 0x3000 : 0xe800) | (rx << 8) | (ry << 5) |
 			functions[kind];
 	if (kind < 3 && !extended)
@@ -34,18 +35,21 @@ static bool check(csh h, bool big, unsigned output, unsigned rx, unsigned ry,
 		  address == 0x10002 + size && !memcmp(i->bytes, bytes, size);
 	if (ok && output == 3) {
 		const cs_mips *m = &i->detail->mips;
-		ok = m->op_count == (kind < 3 ? 3 : 2) &&
-		     m->operands[0].type == MIPS_OP_REG &&
-		     m->operands[0].reg == registers[rx < 2 ? rx + 16 : rx] &&
-		     m->operands[1].type == MIPS_OP_REG &&
-		     m->operands[1].reg == registers[ry < 2 ? ry + 16 : ry];
+		unsigned start = kind >= 6 ? 1 : 0;
+		ok = m->op_count == (kind < 3 || kind >= 6 ? 3 : 2) &&
+		     m->operands[start].type == MIPS_OP_REG &&
+		     m->operands[start].reg ==
+			     registers[rx < 2 ? rx + 16 : rx] &&
+		     m->operands[start + 1].type == MIPS_OP_REG &&
+		     m->operands[start + 1].reg ==
+			     registers[ry < 2 ? ry + 16 : ry];
 		if (kind < 3)
 			ok &= m->operands[2].type == MIPS_OP_IMM &&
 			      m->operands[2].imm == amount;
 		if (!cs_support(CS_SUPPORT_DIET)) {
-			ok &= m->operands[0].access ==
+			ok &= m->operands[start].access ==
 				      (kind < 4 ? CS_AC_WRITE : CS_AC_READ) &&
-			      m->operands[1].access == CS_AC_READ &&
+			      m->operands[start + 1].access == CS_AC_READ &&
 			      cs_insn_group(h, i, MIPS_FEATURE_INMIPS16MODE) &&
 			      !cs_insn_group(h, i, MIPS_FEATURE_HASSTDENC);
 			if (kind >= 4)
@@ -121,7 +125,7 @@ int main(void)
 			cs_option(h, CS_OPT_DETAIL,
 				  output & 2 ? CS_OPT_ON | CS_OPT_DETAIL_REAL :
 					       CS_OPT_OFF);
-			for (unsigned kind = 0; kind < 6; ++kind)
+			for (unsigned kind = 0; kind < 8; ++kind)
 				for (unsigned rx = 0; rx < 8; ++rx)
 					for (unsigned ry = 0; ry < 8; ++ry) {
 						if (kind >= 3) {

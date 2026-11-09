@@ -194,8 +194,53 @@ void Mips_reg_access(const cs_insn *insn, cs_regs regs_read,
 	*regs_write_count = write_count;
 }
 
+static unsigned Mips_frame_id(const MCInst *MI)
+{
+	switch (MCInst_getOpcode(MI)) {
+	case Mips_Save16:
+	case Mips_SaveX16:
+		return MIPS_INS_SAVE;
+	case Mips_Restore16:
+	case Mips_RestoreX16:
+		return MIPS_INS_RESTORE;
+	default:
+		return MIPS_INS_INVALID;
+	}
+}
+
 void Mips_set_instr_map_data(MCInst *MI)
 {
+	unsigned frame_id = Mips_frame_id(MI);
+	if (frame_id) {
+		MI->flat_insn->id = frame_id;
+		if (!detail_is_set(MI))
+			return;
+		cs_mips *m = &get_detail(MI)->mips;
+		m->op_count = MCInst_getNumOperands(MI);
+		for (unsigned n = 0; n < m->op_count; ++n) {
+			MCOperand *op = MCInst_getOperand(MI, n);
+			cs_mips_op *out = &m->operands[n];
+			if (MCOperand_isReg(op)) {
+				out->type = MIPS_OP_REG;
+				out->reg = MCOperand_getReg(op);
+				out->is_reglist = true;
+#ifndef CAPSTONE_DIET
+				out->access = frame_id == MIPS_INS_SAVE ?
+						      CS_AC_READ :
+						      CS_AC_WRITE;
+#endif
+			} else {
+				out->type = MIPS_OP_IMM;
+				out->imm = MCOperand_getImm(op);
+			}
+		}
+#ifndef CAPSTONE_DIET
+		map_add_implicit_read(MI, MIPS_REG_SP);
+		map_add_implicit_write(MI, MIPS_REG_SP);
+		add_group(MI, MIPS_FEATURE_INMIPS16MODE);
+#endif
+		return;
+	}
 	// Fixes for missing groups.
 	if (MCInst_getOpcode(MI) == Mips_JR) {
 		unsigned Reg = MCInst_getOpVal(MI, 0);
@@ -256,6 +301,29 @@ void Mips_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
 {
 	MCRegisterInfo *MRI = (MCRegisterInfo *)info;
 	MI->MRI = MRI;
+	unsigned frame_id = Mips_frame_id(MI);
+	if (frame_id) {
+		SStream_concat0(O, frame_id == MIPS_INS_SAVE ? "save\t" :
+							       "restore\t");
+		for (unsigned n = 0; n < MCInst_getNumOperands(MI); ++n) {
+			if (n)
+				SStream_concat0(O, ", ");
+			MCOperand *op = MCInst_getOperand(MI, n);
+			if (MCOperand_isReg(op)) {
+				if (!(MI->csh->syntax &
+				      CS_OPT_SYNTAX_NO_DOLLAR))
+					SStream_concat1(O, '$');
+				SStream_concat0(
+					O,
+					Mips_LLVM_getRegisterName(
+						MCOperand_getReg(op),
+						MI->csh->syntax &
+							CS_OPT_SYNTAX_NOREGNAME));
+			} else
+				printUInt64(O, MCOperand_getImm(op));
+		}
+		return;
+	}
 
 	Mips_LLVM_printInst(MI, MI->address, O);
 #ifndef CAPSTONE_DIET
