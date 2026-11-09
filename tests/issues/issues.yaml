@@ -6135,14 +6135,14 @@ test_cases:
                 reg: v1
               - type: MIPS_OP_REG
                 reg: v0
-      - asm_text: "addiu sp, 0x1e"
+      - asm_text: "addiu sp, 0xf0"
         details:
           mips:
             operands:
               - type: MIPS_OP_REG
                 reg: sp
               - type: MIPS_OP_IMM
-                imm: 0x1e
+                imm: 0xf0
       - asm_text: "addiu sp, 0x2065"
         details:
           mips:
