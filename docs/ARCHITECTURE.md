@@ -56,6 +56,15 @@ the external definition from that same body; the enabled-feature policy and
 mode changes remain unchanged. The RISC-V extension header owns its generated
 feature enum include, including after Auto-Sync regeneration.
 
+MIPS16 physical forms omitted or misdescribed by the imported compiler tables
+are corrected in `Mips16DisassemblerExtension.h`. Immediate shifts distinguish
+the short zero field (eight bits) from the extended count in prefix bits 10:6;
+reserved prefix/suffix fields are rejected. NEG and multiply reuse the existing
+operand and implicit HI/LO mapping. `unit_mips16_shifts_hilo` checks both byte
+orders, compact register banks, complete shift ranges, physical truncation,
+and reserved fields in normal and DIET builds. Operand access, groups and
+implicit writes are checked only in the normal build.
+
 ### Operand postprocessing
 
 MIPS16 immediate widths, scaling and branch bases are corrected in the owning

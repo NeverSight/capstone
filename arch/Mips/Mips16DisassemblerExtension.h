@@ -57,6 +57,19 @@ static DecodeStatus decodeMips16Instruction(MCInst *MI, uint64_t *Size,
 		stack = major == 0;
 		pc = !stack;
 		break;
+	case 6: // SHFT: short zero count denotes eight; EXTEND carries 0..31.
+		if ((half & 3) == 1 ||
+		    (extended && ((first & 0x3f) || (half & 0x1c))))
+			return MCDisassembler_Fail;
+		MCInst_setOpcode(MI, (half & 3) == 0 ? Mips_SLL :
+				     (half & 3) == 2 ? Mips_SRL :
+						       Mips_SRA);
+		mips16GPR(MI, rx);
+		mips16GPR(MI, ry);
+		unsigned amount = extended ? (first >> 6) & 31 :
+					     (half >> 2) & 7;
+		MCOperand_CreateImm0(MI, extended || amount ? amount : 8);
+		return MCDisassembler_Success;
 	case 0x10:
 		opcode = Mips_LB;
 		break;
@@ -117,6 +130,16 @@ static DecodeStatus decodeMips16Instruction(MCInst *MI, uint64_t *Size,
 		}
 		break;
 	case 0x1d:
+		if (!extended && ((half & 31) == 11 || (half & 31) == 24 ||
+				  (half & 31) == 25)) {
+			MCInst_setOpcode(MI, (half & 31) == 11 ?
+						     Mips_NegRxRy16 :
+					     (half & 31) == 24 ? Mips_MULT :
+								 Mips_MULTu);
+			mips16GPR(MI, rx);
+			mips16GPR(MI, ry);
+			return MCDisassembler_Success;
+		}
 		if (!extended && !(half & 31)) {
 			unsigned kind = (half >> 6) & 3;
 			if (half & 0x20) {
