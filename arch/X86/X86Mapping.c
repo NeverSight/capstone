@@ -8509,7 +8509,7 @@ bool X86_printFeatureExtension(MCInst *instr, SStream *stream, bool att_syntax)
 
 #undef feature_operand_register_name
 
-bool X86_mapFeatureExtension(cs_insn *insn, unsigned int opcode)
+bool X86_mapFeatureExtension(cs_insn *insn, unsigned int opcode, cs_mode mode)
 {
 	if (opcode < X86_FEATURE_OPCODE_BASE)
 		return false;
@@ -9000,6 +9000,13 @@ bool X86_mapFeatureExtension(cs_insn *insn, unsigned int opcode)
 				d->regs_write_count = 1;
 			} else if (opcode == X86_FEATURE_HRESET) {
 				d->regs_read[0] = X86_REG_EAX;
+				d->regs_read_count = 1;
+			} else if (opcode == X86_FEATURE_TLBSYNC) {
+				/* EnhancedTlbi consumes the full control register,
+				 * independently of address-size overrides. */
+				d->regs_read[0] = mode & CS_MODE_64 ?
+							  X86_REG_RAX :
+							  X86_REG_EAX;
 				d->regs_read_count = 1;
 			} else if (opcode == X86_FEATURE_INVLPGB) {
 				d->regs_read[0] = d->x86.addr_size == 8 ?
@@ -10235,7 +10242,8 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
 {
 	unsigned int i;
 
-	if (id >= X86_FEATURE_OPCODE_BASE && X86_mapFeatureExtension(insn, id))
+	if (id >= X86_FEATURE_OPCODE_BASE &&
+	    X86_mapFeatureExtension(insn, id, h->mode))
 		return;
 
 	if (X86_get_insn_id_no_detail(h, insn, id))

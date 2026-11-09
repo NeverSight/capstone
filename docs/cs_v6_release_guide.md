@@ -856,3 +856,14 @@ legacy CLZERO/INVLPGB/TLBSYNC/VMMCALL aliases can consume the bytes. These are
 decoding guarantees; the library does not execute RMP operations or implement
 GHCB services. The instruction authority is AMD APM Volume 3, 24594 revision
 3.39 (October 2026), sections PSMASH through RMPUPDATE and VMGEXIT.
+
+### TLBSYNC control-register metadata
+
+TLBSYNC records its implicit control-register read: RAX in 64-bit code and EAX
+in legacy code. Segment and address-size prefixes do not narrow that control.
+The allocated-array and iterator APIs expose the same read through instruction
+detail and `cs_regs_access`; no register or flags write is added. This follows
+the EnhancedTlbi control and reserved-bit rules in AMD APM volume 3 revision
+3.38, page 496. The decoder does not execute synchronization or qualify hardware
+completion. `unit_x86_system_extensions` checks mode, syntax, prefix and both
+API paths while retaining the existing invalid-encoding coverage.

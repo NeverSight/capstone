@@ -347,6 +347,63 @@ static bool check_prefixes_and_memory(csh h, cs_mode mode)
 	return ok;
 }
 
+static bool check_tlbsync_controls(csh h, cs_mode mode)
+{
+	const uint8_t bytes[][5] = { { 0x0f, 0x01, 0xff },
+				     { 0x67, 0x0f, 0x01, 0xff },
+				     { 0x2e, 0x0f, 0x01, 0xff },
+				     { 0x64, 0x67, 0x0f, 0x01, 0xff } };
+	const size_t sizes[] = { 3, 4, 4, 5 };
+	const x86_reg control = mode == CS_MODE_64 ? X86_REG_RAX : X86_REG_EAX;
+	bool ok = true;
+	for (unsigned i = 0; i < sizeof(sizes) / sizeof(sizes[0]); ++i)
+		for (unsigned iter = 0; iter < 2; ++iter) {
+			cs_insn *insn = NULL;
+			size_t count;
+			if (iter) {
+				const uint8_t *code = bytes[i];
+				size_t size = sizes[i];
+				uint64_t address = 0x1000;
+				insn = cs_malloc(h);
+				if (!insn)
+					return false;
+				count = cs_disasm_iter(h, &code, &size,
+						       &address, insn);
+				ok &= code == bytes[i] + sizes[i] &&
+				      size == 0 && address == 0x1000 + sizes[i];
+			} else {
+				count = cs_disasm(h, bytes[i], sizes[i], 0x1000,
+						  1, &insn);
+			}
+			ok &= count == 1;
+			if (count) {
+				cs_detail *d = insn->detail;
+				cs_regs reads, writes;
+				uint8_t nr = 0, nw = 0;
+				ok &= insn->id == X86_INS_TLBSYNC &&
+				      insn->size == sizes[i] &&
+				      strcmp(insn->mnemonic, "tlbsync") == 0 &&
+				      insn->op_str[0] == '\0' &&
+				      d->x86.op_count == 0 &&
+				      d->x86.eflags == 0 &&
+				      d->groups_count == 1 &&
+				      d->groups[0] == X86_GRP_PRIVILEGE &&
+				      d->regs_read_count == 1 &&
+				      d->regs_read[0] == control &&
+				      d->regs_write_count == 0 &&
+				      cs_regs_access(h, insn, reads, &nr,
+						     writes,
+						     &nw) == CS_ERR_OK &&
+				      nr == 1 && reads[0] == control && nw == 0;
+			}
+			cs_free(insn, iter ? 1 : count);
+		}
+	if (!ok)
+		fprintf(stderr, "TLBSYNC implicit control failed in mode %u\n",
+			mode);
+	return ok;
+}
+
 int main(void)
 {
 	const cs_mode modes[] = { CS_MODE_16, CS_MODE_32, CS_MODE_64 };
@@ -364,6 +421,7 @@ int main(void)
 			     c < sizeof(cases) / sizeof(cases[0]); ++c)
 				ok &= check(h, modes[m], &cases[c], att);
 			ok &= check_prefixes_and_memory(h, modes[m]);
+			ok &= check_tlbsync_controls(h, modes[m]);
 		}
 		cs_close(&h);
 	}
