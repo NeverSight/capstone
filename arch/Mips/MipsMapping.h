@@ -41,6 +41,8 @@ void Mips_set_mem_access(MCInst *MI, bool status);
 
 unsigned Mips_getRegisterListCount(const MCInst *MI);
 
+uint64_t Mips_getJumpTarget(const MCInst *MI, uint64_t Target);
+
 uint64_t Mips_getBranchTarget(const MCInst *MI, uint64_t Address,
 			      int64_t Displacement);
 

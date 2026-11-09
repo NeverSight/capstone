@@ -68,7 +68,19 @@ wraparound; 64-bit MIPS16 retains the full target width.
 These handwritten corrections must be retained during Auto-Sync translation.
 The native MIPS16 tests cover both byte orders, both decode APIs, output options,
 signed/unsigned boundaries, truncated prefixes and reserved I8 suffix fields.
-This does not add the missing MIPS16 call or general memory instructions.
+`Mips16DisassemblerExtension.h` selects physical widths (EXTEND and JAL/JALX
+are four bytes), and supplies the base/stack/PC memory, address, full-register
+MOVE and register/direct call forms missing from the compiler tables. It uses
+ordinary opcode descriptors with explicit operands and projects the encoding
+group to MIPS16. PC-relative memory retains a PC base plus signed/scaled offset;
+execution-context handling of a delay-slot PC belongs to the consumer.
+Direct-call text and detail share the region calculation from the end of the
+four-byte instruction. The extension is included after the generated decoder
+and byte readers; preserve that include and the MIPS16 dispatch on Auto-Sync.
+`unit_mips16_memory_calls` covers canonical operands and poisoned iterator reuse.
+MIPS detail initialization clears the whole active detail once (INVALID is zero).
+The second alias print in DETAIL_REAL must not append memory operands: both
+operand callbacks and memory-group bookkeeping honor `fillDetailOps`.
 
 AArch64 projects descriptor requirements with
 `suite/synctools/aarch64_postprocess.py`. Per-opcode flags skip implicit operand
