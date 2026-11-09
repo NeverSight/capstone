@@ -88,6 +88,7 @@
 		DC474FB519DE6FDA00BCA449 /* X86DisassemblerDecoder.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE243819DDCD8800EF8EA9 /* X86DisassemblerDecoder.c */; };
 		DC474FB619DE6FDA00BCA449 /* X86IntelInstPrinter.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE244519DDCD8800EF8EA9 /* X86IntelInstPrinter.c */; };
 		FD474FB619DE6FDA00BCA449 /* X86IntelInstPrinterPrechecked.c in Sources */ = {isa = PBXBuildFile; fileRef = FDFE244519DDCD8800EF8EA9 /* X86IntelInstPrinterPrechecked.c */; };
+		FE474FB619DE6FDA00BCA449 /* X86IntelInstPrinterNumbers.c in Sources */ = {isa = PBXBuildFile; fileRef = FEFE244519DDCD8800EF8EA9 /* X86IntelInstPrinterNumbers.c */; };
 		DC474FB719DE6FDA00BCA449 /* X86Mapping.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE244619DDCD8800EF8EA9 /* X86Mapping.c */; };
 		DC474FB819DE6FDA00BCA449 /* X86Module.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE244819DDCD8800EF8EA9 /* X86Module.c */; };
 		DC474FB919DE6FDA00BCA449 /* XCoreDisassembler.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE244A19DDCD8800EF8EA9 /* XCoreDisassembler.c */; };
@@ -125,6 +126,7 @@
 		DC474FD919DE6FDA00BCA449 /* X86DisassemblerDecoder.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE243819DDCD8800EF8EA9 /* X86DisassemblerDecoder.c */; };
 		DC474FDA19DE6FDA00BCA449 /* X86IntelInstPrinter.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE244519DDCD8800EF8EA9 /* X86IntelInstPrinter.c */; };
 		FD474FDA19DE6FDA00BCA449 /* X86IntelInstPrinterPrechecked.c in Sources */ = {isa = PBXBuildFile; fileRef = FDFE244519DDCD8800EF8EA9 /* X86IntelInstPrinterPrechecked.c */; };
+		FE474FDA19DE6FDA00BCA449 /* X86IntelInstPrinterNumbers.c in Sources */ = {isa = PBXBuildFile; fileRef = FEFE244519DDCD8800EF8EA9 /* X86IntelInstPrinterNumbers.c */; };
 		DC474FDB19DE6FDA00BCA449 /* X86Mapping.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE244619DDCD8800EF8EA9 /* X86Mapping.c */; };
 		DC474FDC19DE6FDA00BCA449 /* X86Module.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE244819DDCD8800EF8EA9 /* X86Module.c */; };
 		DC474FDD19DE6FDA00BCA449 /* XCoreDisassembler.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE244A19DDCD8800EF8EA9 /* XCoreDisassembler.c */; };
@@ -181,6 +183,7 @@
 		DCFE248B19DDCDC000EF8EA9 /* X86DisassemblerDecoder.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE243819DDCD8800EF8EA9 /* X86DisassemblerDecoder.c */; };
 		DCFE248C19DDCDC000EF8EA9 /* X86IntelInstPrinter.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE244519DDCD8800EF8EA9 /* X86IntelInstPrinter.c */; };
 		FDFE248C19DDCDC000EF8EA9 /* X86IntelInstPrinterPrechecked.c in Sources */ = {isa = PBXBuildFile; fileRef = FDFE244519DDCD8800EF8EA9 /* X86IntelInstPrinterPrechecked.c */; };
+		FEFE248C19DDCDC000EF8EA9 /* X86IntelInstPrinterNumbers.c in Sources */ = {isa = PBXBuildFile; fileRef = FEFE244519DDCD8800EF8EA9 /* X86IntelInstPrinterNumbers.c */; };
 		DCFE248D19DDCDC000EF8EA9 /* X86Mapping.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE244619DDCD8800EF8EA9 /* X86Mapping.c */; };
 		DCFE248E19DDCDC000EF8EA9 /* X86Module.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE244819DDCD8800EF8EA9 /* X86Module.c */; };
 		DCFE249519DDCDD000EF8EA9 /* XCoreDisassembler.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE244A19DDCD8800EF8EA9 /* XCoreDisassembler.c */; };
@@ -466,6 +469,7 @@
 		DCFE244419DDCD8800EF8EA9 /* X86InstPrinter.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = X86InstPrinter.h; sourceTree = "<group>"; };
 		DCFE244519DDCD8800EF8EA9 /* X86IntelInstPrinter.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86IntelInstPrinter.c; sourceTree = "<group>"; };
 		FDFE244519DDCD8800EF8EA9 /* X86IntelInstPrinterPrechecked.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86IntelInstPrinterPrechecked.c; sourceTree = "<group>"; };
+		FEFE244519DDCD8800EF8EA9 /* X86IntelInstPrinterNumbers.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86IntelInstPrinterNumbers.c; sourceTree = "<group>"; };
 		DCFE244619DDCD8800EF8EA9 /* X86Mapping.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86Mapping.c; sourceTree = "<group>"; };
 		DCFE244719DDCD8800EF8EA9 /* X86Mapping.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = X86Mapping.h; sourceTree = "<group>"; };
 		DCFE244819DDCD8800EF8EA9 /* X86Module.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86Module.c; sourceTree = "<group>"; };
@@ -912,6 +916,7 @@
 				DCFE244419DDCD8800EF8EA9 /* X86InstPrinter.h */,
 				DCFE244519DDCD8800EF8EA9 /* X86IntelInstPrinter.c */,
 				FDFE244519DDCD8800EF8EA9 /* X86IntelInstPrinterPrechecked.c */,
+				FEFE244519DDCD8800EF8EA9 /* X86IntelInstPrinterNumbers.c */,
 				DCFE244619DDCD8800EF8EA9 /* X86Mapping.c */,
 				DCFE244719DDCD8800EF8EA9 /* X86Mapping.h */,
 				DCFE244819DDCD8800EF8EA9 /* X86Module.c */,
@@ -1533,6 +1538,7 @@
 				DC474FD319DE6FDA00BCA449 /* SystemZInstPrinter.c in Sources */,
 				DC474FDA19DE6FDA00BCA449 /* X86IntelInstPrinter.c in Sources */,
 				FD474FDA19DE6FDA00BCA449 /* X86IntelInstPrinterPrechecked.c in Sources */,
+				FE474FDA19DE6FDA00BCA449 /* X86IntelInstPrinterNumbers.c in Sources */,
 				DC474FDB19DE6FDA00BCA449 /* X86Mapping.c in Sources */,
 				DC474F9819DE6FCD00BCA449 /* utils.c in Sources */,
 				DC474FC619DE6FDA00BCA449 /* MipsDisassembler.c in Sources */,
@@ -1572,6 +1578,7 @@
 				DCFE247019DDCDA700EF8EA9 /* PPCInstPrinter.c in Sources */,
 				DCFE248C19DDCDC000EF8EA9 /* X86IntelInstPrinter.c in Sources */,
 				FDFE248C19DDCDC000EF8EA9 /* X86IntelInstPrinterPrechecked.c in Sources */,
+				FEFE248C19DDCDC000EF8EA9 /* X86IntelInstPrinterNumbers.c in Sources */,
 				DCFE246F19DDCDA700EF8EA9 /* PPCDisassembler.c in Sources */,
 				DCFE245519DDCD9200EF8EA9 /* AArch64BaseInfo.c in Sources */,
 				DCFE246119DDCD9900EF8EA9 /* ARMMapping.c in Sources */,
@@ -1655,6 +1662,7 @@
 				DC474FAF19DE6FDA00BCA449 /* SystemZInstPrinter.c in Sources */,
 				DC474FB619DE6FDA00BCA449 /* X86IntelInstPrinter.c in Sources */,
 				FD474FB619DE6FDA00BCA449 /* X86IntelInstPrinterPrechecked.c in Sources */,
+				FE474FB619DE6FDA00BCA449 /* X86IntelInstPrinterNumbers.c in Sources */,
 				DC474FB719DE6FDA00BCA449 /* X86Mapping.c in Sources */,
 				DC474F9219DE6FCD00BCA449 /* utils.c in Sources */,
 				DC474FA219DE6FDA00BCA449 /* MipsDisassembler.c in Sources */,

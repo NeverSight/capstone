@@ -412,6 +412,7 @@ if(CAPSTONE_X86_SUPPORT)
         arch/X86/X86Mapping.c
         arch/X86/X86Module.c
     )
+    set(SOURCES_X86_NUMBERS arch/X86/X86IntelInstPrinterNumbers.c)
     set(HEADERS_X86
         arch/X86/X86BaseInfo.h
         arch/X86/X86Disassembler.h
@@ -890,6 +891,8 @@ set(ALL_SOURCES
     ${SOURCES_LOONGARCH}
     ${SOURCES_XTENSA}
     ${SOURCES_ARC}
+    # Keep the numeric helper outside the existing printer and backend layout.
+    ${SOURCES_X86_NUMBERS}
 )
 
 set(ALL_HEADERS
@@ -976,7 +979,7 @@ source_group("Source\\Mips" FILES ${SOURCES_MIPS})
 source_group("Source\\PowerPC" FILES ${SOURCES_PPC})
 source_group("Source\\Sparc" FILES ${SOURCES_SPARC})
 source_group("Source\\SystemZ" FILES ${SOURCES_SYSTEMZ})
-source_group("Source\\X86" FILES ${SOURCES_X86})
+source_group("Source\\X86" FILES ${SOURCES_X86} ${SOURCES_X86_NUMBERS})
 source_group("Source\\XCore" FILES ${SOURCES_XCORE})
 source_group("Source\\M68K" FILES ${SOURCES_M68K})
 source_group("Source\\TMS320C64x" FILES ${SOURCES_TMS320C64X})

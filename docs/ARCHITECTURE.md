@@ -644,6 +644,14 @@ The prechecked append bodies assert their contracts in debug builds. Direct
 printer tests compare complete streams and instruction/detail state with the
 generic path at every stream index, including capacity and markup boundaries.
 
+Within this prechecked instantiation, hexadecimal magnitudes are written
+directly into the final stream. The existing extent covers the optional minus,
+`0x` prefix and at most sixteen digits. The helper preserves the terminator,
+stream flags and untouched tail bytes. It lives in a separate translation unit,
+appended after the existing CMake/Make objects, to keep it out of the large
+printer body and preserve that body's layout. Generic formatting and callbacks
+continue to use the shared stream implementation.
+
 The Intel register-name offsets also carry three length bits in their existing
 16-bit records. `suite/synctools/x86_register_name_sizes.py` derives them from
 `X86GenRegisterName1.inc`, preserving string bytes, suffix sharing and offsets;

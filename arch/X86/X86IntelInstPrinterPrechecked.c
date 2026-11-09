@@ -9,5 +9,7 @@
 // Share the printer and append bodies. The public entry validates the complete
 // generated path's extent and stream state before calling this instantiation.
 #define CAPSTONE_SSTREAM_PRECHECKED
+#include "X86InstPrinter.h"
+#define SStream_concat_hex64 X86_Intel_printHexPrechecked
 #include "X86IntelInstPrinter.c"
 #endif
