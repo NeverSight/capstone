@@ -83,9 +83,116 @@ static bool test_duplicate_selection(void)
 	       check_lookup(duplicates, 7, 6, UINT_MAX);
 }
 
+static bool test_name_lookup(void)
+{
+	static const name_map names[] = {
+		{ 17, "duplicate" },	{ 0, "" },
+		{ 89, "different" },	{ 99, "duplicate" },
+		{ INT_MAX, "\x80" },	{ 101, NULL },
+		{ 202, "unreachable" },
+	};
+	static const struct {
+		int count;
+		const char *name;
+		int expected;
+	} cases[] = {
+		{ -1, "duplicate", -1 },
+		{ 0, "duplicate", -1 },
+		{ 1, "duplicate", 17 },
+		{ 1, "", -1 },
+		{ 2, "", 0 },
+		{ 2, "different", -1 },
+		{ 3, "different", 89 },
+		{ 7, "duplicate", 17 },
+		{ 7, "\x80", INT_MAX },
+		{ 7, "\xff", -1 },
+		{ 7, "diff", -1 },
+		{ 7, "different_suffix", -1 },
+		{ 7, "unreachable", -1 },
+		{ 7, "absent", -1 },
+	};
+	for (unsigned i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+		int actual = name2id(names, cases[i].count, cases[i].name);
+		if (actual != cases[i].expected) {
+			fprintf(stderr, "Name lookup %u: expected %d, got %d\n",
+				i, cases[i].expected, actual);
+			return false;
+		}
+	}
+	return true;
+}
+
+static bool test_alias_lookup(void)
+{
+	static const name_map names[] = {
+		{ 17, "move" },		  { 23, "move.w" },
+		{ 29, "move,pt" },	  { 31, "123456789abcdef" },
+		{ 37, "\200" },		  { 0, "zero" },
+		{ UINT_MAX, "negative" }, { 41, "" },
+		{ 43, "move" },		  { 47, NULL },
+		{ 53, "unreachable" },
+	};
+	static const struct {
+		cs_arch arch;
+		const char *text;
+		int count;
+		unsigned expected;
+	} cases[] = {
+		{ CS_ARCH_ARM, " \tmove.w r0", 11, 17 },
+		{ CS_ARCH_AARCH64, "move.w", 11, 17 },
+		{ CS_ARCH_MIPS, "move\tr0", 11, 17 },
+		{ CS_ARCH_PPC, "move.w r0", 11, 23 },
+		{ CS_ARCH_RISCV, "move.w\tr0", 11, 23 },
+		{ CS_ARCH_SPARC, "move,pt r0", 11, 17 },
+		{ CS_ARCH_SPARC, "move.w r0", 11, 23 },
+		{ CS_ARCH_ARM, "move,pt r0", 11, 29 },
+		{ CS_ARCH_ARM, "123456789abcdef_suffix", 11, 31 },
+		{ CS_ARCH_ARM, "123456789abcde", 11, 0 },
+		{ CS_ARCH_ARM, "\200 r0", 11, 37 },
+		{ CS_ARCH_ARM, "zero", 11, 0 },
+		{ CS_ARCH_ARM, "negative", 11, 0 },
+		{ CS_ARCH_ARM, " \t", 11, 41 },
+		{ CS_ARCH_ARM, "unreachable", 11, 0 },
+		{ CS_ARCH_ARM, "missing", 11, 0 },
+		{ CS_ARCH_ARM, "move", INT_MIN, 0 },
+		{ CS_ARCH_ARM, "move", 0, 0 },
+		{ CS_ARCH_ARM, "move.w", 1, 17 },
+		{ CS_ARCH_PPC, "move.w", 1, 0 },
+	};
+	for (unsigned i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+		cs_struct handle = { 0 };
+		cs_insn insn = { 0 };
+		MCInst MI = { 0 };
+		SStream stream = { 0 };
+		handle.arch = cases[i].arch;
+		MI.csh = &handle;
+		MI.flat_insn = &insn;
+		MI.isAliasInstr = true;
+		strcpy(stream.buffer, cases[i].text);
+		map_set_alias_id(&MI, &stream, names, cases[i].count);
+		if (insn.alias_id != cases[i].expected) {
+			fprintf(stderr,
+				"Alias lookup %u: expected %u, got %llu\n", i,
+				cases[i].expected,
+				(unsigned long long)insn.alias_id);
+			return false;
+		}
+		// Non-aliases must not inspect a stream, map or architecture.
+		MI.isAliasInstr = false;
+		MI.csh = NULL;
+		insn.alias_id = 99;
+		map_set_alias_id(&MI, NULL, NULL, INT_MAX);
+		if (insn.alias_id != 0)
+			return false;
+	}
+	return true;
+}
+
 int main(void)
 {
-	return test_dense_and_sparse() && test_duplicate_selection() &&
+	return test_name_lookup() && test_alias_lookup() &&
+			       test_dense_and_sparse() &&
+			       test_duplicate_selection() &&
 			       find_cs_id(0, NULL, 0) == UINT_MAX &&
 			       find_cs_id(UINT_MAX, NULL, 0) == UINT_MAX ?
 		       0 :

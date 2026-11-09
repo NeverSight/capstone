@@ -808,7 +808,7 @@ void X86_Intel_printInst(MCInst *MI, SStream *O, void *Info)
 		return;
 	}
 
-	X86_lockrep(MI, O);
+	X86_printPrefixes(MI, O);
 	if (MCInst_getOpcode(MI) == X86_UD1) {
 		SStream_concat0(O, "ud1\t");
 		printOperand(MI, 0, O);

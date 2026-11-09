@@ -187,9 +187,16 @@ static void update_pub_insn(cs_insn *pub, InternalInstruction *inter)
 	pub->detail->x86.encoding.modrm_offset = inter->modRMOffset;
 
 	pub->detail->x86.sib = inter->sib;
-	pub->detail->x86.sib_index = x86_map_sib_index(inter->sibIndex);
-	pub->detail->x86.sib_scale = inter->sibScale;
-	pub->detail->x86.sib_base = x86_map_sib_base(inter->sibBase);
+	if (inter->sibIndex == SIB_INDEX_NONE &&
+	    inter->sibBase == SIB_BASE_NONE) {
+		pub->detail->x86.sib_index = X86_REG_INVALID;
+		pub->detail->x86.sib_scale = inter->sibScale;
+		pub->detail->x86.sib_base = X86_REG_INVALID;
+	} else {
+		pub->detail->x86.sib_index = x86_map_sib_index(inter->sibIndex);
+		pub->detail->x86.sib_scale = inter->sibScale;
+		pub->detail->x86.sib_base = x86_map_sib_base(inter->sibBase);
+	}
 	if (inter->apxEvexB4 && inter->sibBase != SIB_BASE_NONE) {
 		const unsigned int number =
 			16 |

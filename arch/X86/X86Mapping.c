@@ -11627,11 +11627,29 @@ static void add_cx(MCInst *MI)
 }
 #endif
 
-// return true if we patch the mnemonic
-bool X86_lockrep(MCInst *MI, SStream *O)
+#if defined(_MSC_VER)
+static __forceinline
+#elif defined(__GNUC__)
+static inline __attribute__((always_inline))
+#else
+static inline
+#endif
+	void copy_normalized_prefixes(MCInst *MI)
+{
+	// copy normalized prefix[] back to x86.prefix[]
+	if (MI->csh->detail_opt)
+		memcpy(MI->flat_insn->detail->x86.prefix, MI->x86_prefix,
+		       ARR_SIZE(MI->x86_prefix));
+}
+
+#if defined(_MSC_VER)
+__declspec(noinline)
+#elif defined(__GNUC__)
+__attribute__((noinline))
+#endif
+static void X86_lockrep_full(MCInst *MI, SStream *O)
 {
 	unsigned int opcode;
-	bool res = false;
 
 #ifndef CAPSTONE_DIET
 	switch (MI->xAcquireRelease) {
@@ -11719,12 +11737,24 @@ bool X86_lockrep(MCInst *MI, SStream *O)
 		break;
 	}
 
-	// copy normalized prefix[] back to x86.prefix[]
-	if (MI->csh->detail_opt)
-		memcpy(MI->flat_insn->detail->x86.prefix, MI->x86_prefix,
-		       ARR_SIZE(MI->x86_prefix));
+	copy_normalized_prefixes(MI);
+}
 
-	return res;
+void X86_printPrefixes(MCInst *MI, SStream *O)
+{
+	if (MI->xAcquireRelease || MI->x86Lock || MI->x86_prefix[0] ||
+	    MI->x86_prefix[1]) {
+		X86_lockrep_full(MI, O);
+		return;
+	}
+
+	copy_normalized_prefixes(MI);
+}
+
+bool X86_lockrep(MCInst *MI, SStream *O)
+{
+	X86_printPrefixes(MI, O);
+	return false;
 }
 
 void op_addReg(MCInst *MI, int reg)

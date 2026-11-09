@@ -81,6 +81,9 @@ extern const uint64_t arch_masks[9];
 // return True if we patch mnemonic, like in MULPD case
 bool X86_lockrep(MCInst *MI, SStream *O);
 
+// Print and normalize prefixes without a result value.
+CAPSTONE_INTERNAL void X86_printPrefixes(MCInst *MI, SStream *O);
+
 // map registers to sizes
 extern const uint8_t regsize_map_32[];
 extern const uint8_t regsize_map_64[];

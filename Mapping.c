@@ -58,22 +58,29 @@ const insn_map *lookup_insn_map(cs_struct *handle, unsigned short id)
 
 // Gives the id for the given @name if it is saved in @map.
 // Returns the id or -1 if not found.
-int name2id(const name_map *map, int max, const char *name)
+static int name2id_n(const name_map *map, int max, const char *name,
+		     size_t max_length)
 {
 	CS_ASSERT_RET_VAL(map && name, -1);
-	int i;
-
-	for (i = 0; i < max; i++) {
-		if (!map[i].name) {
+	for (int i = 0; i < max; ++i) {
+		const char *entry = map[i].name;
+		if (!entry)
 			return -1;
+		size_t j = 0;
+		while (j < max_length && entry[j] == name[j]) {
+			if (entry[j] == '\0')
+				return map[i].id;
+			++j;
 		}
-		if (!strcmp(map[i].name, name)) {
+		if (j == max_length && entry[j] == '\0')
 			return map[i].id;
-		}
 	}
-
-	// nothing match
 	return -1;
+}
+
+int name2id(const name_map *map, int max, const char *name)
+{
+	return name2id_n(map, max, name, (size_t)-1);
 }
 
 // Gives the name for the given @id if it is saved in @map.
@@ -474,7 +481,6 @@ void map_set_alias_id(MCInst *MI, const SStream *O,
 		return;
 	}
 
-	char alias_mnem[16] = { 0 };
 	int i = 0, j = 0;
 	const char *asm_str_buf = O->buffer;
 	// Skip spaces and tabs
@@ -485,13 +491,14 @@ void map_set_alias_id(MCInst *MI, const SStream *O,
 		}
 		++i;
 	}
-	for (; j < sizeof(alias_mnem) - 1; ++j, ++i) {
+	const char *alias_mnem = asm_str_buf + i;
+	// Retain the existing 15-byte mnemonic limit.
+	for (; j < 15; ++j, ++i) {
 		if (char_ends_mnem(asm_str_buf[i], MI->csh->arch))
 			break;
-		alias_mnem[j] = asm_str_buf[i];
 	}
 
-	int alias_id = name2id(alias_mnem_id_map, map_size, alias_mnem);
+	int alias_id = name2id_n(alias_mnem_id_map, map_size, alias_mnem, j);
 	MI->flat_insn->alias_id = alias_id < 0 ? 0 : alias_id;
 }
 

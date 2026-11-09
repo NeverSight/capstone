@@ -1068,7 +1068,7 @@ void X86_ATT_printInst(MCInst *MI, SStream *OS, void *info)
 		return;
 	}
 
-	X86_lockrep(MI, OS);
+	X86_printPrefixes(MI, OS);
 	if (MCInst_getOpcode(MI) == X86_UD1) {
 		SStream_concat0(OS, "ud1\t");
 		if (MCInst_getNumOperands(MI) == 2)
