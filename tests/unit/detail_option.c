@@ -4,6 +4,7 @@
 #include <capstone/capstone.h>
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -156,13 +157,156 @@ static bool test_skipdata_detail(unsigned allocated, unsigned detail,
 	return success;
 }
 
+static bool check_x86_string_detail(csh handle, const uint8_t *bytes,
+				    size_t length, const cs_insn *expected,
+				    bool iterator)
+{
+	cs_insn *actual = iterator ? cs_malloc(handle) : NULL;
+	const uint8_t *cursor = bytes;
+	size_t remaining = length;
+	uint64_t address = 0x1000;
+	bool decoded = iterator ? cs_disasm_iter(handle, &cursor, &remaining,
+						 &address, actual) :
+				  cs_disasm(handle, bytes, length, address, 1,
+					    &actual) == 1;
+	bool good = decoded && actual->id == expected->id &&
+		    actual->size == length &&
+		    actual->address == expected->address &&
+		    !memcmp(actual->bytes, bytes, length) &&
+		    !strcmp(actual->mnemonic, expected->mnemonic) &&
+		    !strcmp(actual->op_str, expected->op_str) &&
+		    !memcmp(actual->detail, expected->detail,
+			    offsetof(cs_detail, x86) + sizeof(cs_x86));
+	if (iterator)
+		good &= cursor == bytes + length && !remaining &&
+			address == 0x1000 + length;
+	if (!cs_support(CS_SUPPORT_DIET) && decoded) {
+		cs_regs r1 = { 0 }, w1 = { 0 }, r2 = { 0 }, w2 = { 0 };
+		uint8_t nr1, nw1, nr2, nw2;
+		good &= cs_regs_access(handle, expected, r1, &nr1, w1, &nw1) ==
+				CS_ERR_OK &&
+			cs_regs_access(handle, actual, r2, &nr2, w2, &nw2) ==
+				CS_ERR_OK &&
+			nr1 == nr2 && nw1 == nw2 &&
+			!memcmp(r1, r2, sizeof(r1)) &&
+			!memcmp(w1, w2, sizeof(w1));
+	}
+	if (actual)
+		cs_free(actual, 1);
+	return good;
+}
+
+static bool test_x86_string_detail_flags(void)
+{
+	static const cs_mode modes[] = { CS_MODE_16, CS_MODE_32, CS_MODE_64 };
+	static const cs_opt_value syntaxes[] = { CS_OPT_SYNTAX_INTEL,
+						 CS_OPT_SYNTAX_ATT,
+						 CS_OPT_SYNTAX_MASM };
+	static const uint8_t opcodes[] = { 0xa4, 0xa5, 0xa6, 0xa7, 0xaa,
+					   0xab, 0xac, 0xad, 0xae, 0xaf,
+					   0x6c, 0x6d, 0x6e, 0x6f };
+	unsigned comparisons = 0;
+	for (unsigned mode = 0; mode < 3; ++mode) {
+		csh handle;
+		if (cs_open(CS_ARCH_X86, modes[mode], &handle))
+			return false;
+		for (unsigned syntax = 0; syntax < 3; ++syntax) {
+			if (cs_option(handle, CS_OPT_SYNTAX, syntaxes[syntax]))
+				continue; // Syntax can be disabled at build time.
+			for (unsigned prefix = 0;
+			     prefix < (mode == 2 ? 32 : 16); ++prefix) {
+				for (unsigned ci = 0; ci < sizeof(opcodes);
+				     ++ci) {
+					uint8_t bytes[6];
+					size_t length = 0;
+					if (prefix & 1)
+						bytes[length++] = 0x66;
+					if (prefix & 2)
+						bytes[length++] = 0x67;
+					if (prefix & 4)
+						bytes[length++] = 0x64;
+					if (prefix & 8)
+						bytes[length++] = 0xf3;
+					if (prefix & 16)
+						bytes[length++] = 0x48;
+					bytes[length++] = opcodes[ci];
+					cs_option(handle, CS_OPT_DETAIL,
+						  CS_OPT_OFF);
+					cs_option(handle, CS_OPT_DETAIL,
+						  CS_OPT_ON);
+					cs_insn *expected = NULL;
+					if (cs_disasm(handle, bytes, length,
+						      0x1000, 1,
+						      &expected) != 1) {
+						cs_close(&handle);
+						return false;
+					}
+					unsigned memories = 0;
+					for (unsigned i = 0;
+					     i < expected->detail->x86.op_count;
+					     ++i)
+						memories +=
+							expected->detail->x86
+								.operands[i]
+								.type ==
+							X86_OP_MEM;
+					if (!check(memories == (ci < 4 ? 2 : 1),
+						   "string memory operands")) {
+						cs_free(expected, 1);
+						cs_close(&handle);
+						return false;
+					}
+					for (unsigned flags = 1; flags < 16;
+					     ++flags) {
+						cs_option(handle, CS_OPT_DETAIL,
+							  CS_OPT_OFF);
+						cs_option(handle, CS_OPT_DETAIL,
+							  flags);
+						for (unsigned iter = 0;
+						     iter < 2; ++iter) {
+							bool good =
+								check_x86_string_detail(
+									handle,
+									bytes,
+									length,
+									expected,
+									iter);
+							if (!good) {
+								fprintf(stderr,
+									"string detail flags: mode=%u syntax=%u prefix=%u opcode=%02x flags=%u iter=%u\n",
+									mode,
+									syntax,
+									prefix,
+									opcodes[ci],
+									flags,
+									iter);
+								cs_free(expected,
+									1);
+								cs_close(
+									&handle);
+								return false;
+							}
+							++comparisons;
+						}
+					}
+					cs_free(expected, 1);
+				}
+			}
+		}
+		cs_close(&handle);
+	}
+	printf("Compared %u string detail flag/API/prefix combinations\n",
+	       comparisons);
+	return comparisons != 0;
+}
+
 int main(void)
 {
 	// bl 0x1000
 	static const uint8_t aarch64_code[] = { 0x00, 0x00, 0x00, 0x94 };
 	csh handle = 0;
 	bool detail = false;
-	bool success = true;
+	bool success = test_x86_string_detail_flags();
 
 	if (!check(cs_open(CS_ARCH_X86, CS_MODE_64, &handle) == CS_ERR_OK,
 		   "open 64-bit mode"))

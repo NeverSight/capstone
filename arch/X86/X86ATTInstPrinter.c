@@ -65,7 +65,7 @@ static void printOperand(MCInst *MI, unsigned OpNo, SStream *O);
 
 static void set_mem_access(MCInst *MI, bool status)
 {
-	if (MI->csh->detail_opt != CS_OPT_ON)
+	if (!MI->csh->detail_opt)
 		return;
 
 	MI->csh->doing_mem = status;

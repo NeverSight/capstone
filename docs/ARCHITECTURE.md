@@ -322,6 +322,11 @@ Batch decoding retains its existing entry and allocation behavior. Skip-data
 callbacks can change options for the next instruction; common iterator helpers
 hide and restore the detail pointer around decoding and callback execution.
 
+The x86 string operand printers treat every nonzero detail flag set as
+active. Their memory state spans the index-register printer and advances the
+operand count once per memory operand. Intel, MASM and AT&T therefore keep
+memory types, addressing and access metadata when detail flags are combined.
+
 Without detail, the x86 mapping layer exposes its existing checked public-ID
 lookup as a private inline helper shared by the mapper and both core decode
 APIs. Cached holes preserve the current ID. Out-of-range IDs, unavailable
