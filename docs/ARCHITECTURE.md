@@ -627,8 +627,17 @@ rejects stale output, and parser tests reject conditional or unowned work.
 
 The full Intel printer can preflight its generated body once, after lock/rep
 prefixes have been emitted. With the standard formatter, an open plain stream
-and sufficient remaining capacity, it uses a second instantiation of the same
-printer and the same stream copy bodies without per-token state/capacity checks.
+and sufficient remaining capacity, it uses a separate instantiation of the short
+paths and the same stream copy bodies without per-token state/capacity checks.
+A generated 32-bit opcode record combines the mnemonic offset, length and path
+selector. The entry appends the mnemonic before transferring to the selected
+path, so that path does not carry the prefix state through its helper calls.
+This instantiation also includes short `printanymem` paths: LEA and BND use only
+a few opcode rows but should not require the general fragment chain. Other
+paths transfer to the original general printer before appending the mnemonic;
+the private instantiation does not duplicate the general operand-fragment chain
+or its two packed opcode tables.
+
 Custom formatters, markup, closed/full streams, DIET and reduced builds retain
 the original path. The decode, operand/detail writes and public interfaces are
 unchanged. This instantiation is confined to GCC-compatible user-space builds.

@@ -111,6 +111,18 @@ class PrinterProjection(unittest.TestCase):
             with self.subTest(source=source), self.assertRaises(ValueError):
                 PRINTER.fragments(source + "}")
 
+    def test_prechecked_wrapper_has_one_owner(self):
+        source = PRINTER.PRECHECKED_BEGIN + "writer\n" + PRINTER.PRECHECKED_END
+        self.assertEqual(PRINTER.original_writer(source), "writer\n")
+        for invalid in [
+            PRINTER.PRECHECKED_BEGIN + "writer\n",
+            "writer\n" + PRINTER.PRECHECKED_END,
+            source + "trailing statement\n",
+            PRINTER.PRECHECKED_BEGIN + source,
+        ]:
+            with self.subTest(source=invalid), self.assertRaises(ValueError):
+                PRINTER.original_writer(invalid)
+
     def test_generation_include_pair_has_one_owner(self):
         source = PRINTER.TABLE_INCLUDE + "writer\n" + PRINTER.INCLUDE
         self.assertEqual(PRINTER.original_writer(source), "writer\n")

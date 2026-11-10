@@ -19,6 +19,14 @@ TABLE_INCLUDE = (
     + INCLUDE
     + "#undef CAPSTONE_X86_QUICK_PRINTER_TABLE\n"
 )
+PRECHECKED_BEGIN = (
+    "#if defined(CAPSTONE_SSTREAM_PRECHECKED)\n"
+    "#define CAPSTONE_X86_PRECHECKED_PRINT\n"
+    + INCLUDE
+    + "#undef CAPSTONE_X86_PRECHECKED_PRINT\n"
+    "#else\n"
+)
+PRECHECKED_END = "#endif // CAPSTONE_SSTREAM_PRECHECKED\n"
 FRAGMENT = re.compile(
     r"switch \(\(uint32_t\)\(\(Bits >> (\d+)\) & (\d+)\)\) \{(.*?)\n  \}",
     re.S,
@@ -36,6 +44,15 @@ def without_comments(text):
 
 
 def original_writer(text):
+    wrapped = text.startswith(PRECHECKED_BEGIN)
+    require(
+        text.count(PRECHECKED_BEGIN) == int(wrapped)
+        and text.count(PRECHECKED_END) == int(wrapped),
+        "Incomplete prechecked-printer wrapper",
+    )
+    if wrapped:
+        require(text.endswith(PRECHECKED_END), "Trailing prechecked-printer content")
+        text = text[len(PRECHECKED_BEGIN) : -len(PRECHECKED_END)]
     table_count = text.count(TABLE_INCLUDE)
     require(table_count <= 1, "Duplicate quick-printer table include")
     text = text.replace(TABLE_INCLUDE, "")
@@ -161,6 +178,68 @@ def path_extent(path, prefix_length):
     return length
 
 
+def prechecked_writer(text, names, values, paths, quick, indices, sized):
+    """Keep the bounded prefix append before a frameless recipe tail transfer."""
+    signature = "static void printInstruction(MCInst *MI, SStream *O)\n{\n"
+    require(text.count(signature) == 1, "Unexpected printer function boundary")
+    header, body = text.split(signature)
+    declaration = "  unsigned int opcode = MCInst_getOpcode(MI);"
+    require(body.count(declaration) == 1, "Unexpected opcode declaration")
+    tables, body = body.split(declaration)
+    import x86_mnemonic_sizes as mnemonic
+
+    tables = re.sub(r"(?m)^[ \t]+$", "", mnemonic.TABLE.sub("", tables))
+    require(body.count("  // Fragment 0") == 1, "Unexpected fragment boundary")
+    # LEA and BND share unqualified-memory helpers but few opcode rows.
+    # Keep every bounded short form in this instantiation before delegating.
+    quick = quick + [
+        path
+        for path in dict.fromkeys(paths)
+        if path not in indices
+        and len(path) <= 6
+        and any(line.startswith("printanymem(") for line in path)
+    ]
+    indices = {path: index + 1 for index, path in enumerate(quick)}
+    string_mask, length_shift, length_mask = map(int, sized.groups())
+    offset_bits = string_mask.bit_length()
+    recipe_shift = offset_bits + length_mask.bit_length()
+    require(
+        recipe_shift + len(quick).bit_length() <= 32, "Recipe record exceeds uint32_t"
+    )
+
+    result = header + tables
+    for index, path in enumerate(quick, 1):
+        result += f"\nstatic void X86Recipe{index}(MCInst *MI, SStream *O)\n{{\n"
+        result += "".join("  " + line + "\n" for line in path) + "}\n"
+    result += "\ntypedef void (*X86RecipeHandler)(MCInst *, SStream *);\n"
+    result += "static const X86RecipeHandler X86RecipeHandlers[] = {\n  NULL,\n"
+    result += "".join(f"  X86Recipe{index},\n" for index in range(1, len(quick) + 1))
+    result += "};\nstatic const uint32_t X86RecipeRecords[] = {\n"
+    for name, value, path in zip(names, values, paths):
+        record = (
+            (value & string_mask)
+            | (((value >> length_shift) & length_mask) << offset_bits)
+            | (indices.get(path, 0) << recipe_shift)
+        )
+        result += f"  {record}U, // {name}\n"
+    result += "};\n\nstatic void printInstruction(MCInst *MI, SStream *O)\n{\n"
+    result += declaration + "\n"
+    result += "  uint32_t record = X86RecipeRecords[opcode];\n"
+    result += f"  unsigned recipe = record >> {recipe_shift};\n"
+    result += (
+        "  if (!recipe) {\n"
+        "    X86_Intel_printInstructionGeneral(MI, O);\n"
+        "    return;\n"
+        "  }\n"
+    )
+    result += (
+        f"  SStream_concat0_n(O, AsmStrs + (record & {string_mask}) - 1, "
+        f"(size_t)((record >> {offset_bits}) & {length_mask}));\n"
+    )
+    result += "  X86RecipeHandlers[recipe](MI, O);\n}\n"
+    return result
+
+
 def generate(text, enum_text):
     # Reuse the original table owner's enum, bounds and packed-bit validation.
     import x86_mnemonic_sizes as mnemonic
@@ -246,12 +325,15 @@ def generate(text, enum_text):
         + "    X86_PRINTER_MAX_LENGTH < SSTREAM_BUF_LEN ? 1 : -1];\n"
         + "#elif defined(CAPSTONE_X86_QUICK_PRINTER_TABLE)\n"
         + table
+        + "#elif defined(CAPSTONE_X86_PRECHECKED_PRINT)\n"
+        + prechecked_writer(text, names, values, paths, quick, indices, sized)
         + "#else\n"
         + dispatch
         + "#endif\n"
     )
     first = text.rfind("\n", 0, arrays[0].start()) + 1
     output = text[:first] + TABLE_INCLUDE + text[first:start] + INCLUDE + text[start:]
+    output = PRECHECKED_BEGIN + output + PRECHECKED_END
     return output, projection
 
 

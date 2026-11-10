@@ -1,3 +1,8 @@
+#if defined(CAPSTONE_SSTREAM_PRECHECKED)
+#define CAPSTONE_X86_PRECHECKED_PRINT
+#include "X86GenPrinterQuick.inc"
+#undef CAPSTONE_X86_PRECHECKED_PRINT
+#else
 /* Capstone Disassembly Engine, http://www.capstone-engine.org */
 /* By Nguyen Anh Quynh <aquynh@gmail.com>, 2013-2019 */
 
@@ -33207,3 +33212,4 @@ static void printInstruction(MCInst *MI, SStream *O)
 
 
 
+#endif // CAPSTONE_SSTREAM_PRECHECKED

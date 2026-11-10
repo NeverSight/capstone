@@ -60,6 +60,12 @@
 
 #include "X86BaseInfo.h"
 
+#ifdef CAPSTONE_SSTREAM_PRECHECKED
+#define X86_OPTIONAL_PRINTER __attribute__((unused))
+#else
+#define X86_OPTIONAL_PRINTER
+#endif
+
 static void printMemReference(MCInst *MI, unsigned Op, SStream *O);
 static void printOperand(MCInst *MI, unsigned OpNo, SStream *O);
 
@@ -252,7 +258,8 @@ static void printf64mem(MCInst *MI, unsigned OpNo, SStream *O)
 	printMemReference(MI, OpNo, O);
 }
 
-static void printf80mem(MCInst *MI, unsigned OpNo, SStream *O)
+static X86_OPTIONAL_PRINTER void printf80mem(MCInst *MI, unsigned OpNo,
+					     SStream *O)
 {
 	switch (MCInst_getOpcode(MI)) {
 	default:
@@ -595,56 +602,64 @@ static void printDstIdx(MCInst *MI, unsigned Op, SStream *O)
 	set_mem_access(MI, false);
 }
 
-static void printSrcIdx8(MCInst *MI, unsigned OpNo, SStream *O)
+static X86_OPTIONAL_PRINTER void printSrcIdx8(MCInst *MI, unsigned OpNo,
+					      SStream *O)
 {
 	SStream_concat0(O, "byte ptr ");
 	MI->x86opsize = 1;
 	printSrcIdx(MI, OpNo, O);
 }
 
-static void printSrcIdx16(MCInst *MI, unsigned OpNo, SStream *O)
+static X86_OPTIONAL_PRINTER void printSrcIdx16(MCInst *MI, unsigned OpNo,
+					       SStream *O)
 {
 	SStream_concat0(O, "word ptr ");
 	MI->x86opsize = 2;
 	printSrcIdx(MI, OpNo, O);
 }
 
-static void printSrcIdx32(MCInst *MI, unsigned OpNo, SStream *O)
+static X86_OPTIONAL_PRINTER void printSrcIdx32(MCInst *MI, unsigned OpNo,
+					       SStream *O)
 {
 	SStream_concat0(O, "dword ptr ");
 	MI->x86opsize = 4;
 	printSrcIdx(MI, OpNo, O);
 }
 
-static void printSrcIdx64(MCInst *MI, unsigned OpNo, SStream *O)
+static X86_OPTIONAL_PRINTER void printSrcIdx64(MCInst *MI, unsigned OpNo,
+					       SStream *O)
 {
 	SStream_concat0(O, "qword ptr ");
 	MI->x86opsize = 8;
 	printSrcIdx(MI, OpNo, O);
 }
 
-static void printDstIdx8(MCInst *MI, unsigned OpNo, SStream *O)
+static X86_OPTIONAL_PRINTER void printDstIdx8(MCInst *MI, unsigned OpNo,
+					      SStream *O)
 {
 	SStream_concat0(O, "byte ptr ");
 	MI->x86opsize = 1;
 	printDstIdx(MI, OpNo, O);
 }
 
-static void printDstIdx16(MCInst *MI, unsigned OpNo, SStream *O)
+static X86_OPTIONAL_PRINTER void printDstIdx16(MCInst *MI, unsigned OpNo,
+					       SStream *O)
 {
 	SStream_concat0(O, "word ptr ");
 	MI->x86opsize = 2;
 	printDstIdx(MI, OpNo, O);
 }
 
-static void printDstIdx32(MCInst *MI, unsigned OpNo, SStream *O)
+static X86_OPTIONAL_PRINTER void printDstIdx32(MCInst *MI, unsigned OpNo,
+					       SStream *O)
 {
 	SStream_concat0(O, "dword ptr ");
 	MI->x86opsize = 4;
 	printDstIdx(MI, OpNo, O);
 }
 
-static void printDstIdx64(MCInst *MI, unsigned OpNo, SStream *O)
+static X86_OPTIONAL_PRINTER void printDstIdx64(MCInst *MI, unsigned OpNo,
+					       SStream *O)
 {
 	SStream_concat0(O, "qword ptr ");
 	MI->x86opsize = 8;
@@ -749,28 +764,32 @@ static void printU8Imm(MCInst *MI, unsigned Op, SStream *O)
 	}
 }
 
-static void printMemOffs8(MCInst *MI, unsigned OpNo, SStream *O)
+static X86_OPTIONAL_PRINTER void printMemOffs8(MCInst *MI, unsigned OpNo,
+					       SStream *O)
 {
 	SStream_concat0(O, "byte ptr ");
 	MI->x86opsize = 1;
 	printMemOffset(MI, OpNo, O);
 }
 
-static void printMemOffs16(MCInst *MI, unsigned OpNo, SStream *O)
+static X86_OPTIONAL_PRINTER void printMemOffs16(MCInst *MI, unsigned OpNo,
+						SStream *O)
 {
 	SStream_concat0(O, "word ptr ");
 	MI->x86opsize = 2;
 	printMemOffset(MI, OpNo, O);
 }
 
-static void printMemOffs32(MCInst *MI, unsigned OpNo, SStream *O)
+static X86_OPTIONAL_PRINTER void printMemOffs32(MCInst *MI, unsigned OpNo,
+						SStream *O)
 {
 	SStream_concat0(O, "dword ptr ");
 	MI->x86opsize = 4;
 	printMemOffset(MI, OpNo, O);
 }
 
-static void printMemOffs64(MCInst *MI, unsigned OpNo, SStream *O)
+static X86_OPTIONAL_PRINTER void printMemOffs64(MCInst *MI, unsigned OpNo,
+						SStream *O)
 {
 	SStream_concat0(O, "qword ptr ");
 	MI->x86opsize = 8;
@@ -791,6 +810,13 @@ void X86_Intel_printInstructionPrechecked(MCInst *MI, SStream *O)
 	printInstruction(MI, O);
 }
 #else
+
+#ifdef CAPSTONE_X86_PRECHECKED_PRINTER
+void X86_Intel_printInstructionGeneral(MCInst *MI, SStream *O)
+{
+	printInstruction(MI, O);
+}
+#endif
 
 void X86_Intel_printInst(MCInst *MI, SStream *O, void *Info)
 {
@@ -1235,7 +1261,8 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
 		MI->op1_size = MI->x86opsize;
 }
 
-static void printanymem(MCInst *MI, unsigned OpNo, SStream *O)
+static X86_OPTIONAL_PRINTER void printanymem(MCInst *MI, unsigned OpNo,
+					     SStream *O)
 {
 	switch (MI->Opcode) {
 	default:
@@ -1274,5 +1301,7 @@ static void printanymem(MCInst *MI, unsigned OpNo, SStream *O)
 #endif
 
 #include "X86GenRegisterName1.inc"
+
+#undef X86_OPTIONAL_PRINTER
 
 #endif

@@ -27,6 +27,8 @@ void X86_Intel_printInst(MCInst *MI, SStream *OS, void *Info);
 	!defined(_WIN32_WCE)
 #define CAPSTONE_X86_PRECHECKED_PRINTER
 void X86_Intel_printInstructionPrechecked(MCInst *MI, SStream *OS);
+__attribute__((visibility("hidden"))) void
+X86_Intel_printInstructionGeneral(MCInst *MI, SStream *OS);
 __attribute__((visibility("hidden"), noinline)) void
 X86_Intel_printHexPrechecked(SStream *OS, uint64_t value, bool negative);
 #endif
