@@ -40,7 +40,11 @@ static const e2_case cases[] = {
 	  3, \
 	  { REG(D, CS_AC_READ_WRITE), REG(S, CS_AC_READ), \
 	    REG(C, CS_AC_READ) } },
+#define E2_EHB(B) { B, MIPS_INS_EHB, 0, { { 0 } } },
+#define E2_SYNC(B, V) { B, MIPS_INS_SYNC, 1, { IMM(V) } },
 #include "mips16e2_cases.inc"
+#undef E2_EHB
+#undef E2_SYNC
 #undef E2_IMM
 #undef E2_UPPER
 #undef E2_MEM
@@ -74,6 +78,10 @@ static bool inspect(csh h, const cs_insn *insn, const e2_case *c,
 		    strchr(comma + 1, ','))
 			return false;
 	}
+	if (!cs_support(CS_SUPPORT_DIET) && (output & 1) &&
+	    (c->id == MIPS_INS_EHB || c->id == MIPS_INS_SYNC) &&
+	    strcmp(insn->mnemonic, c->id == MIPS_INS_EHB ? "ehb" : "sync"))
+		return false;
 	if (!(output & 2))
 		return true;
 	const cs_mips *m = &insn->detail->mips;
@@ -112,6 +120,14 @@ static bool inspect(csh h, const cs_insn *insn, const e2_case *c,
 				return false;
 		}
 		if (nw != 1 || written[0] != c->ops[0].reg)
+			return false;
+	}
+	if (!cs_support(CS_SUPPORT_DIET) &&
+	    (c->id == MIPS_INS_EHB || c->id == MIPS_INS_SYNC)) {
+		cs_regs read, written;
+		uint8_t nr = 0, nw = 0;
+		if (cs_regs_access(h, insn, read, &nr, written, &nw) || nr ||
+		    nw)
 			return false;
 	}
 	return cs_support(CS_SUPPORT_DIET) ||
@@ -217,7 +233,8 @@ static bool fields(csh h, bool big)
 		0xf00832a6, 0xf01032a6, 0xf04032a6, 0xf08032a6, 0xf10032a6,
 		0xf20032a6, 0xf40032a6, 0xf0cb3144, 0xf0cb3244, 0xf0cb3444,
 		0xf7e13448, 0xf1ec92ff, 0xf3e492ff, 0xf5e492ff, 0xf00092c0,
-		0xf000d280, 0xf000d2a0,
+		0xf000d280, 0xf000d2a0, 0xf0c03011, 0xf0c13110, 0xf0e03010,
+		0xf0803010, 0xf0013014, 0xf0203014, 0xf0003114, 0xf0003034,
 	};
 	for (unsigned n = 0; n < sizeof(reserved) / sizeof(reserved[0]); ++n) {
 		e2_case c = { .bits = reserved[n] };
@@ -333,7 +350,8 @@ int main(void)
 							}
 							return EXIT_FAILURE;
 						}
-						if (n >= 24 && (output & 1) &&
+						if (n >= 24 && n < 28 &&
+						    (output & 1) &&
 						    !cs_support(
 							    CS_SUPPORT_DIET)) {
 							char want[32];
