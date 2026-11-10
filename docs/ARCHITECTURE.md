@@ -103,6 +103,8 @@ Merge loads and conditional/bitfield destinations carry read/write access,
 whereas merge-store memory is write-only. `unit_mips16e2` checks independent
 GNU encodings, all compact move fields, bitfield bounds, reserved bits, physical
 truncations, both APIs, output modes, syntax options and poisoned detail reuse.
+EHB and all 32 SYNC stypes retain their exact EXTEND encoding, immediate detail
+and lack of GPR effects; malformed reserved fields remain rejected.
 As with other Capstone features, decoding does not attest an image's ASE flags;
 consumers must enforce the selected machine profile.
 MIPS detail initialization clears the whole active detail once (INVALID is zero).

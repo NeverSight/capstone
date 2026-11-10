@@ -51,6 +51,15 @@ static DecodeStatus decodeMips16Instruction(MCInst *MI, uint64_t *Size,
 	unsigned opcode = 0, scale = 0, base = rx, reg = ry;
 	bool stack = false, pc = false;
 	if (extended) {
+		if (first == 0xf0c0 && half == 0x3010) {
+			MCInst_setOpcode(MI, Mips_EHB);
+			return MCDisassembler_Success;
+		}
+		if (!(first & 63) && half == 0x3014) {
+			MCInst_setOpcode(MI, Mips_SYNC);
+			MCOperand_CreateImm0(MI, (first >> 6) & 31);
+			return MCDisassembler_Success;
+		}
 		unsigned selector = (half >> 5) & 7;
 		switch ((major << 3) | selector) {
 #define M16E2_IMMEDIATE(Major, Selector, Opcode, Source) \
