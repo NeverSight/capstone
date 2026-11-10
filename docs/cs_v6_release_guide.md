@@ -877,3 +877,7 @@ because it does not load them. Operand access and the implicit SP read/write are
 reported in non-DIET detail. Short frame zero denotes 128 bytes, extended zero
 denotes zero bytes; the reserved aregs encoding is refused. Public layouts and
 IDs are unchanged. Encoding authority: MD00076 revision 2.63, pages 118–127.
+
+MIPS16e2 decoding includes LL/SC, RDHWR and DI/EI. The RDHWR hardware index is
+an immediate in `cs_mips` (followed by selector zero), not a general register
+read. SC's GPR is read/write and its memory operand is write-only.

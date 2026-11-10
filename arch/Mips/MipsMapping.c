@@ -400,6 +400,9 @@ static unsigned Mips_map_op_index(const MCInst *MI, unsigned OpNum)
 
 static cs_op_type Mips_map_op_type(MCInst *MI, unsigned OpNum)
 {
+	if ((MI->csh->mode & CS_MODE_MIPS16) &&
+	    MCInst_getOpcode(MI) == Mips_RDHWR && OpNum == 1)
+		return CS_OP_IMM;
 	return map_get_op_type(MI, Mips_map_op_index(MI, OpNum));
 }
 
@@ -408,6 +411,9 @@ static cs_ac_type Mips_map_op_access(MCInst *MI, unsigned OpNum)
 #ifndef CAPSTONE_DIET
 	if (MI->csh->mode & CS_MODE_MIPS16) {
 		switch (MCInst_getOpcode(MI)) {
+		case Mips_SC:
+			return OpNum < 2 ? CS_AC_READ | CS_AC_WRITE :
+					   CS_AC_WRITE;
 		case Mips_LWL:
 		case Mips_LWR:
 			return OpNum == 0 ? CS_AC_READ | CS_AC_WRITE :

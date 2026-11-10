@@ -60,6 +60,24 @@ static DecodeStatus decodeMips16Instruction(MCInst *MI, uint64_t *Size,
 			MCOperand_CreateImm0(MI, (first >> 6) & 31);
 			return MCDisassembler_Success;
 		}
+		if (!(first & 0x7e0) && (half & 0xff1f) == 0x300c) {
+			MCInst_setOpcode(MI, Mips_RDHWR);
+			mips16GPR(MI, ry);
+			/* A hardware register number is not a GPR read. The imported
+			 * register class only represents HWR29; keep the index explicit. */
+			MCOperand_CreateImm0(MI, first & 31);
+			MCOperand_CreateImm0(MI, 0);
+			return MCDisassembler_Success;
+		}
+		if ((first == 0xf002 || first == 0xf003 || first == 0xf006 ||
+		     first == 0xf007) &&
+		    (half & 0xff1f) == 0x670c) {
+			if ((first & 4) && (half & 0xe0))
+				return MCDisassembler_Fail;
+			MCInst_setOpcode(MI, first & 1 ? Mips_EI : Mips_DI);
+			mips16GPR(MI, first & 4 ? 0 : ry);
+			return MCDisassembler_Success;
+		}
 		unsigned selector = (half >> 5) & 7;
 		switch ((major << 3) | selector) {
 #define M16E2_IMMEDIATE(Major, Selector, Opcode, Source) \
@@ -82,6 +100,20 @@ static DecodeStatus decodeMips16Instruction(MCInst *MI, uint64_t *Size,
 #include "Mips16E2Encodings.inc"
 #undef M16E2_IMMEDIATE
 #undef M16E2_MEMORY
+		case (0x12 << 3) | 6:
+		case (0x1a << 3) | 6:
+			if (first & 0x618)
+				return MCDisassembler_Fail;
+			MCInst_setOpcode(MI, major == 0x12 ? Mips_LL : Mips_SC);
+			mips16GPR(MI, rx);
+			if (major == 0x1a)
+				mips16GPR(MI, rx);
+			mips16GPR(MI, mips16CompactReg(first & 7));
+			MCOperand_CreateImm0(
+				MI,
+				(int)(((first & 0x1e0) | (half & 31)) ^ 0x100) -
+					0x100);
+			return MCDisassembler_Success;
 		case (0x12 << 3) | 7:
 		case (0x1a << 3) | 7:
 			if (first & 0x608)

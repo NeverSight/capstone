@@ -130,6 +130,12 @@ including its existing invocation after failed decoding. Native tests compare
 every projected flag with the actual descriptor objects. The AArch64 generator
 shares the writeback helper audit, so a helper change has one review boundary.
 
+The MIPS16e2 extension also decodes LL/SC, RDHWR and DI/EI. SC retains a tied
+read/write GPR and write-only memory. RDHWR exposes the hardware-register number
+as an immediate, not a GPR or the imported HWR29-only register class; its explicit
+selector is zero. This is encoding support, not privilege/implementation
+admission. The hand-written mapping hooks survive regeneration.
+
 ### Component 2 - Mapping logic
 
 The mapping component has three different task:

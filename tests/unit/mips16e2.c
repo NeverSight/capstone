@@ -42,7 +42,12 @@ static const e2_case cases[] = {
 	    REG(C, CS_AC_READ) } },
 #define E2_EHB(B) { B, MIPS_INS_EHB, 0, { { 0 } } },
 #define E2_SYNC(B, V) { B, MIPS_INS_SYNC, 1, { IMM(V) } },
+#define E2_SYS(B, ID, D) { B, MIPS_INS_##ID, 1, { REG(D, CS_AC_WRITE) } },
+#define E2_HWR(B, D, N) \
+	{ B, MIPS_INS_RDHWR, 3, { REG(D, CS_AC_WRITE), IMM(N), IMM(0) } },
 #include "mips16e2_cases.inc"
+#undef E2_SYS
+#undef E2_HWR
 #undef E2_EHB
 #undef E2_SYNC
 #undef E2_IMM
@@ -163,6 +168,62 @@ static bool fields(csh h, bool big)
 {
 	cs_option(h, CS_OPT_TEXT, CS_OPT_ON);
 	cs_option(h, CS_OPT_DETAIL, CS_OPT_ON | CS_OPT_DETAIL_REAL);
+	for (unsigned store = 0; store < 2; ++store)
+		for (unsigned x = 0; x < 8; ++x)
+			for (unsigned b = 0; b < 8; ++b) {
+				const int offsets[] = { -256, -1, 0, 31, 255 };
+				for (unsigned k = 0;
+				     k < sizeof(offsets) / sizeof(offsets[0]);
+				     ++k) {
+					e2_case c = { 0 };
+					c.bits = 0xf00090c0 | (store << 14) |
+						 (x << 8) | (b << 16) |
+						 ((offsets[k] & 0x1e0) << 16) |
+						 (offsets[k] & 31);
+					c.id = store ? MIPS_INS_SC :
+						       MIPS_INS_LL;
+					c.count = 2;
+					c.ops[0].type = MIPS_OP_REG;
+					c.ops[0].reg = compact(x);
+					c.ops[0].access =
+						store ? CS_AC_READ_WRITE :
+							CS_AC_WRITE;
+					c.ops[1].type = MIPS_OP_MEM;
+					c.ops[1].access = store ? CS_AC_WRITE :
+								  CS_AC_READ;
+					c.ops[1].mem.base = compact(b);
+					c.ops[1].mem.disp = offsets[k];
+					if (!exact(h, big, &c, true))
+						return false;
+					for (unsigned bit = 3; bit <= 10;
+					     ++bit) {
+						if (bit != 3 && bit != 4 &&
+						    bit != 9 && bit != 10)
+							continue;
+						e2_case invalid = c;
+						invalid.bits |= 1u
+								<< (16 + bit);
+						if (!exact(h, big, &invalid,
+							   false))
+							return false;
+					}
+				}
+			}
+	for (unsigned hwr = 0; hwr < 32; ++hwr)
+		for (unsigned y = 0; y < 8; ++y) {
+			e2_case c = { 0 };
+			c.bits = 0xf000300c | (hwr << 16) | (y << 5);
+			c.id = MIPS_INS_RDHWR;
+			c.count = 3;
+			c.ops[0].type = MIPS_OP_REG;
+			c.ops[0].reg = compact(y);
+			c.ops[0].access = CS_AC_WRITE;
+			c.ops[1].type = c.ops[2].type = MIPS_OP_IMM;
+			c.ops[1].imm = hwr;
+			c.ops[1].access = c.ops[2].access = CS_AC_READ;
+			if (!exact(h, big, &c, true))
+				return false;
+		}
 	for (unsigned kind = 0; kind < 8; ++kind)
 		for (unsigned x = 0; x < 8; ++x)
 			for (unsigned y = 0; y < 8; ++y)
@@ -232,9 +293,10 @@ static bool fields(csh h, bool big)
 	const uint32_t reserved[] = {
 		0xf00832a6, 0xf01032a6, 0xf04032a6, 0xf08032a6, 0xf10032a6,
 		0xf20032a6, 0xf40032a6, 0xf0cb3144, 0xf0cb3244, 0xf0cb3444,
-		0xf7e13448, 0xf1ec92ff, 0xf3e492ff, 0xf5e492ff, 0xf00092c0,
-		0xf000d280, 0xf000d2a0, 0xf0c03011, 0xf0c13110, 0xf0e03010,
-		0xf0803010, 0xf0013014, 0xf0203014, 0xf0003114, 0xf0003034,
+		0xf7e13448, 0xf1ec92ff, 0xf3e492ff, 0xf5e492ff, 0xf01892c0,
+		0xf60492c0, 0xf006674c, 0xf000d280, 0xf000d2a0, 0xf0c03011,
+		0xf0c13110, 0xf0e03010, 0xf0803010, 0xf0013014, 0xf0203014,
+		0xf0003114, 0xf0003034,
 	};
 	for (unsigned n = 0; n < sizeof(reserved) / sizeof(reserved[0]); ++n) {
 		e2_case c = { .bits = reserved[n] };
