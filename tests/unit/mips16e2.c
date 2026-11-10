@@ -45,7 +45,12 @@ static const e2_case cases[] = {
 #define E2_SYS(B, ID, D) { B, MIPS_INS_##ID, 1, { REG(D, CS_AC_WRITE) } },
 #define E2_HWR(B, D, N) \
 	{ B, MIPS_INS_RDHWR, 3, { REG(D, CS_AC_WRITE), IMM(N), IMM(0) } },
+#define E2_CP0(B, ID, D, C, S, A, CA) \
+	{ B, MIPS_INS_##ID, 3, { REG(D, A), REG(C, CA), IMM(S) } },
+#define E2_PAUSE(B) { B, MIPS_INS_PAUSE, 0, { { 0 } } },
 #include "mips16e2_cases.inc"
+#undef E2_CP0
+#undef E2_PAUSE
 #undef E2_SYS
 #undef E2_HWR
 #undef E2_EHB
@@ -168,6 +173,40 @@ static bool fields(csh h, bool big)
 {
 	cs_option(h, CS_OPT_TEXT, CS_OPT_ON);
 	cs_option(h, CS_OPT_DETAIL, CS_OPT_ON | CS_OPT_DETAIL_REAL);
+	static const unsigned cp0[] = {
+#define E2_CP0_REG(N) MIPS_REG_COP0##N,
+#include "mips16e2_cp0_regs.inc"
+#undef E2_CP0_REG
+	};
+	for (unsigned write = 0; write < 2; ++write)
+		for (unsigned sel = 0; sel < 8; ++sel)
+			for (unsigned reg = 0; reg < 32; ++reg)
+				for (unsigned y = 0; y < 8; ++y) {
+					e2_case c = { 0 };
+					c.bits = 0xf0006700 | (write << 16) |
+						 (sel << 21) | (y << 5) | reg;
+					c.id = write ? MIPS_INS_MTC0 :
+						       MIPS_INS_MFC0;
+					c.count = 3;
+					c.ops[0].type = c.ops[1].type =
+						MIPS_OP_REG;
+					c.ops[0].reg = compact(y);
+					c.ops[1].reg = cp0[reg];
+					c.ops[0].access = write ? CS_AC_READ :
+								  CS_AC_WRITE;
+					c.ops[1].access = write ? CS_AC_WRITE :
+								  CS_AC_READ;
+					c.ops[2].type = MIPS_OP_IMM;
+					c.ops[2].imm = sel;
+					c.ops[2].access = CS_AC_READ;
+					if (!exact(h, big, &c, true))
+						return false;
+					c.bits |=
+						1u
+						<< 24; // Reserved CP0 group bit.
+					if (!exact(h, big, &c, false))
+						return false;
+				}
 	for (unsigned store = 0; store < 2; ++store)
 		for (unsigned x = 0; x < 8; ++x)
 			for (unsigned b = 0; b < 8; ++b) {

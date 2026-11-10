@@ -51,6 +51,22 @@ static DecodeStatus decodeMips16Instruction(MCInst *MI, uint64_t *Size,
 	unsigned opcode = 0, scale = 0, base = rx, reg = ry;
 	bool stack = false, pc = false;
 	if (extended) {
+		if (first == 0xf140 && half == 0x3018) {
+			MCInst_setOpcode(MI, Mips_PAUSE);
+			return MCDisassembler_Success;
+		}
+		if ((first & 0xff1e) == 0xf000 && (half & 0xff00) == 0x6700) {
+			bool write = first & 1;
+			MCInst_setOpcode(MI, write ? Mips_MTC0 : Mips_MFC0);
+			if (!write)
+				mips16GPR(MI, ry);
+			MCOperand_CreateReg0(MI, getReg(MI, Mips_COP0RegClassID,
+							half & 31));
+			if (write)
+				mips16GPR(MI, ry);
+			MCOperand_CreateImm0(MI, (first >> 5) & 7);
+			return MCDisassembler_Success;
+		}
 		if (first == 0xf0c0 && half == 0x3010) {
 			MCInst_setOpcode(MI, Mips_EHB);
 			return MCDisassembler_Success;
