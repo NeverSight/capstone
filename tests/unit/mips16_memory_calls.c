@@ -336,9 +336,8 @@ static bool reserved_and_options(csh h, bool big)
 		for (unsigned reserved = 1; reserved < 8; ++reserved) {
 			unsigned major = memories[k].half >> 11;
 			// These formerly reserved selectors now name MIPS16e2 forms.
-			if ((major == 0x12 &&
-			     (reserved <= 5 || reserved == 7)) ||
-			    (major == 0x1a && (reserved <= 3 || reserved == 7)))
+			if ((major == 0x12 && (reserved <= 7)) ||
+			    (major == 0x1a && (reserved <= 3 || reserved >= 6)))
 				continue;
 			halfword(bytes, 0xf000, big);
 			halfword(bytes + 2, memories[k].half | (reserved << 5),

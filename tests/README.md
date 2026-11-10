@@ -240,5 +240,6 @@ test all variants.
 using literal GNU binutils encodings in `unit/mips16e2_cases.inc`. Build with
 `CAPSTONE_MIPS_SUPPORT=ON` and `CAPSTONE_BUILD_CSTEST=ON`, then run
 `ctest --test-dir <build> -R '^unit_mips' --output-on-failure` in both Release
-and `CAPSTONE_BUILD_DIET=ON` configurations. This does not cover e2 privileged,
-atomic, cache or hint instructions.
+and `CAPSTONE_BUILD_DIET=ON` configurations. LL/SC, RDHWR and DI/EI literals additionally check tied accesses and hardware
+indices. General CP0, MT, cache and hint instruction decoding remains outside
+this test slice.
