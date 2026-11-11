@@ -15,7 +15,33 @@ if(APPLE)
         "-DCMAKE_OSX_SYSROOT:STRING=${CMAKE_OSX_SYSROOT}"
         "-DCMAKE_OSX_DEPLOYMENT_TARGET:STRING=${CMAKE_OSX_DEPLOYMENT_TARGET}")
 endif()
-set(CMOCKA_LIB_FILE "${CMAKE_CURRENT_BINARY_DIR}/extern/src/cmocka_ext-build/src/${CMAKE_STATIC_LIBRARY_PREFIX}cmocka${CMAKE_STATIC_LIBRARY_SUFFIX}")
+# ExternalProject uses our generator. Multi-config generators place each
+# archive in the active configuration's subdirectory.
+function(cstest_import_archive target file byproduct)
+    add_library(${target} STATIC IMPORTED)
+    if(CMAKE_CONFIGURATION_TYPES)
+        get_filename_component(directory "${file}" DIRECTORY)
+        get_filename_component(name "${file}" NAME)
+        set_property(TARGET ${target} PROPERTY IMPORTED_CONFIGURATIONS "${CMAKE_CONFIGURATION_TYPES}")
+        foreach(config IN LISTS CMAKE_CONFIGURATION_TYPES)
+            string(TOUPPER "${config}" upper_config)
+            set_property(TARGET ${target} PROPERTY IMPORTED_LOCATION_${upper_config}
+                "${directory}/${config}/${name}")
+        endforeach()
+        if(CMAKE_VERSION VERSION_LESS 3.20)
+            set(file "${directory}/${CMAKE_CFG_INTDIR}/${name}")
+        else()
+            set(file "${directory}/$<CONFIG>/${name}")
+        endif()
+    else()
+        set_property(TARGET ${target} PROPERTY IMPORTED_LOCATION "${file}")
+    endif()
+    set(${byproduct} "${file}" PARENT_SCOPE)
+endfunction()
+
+cstest_import_archive(cmocka
+    "${CMAKE_CURRENT_BINARY_DIR}/extern/src/cmocka_ext-build/src/${CMAKE_STATIC_LIBRARY_PREFIX}cmocka${CMAKE_STATIC_LIBRARY_SUFFIX}"
+    CMOCKA_LIB_FILE)
 
 # CMocka is the unit testing library we use.
 ExternalProject_Add(cmocka_ext
@@ -35,8 +61,6 @@ ExternalProject_Add(cmocka_ext
     INSTALL_COMMAND ""
 )
 set(CMOCKA_INCLUDE_DIR ${CMAKE_CURRENT_BINARY_DIR}/extern/src/cmocka_ext/include)
-add_library(cmocka STATIC IMPORTED)
-set_target_properties(cmocka PROPERTIES IMPORTED_LOCATION "${CMOCKA_LIB_FILE}")
 
 # libyaml is used to parse the test files.
 # Normally it can be installed via the package managers,
@@ -49,7 +73,9 @@ if (NOT libyaml OR NOT LIBYAML_INCLUDE_DIRS)
     # Build libyaml
     set(USE_BUILT_LIBYAML true)
     message("System libyaml: NO - Building it.")
-    set(LIBYAML_LIB_FILE "${CMAKE_CURRENT_BINARY_DIR}/extern/src/libyaml_ext-build/${CMAKE_STATIC_LIBRARY_PREFIX}yaml${CMAKE_STATIC_LIBRARY_SUFFIX}")
+    cstest_import_archive(libyaml_built
+        "${CMAKE_CURRENT_BINARY_DIR}/extern/src/libyaml_ext-build/${CMAKE_STATIC_LIBRARY_PREFIX}yaml${CMAKE_STATIC_LIBRARY_SUFFIX}"
+        LIBYAML_LIB_FILE)
     set(LIBYAML_LIBRARY_DIRS "${CMAKE_CURRENT_BINARY_DIR}/extern/src/libyaml_ext-build/")
     set(LIBYAML_INCLUDE_DIRS "${CMAKE_CURRENT_BINARY_DIR}/extern/src/libyaml_ext/include")
     ExternalProject_Add(libyaml_ext
@@ -72,9 +98,7 @@ if (NOT libyaml OR NOT LIBYAML_INCLUDE_DIRS)
         BUILD_BYPRODUCTS "${LIBYAML_LIB_FILE}"
         INSTALL_COMMAND ""
     )
-    add_library(libyaml_built STATIC IMPORTED)
     target_compile_definitions(libyaml_built INTERFACE YAML_DECLARE_STATIC)
-    set_target_properties(libyaml_built PROPERTIES IMPORTED_LOCATION "${LIBYAML_LIB_FILE}")
     set_target_properties(libyaml_built PROPERTIES INCLUDE_DIRECTORIES "${LIBYAML_INCLUDE_DIRS}")
     set_target_properties(libyaml_built PROPERTIES LIBRARY_DIRECTORIES "${LIBYAML_LIB_DIR}")
 else()
@@ -86,7 +110,9 @@ endif()
 # Sadly it has no CMakeLists.txt. So we patch it into.
 set(LIBCYAML_INCLUDE_DIR "${CMAKE_CURRENT_BINARY_DIR}/extern/src/libcyaml_ext/include")
 
-set(LIBCYAML_LIB_FILE "${CMAKE_CURRENT_BINARY_DIR}/extern/src/libcyaml_ext-build/lib/${CMAKE_STATIC_LIBRARY_PREFIX}cyaml_static${CMAKE_STATIC_LIBRARY_SUFFIX}")
+cstest_import_archive(libcyaml
+    "${CMAKE_CURRENT_BINARY_DIR}/extern/src/libcyaml_ext-build/lib/${CMAKE_STATIC_LIBRARY_PREFIX}cyaml_static${CMAKE_STATIC_LIBRARY_SUFFIX}"
+    LIBCYAML_LIB_FILE)
 set(LIBCYAML_LIBRARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/extern/src/libcyaml_ext-build/lib/")
 set(LIBCYAML_SRC_DIR "${CMAKE_CURRENT_BINARY_DIR}/extern/src/libcyaml_ext/")
 ExternalProject_Add(libcyaml_ext
@@ -112,8 +138,6 @@ ExternalProject_Add(libcyaml_ext
 ExternalProject_Add_StepDependencies(libcyaml_ext patch
     "${EXTERNAL_PROJ_PATCH_DIR}/libcyaml/CMakeLists.txt")
 
-add_library(libcyaml STATIC IMPORTED)
-set_target_properties(libcyaml PROPERTIES IMPORTED_LOCATION "${LIBCYAML_LIB_FILE}")
 set_target_properties(libcyaml PROPERTIES INCLUDE_DIRECTORIES "${LIBCYAML_INCLUDE_DIR}")
 set_target_properties(libcyaml PROPERTIES LIBRARY_DIRECTORIES "${LIBCYAML_LIBRARY_DIR}")
 if (USE_BUILT_LIBYAML)
