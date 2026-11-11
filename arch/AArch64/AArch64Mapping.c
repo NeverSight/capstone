@@ -140,6 +140,7 @@ const insn_map aarch64_insns[] = {
 #include "AArch64GenCSMappingInsn.inc"
 };
 
+#if !defined(CAPSTONE_DIET) || !defined(CAPSTONE_USE_ALIAS_TRIE)
 static const name_map insn_alias_mnem_map[] = {
 #include "AArch64GenCSAliasMnemMap.inc"
 	{ AARCH64_INS_ALIAS_CFP, "cfp" },
@@ -162,6 +163,13 @@ static const name_map insn_alias_mnem_map[] = {
 	{ AARCH64_INS_ALIAS_BFXIL, "bfxil" },
 	{ AARCH64_INS_ALIAS_END, NULL },
 };
+#endif
+
+#ifdef CAPSTONE_USE_ALIAS_TRIE
+static const alias_trie_node alias_trie[] = {
+#include "AArch64GenAliasTrie.inc"
+};
+#endif
 
 static const char *get_custom_reg_alias(unsigned reg)
 {
@@ -991,8 +999,8 @@ void AArch64_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
 	}
 	AArch64_check_updates_flags(MI);
 	AArch64_add_sysreg_alias_access(MI);
-	map_set_alias_id(MI, O, insn_alias_mnem_map,
-			 ARR_SIZE(insn_alias_mnem_map) - 1);
+	MAP_SET_ALIAS_ID(MI, O, insn_alias_mnem_map,
+			ARR_SIZE(insn_alias_mnem_map) - 1, alias_trie);
 	int syntax_opt = MI->csh->syntax;
 	if (syntax_opt & CS_OPT_SYNTAX_CS_REG_ALIAS)
 		patch_cs_reg_alias(O->buffer);

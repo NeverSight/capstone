@@ -153,6 +153,12 @@ static const name_map insn_alias_mnem_map[] = {
 	{ PPC_INS_ALIAS_END, NULL },
 };
 
+#ifdef CAPSTONE_USE_ALIAS_TRIE
+static const alias_trie_node alias_trie[] = {
+#include "PPCGenAliasTrie.inc"
+};
+#endif
+
 #endif
 
 const char *PPC_insn_name(csh handle, unsigned int id)
@@ -325,8 +331,8 @@ void PPC_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
 	MI->flat_insn->usesAliasDetails = map_use_alias_details(MI);
 	PPC_LLVM_printInst(MI, MI->address, "", O);
 #ifndef CAPSTONE_DIET
-	map_set_alias_id(MI, O, insn_alias_mnem_map,
-			 ARR_SIZE(insn_alias_mnem_map));
+	MAP_SET_ALIAS_ID(MI, O, insn_alias_mnem_map,
+			ARR_SIZE(insn_alias_mnem_map), alias_trie);
 #endif
 }
 

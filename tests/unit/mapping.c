@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 
 #include "../../Mapping.h"
+#include "../../utils.h"
 #include <limits.h>
 #include <stdio.h>
 #include <string.h>
@@ -189,6 +190,42 @@ static bool test_alias_lookup(void)
 	return true;
 }
 
+#ifdef CAPSTONE_USE_ALIAS_TRIE
+static bool test_generated_alias_lookup(void)
+{
+	static const alias_trie_node trie[] = {
+#include "../../arch/AArch64/AArch64GenAliasTrie.inc"
+	};
+	static const struct {
+		const char *text;
+		unsigned int expected;
+	} cases[] = {
+		{ " \tmov.16b v1, v2", AARCH64_INS_ALIAS_MOV },
+		{ "bfxil\tx0, x1", AARCH64_INS_ALIAS_BFXIL },
+		{ "cmp", AARCH64_INS_ALIAS_CMP },
+		{ "cm", 0 }, { "mov_suffix", 0 }, { "\200", 0 }, { "", 0 },
+	};
+	cs_struct handle = { 0 };
+	cs_insn insn = { 0 };
+	MCInst mi = { 0 };
+	SStream stream = { 0 };
+	handle.arch = CS_ARCH_AARCH64;
+	mi.csh = &handle;
+	mi.flat_insn = &insn;
+	mi.isAliasInstr = true;
+	for (size_t i = 0; i < ARR_SIZE(cases); ++i) {
+		strcpy(stream.buffer, cases[i].text);
+		map_set_alias_id_trie(&mi, &stream, trie, ARR_SIZE(trie));
+		if (insn.alias_id != cases[i].expected)
+			return false;
+	}
+	mi.isAliasInstr = false;
+	insn.alias_id = 99;
+	map_set_alias_id_trie(&mi, NULL, NULL, 0);
+	return insn.alias_id == 0;
+}
+#endif
+
 static bool test_full_group_map(void)
 {
 #ifndef CAPSTONE_DIET
@@ -220,6 +257,10 @@ static bool test_full_group_map(void)
 
 int main(void)
 {
+#ifdef CAPSTONE_USE_ALIAS_TRIE
+	if (!test_generated_alias_lookup())
+		return 1;
+#endif
 	bool found = true;
 	if (enum_map_bin_search(NULL, 0, "missing", &found) != UINT64_MAX ||
 	    found)

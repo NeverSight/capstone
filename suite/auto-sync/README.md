@@ -222,4 +222,8 @@ Documentation about the `.inc` file generation is in the [llvm-capstone](https:/
   python3 -m usort format src/autosync
   python3 -m black src/autosync
   ```
-  
+
+After updating an AArch64, Mips, PowerPC or Sparc alias mnemonic map, run
+`python3 suite/synctools/alias_mnemonic_trie.py` to regenerate the recognition
+table used in builds containing only these backends. The first map row for each
+spelling supplies its public alias ID.

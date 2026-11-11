@@ -509,6 +509,34 @@ void map_set_alias_id(MCInst *MI, const SStream *O,
 	MI->flat_insn->alias_id = alias_id < 0 ? 0 : alias_id;
 }
 
+#ifdef CAPSTONE_USE_ALIAS_TRIE
+void map_set_alias_id_trie(MCInst *MI, const SStream *O,
+			   const alias_trie_node *trie, size_t trie_size)
+{
+	unsigned int id = 0;
+	if (MCInst_isAlias(MI)) {
+		const char *name = O->buffer;
+		while (is_blank_char(*name))
+			++name;
+		unsigned int state = 1;
+		/* The public alias parser considers at most 15 bytes. */
+		for (size_t i = 0; i < 15; ++i) {
+			if (char_ends_mnem(name[i], MI->csh->arch))
+				break;
+			unsigned int next =
+				trie[state].offset + (unsigned char)name[i];
+			if (next >= trie_size || trie[next].parent != state) {
+				state = 0;
+				break;
+			}
+			state = next;
+		}
+		id = trie[state].id;
+	}
+	MI->flat_insn->alias_id = id;
+}
+#endif
+
 /// Does a binary search over the given map and searches for @id.
 /// If @id exists in @map, it sets @found to true and returns
 /// the value for the @id.

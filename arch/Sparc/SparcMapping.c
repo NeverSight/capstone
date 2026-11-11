@@ -211,6 +211,12 @@ static const name_map insn_alias_mnem_map[] = {
 	{ SPARC_INS_ALIAS_CALL, "call" },
 	{ SPARC_INS_ALIAS_END, NULL },
 };
+
+#ifdef CAPSTONE_USE_ALIAS_TRIE
+static const alias_trie_node alias_trie[] = {
+#include "SparcGenAliasTrie.inc"
+};
+#endif
 static void insert_op(MCInst *MI, unsigned index, cs_sparc_op op)
 {
 	if (!detail_is_set(MI)) {
@@ -304,8 +310,8 @@ void Sparc_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
 	Sparc_LLVM_printInst(MI, MI->address, "", O);
 
 #ifndef CAPSTONE_DIET
-	map_set_alias_id(MI, O, insn_alias_mnem_map,
-			 ARR_SIZE(insn_alias_mnem_map));
+	MAP_SET_ALIAS_ID(MI, O, insn_alias_mnem_map,
+			ARR_SIZE(insn_alias_mnem_map), alias_trie);
 	Sparc_correct_details(MI);
 #endif
 }

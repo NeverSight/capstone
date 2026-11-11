@@ -116,6 +116,10 @@ INSTALL_LIB ?= $(INSTALL_BIN) -m0755
 LIBNAME = capstone
 
 
+ifeq ($(strip $(filter-out aarch64 mips powerpc sparc,$(CAPSTONE_ARCHS))),)
+CFLAGS += -DCAPSTONE_USE_ALIAS_TRIE
+endif
+
 DEP_ARM =
 DEP_ARM += $(wildcard arch/ARM/ARM*.inc)
 

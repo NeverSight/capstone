@@ -296,6 +296,23 @@ bool map_use_alias_details(const MCInst *MI);
 void map_set_alias_id(MCInst *MI, const SStream *O,
 		      const name_map *alias_mnem_id_map, int map_size);
 
+#ifdef CAPSTONE_USE_ALIAS_TRIE
+typedef struct {
+	uint16_t offset;
+	uint16_t parent;
+	unsigned int id;
+} alias_trie_node;
+
+CAPSTONE_INTERNAL void map_set_alias_id_trie(MCInst *MI, const SStream *O,
+					    const alias_trie_node *trie,
+					    size_t trie_size);
+#define MAP_SET_ALIAS_ID(mi, stream, map, count, trie) \
+	map_set_alias_id_trie((mi), (stream), (trie), ARR_SIZE(trie))
+#else
+#define MAP_SET_ALIAS_ID(mi, stream, map, count, trie) \
+	map_set_alias_id((mi), (stream), (map), (count))
+#endif
+
 /// Mapping from Capstone enumeration identifiers and their values.
 ///
 /// This map MUST BE sorted to allow binary searches.

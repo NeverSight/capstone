@@ -17,6 +17,11 @@ if(CAPSTONE_ARC_SUPPORT OR CAPSTONE_LOONGARCH_SUPPORT OR CAPSTONE_MIPS_SUPPORT
    OR CAPSTONE_SPARC_SUPPORT OR CAPSTONE_SYSTEMZ_SUPPORT)
     list(APPEND UNIT_TEST_SOURCES register_descriptors.c)
 endif()
+if(Python3_Interpreter_FOUND AND (CAPSTONE_AARCH64_SUPPORT OR CAPSTONE_MIPS_SUPPORT OR
+   CAPSTONE_PPC_SUPPORT OR CAPSTONE_SPARC_SUPPORT))
+    add_test(NAME unit_alias_mnemonic_trie_generator
+        COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/suite/synctools/alias_mnemonic_trie.py" --check)
+endif()
 if(CAPSTONE_MIPS_SUPPORT)
     list(APPEND UNIT_TEST_SOURCES mips_reglist_offset.c mips_msa_control.c mips16_word_order.c mips16_immediates.c mips16_memory_calls.c mips16_shifts_hilo.c mips16_frames.c mips16e2.c)
 endif()
