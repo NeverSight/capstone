@@ -62,8 +62,13 @@ static bool check(void)
 		CS_MODE_16 | CS_MODE_64,
 		CS_MODE_32 | CS_MODE_64,
 	};
-	static const unsigned syntaxes[] = { CS_OPT_SYNTAX_INTEL,
-					     CS_OPT_SYNTAX_ATT };
+	static const unsigned syntaxes[] = {
+		CS_OPT_SYNTAX_INTEL,
+		CS_OPT_SYNTAX_MASM,
+#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_ATT_DISABLE)
+		CS_OPT_SYNTAX_ATT,
+#endif
+	};
 	static const uint8_t prefixes[] = {
 		0x66, 0x67, 0xf0, 0xf2, 0xf3, 0x26, 0x2e, 0x36, 0x3e,
 		0x64, 0x65, 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46,
@@ -102,7 +107,8 @@ static bool check(void)
 		CHECK(cs_option(full, CS_OPT_DETAIL, CS_OPT_ON) == CS_ERR_OK);
 		cs_insn *insn = cs_malloc(full);
 		CHECK(insn);
-		for (size_t syntax = 0; syntax < 2; ++syntax) {
+		for (size_t syntax = 0;
+		     syntax < sizeof(syntaxes) / sizeof(syntaxes[0]); ++syntax) {
 			CHECK(cs_option(full, CS_OPT_SYNTAX,
 					syntaxes[syntax]) == CS_ERR_OK);
 			CHECK(cs_option(query, CS_OPT_SYNTAX,
