@@ -60,6 +60,7 @@ if(CAPSTONE_X86_SUPPORT)
     list(APPEND UNIT_TEST_SOURCES x86_mapping_counts.c)
     list(APPEND UNIT_TEST_SOURCES x86_memory_scale.c)
     list(APPEND UNIT_TEST_SOURCES x86_reg_access.c)
+    list(APPEND UNIT_TEST_SOURCES x86_bextr_flags.c)
     find_package(Python3 3.8 COMPONENTS Interpreter QUIET)
     if(Python3_Interpreter_FOUND)
         add_test(NAME unit_x86_mapping_counts_generator
