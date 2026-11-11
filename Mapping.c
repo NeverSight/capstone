@@ -249,16 +249,23 @@ void map_groups(MCInst *MI, const insn_map *imap)
 
 	cs_detail *detail = MI->flat_insn->detail;
 	unsigned Opcode = MCInst_getOpcode(MI);
-	unsigned i = 0;
-	uint16_t group = imap[Opcode].groups[i];
-	while (group != 0) {
-		if (detail->groups_count >= MAX_NUM_GROUPS) {
-			printf("ERROR: Too many groups defined in instruction mapping.\n");
-			return;
-		}
-		detail->groups[detail->groups_count++] = group;
-		group = imap[Opcode].groups[++i];
+	const unsigned char *groups = imap[Opcode].groups;
+	unsigned start = detail->groups_count;
+	unsigned count = start;
+
+	while (count < MAX_NUM_GROUPS) {
+		unsigned char group = groups[count - start];
+		if (!group)
+			break;
+		detail->groups[count++] = group;
 	}
+	detail->groups_count = count;
+
+	/* A full source row has no trailing zero. Only inspect the next
+	 * source entry when existing destination groups limited the copy. */
+	if (count >= MAX_NUM_GROUPS && count - start < MAX_NUM_GROUPS &&
+	    groups[count - start])
+		printf("ERROR: Too many groups defined in instruction mapping.\n");
 #endif // CAPSTONE_DIET
 }
 

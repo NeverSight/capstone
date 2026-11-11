@@ -3,6 +3,7 @@
 #include "../../Mapping.h"
 #include <limits.h>
 #include <stdio.h>
+#include <string.h>
 
 static bool check_lookup(const insn_map *table, unsigned size, unsigned opcode,
 			 unsigned expected)
@@ -188,13 +189,42 @@ static bool test_alias_lookup(void)
 	return true;
 }
 
+static bool test_full_group_map(void)
+{
+#ifndef CAPSTONE_DIET
+	insn_map row = { 0 };
+	cs_detail detail = { 0 };
+	cs_insn insn = { 0 };
+	MCInst mi = { 0 };
+	mi.flat_insn = &insn;
+	insn.detail = &detail;
+	row.branch = true;
+	for (unsigned i = 0; i < MAX_NUM_GROUPS; ++i)
+		row.groups[i] = i + 1;
+
+	map_groups(&mi, &row);
+	if (detail.groups_count != MAX_NUM_GROUPS ||
+	    memcmp(detail.groups, row.groups, sizeof(row.groups)))
+		return false;
+
+	/* Preserve the existing group and append as many entries as fit. */
+	detail.groups_count = 1;
+	detail.groups[0] = 99;
+	map_groups(&mi, &row);
+	if (detail.groups_count != MAX_NUM_GROUPS || detail.groups[0] != 99 ||
+	    memcmp(detail.groups + 1, row.groups, MAX_NUM_GROUPS - 1))
+		return false;
+#endif
+	return true;
+}
+
 int main(void)
 {
 	bool found = true;
 	if (enum_map_bin_search(NULL, 0, "missing", &found) != UINT64_MAX ||
 	    found)
 		return 1;
-	return test_name_lookup() && test_alias_lookup() &&
+	return test_full_group_map() && test_name_lookup() && test_alias_lookup() &&
 			       test_dense_and_sparse() &&
 			       test_duplicate_selection() &&
 			       find_cs_id(0, NULL, 0) == UINT_MAX &&
