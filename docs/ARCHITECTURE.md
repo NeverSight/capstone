@@ -136,6 +136,13 @@ as an immediate, not a GPR or the imported HWR29-only register class; its explic
 selector is zero. This is encoding support, not privilege/implementation
 admission. The hand-written mapping hooks survive regeneration.
 
+The e2 extension also covers DMT/EMT/DVPE/EVPE and CACHE/PREF. MT result
+omission and DIET detail agree; nonzero reserved result fields still reject.
+CACHE/PREF preserve the five-bit operation/hint and signed nine-bit byte offset,
+including reserved prefix-bit checks. This does not assert executable cache or
+thread-scheduling semantics. Unit tests cover both APIs, byte orders, options,
+all cache offsets/hints/base registers, and MT result fields.
+
 ### Component 2 - Mapping logic
 
 The mapping component has three different task:

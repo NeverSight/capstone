@@ -366,6 +366,23 @@ void Mips_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
 	}
 
 	Mips_LLVM_printInst(MI, MI->address, O);
+#ifdef CAPSTONE_DIET
+	// The regular printer omits the discarded result of these physical e2
+	// forms. DIET has no alias printer; keep the public operand contract.
+	if ((MI->csh->mode & CS_MODE_MIPS16) && detail_is_set(MI)) {
+		switch (MCInst_getOpcode(MI)) {
+		case Mips_DMT:
+		case Mips_EMT:
+		case Mips_DVPE:
+		case Mips_EVPE:
+			if (MCInst_getOpVal(MI, 0) == MIPS_REG_ZERO)
+				get_detail(MI)->mips.op_count = 0;
+			break;
+		default:
+			break;
+		}
+	}
+#endif
 #ifndef CAPSTONE_DIET
 	map_set_alias_id(MI, O, insn_alias_mnem_map,
 			 ARR_SIZE(insn_alias_mnem_map));
