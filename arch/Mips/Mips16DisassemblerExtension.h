@@ -94,6 +94,18 @@ static DecodeStatus decodeMips16Instruction(MCInst *MI, uint64_t *Size,
 			mips16GPR(MI, first & 4 ? 0 : ry);
 			return MCDisassembler_Success;
 		}
+		if ((first == 0xf022 || first == 0xf023 || first == 0xf026 ||
+		     first == 0xf027) &&
+		    (half & 0xff1e) == 0x6700) {
+			if ((first & 4) && (half & 0xe0))
+				return MCDisassembler_Fail;
+			MCInst_setOpcode(
+				MI,
+				half & 1 ? (first & 1 ? Mips_EMT : Mips_DMT) :
+					   (first & 1 ? Mips_EVPE : Mips_DVPE));
+			mips16GPR(MI, first & 4 ? 0 : ry);
+			return MCDisassembler_Success;
+		}
 		unsigned selector = (half >> 5) & 7;
 		switch ((major << 3) | selector) {
 #define M16E2_IMMEDIATE(Major, Selector, Opcode, Source) \
@@ -116,6 +128,19 @@ static DecodeStatus decodeMips16Instruction(MCInst *MI, uint64_t *Size,
 #include "Mips16E2Encodings.inc"
 #undef M16E2_IMMEDIATE
 #undef M16E2_MEMORY
+		case (0x1a << 3) | 4:
+		case (0x1a << 3) | 5:
+			if (first & 0x600)
+				return MCDisassembler_Fail;
+			MCInst_setOpcode(MI, selector == 5 ? Mips_CACHE :
+							     Mips_PREF);
+			mips16GPR(MI, rx);
+			MCOperand_CreateImm0(
+				MI,
+				(int)(((first & 0x1e0) | (half & 31)) ^ 0x100) -
+					0x100);
+			MCOperand_CreateImm0(MI, first & 31);
+			return MCDisassembler_Success;
 		case (0x12 << 3) | 6:
 		case (0x1a << 3) | 6:
 			if (first & 0x618)

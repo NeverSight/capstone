@@ -47,8 +47,13 @@ static const e2_case cases[] = {
 	{ B, MIPS_INS_RDHWR, 3, { REG(D, CS_AC_WRITE), IMM(N), IMM(0) } },
 #define E2_CP0(B, ID, D, C, S, A, CA) \
 	{ B, MIPS_INS_##ID, 3, { REG(D, A), REG(C, CA), IMM(S) } },
+#define E2_CACHE(B, ID, H, R, D) \
+	{ B, MIPS_INS_##ID, 2, { IMM(H), MEM(R, D, CS_AC_INVALID) } },
+#define E2_MT_DISCARD(B, ID) { B, MIPS_INS_##ID, 0, { { 0 } } },
 #define E2_PAUSE(B) { B, MIPS_INS_PAUSE, 0, { { 0 } } },
 #include "mips16e2_cases.inc"
+#undef E2_MT_DISCARD
+#undef E2_CACHE
 #undef E2_CP0
 #undef E2_PAUSE
 #undef E2_SYS
@@ -329,11 +334,63 @@ static bool fields(csh h, bool big)
 					return false;
 			}
 	}
+	for (unsigned kind = 0; kind < 4; ++kind)
+		for (unsigned discard = 0; discard < 2; ++discard)
+			for (unsigned y = 0; y < 8; ++y) {
+				e2_case c = { .bits = 0xf0226700 |
+						      ((kind & 1) << 16) |
+						      (discard << 18) |
+						      (y << 5) | (kind >> 1),
+					      .count = 1 };
+				c.id = kind & 2 ? (kind & 1 ? MIPS_INS_EMT :
+							      MIPS_INS_DMT) :
+						  (kind & 1 ? MIPS_INS_EVPE :
+							      MIPS_INS_DVPE);
+				c.ops[0].type = MIPS_OP_REG;
+				c.ops[0].reg = discard ? MIPS_REG_ZERO :
+							 compact(y);
+				c.ops[0].access = CS_AC_WRITE;
+				if (!exact(h, big, &c, !discard || !y))
+					return false;
+			}
+	for (unsigned prefetch = 0; prefetch < 2; ++prefetch)
+		for (unsigned hint = 0; hint < 32; ++hint)
+			for (unsigned base = 0; base < 8; ++base)
+				for (int offset = -256; offset < 256;
+				     ++offset) {
+					e2_case c = { .bits = 0xf000d080 |
+							      ((!prefetch)
+							       << 5) |
+							      (hint << 16) |
+							      (base << 8) |
+							      ((offset & 0x1e0)
+							       << 16) |
+							      (offset & 31),
+						      .count = 2 };
+					c.id = prefetch ? MIPS_INS_PREF :
+							  MIPS_INS_CACHE;
+					c.ops[0].type = MIPS_OP_IMM;
+					c.ops[0].imm = hint;
+					c.ops[0].access = CS_AC_READ;
+					c.ops[1].type = MIPS_OP_MEM;
+					c.ops[1].mem.base = compact(base);
+					c.ops[1].mem.disp = offset;
+					if (!exact(h, big, &c, true))
+						return false;
+					for (unsigned bit = 25; bit <= 26;
+					     ++bit) {
+						e2_case invalid = c;
+						invalid.bits |= 1u << bit;
+						if (!exact(h, big, &invalid,
+							   false))
+							return false;
+					}
+				}
 	const uint32_t reserved[] = {
 		0xf00832a6, 0xf01032a6, 0xf04032a6, 0xf08032a6, 0xf10032a6,
 		0xf20032a6, 0xf40032a6, 0xf0cb3144, 0xf0cb3244, 0xf0cb3444,
 		0xf7e13448, 0xf1ec92ff, 0xf3e492ff, 0xf5e492ff, 0xf01892c0,
-		0xf60492c0, 0xf006674c, 0xf000d280, 0xf000d2a0, 0xf0c03011,
+		0xf60492c0, 0xf006674c, 0xf200d280, 0xf400d2a0, 0xf0c03011,
 		0xf0c13110, 0xf0e03010, 0xf0803010, 0xf0013014, 0xf0203014,
 		0xf0003114, 0xf0003034,
 	};
