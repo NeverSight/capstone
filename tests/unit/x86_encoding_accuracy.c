@@ -1455,6 +1455,12 @@ int main(void)
 	};
 	const cs_mode modes[] = { CS_MODE_16, CS_MODE_32, CS_MODE_64 };
 	const unsigned syntaxes[] = { CS_OPT_SYNTAX_INTEL, CS_OPT_SYNTAX_ATT };
+	if (!cs_mem_is_setup()) {
+		const cs_opt_mem hooks = { malloc, calloc, realloc, free,
+					   vsnprintf };
+		if (cs_option(0, CS_OPT_MEM, (uintptr_t)&hooks) != CS_ERR_OK)
+			return 1;
+	}
 	bool ok = check_operand_sets() && check_internal_scan_mode() &&
 		  check_inherited_moffs_size() &&
 		  check_inherited_three_operand_size() && check_id_cache() &&
