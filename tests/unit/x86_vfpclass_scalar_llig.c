@@ -9,13 +9,20 @@ static bool same_as_ll0(csh h, uint8_t *code, size_t size)
     cs_insn *base = NULL, *got = NULL;
     uint8_t saved = code[3];
     code[3] &= (uint8_t)~0x60;
-    if (cs_disasm(h, code, size, 0, 1, &base) != 1) return false;
+    size_t base_count = cs_disasm(h, code, size, 0, 1, &base);
     code[3] = saved;
-    if (cs_disasm(h, code, size, 0, 1, &got) != 1) { cs_free(base,1); return false; }
-    bool ok = base->id == got->id && !strcmp(base->mnemonic,got->mnemonic) &&
-              !strcmp(base->op_str,got->op_str) && base->detail && got->detail &&
-              base->detail->x86.op_count == got->detail->x86.op_count;
-    cs_free(base,1); cs_free(got,1); return ok;
+    size_t got_count = cs_disasm(h, code, size, 0, 1, &got);
+    bool ok;
+    if (cs_support(CS_SUPPORT_X86_REDUCE))
+        ok = base_count == 0 && got_count == 0;
+    else
+        ok = base_count == 1 && got_count == 1 && base->id == got->id &&
+             !strcmp(base->mnemonic, got->mnemonic) &&
+             !strcmp(base->op_str, got->op_str) && base->detail && got->detail &&
+             base->detail->x86.op_count == got->detail->x86.op_count;
+    cs_free(base, base_count);
+    cs_free(got, got_count);
+    return ok;
 }
 
 int main(void)

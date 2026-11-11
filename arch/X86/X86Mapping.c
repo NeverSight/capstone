@@ -12030,11 +12030,18 @@ static bool is_mask_register(x86_reg reg)
 	return reg >= X86_REG_K0 && reg <= X86_REG_K7;
 }
 
-static uint8_t mask_instruction_operand_size(unsigned int id)
+static uint8_t mask_instruction_operand_size(unsigned int id, const cs_x86 *x86)
 {
 	switch (id) {
 	default:
 		return 0;
+	case X86_INS_VFPCLASSPS:
+		/* One mask bit per lane. Only the 512-bit PS form needs 16 bits. */
+		return l2FromEVEX4of4(x86->opcode[3]) ? 2 : 1;
+	case X86_INS_VFPCLASSPD:
+	case X86_INS_VFPCLASSSD:
+	case X86_INS_VFPCLASSSS:
+		return 1;
 	case X86_INS_KADDB:
 	case X86_INS_KANDB:
 	case X86_INS_KANDNB:
@@ -12405,39 +12412,6 @@ static void repair_vector_mask_sizes(cs_x86 *x86, const SStream *assembly,
 	}
 	if (written_vector_size != 0)
 		vector_size = written_vector_size;
-	if (vector_size == 0 && is_vfpclass(instruction_id)) {
-		for (i = 0; i < x86->op_count; ++i) {
-			const cs_x86_op *operand = &x86->operands[i];
-			unsigned int lanes = 0;
-
-			if (operand->type != X86_OP_MEM)
-				continue;
-			if (scalar) {
-				vector_size = element_size;
-				break;
-			}
-			switch (operand->avx_bcast) {
-			default:
-				vector_size = operand->size;
-				break;
-			case X86_AVX_BCAST_2:
-				lanes = 2;
-				break;
-			case X86_AVX_BCAST_4:
-				lanes = 4;
-				break;
-			case X86_AVX_BCAST_8:
-				lanes = 8;
-				break;
-			case X86_AVX_BCAST_16:
-				lanes = 16;
-				break;
-			}
-			if (lanes != 0)
-				vector_size = element_size * lanes;
-			break;
-		}
-	}
 	if (vector_size == 0)
 		return;
 	mask_size = normalized_mask_size(
@@ -12445,9 +12419,8 @@ static void repair_vector_mask_sizes(cs_x86 *x86, const SStream *assembly,
 	set_mask_register_operand_size(x86, mask_size);
 }
 
-static void repair_vfpclass_mask_access(csh handle, cs_insn *insn)
+static void repair_vfpclass_mask_access(cs_insn *insn)
 {
-	cs_struct *capstone = (cs_struct *)(uintptr_t)handle;
 	cs_detail *detail = insn->detail;
 	cs_x86 *x86 = &detail->x86;
 	cs_x86_op *destination = NULL;
@@ -12468,11 +12441,7 @@ static void repair_vfpclass_mask_access(csh handle, cs_insn *insn)
 	}
 	if (destination == NULL)
 		return;
-	if (capstone->syntax == CS_OPT_SYNTAX_ATT && writemask != NULL) {
-		cs_x86_op *temporary = destination;
-		destination = writemask;
-		writemask = temporary;
-	}
+	/* Both printers append the writemask immediately after the destination. */
 	destination->access = CS_AC_WRITE;
 	if (writemask != NULL)
 		writemask->access = CS_AC_READ;
@@ -12744,7 +12713,7 @@ void X86_postprinter(csh handle, cs_insn *insn, SStream *mnem, MCInst *mci)
 		repair_avx_broadcast(memory, mnem);
 	if (has_mask) {
 		uint8_t mask_operand_size =
-			mask_instruction_operand_size(insn->id);
+			mask_instruction_operand_size(insn->id, x86);
 		if (mask_operand_size)
 			set_mask_register_operand_size(x86, mask_operand_size);
 		else
@@ -12757,7 +12726,7 @@ void X86_postprinter(csh handle, cs_insn *insn, SStream *mnem, MCInst *mci)
 	if (memory)
 		repair_x87_environment_detail(handle, insn);
 	if (has_mask)
-		repair_vfpclass_mask_access(handle, insn);
+		repair_vfpclass_mask_access(insn);
 	switch (insn->id) {
 	default:
 		break;
