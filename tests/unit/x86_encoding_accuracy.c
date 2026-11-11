@@ -285,6 +285,62 @@ static bool decode(csh handle, const uint8_t *bytes, size_t size, unsigned id,
 	return decode_reference(handle, bytes, size, id, length, NULL);
 }
 
+static bool check_x87_stack_registers(csh handle, bool detail, bool text)
+{
+	static const struct {
+		uint8_t opcode, modrm;
+		bool exchange;
+	} forms[] = { { 0xd9, 0xc8, true },  { 0xdd, 0xc8, true },
+		      { 0xdf, 0xc8, true },  { 0xdd, 0xd8, false },
+		      { 0xdf, 0xd0, false }, { 0xdf, 0xd8, false } };
+	for (size_t i = 0; i < sizeof(forms) / sizeof(forms[0]); ++i) {
+		for (unsigned reg = 0; reg < 8; ++reg) {
+			uint8_t bytes[] = { forms[i].opcode,
+					    (uint8_t)(forms[i].modrm + reg) };
+#ifdef CAPSTONE_X86_REDUCE
+			if (!decode(handle, bytes, sizeof(bytes),
+				    X86_INS_INVALID, 0))
+				return false;
+#else
+			unsigned id = forms[i].exchange ? X86_INS_FXCH :
+							  X86_INS_FSTP;
+			if (!decode(handle, bytes, sizeof(bytes), id, 2))
+				return false;
+#ifndef CAPSTONE_DIET
+			if (!detail || !text)
+				continue;
+			cs_insn *insn;
+			if (cs_disasm(handle, bytes, sizeof(bytes), 0, 1,
+				      &insn) != 1)
+				return false;
+			const cs_x86 *x = &insn->detail->x86;
+			bool ok = x->opcode[0] == bytes[0] &&
+				  x->modrm == bytes[1] && x->op_count != 0 &&
+				  cs_reg_read(handle, insn, X86_REG_ST0) &&
+				  cs_insn_group(handle, insn, X86_GRP_FPU);
+			unsigned access = forms[i].exchange ? CS_AC_READ_WRITE :
+							      CS_AC_WRITE;
+			if (forms[i].exchange)
+				ok &= cs_reg_write(handle, insn, X86_REG_ST0);
+			for (unsigned j = 0; j < x->op_count; ++j)
+				ok &= x->operands[j].type == X86_OP_REG &&
+				      x->operands[j].access == access;
+			if (x->op_count)
+				ok &= x->operands[x->op_count - 1].reg ==
+				      X86_REG_ST0 + reg;
+			cs_free(insn, 1);
+			if (!ok) {
+				fprintf(stderr, "x87 stack access: %02x %02x\n",
+					bytes[0], bytes[1]);
+				return false;
+			}
+#endif
+#endif
+		}
+	}
+	return true;
+}
+
 /* Run these fixed acceptance/ID expectations under every text/detail setting.
  * This covers operand validation shared by scan and output-producing paths;
  * the reader, lock and UD1 checks below cover their mode-dependent forms. */
@@ -1429,6 +1485,7 @@ int main(void)
 							text) == CS_ERR_OK;
 					if (detail)
 						ok &= check_legacy_opcode_bytes(handle);
+					ok &= check_x87_stack_registers(handle, detail, text);
 					ok &= check_public_id_cache(handle,
 								    modes[m]);
 					ok &= check_reader_bounds(

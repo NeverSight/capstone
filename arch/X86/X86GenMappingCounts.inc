@@ -4115,7 +4115,7 @@ static const uint16_t x86_mapping_counts[] = {
 	1056, // X86_ST_FP32m
 	1056, // X86_ST_FP64m
 	1056, // X86_ST_FP80m
-	32, // X86_ST_FPrr
+	1057, // X86_ST_FPrr
 	0, // X86_ST_Fp32m
 	0, // X86_ST_Fp64m
 	0, // X86_ST_Fp64m32
@@ -16629,7 +16629,7 @@ static const uint16_t x86_mapping_counts[] = {
 	0, // X86_XCHG64rr
 	0, // X86_XCHG8rm
 	0, // X86_XCHG8rr
-	1056, // X86_XCH_F
+	1089, // X86_XCH_F
 	68, // X86_XCRYPTCBC
 	68, // X86_XCRYPTCFB
 	68, // X86_XCRYPTCTR

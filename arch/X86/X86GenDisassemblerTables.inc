@@ -85916,7 +85916,7 @@ static const InstrUID modRMTable[] = {
   0x3ae, /* FSAVEm */
   0x3a6, /* FNSTSWm */
   0x393, /* FFREE */
-  0x0, /*  */
+  0x3b72, /* XCH_F */
   0xa9c, /* ST_Frr */
   0xa90, /* ST_FPrr */
   0xb3c, /* UCOM_Fr */
@@ -86013,30 +86013,30 @@ static const InstrUID modRMTable[] = {
   0x394, /* FFREEP */
   0x394, /* FFREEP */
   0x394, /* FFREEP */
-  0x0, /*  */
-  0x0, /*  */
-  0x0, /*  */
-  0x0, /*  */
-  0x0, /*  */
-  0x0, /*  */
-  0x0, /*  */
-  0x0, /*  */
-  0x0, /*  */
-  0x0, /*  */
-  0x0, /*  */
-  0x0, /*  */
-  0x0, /*  */
-  0x0, /*  */
-  0x0, /*  */
-  0x0, /*  */
-  0x0, /*  */
-  0x0, /*  */
-  0x0, /*  */
-  0x0, /*  */
-  0x0, /*  */
-  0x0, /*  */
-  0x0, /*  */
-  0x0, /*  */
+  0x3b72, /* XCH_F */
+  0x3b72, /* XCH_F */
+  0x3b72, /* XCH_F */
+  0x3b72, /* XCH_F */
+  0x3b72, /* XCH_F */
+  0x3b72, /* XCH_F */
+  0x3b72, /* XCH_F */
+  0x3b72, /* XCH_F */
+  0xa90, /* ST_FPrr */
+  0xa90, /* ST_FPrr */
+  0xa90, /* ST_FPrr */
+  0xa90, /* ST_FPrr */
+  0xa90, /* ST_FPrr */
+  0xa90, /* ST_FPrr */
+  0xa90, /* ST_FPrr */
+  0xa90, /* ST_FPrr */
+  0xa90, /* ST_FPrr */
+  0xa90, /* ST_FPrr */
+  0xa90, /* ST_FPrr */
+  0xa90, /* ST_FPrr */
+  0xa90, /* ST_FPrr */
+  0xa90, /* ST_FPrr */
+  0xa90, /* ST_FPrr */
+  0xa90, /* ST_FPrr */
   0x3a5, /* FNSTSW16r */
   0x0, /*  */
   0x0, /*  */

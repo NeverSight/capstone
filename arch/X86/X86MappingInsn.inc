@@ -17912,7 +17912,7 @@
 {
 	X86_ST_FPrr, X86_INS_FSTP, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { X86_REG_FPSW, 0 }, { 0 }, 0, 0
+	{ X86_REG_ST0, 0 }, { X86_REG_FPSW, 0 }, { X86_GRP_FPU, 0 }, 0, 0
 #endif
 },
 
@@ -105510,7 +105510,7 @@
 {
 	X86_XCH_F, X86_INS_FXCH, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { X86_REG_FPSW, 0 }, { X86_GRP_FPU, 0 }, 0, 0
+	{ X86_REG_ST0, 0 }, { X86_REG_FPSW, X86_REG_ST0, 0 }, { X86_GRP_FPU, 0 }, 0, 0
 #endif
 },
 

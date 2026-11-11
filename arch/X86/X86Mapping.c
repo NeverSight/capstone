@@ -11092,7 +11092,7 @@ static const struct insn_reg insn_regs_intel_extra[] = {
 	{ X86_VMRUN64, X86_REG_RAX, CS_AC_WRITE },
 	{ X86_VMSAVE32, X86_REG_EAX, CS_AC_READ },
 	{ X86_VMSAVE64, X86_REG_RAX, CS_AC_READ },
-	{ X86_XCH_F, X86_REG_ST0, CS_AC_WRITE },
+	{ X86_XCH_F, X86_REG_ST0, CS_AC_READ_WRITE },
 #endif
 };
 
