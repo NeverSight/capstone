@@ -646,10 +646,9 @@ static void ARM_post_index_detection(MCInst *MI)
 		if (ARM_get_detail(MI)->operands[i].type & ARM_OP_MEM)
 			break;
 	}
-	if (i >= ARM_get_detail(MI)->op_count) {
-		// Last operand
+	/* A trailing memory operand has no post-index register or immediate. */
+	if (i + 1 >= ARM_get_detail(MI)->op_count)
 		return;
-	}
 
 	cs_arm_op *op = &ARM_get_detail(MI)->operands[i];
 	cs_arm_op op_next = ARM_get_detail(MI)->operands[i + 1];
