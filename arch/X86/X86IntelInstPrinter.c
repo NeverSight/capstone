@@ -306,7 +306,7 @@ static void printRegName(SStream *OS, unsigned RegNo)
 			NULL;
 
 	if (extension_name)
-		SStream_concat0(OS, extension_name);
+		(SStream_concat0)(OS, extension_name);
 	else
 		SStream_concat0_small(OS, getRegisterName(RegNo),
 				      getRegisterNameLength(RegNo));
