@@ -425,6 +425,12 @@ if(CAPSTONE_X86_SUPPORT)
         arch/X86/X86Mapping.c
         arch/X86/X86Module.c
     )
+    # With native MSVC x64 static CRT and LTCG, inlining gives the public
+    # iterator a large probed stack frame, even on its compact scan path.
+    if(CAPSTONE_BUILD_STATIC_MSVC_RUNTIME AND CMAKE_C_COMPILER_ID STREQUAL "MSVC"
+       AND MSVC_C_ARCHITECTURE_ID STREQUAL "x64")
+        set_property(SOURCE arch/X86/X86DisassemblerDecoder.c APPEND PROPERTY COMPILE_OPTIONS /GL-)
+    endif()
     set(SOURCES_X86_NUMBERS arch/X86/X86IntelInstPrinterNumbers.c)
     set(HEADERS_X86
         arch/X86/X86BaseInfo.h
