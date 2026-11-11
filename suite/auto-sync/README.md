@@ -54,6 +54,11 @@ no aliases must still return `false`. The TableGen regression is
 `llvm/test/TableGen/AsmWriterCapstoneDiet.td`; the C++ translator's class
 declaration test covers the corresponding forward declarations.
 
+Keep all 32 entries of the generated MSACtrl register class decodable in
+`DecodeMSACtrlRegisterClass`. CFCMSA and CTCMSA encode five-bit selectors,
+including reserved registers. The `mips_msa_control` unit test checks the
+register operand in both byte orders.
+
 Retain the `Mips16DisassemblerExtension.h` include after the byte readers and
 its MIPS16 dispatch in `getInstruction`, immediate/branch
 operand callbacks in `MipsDisassembler.c`, and T-branch routing in

@@ -2729,7 +2729,7 @@ static DecodeStatus DecodeMSACtrlRegisterClass(MCInst *Inst, unsigned RegNo,
 					       uint64_t Address,
 					       const void *Decoder)
 {
-	if (RegNo > 7)
+	if (RegNo > 31)
 		return MCDisassembler_Fail;
 
 	unsigned Reg = getReg(Inst, Mips_MSACtrlRegClassID, RegNo);
