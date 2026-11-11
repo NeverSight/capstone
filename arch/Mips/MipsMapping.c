@@ -375,8 +375,12 @@ void Mips_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
 		case Mips_EMT:
 		case Mips_DVPE:
 		case Mips_EVPE:
-			if (MCInst_getOpVal(MI, 0) == MIPS_REG_ZERO)
+			if (MCInst_getOpVal(MI, 0) == MIPS_REG_ZERO &&
+			    !(MI->csh->detail_opt & CS_OPT_DETAIL_REAL)) {
+				memset(get_detail(MI)->mips.operands, 0,
+				       sizeof(get_detail(MI)->mips.operands));
 				get_detail(MI)->mips.op_count = 0;
+			}
 			break;
 		default:
 			break;
