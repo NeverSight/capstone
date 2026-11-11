@@ -1404,11 +1404,14 @@ X86_TRANSLATE_INLINE bool translateInstruction(MCInst *mcInst,
 	if (beginTranslation(mcInst, insn))
 		return true;
 
-	/* UD1 has a runtime operand override; other selected sets use
-	 * the same translators with constant descriptors, including duplicates. */
+#if !defined(_MSC_VER) || defined(__clang__)
+	/* MSVC expands both generated switches into a stack-probed frame.
+	 * Its descriptor loop below uses the same operand translators.
+	 * UD1 always uses that loop for its runtime operand override. */
 	if (insn->instructionID != X86_UD1) {
 #include "X86GenOperandTranslate.inc"
 	}
+#endif
 
 	for (index = 0; index < X86_MAX_OPERANDS &&
 			insn->operands[index].encoding != ENCODING_NONE;
