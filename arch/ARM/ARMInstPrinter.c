@@ -108,8 +108,22 @@ static void printPredicateOperand(MCInst *MI, unsigned OpNum, SStream *O)
 
 static void printRegName(SStream *OS, unsigned RegNo)
 {
+#if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
+	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
+	!defined(_WIN32_WCE)
+	const char *name = getRegisterName(RegNo, ARM_NoRegAltName);
+	/* With markup disabled the two empty tags contribute no bytes. The
+	 * generic formatter still owns custom callbacks and full streams. */
+	if (cs_vsnprintf == cs_default_vsnprintf && !getUseMarkup() &&
+	    OS->index < SSTREAM_BUF_LEN - 1 && name && name[0]) {
+		SStream_concat0(OS, name);
+		return;
+	}
+	SStream_concat2(OS, markup("<reg:"), name);
+#else
 	SStream_concat2(OS, markup("<reg:"),
 			getRegisterName(RegNo, ARM_NoRegAltName));
+#endif
 	SStream_concat0(OS, markup(">"));
 }
 
