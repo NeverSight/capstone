@@ -260,7 +260,15 @@ CAPSTONE_INTERNAL void SStream_concat0_substr(SStream *ss, const char *s,
 {
 #if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE)
-	if (cs_mem_malloc == malloc && cs_mem_free == free) {
+#if defined(_MSC_VER) && defined(_DLL) && !defined(_WIN32_WCE)
+	bool default_allocator =
+		(cs_mem_malloc == cs_initial_memory_hooks.malloc &&
+		 cs_mem_free == cs_initial_memory_hooks.free) ||
+		(cs_mem_malloc == malloc && cs_mem_free == free);
+#else
+	bool default_allocator = cs_mem_malloc == malloc && cs_mem_free == free;
+#endif
+	if (default_allocator) {
 		assert(ss && s);
 		if (ss->is_closed || len == 0)
 			return;

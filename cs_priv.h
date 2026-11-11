@@ -169,6 +169,11 @@ extern cs_free_t cs_mem_free;
 extern cs_vsnprintf_t cs_vsnprintf;
 #ifdef _MSC_VER
 extern cs_vsnprintf_t const cs_default_vsnprintf;
+#if defined(_DLL) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
+	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
+	!defined(_WIN32_WCE)
+extern const volatile cs_opt_mem cs_initial_memory_hooks;
+#endif
 #else
 #define cs_default_vsnprintf vsnprintf
 #endif

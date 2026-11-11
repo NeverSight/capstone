@@ -491,6 +491,13 @@ cs_vsnprintf_t cs_vsnprintf = vsnprintf;
 #ifdef _MSC_VER
 /* The UCRT can give its inline vsnprintf a separate address in each C file. */
 cs_vsnprintf_t const cs_default_vsnprintf = vsnprintf;
+#ifdef _DLL
+/* Imported functions can have distinct thunk and IAT addresses. Load
+ * the same stored pointer representation as the original allocator hooks. */
+const volatile cs_opt_mem cs_initial_memory_hooks = {
+	malloc, calloc, realloc, free, vsnprintf
+};
+#endif
 #endif
 #endif // defined(_WIN32_WCE)
 
