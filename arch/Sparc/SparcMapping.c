@@ -180,7 +180,7 @@ bool Sparc_getInstruction(csh handle, const uint8_t *code, size_t code_len,
 void Sparc_init_mri(MCRegisterInfo *MRI)
 {
 	MCRegisterInfo_InitMCRegisterInfo(
-		MRI, SparcRegDesc, sizeof(SparcRegDesc), 0, 0,
+		MRI, SparcRegDesc, ARR_SIZE(SparcRegDesc), 0, 0,
 		SparcMCRegisterClasses, ARR_SIZE(SparcMCRegisterClasses), 0, 0,
 		SparcRegDiffLists, 0, SparcSubRegIdxLists,
 		ARR_SIZE(SparcSubRegIdxLists), 0);

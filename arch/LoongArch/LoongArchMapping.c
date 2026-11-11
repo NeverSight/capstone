@@ -32,7 +32,7 @@
 void LoongArch_init_mri(MCRegisterInfo *MRI)
 {
 	MCRegisterInfo_InitMCRegisterInfo(MRI, LoongArchRegDesc,
-					  sizeof(LoongArchRegDesc), 0, 0,
+					  ARR_SIZE(LoongArchRegDesc), 0, 0,
 					  LoongArchMCRegisterClasses,
 					  ARR_SIZE(LoongArchMCRegisterClasses),
 					  0, 0, LoongArchRegDiffLists, 0,

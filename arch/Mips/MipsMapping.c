@@ -49,7 +49,7 @@ unsigned Mips_getRegisterListCount(const MCInst *MI)
 
 void Mips_init_mri(MCRegisterInfo *MRI)
 {
-	MCRegisterInfo_InitMCRegisterInfo(MRI, MipsRegDesc, sizeof(MipsRegDesc),
+	MCRegisterInfo_InitMCRegisterInfo(MRI, MipsRegDesc, ARR_SIZE(MipsRegDesc),
 					  0, 0, MipsMCRegisterClasses,
 					  ARR_SIZE(MipsMCRegisterClasses), 0, 0,
 					  MipsRegDiffLists, 0,

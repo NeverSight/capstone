@@ -56,7 +56,7 @@ void SystemZ_set_instr_map_data(MCInst *MI, const uint8_t *Bytes,
 void SystemZ_init_mri(MCRegisterInfo *MRI)
 {
 	MCRegisterInfo_InitMCRegisterInfo(
-		MRI, SystemZRegDesc, AARCH64_REG_ENDING, 0, 0,
+		MRI, SystemZRegDesc, ARR_SIZE(SystemZRegDesc), 0, 0,
 		SystemZMCRegisterClasses, ARR_SIZE(SystemZMCRegisterClasses), 0,
 		0, SystemZRegDiffLists, 0, SystemZSubRegIdxLists,
 		ARR_SIZE(SystemZSubRegIdxLists), 0);

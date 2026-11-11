@@ -13,6 +13,10 @@ if(CAPSTONE_AARCH64_SUPPORT OR CAPSTONE_ARM_SUPPORT OR CAPSTONE_ALPHA_SUPPORT
             COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/test_mapping_diet_types.py")
     endif()
 endif()
+if(CAPSTONE_ARC_SUPPORT OR CAPSTONE_LOONGARCH_SUPPORT OR CAPSTONE_MIPS_SUPPORT
+   OR CAPSTONE_SPARC_SUPPORT OR CAPSTONE_SYSTEMZ_SUPPORT)
+    list(APPEND UNIT_TEST_SOURCES register_descriptors.c)
+endif()
 if(CAPSTONE_MIPS_SUPPORT)
     list(APPEND UNIT_TEST_SOURCES mips_reglist_offset.c mips_msa_control.c mips16_word_order.c mips16_immediates.c mips16_memory_calls.c mips16_shifts_hilo.c mips16_frames.c mips16e2.c)
 endif()

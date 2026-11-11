@@ -30,7 +30,7 @@
 
 void ARC_init_mri(MCRegisterInfo *MRI)
 {
-	MCRegisterInfo_InitMCRegisterInfo(MRI, ARCRegDesc, sizeof(ARCRegDesc),
+	MCRegisterInfo_InitMCRegisterInfo(MRI, ARCRegDesc, ARR_SIZE(ARCRegDesc),
 					  0, 0, ARCMCRegisterClasses,
 					  ARR_SIZE(ARCMCRegisterClasses), 0, 0,
 					  ARCRegDiffLists, 0, ARCSubRegIdxLists,
