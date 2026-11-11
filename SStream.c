@@ -334,7 +334,7 @@ void SStream_concat_hex64(SStream *ss, uint64_t value, bool negative)
 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
 	!defined(_WIN32_WCE)
 	// CS_OPT_MEM may install a formatter with its own output/error behavior.
-	if (cs_vsnprintf == vsnprintf) {
+	if (cs_vsnprintf == cs_default_vsnprintf) {
 		assert(ss);
 		SSTREAM_RETURN_IF_CLOSED(ss);
 		char buffer[19]; // sign, 0x, and up to 16 hexadecimal digits
@@ -361,7 +361,7 @@ void SStream_concat_dec64(SStream *ss, uint64_t value, bool negative)
 #if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
 	!defined(_WIN32_WCE)
-	if (cs_vsnprintf == vsnprintf) {
+	if (cs_vsnprintf == cs_default_vsnprintf) {
 		assert(ss);
 		SSTREAM_RETURN_IF_CLOSED(ss);
 		if (SStream_remaining(ss) == 0)
@@ -701,7 +701,7 @@ void SStream_concat2(SStream *ss, const char *first, const char *second)
 #if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
 	!defined(_WIN32_WCE)
-	if (cs_vsnprintf == vsnprintf && first && second) {
+	if (cs_vsnprintf == cs_default_vsnprintf && first && second) {
 		assert(ss);
 		SSTREAM_RETURN_IF_CLOSED(ss);
 		if (SStream_remaining(ss) == 0)

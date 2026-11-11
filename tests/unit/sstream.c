@@ -23,6 +23,7 @@ static void concat2_candidate(SStream *s, const char *a, const char *b)
 	SStream_concat2(s, a, b);
 }
 static unsigned concat2_hook_mode, concat2_calls;
+static cs_vsnprintf_t saved_formatter;
 static const char *concat2_hook_first, *concat2_hook_second;
 static char concat2_hook_format[16];
 static int concat2_hook(char *out, size_t size, const char *fmt, va_list ap)
@@ -35,7 +36,7 @@ static int concat2_hook(char *out, size_t size, const char *fmt, va_list ap)
 	concat2_hook_second = va_arg(copy, const char *);
 	va_end(copy);
 	if (concat2_hook_mode == 3)
-		cs_vsnprintf = vsnprintf;
+		cs_vsnprintf = saved_formatter;
 	memset(out, 0x5a, size);
 	int n = vsnprintf(out, size, fmt, ap);
 	if (concat2_hook_mode == 1)
@@ -62,25 +63,25 @@ static bool concat2_compare(concat2_writer candidate, const char *first,
 	concat2_calls = 0;
 	concat2_hook_format[0] = 0;
 	concat2_hook_first = concat2_hook_second = NULL;
-	cs_vsnprintf = h ? concat2_hook : vsnprintf;
+	cs_vsnprintf = h ? concat2_hook : saved_formatter;
 	concat2_reference(&a, first, second);
 	unsigned old_calls = concat2_calls;
 	const char *old_first = concat2_hook_first,
 		   *old_second = concat2_hook_second;
 	char old_format[16];
 	strcpy(old_format, concat2_hook_format);
-	bool old_default = cs_vsnprintf == vsnprintf;
+	bool old_default = cs_vsnprintf == saved_formatter;
 	concat2_calls = 0;
 	concat2_hook_format[0] = 0;
 	concat2_hook_first = concat2_hook_second = NULL;
-	cs_vsnprintf = h ? concat2_hook : vsnprintf;
+	cs_vsnprintf = h ? concat2_hook : saved_formatter;
 	candidate(&b, first, second);
 	bool match = !memcmp(&a, &b, sizeof(a)) && old_calls == concat2_calls &&
 		     old_first == concat2_hook_first &&
 		     old_second == concat2_hook_second &&
 		     !strcmp(old_format, concat2_hook_format) &&
-		     old_default == (cs_vsnprintf == vsnprintf);
-	cs_vsnprintf = vsnprintf;
+		     old_default == (cs_vsnprintf == saved_formatter);
+	cs_vsnprintf = saved_formatter;
 	return match;
 }
 static int concat2_verify(concat2_writer candidate)
@@ -1597,6 +1598,7 @@ static bool test_diet_appends(void)
 
 int main()
 {
+	saved_formatter = cs_vsnprintf ? cs_vsnprintf : vsnprintf;
 	bool result = test_concat2_appends();
 	if (cs_support(CS_SUPPORT_DIET))
 		return result && test_diet_appends() ? 0 : -1;

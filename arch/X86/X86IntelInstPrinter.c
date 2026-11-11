@@ -60,7 +60,7 @@
 
 #include "X86BaseInfo.h"
 
-#ifdef CAPSTONE_SSTREAM_PRECHECKED
+#if defined(CAPSTONE_SSTREAM_PRECHECKED) && defined(__GNUC__)
 #define X86_OPTIONAL_PRINTER __attribute__((unused))
 #else
 #define X86_OPTIONAL_PRINTER
@@ -490,7 +490,7 @@ static inline void set_early_operand_access(MCInst *MI)
 #if defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
 	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
 	// A custom formatter can observe detail or change options while printing.
-	if (cs_vsnprintf == vsnprintf)
+	if (cs_vsnprintf == cs_default_vsnprintf)
 		return;
 #endif
 	uint8_t access[CS_X86_MAXIMUM_OPERAND_SIZE];
@@ -847,7 +847,7 @@ void X86_Intel_printInst(MCInst *MI, SStream *O, void *Info)
 #ifdef CAPSTONE_X86_PRECHECKED_PRINTER
 		// Prefixes have already been printed. These fixed generated paths
 		// neither call a custom formatter nor change the stream flags.
-		if (cs_vsnprintf == vsnprintf && !O->is_closed &&
+		if (cs_vsnprintf == cs_default_vsnprintf && !O->is_closed &&
 		    !O->markup_stream && !O->prefixed_by_markup &&
 		    O->index <= SSTREAM_BUF_LEN - 1 - X86_PRINTER_MAX_LENGTH)
 			X86_Intel_printInstructionPrechecked(MI, O);

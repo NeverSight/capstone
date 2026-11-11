@@ -50,7 +50,7 @@ void X86_printMemoryScale(SStream *O, uint64_t scale, bool att)
 #if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
 	!defined(_WIN32_WCE)
-	if (cs_vsnprintf == vsnprintf && scale < 10) {
+	if (cs_vsnprintf == cs_default_vsnprintf && scale < 10) {
 		if (att) {
 			const char text[] = { ',', ' ', (char)('0' + scale),
 					      '\0' };

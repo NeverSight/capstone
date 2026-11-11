@@ -167,6 +167,11 @@ extern cs_calloc_t cs_mem_calloc;
 extern cs_realloc_t cs_mem_realloc;
 extern cs_free_t cs_mem_free;
 extern cs_vsnprintf_t cs_vsnprintf;
+#ifdef _MSC_VER
+extern cs_vsnprintf_t const cs_default_vsnprintf;
+#else
+#define cs_default_vsnprintf vsnprintf
+#endif
 
 static inline bool cs_mem_is_setup()
 {

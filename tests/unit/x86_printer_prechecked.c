@@ -9,6 +9,7 @@
 #include <string.h>
 
 #ifdef CAPSTONE_X86_PRECHECKED_PRINTER
+static cs_vsnprintf_t default_formatter;
 static int passthrough(char *buffer, size_t size, const char *format,
 		       va_list args)
 {
@@ -38,9 +39,9 @@ static void print(Result *out, const Result *seed, size_t index, unsigned flags,
 	out->stream.markup_stream = flags & 2;
 	out->stream.prefixed_by_markup = flags & 4;
 	out->stream.unsigned_num = flags & 8;
-	cs_vsnprintf = generic ? passthrough : vsnprintf;
+	cs_vsnprintf = generic ? passthrough : default_formatter;
 	X86_Intel_printInst(&out->internal, &out->stream, NULL);
-	cs_vsnprintf = vsnprintf;
+	cs_vsnprintf = default_formatter;
 	// Compare complete private/public values after normalizing object addresses.
 	out->internal.csh = NULL;
 	out->internal.flat_insn = NULL;
@@ -49,6 +50,7 @@ static void print(Result *out, const Result *seed, size_t index, unsigned flags,
 
 int main(void)
 {
+	default_formatter = cs_vsnprintf;
 	static const uint8_t code[][15] = {
 		{ 0x90 },
 		{ 0xc3 },

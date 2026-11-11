@@ -488,6 +488,10 @@ cs_free_t cs_mem_free = free;
 cs_vsnprintf_t cs_vsnprintf = _vsnprintf;
 #else
 cs_vsnprintf_t cs_vsnprintf = vsnprintf;
+#ifdef _MSC_VER
+/* The UCRT can give its inline vsnprintf a separate address in each C file. */
+cs_vsnprintf_t const cs_default_vsnprintf = vsnprintf;
+#endif
 #endif // defined(_WIN32_WCE)
 
 #elif defined(_KERNEL_MODE)
