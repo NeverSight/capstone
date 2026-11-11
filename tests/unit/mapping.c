@@ -190,6 +190,10 @@ static bool test_alias_lookup(void)
 
 int main(void)
 {
+	bool found = true;
+	if (enum_map_bin_search(NULL, 0, "missing", &found) != UINT64_MAX ||
+	    found)
+		return 1;
 	return test_name_lookup() && test_alias_lookup() &&
 			       test_dense_and_sparse() &&
 			       test_duplicate_selection() &&

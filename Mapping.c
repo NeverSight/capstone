@@ -511,6 +511,11 @@ void map_set_alias_id(MCInst *MI, const SStream *O,
 uint64_t enum_map_bin_search(const cs_enum_id_map *map, size_t map_len,
 			     const char *id, bool *found)
 {
+	if (map_len == 0) {
+		*found = false;
+		return UINT64_MAX;
+	}
+
 	size_t l = 0;
 	size_t r = map_len;
 	size_t id_len = strlen(id);
