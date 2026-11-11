@@ -3717,7 +3717,22 @@ CAPSTONE_INTERNAL uint16_t X86_scanCallTarget(csh ud, const uint8_t *code,
 	const cs_struct *handle = (cs_struct *)(uintptr_t)ud;
 	if (!handle || handle->arch != CS_ARCH_X86 || !code || !size || !target)
 		return 0;
-	InternalInstruction insn = { 0 };
+	InternalInstruction insn;
+	if (code[0] == 0xe8 && !x86_has_feature(handle->mode, CS_MODE_16)) {
+		/* An unprefixed near CALL in 32/64-bit mode has a rel32. */
+		int32_t displacement;
+		insn.code = code;
+		insn.codeSize = size;
+		insn.readerCursor = 1;
+		if (consumeInt32(&insn, &displacement))
+			return 0;
+		const uint16_t length = (uint16_t)insn.readerCursor;
+		*target = X86_relativeBranchTarget(handle->mode, address, length,
+						   (uint64_t)displacement,
+						   sizeof(displacement));
+		return length;
+	}
+	memset(&insn, 0, sizeof(insn));
 	if (decodeInstruction(&insn, code, size, handle->mode))
 		return 0;
 	switch (insn.instructionID) {
