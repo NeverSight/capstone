@@ -120,7 +120,7 @@ DEP_ARM =
 DEP_ARM += $(wildcard arch/ARM/ARM*.inc)
 
 LIBOBJ_ARM =
-ifneq (,$(findstring arm,$(CAPSTONE_ARCHS)))
+ifneq (,$(filter arm,$(CAPSTONE_ARCHS)))
 	CFLAGS += -DCAPSTONE_HAS_ARM
 	LIBSRC_ARM += $(wildcard arch/ARM/ARM*.c)
 	LIBOBJ_ARM += $(LIBSRC_ARM:%.c=$(OBJDIR)/%.o)
@@ -130,7 +130,7 @@ DEP_AARCH64 =
 DEP_AARCH64 += $(wildcard arch/AArch64/AArch64*.inc)
 
 LIBOBJ_AARCH64 =
-ifneq (,$(findstring aarch64,$(CAPSTONE_ARCHS)))
+ifneq (,$(filter aarch64,$(CAPSTONE_ARCHS)))
 	CFLAGS += -DCAPSTONE_HAS_ARM64
 	CFLAGS += -DCAPSTONE_HAS_AARCH64
 	LIBSRC_AARCH64 += $(wildcard arch/AArch64/AArch64*.c)
@@ -143,7 +143,7 @@ DEP_M68K += $(wildcard arch/M68K/M68K*.inc)
 DEP_M68K += $(wildcard arch/M68K/M68K*.h)
 
 LIBOBJ_M68K =
-ifneq (,$(findstring m68k,$(CAPSTONE_ARCHS)))
+ifneq (,$(filter m68k,$(CAPSTONE_ARCHS)))
 	CFLAGS += -DCAPSTONE_HAS_M68K
 	LIBSRC_M68K += $(wildcard arch/M68K/M68K*.c)
 	LIBOBJ_M68K += $(LIBSRC_M68K:%.c=$(OBJDIR)/%.o)
@@ -153,7 +153,7 @@ DEP_MIPS =
 DEP_MIPS += $(wildcard arch/Mips/Mips*.inc)
 
 LIBOBJ_MIPS =
-ifneq (,$(findstring mips,$(CAPSTONE_ARCHS)))
+ifneq (,$(filter mips,$(CAPSTONE_ARCHS)))
 	CFLAGS += -DCAPSTONE_HAS_MIPS
 	LIBSRC_MIPS += $(wildcard arch/Mips/Mips*.c)
 	LIBOBJ_MIPS += $(LIBSRC_MIPS:%.c=$(OBJDIR)/%.o)
@@ -162,7 +162,7 @@ endif
 DEP_SH = $(wildcard arch/SH/SH*.inc)
 
 LIBOBJ_SH =
-ifneq (,$(findstring sh,$(CAPSTONE_ARCHS)))
+ifneq (,$(filter sh,$(CAPSTONE_ARCHS)))
 	CFLAGS += -DCAPSTONE_HAS_SH
 	LIBSRC_SH += $(wildcard arch/SH/SH*.c)
 	LIBOBJ_SH += $(LIBSRC_SH:%.c=$(OBJDIR)/%.o)
@@ -172,7 +172,7 @@ DEP_PPC =
 DEP_PPC += $(wildcard arch/PowerPC/PPC*.inc)
 
 LIBOBJ_PPC =
-ifneq (,$(findstring powerpc,$(CAPSTONE_ARCHS)))
+ifneq (,$(filter powerpc,$(CAPSTONE_ARCHS)))
 	CFLAGS += -DCAPSTONE_HAS_POWERPC
 	LIBSRC_PPC += $(wildcard arch/PowerPC/PPC*.c)
 	LIBOBJ_PPC += $(LIBSRC_PPC:%.c=$(OBJDIR)/%.o)
@@ -183,7 +183,7 @@ DEP_SPARC =
 DEP_SPARC += $(wildcard arch/Sparc/Sparc*.inc)
 
 LIBOBJ_SPARC =
-ifneq (,$(findstring sparc,$(CAPSTONE_ARCHS)))
+ifneq (,$(filter sparc,$(CAPSTONE_ARCHS)))
 	CFLAGS += -DCAPSTONE_HAS_SPARC
 	LIBSRC_SPARC += $(wildcard arch/Sparc/Sparc*.c)
 	LIBOBJ_SPARC += $(LIBSRC_SPARC:%.c=$(OBJDIR)/%.o)
@@ -194,7 +194,7 @@ DEP_SYSZ =
 DEP_SYSZ += $(wildcard arch/SystemZ/SystemZ*.inc)
 
 LIBOBJ_SYSZ =
-ifneq (,$(findstring systemz,$(CAPSTONE_ARCHS)))
+ifneq (,$(filter systemz,$(CAPSTONE_ARCHS)))
 	CFLAGS += -DCAPSTONE_HAS_SYSTEMZ
 	LIBSRC_SYSZ += $(wildcard arch/SystemZ/SystemZ*.c)
 	LIBOBJ_SYSZ += $(LIBSRC_SYSZ:%.c=$(OBJDIR)/%.o)
@@ -214,7 +214,7 @@ DEP_X86 += $(wildcard arch/X86/X86*.inc)
 
 LIBOBJ_X86 =
 LIBOBJ_X86_NUMBERS =
-ifneq (,$(findstring x86,$(CAPSTONE_ARCHS)))
+ifneq (,$(filter x86,$(CAPSTONE_ARCHS)))
 	CFLAGS += -DCAPSTONE_HAS_X86
 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86DisassemblerDecoder.o
 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86Disassembler.o
@@ -237,7 +237,7 @@ DEP_XCORE =
 DEP_XCORE += $(wildcard arch/XCore/XCore*.inc)
 
 LIBOBJ_XCORE =
-ifneq (,$(findstring xcore,$(CAPSTONE_ARCHS)))
+ifneq (,$(filter xcore,$(CAPSTONE_ARCHS)))
 	CFLAGS += -DCAPSTONE_HAS_XCORE
 	LIBSRC_XCORE += $(wildcard arch/XCore/XCore*.c)
 	LIBOBJ_XCORE += $(LIBSRC_XCORE:%.c=$(OBJDIR)/%.o)
@@ -248,7 +248,7 @@ DEP_TMS320C64X =
 DEP_TMS320C64X += $(wildcard arch/TMS320C64x/TMS320C64x*.inc)
 
 LIBOBJ_TMS320C64X =
-ifneq (,$(findstring tms320c64x,$(CAPSTONE_ARCHS)))
+ifneq (,$(filter tms320c64x,$(CAPSTONE_ARCHS)))
 	CFLAGS += -DCAPSTONE_HAS_TMS320C64X
 	LIBSRC_TMS320C64X += $(wildcard arch/TMS320C64x/TMS320C64x*.c)
 	LIBOBJ_TMS320C64X += $(LIBSRC_TMS320C64X:%.c=$(OBJDIR)/%.o)
@@ -259,7 +259,7 @@ DEP_M680X += $(wildcard arch/M680X/*.inc)
 DEP_M680X += $(wildcard arch/M680X/M680X*.h)
 
 LIBOBJ_M680X =
-ifneq (,$(findstring m680x,$(CAPSTONE_ARCHS)))
+ifneq (,$(filter m680x,$(CAPSTONE_ARCHS)))
 	CFLAGS += -DCAPSTONE_HAS_M680X
 	LIBSRC_M680X += $(wildcard arch/M680X/*.c)
 	LIBOBJ_M680X += $(LIBSRC_M680X:%.c=$(OBJDIR)/%.o)
@@ -270,7 +270,7 @@ DEP_EVM =
 DEP_EVM += $(wildcard arch/EVM/EVM*.inc)
 
 LIBOBJ_EVM =
-ifneq (,$(findstring evm,$(CAPSTONE_ARCHS)))
+ifneq (,$(filter evm,$(CAPSTONE_ARCHS)))
 	CFLAGS += -DCAPSTONE_HAS_EVM
 	LIBSRC_EVM += $(wildcard arch/EVM/EVM*.c)
 	LIBOBJ_EVM += $(LIBSRC_EVM:%.c=$(OBJDIR)/%.o)
@@ -280,7 +280,7 @@ DEP_RISCV =
 DEP_RISCV += $(wildcard arch/RISCV/RISCV*.inc)
 
 LIBOBJ_RISCV =
-ifneq (,$(findstring riscv,$(CAPSTONE_ARCHS)))
+ifneq (,$(filter riscv,$(CAPSTONE_ARCHS)))
 	CFLAGS += -DCAPSTONE_HAS_RISCV
 	LIBSRC_RISCV += $(wildcard arch/RISCV/RISCV*.c)
 	LIBOBJ_RISCV += $(LIBSRC_RISCV:%.c=$(OBJDIR)/%.o)
@@ -290,7 +290,7 @@ DEP_WASM =
 DEP_WASM += $(wildcard arch/WASM/WASM*.inc)
 
 LIBOBJ_WASM =
-ifneq (,$(findstring wasm,$(CAPSTONE_ARCHS)))
+ifneq (,$(filter wasm,$(CAPSTONE_ARCHS)))
 	CFLAGS += -DCAPSTONE_HAS_WASM
 	LIBSRC_WASM += $(wildcard arch/WASM/WASM*.c)
 	LIBOBJ_WASM += $(LIBSRC_WASM:%.c=$(OBJDIR)/%.o)
@@ -301,7 +301,7 @@ DEP_MOS65XX =
 DEP_MOS65XX += $(wildcard arch/MOS65XX/MOS65XX*.inc)
 
 LIBOBJ_MOS65XX =
-ifneq (,$(findstring mos65xx,$(CAPSTONE_ARCHS)))
+ifneq (,$(filter mos65xx,$(CAPSTONE_ARCHS)))
 	CFLAGS += -DCAPSTONE_HAS_MOS65XX
 	LIBSRC_MOS65XX += $(wildcard arch/MOS65XX/MOS65XX*.c)
 	LIBOBJ_MOS65XX += $(LIBSRC_MOS65XX:%.c=$(OBJDIR)/%.o)
@@ -312,7 +312,7 @@ DEP_BPF =
 DEP_BPF += $(wildcard arch/BPF/BPF*.inc)
 
 LIBOBJ_BPF =
-ifneq (,$(findstring bpf,$(CAPSTONE_ARCHS)))
+ifneq (,$(filter bpf,$(CAPSTONE_ARCHS)))
 	CFLAGS += -DCAPSTONE_HAS_BPF
 	LIBSRC_BPF += $(wildcard arch/BPF/BPF*.c)
 	LIBOBJ_BPF += $(LIBSRC_BPF:%.c=$(OBJDIR)/%.o)
@@ -322,7 +322,7 @@ DEP_TRICORE =
 DEP_TRICORE +=$(wildcard arch/TriCore/TriCore*.inc)
 
 LIBOBJ_TRICORE =
-ifneq (,$(findstring tricore,$(CAPSTONE_ARCHS)))
+ifneq (,$(filter tricore,$(CAPSTONE_ARCHS)))
 	CFLAGS += -DCAPSTONE_HAS_TRICORE
 	LIBSRC_TRICORE += $(wildcard arch/TriCore/TriCore*.c)
 	LIBOBJ_TRICORE += $(LIBSRC_TRICORE:%.c=$(OBJDIR)/%.o)
@@ -332,7 +332,7 @@ DEP_ALPHA =
 DEP_ALPHA +=$(wildcard arch/Alpha/Alpha*.inc)
 
 LIBOBJ_ALPHA =
-ifneq (,$(findstring alpha,$(CAPSTONE_ARCHS)))
+ifneq (,$(filter alpha,$(CAPSTONE_ARCHS)))
 	CFLAGS += -DCAPSTONE_HAS_ALPHA
 	LIBSRC_ALPHA += $(wildcard arch/Alpha/Alpha*.c)
 	LIBOBJ_ALPHA += $(LIBSRC_ALPHA:%.c=$(OBJDIR)/%.o)
@@ -342,7 +342,7 @@ DEP_HPPA =
 DEP_HPPA += $(wildcard arch/HPPA/HPPA*.inc)
 
 LIBOBJ_HPPA =
-ifneq (,$(findstring hppa,$(CAPSTONE_ARCHS)))
+ifneq (,$(filter hppa,$(CAPSTONE_ARCHS)))
 	CFLAGS += -DCAPSTONE_HAS_HPPA
 	LIBSRC_HPPA += $(wildcard arch/HPPA/HPPA*.c)
 	LIBOBJ_HPPA += $(LIBSRC_HPPA:%.c=$(OBJDIR)/%.o)
@@ -352,7 +352,7 @@ DEP_LOONGARCH =
 DEP_LOONGARCH += $(wildcard arch/LoongArch/LoongArch*.inc)
 
 LIBOBJ_LOONGARCH =
-ifneq (,$(findstring loongarch,$(CAPSTONE_ARCHS)))
+ifneq (,$(filter loongarch,$(CAPSTONE_ARCHS)))
 	CFLAGS += -DCAPSTONE_HAS_LOONGARCH
 	LIBSRC_LOONGARCH += $(wildcard arch/LoongArch/LoongArch*.c)
 	LIBOBJ_LOONGARCH += $(LIBSRC_LOONGARCH:%.c=$(OBJDIR)/%.o)
@@ -362,7 +362,7 @@ DEP_XTENSA =
 DEP_XTENSA += $(wildcard arch/Xtensa/Xtensa*.inc)
 
 LIBOBJ_XTENSA =
-ifneq (,$(findstring xtensa,$(CAPSTONE_ARCHS)))
+ifneq (,$(filter xtensa,$(CAPSTONE_ARCHS)))
 	CFLAGS += -DCAPSTONE_HAS_XTENSA
 	LIBSRC_XTENSA += $(wildcard arch/Xtensa/Xtensa*.c)
 	LIBOBJ_XTENSA += $(LIBSRC_XTENSA:%.c=$(OBJDIR)/%.o)
@@ -372,7 +372,7 @@ DEP_ARC =
 DEP_ARC += $(wildcard arch/ARC/ARC*.inc)
 
 LIBOBJ_ARC =
-ifneq (,$(findstring arc,$(CAPSTONE_ARCHS)))
+ifneq (,$(filter arc,$(CAPSTONE_ARCHS)))
 	CFLAGS += -DCAPSTONE_HAS_ARC
 	LIBSRC_ARC += $(wildcard arch/ARC/ARC*.c)
 	LIBOBJ_ARC += $(LIBSRC_ARC:%.c=$(OBJDIR)/%.o)
