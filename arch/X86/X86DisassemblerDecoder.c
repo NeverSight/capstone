@@ -949,12 +949,14 @@ legacyOpcode:
 
 		if (current == 0x38) {
 			// dbgprintf(insn, "Found a three-byte escape prefix (0x%hhx)", current);
+			insn->threeByteEscape = current;
 			if (consumeByte(insn, &current))
 				return -1;
 
 			insn->opcodeType = THREEBYTE_38;
 		} else if (current == 0x3a) {
 			// dbgprintf(insn, "Found a three-byte escape prefix (0x%hhx)", current);
+			insn->threeByteEscape = current;
 			if (consumeByte(insn, &current))
 				return -1;
 
@@ -962,6 +964,7 @@ legacyOpcode:
 		} else if (current == 0x0f) {
 			// dbgprintf(insn, "Found a 3dnow escape prefix (0x%hhx)", current);
 			// Consume operands before the opcode to comply with the 3DNow encoding
+			insn->threeByteEscape = current;
 			if (readModRM(insn))
 				return -1;
 

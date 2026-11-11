@@ -103,6 +103,36 @@ static bool check_inherited_three_operand_size(void)
 	return true;
 }
 
+static bool check_legacy_opcode_bytes(csh handle)
+{
+	static const struct {
+		uint8_t bytes[6], length, opcode[4];
+	} cases[] = {
+		{ { 0x0f, 0x38, 0xf0, 0x08 }, 4, { 0x0f, 0x38, 0xf0 } },
+#ifndef CAPSTONE_X86_REDUCE
+		{ { 0x66, 0x0f, 0x38, 0x00, 0xc1 }, 5, { 0x0f, 0x38, 0x00 } },
+		{ { 0x66, 0x0f, 0x3a, 0x0f, 0xc1, 7 }, 6, { 0x0f, 0x3a, 0x0f } },
+		/* 3DNow! selects its operation with a byte after ModR/M. */
+		{ { 0x0f, 0x0f, 0xc1, 0xbf }, 4, { 0x0f, 0x0f, 0xbf } },
+#endif
+	};
+	for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+		cs_insn *insn = NULL;
+		size_t count = cs_disasm(handle, cases[i].bytes, cases[i].length,
+					 0, 1, &insn);
+		bool ok = count == 1 && insn->size == cases[i].length &&
+			  insn->detail &&
+			  !memcmp(insn->detail->x86.opcode, cases[i].opcode,
+				  sizeof(cases[i].opcode));
+		cs_free(insn, count);
+		if (!ok) {
+			fprintf(stderr, "legacy opcode bytes case %zu\n", i);
+			return false;
+		}
+	}
+	return true;
+}
+
 static bool check_internal_scan_mode(void)
 {
 	const uint8_t bytes[] = { 0x66, 0xb8, 0x34, 0x12, 0x90, 0x90 };
@@ -1397,6 +1427,8 @@ int main(void)
 							detail) == CS_ERR_OK;
 					ok &= cs_option(handle, CS_OPT_TEXT,
 							text) == CS_ERR_OK;
+					if (detail)
+						ok &= check_legacy_opcode_bytes(handle);
 					ok &= check_public_id_cache(handle,
 								    modes[m]);
 					ok &= check_reader_bounds(

@@ -795,6 +795,13 @@ Please note though, `writeback` registers are correctly added to the `regs_write
 
 These issues will be addressed in the next releases. For a more detailed descriptions see: https://github.com/capstone-engine/capstone/issues/2472#issuecomment-2335226281 (starting at "eor and the others").
 
+## x86 legacy opcode bytes
+
+For the legacy three-byte maps, `cs_x86.opcode` contains the complete
+`0F 38 xx` or `0F 3A xx` opcode. For 3DNow!, the array holds `0F 0F xx`,
+where `xx` is the selector following the ModR/M and any address bytes.
+For example, `66 0F 3A 0F C1 07` reports `{ 0x0f, 0x3a, 0x0f, 0 }`.
+
 ## x86 legacy x87 environment details
 
 `FLDENV` and `FNSTENV` report a 14- or 28-byte memory operand according to
