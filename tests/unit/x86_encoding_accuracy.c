@@ -832,6 +832,70 @@ static int inspect_operand_access(char *text, size_t size, const char *format,
 	return access_callback.formatter(text, size, format, args);
 }
 
+static cs_vsnprintf_t broadcast_formatter;
+static bool restore_broadcast_formatter;
+
+static int write_broadcast(char *text, size_t size, const char *format,
+			   va_list args)
+{
+	(void)format;
+	(void)args;
+	if (restore_broadcast_formatter)
+		cs_vsnprintf = broadcast_formatter;
+	return snprintf(text, size, "{1to8}");
+}
+
+/* Exercise the text-based broadcast repair with a custom formatter. The
+ * decorator in this test comes from the callback, not the encoded ADD. */
+static bool check_formatter_broadcast(void)
+{
+	if (cs_support(CS_SUPPORT_DIET))
+		return true;
+	const uint8_t bytes[] = { 0x83, 0x40, 0x20, 1 };
+	const cs_mode modes[] = { CS_MODE_16, CS_MODE_32, CS_MODE_64 };
+	cs_opt_mem original = { cs_mem_malloc, cs_mem_calloc, cs_mem_realloc,
+				cs_mem_free, cs_vsnprintf };
+	cs_opt_mem hooks = original;
+	hooks.vsnprintf = write_broadcast;
+	broadcast_formatter = original.vsnprintf;
+	bool ok = true;
+	for (size_t mode = 0; mode < sizeof(modes) / sizeof(modes[0]); ++mode)
+		for (unsigned restore = 0; restore < 2; ++restore) {
+			csh handle = 0;
+			cs_insn *insn = NULL;
+			restore_broadcast_formatter = restore != 0;
+			bool decoded =
+				cs_option(0, CS_OPT_MEM, (uintptr_t)&hooks) ==
+					CS_ERR_OK &&
+				cs_open(CS_ARCH_X86, modes[mode], &handle) ==
+					CS_ERR_OK &&
+				cs_option(handle, CS_OPT_DETAIL, CS_OPT_ON) ==
+					CS_ERR_OK &&
+				cs_disasm(handle, bytes, sizeof(bytes), 0, 1,
+					  &insn) == 1;
+			bool matches = decoded;
+			if (decoded) {
+				const cs_x86 *x86 = &insn->detail->x86;
+				matches = strstr(insn->op_str, "{1to8}") !=
+						  NULL &&
+					  x86->op_count == 2 &&
+					  x86->operands[0].type == X86_OP_MEM &&
+					  x86->operands[0].avx_bcast ==
+						  X86_AVX_BCAST_8;
+				cs_free(insn, 1);
+			}
+			if (!matches)
+				fprintf(stderr,
+					"custom broadcast mismatch (mode %u, restore %u)\n",
+					(unsigned)modes[mode], restore);
+			ok &= matches;
+			if (handle)
+				cs_close(&handle);
+		}
+	return cs_option(0, CS_OPT_MEM, (uintptr_t)&original) == CS_ERR_OK &&
+	       ok;
+}
+
 /* A formatter observes the stream's unwritten tail and preceding detail, and
  * can change the options used by the remainder of this decode. */
 static bool check_operand_access_callback(void)
@@ -1465,7 +1529,7 @@ int main(void)
 		  check_inherited_moffs_size() &&
 		  check_inherited_three_operand_size() && check_id_cache() &&
 		  check_instruction_names() && check_intel_operand_access() &&
-		  check_operand_access_callback();
+		  check_operand_access_callback() && check_formatter_broadcast();
 	for (size_t m = 0; m < sizeof(modes) / sizeof(modes[0]); ++m)
 		for (size_t s = 0; s < sizeof(syntaxes) / sizeof(syntaxes[0]);
 		     ++s)
