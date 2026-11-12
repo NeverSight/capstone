@@ -144,11 +144,19 @@ endif()
 list(LENGTH SUPPORTED_ARCHITECTURES count)
 math(EXPR count "${count}-1")
 # create options controlling whether support for a particular architecture is needed
+set(capstone_enabled_architectures)
 foreach(i RANGE ${count})
     list(GET SUPPORTED_ARCHITECTURES ${i} supported_architecture)
     list(GET SUPPORTED_ARCHITECTURE_LABELS ${i} supported_architecture_label)
     option("CAPSTONE_${supported_architecture}_SUPPORT" "${supported_architecture_label} support" ${CAPSTONE_ARCHITECTURE_DEFAULT})
+    if(CAPSTONE_${supported_architecture}_SUPPORT)
+        list(APPEND capstone_enabled_architectures "${supported_architecture}")
+    endif()
 endforeach()
+
+if(capstone_enabled_architectures STREQUAL "AARCH64")
+    add_compile_definitions(CAPSTONE_AARCH64_SHORT_REGISTER_NAMES)
+endif()
 
 # Dedicated builds of these backends use their generated mnemonic tries.
 set(alias_trie_architectures AARCH64 MIPS PPC SPARC)

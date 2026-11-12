@@ -80,6 +80,18 @@ DECLARE_printComplexRotationOp(90, 0);
 
 void printRegName(SStream *OS, unsigned Reg)
 {
+#if defined(CAPSTONE_AARCH64_SHORT_REGISTER_NAMES) && !defined(CAPSTONE_DIET) && \
+	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
+	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
+#include "AArch64GenShortRegisterNames.inc"
+	if (Reg && Reg <= ARR_SIZE(short_names) && short_names[Reg - 1].length &&
+	    cs_vsnprintf == cs_default_vsnprintf && !getUseMarkup() &&
+	    OS->index < SSTREAM_BUF_LEN - 1) {
+		SStream_concat0_small(OS, short_names[Reg - 1].text,
+				      short_names[Reg - 1].length);
+		return;
+	}
+#endif
 	SStream_concat2(OS, markup("<reg:"),
 			getRegisterName(Reg, AArch64_NoRegAltName));
 	SStream_concat0(OS, markup(">"));

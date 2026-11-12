@@ -61,6 +61,8 @@ endif()
 if(CAPSTONE_AARCH64_SUPPORT)
     list(APPEND UNIT_TEST_SOURCES aarch64_postprocess.c)
     if(Python3_Interpreter_FOUND)
+        add_test(NAME unit_aarch64_register_names_generator
+            COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/suite/synctools/aarch64_register_names.py" --check)
         add_test(NAME unit_aarch64_postprocess_generator
             COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/suite/synctools/aarch64_postprocess.py" --check)
         add_test(NAME unit_aarch64_postprocess_newlines

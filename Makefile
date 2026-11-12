@@ -116,6 +116,10 @@ INSTALL_LIB ?= $(INSTALL_BIN) -m0755
 LIBNAME = capstone
 
 
+ifeq ($(sort $(CAPSTONE_ARCHS)),aarch64)
+CFLAGS += -DCAPSTONE_AARCH64_SHORT_REGISTER_NAMES
+endif
+
 ifeq ($(strip $(filter-out aarch64 mips powerpc sparc,$(CAPSTONE_ARCHS))),)
 CFLAGS += -DCAPSTONE_USE_ALIAS_TRIE
 endif
