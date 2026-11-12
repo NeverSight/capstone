@@ -873,10 +873,50 @@ void AArch64_set_instr_map_data(MCInst *MI)
 	map_groups(MI, aarch64_insns);
 }
 
+#ifdef CAPSTONE_AARCH64_DEDICATED_SCAN
+/* These A64 classes have no reserved operand encodings. For a text-free
+ * scan, the table's internal opcode suffices for the normal public mapper. */
+static unsigned scanImmediateOpcode(uint32_t word)
+{
+	if ((word & 0x7c000000) == 0x14000000)
+		return word >> 31 ? AArch64_BL : AArch64_B;
+	if ((word & 0x1f000000) == 0x10000000)
+		return word >> 31 ? AArch64_ADRP : AArch64_ADR;
+	if ((word & 0x7e000000) == 0x34000000) {
+		static const unsigned opcodes[2][2] = {
+			{ AArch64_CBZW, AArch64_CBNZW },
+			{ AArch64_CBZX, AArch64_CBNZX },
+		};
+		return opcodes[word >> 31][(word >> 24) & 1];
+	}
+	if ((word & 0x1f800000) == 0x11000000) {
+		static const unsigned opcodes[8] = {
+			AArch64_ADDWri,	 AArch64_ADDSWri, AArch64_SUBWri,
+			AArch64_SUBSWri, AArch64_ADDXri,  AArch64_ADDSXri,
+			AArch64_SUBXri,	 AArch64_SUBSXri,
+		};
+		return opcodes[word >> 29];
+	}
+	return 0;
+}
+#endif
+
 bool AArch64_getInstruction(csh handle, const uint8_t *code, size_t code_len,
 			    MCInst *MI, uint16_t *size, uint64_t address,
 			    void *info)
 {
+#ifdef CAPSTONE_AARCH64_DEDICATED_SCAN
+	if (code_len >= 4 && MI->csh->no_text && !MI->flat_insn->detail &&
+	    MI->csh->disasm == AArch64_getInstruction) {
+		unsigned opcode = scanImmediateOpcode(readBytes32(MI, code));
+		if (opcode) {
+			MCInst_setOpcode(MI, opcode);
+			map_cs_id(MI, aarch64_insns, ARR_SIZE(aarch64_insns));
+			*size = 4;
+			return true;
+		}
+	}
+#endif
 	AArch64_init_cs_detail(MI);
 	DecodeStatus Result = AArch64_LLVM_getInstruction(
 		handle, code, code_len, MI, size, address, info);

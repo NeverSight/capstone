@@ -63,7 +63,7 @@ if(CAPSTONE_ARM_SUPPORT AND NOT CAPSTONE_BUILD_DIET)
     list(APPEND UNIT_TEST_SOURCES arm_post_index.c)
 endif()
 if(CAPSTONE_AARCH64_SUPPORT)
-    list(APPEND UNIT_TEST_SOURCES aarch64_postprocess.c)
+    list(APPEND UNIT_TEST_SOURCES aarch64_postprocess.c aarch64_scan.c)
     if(Python3_Interpreter_FOUND)
         add_test(NAME unit_aarch64_register_names_generator
             COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/suite/synctools/aarch64_register_names.py" --check)
