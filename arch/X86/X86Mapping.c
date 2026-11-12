@@ -12698,6 +12698,21 @@ void X86_postprinter(csh handle, cs_insn *insn, SStream *mnem, MCInst *mci)
 		return;
 
 	cs_x86 *x86 = &insn->detail->x86;
+#if defined(CAPSTONE_X86_ONLY) && defined(__linux__)
+	/* VEX/EVEX, x87 environments and RCL retain all operand repairs.
+	 * Other encodings can only need the first memory operand's broadcast
+	 * repair, including decorators introduced by a custom formatter. */
+	if ((x86->opcode[0] & 0xe0) != 0xc0 && x86->opcode[0] != 0x62) {
+		for (i = 0; i < x86->op_count; ++i) {
+			cs_x86_op *operand = &x86->operands[i];
+			if (operand->type == X86_OP_MEM) {
+				repair_avx_broadcast(operand, mnem);
+				break;
+			}
+		}
+		return;
+	}
+#endif
 	// Find the operands that these repairs can change once, in output order.
 	for (i = 0; i < x86->op_count; ++i) {
 		cs_x86_op *operand = &x86->operands[i];
