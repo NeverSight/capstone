@@ -94,6 +94,65 @@ static void X86_writeBaseMov(cs_insn *insn, const struct X86SimpleOutput *row,
 	}
 }
 
+/* The /digit selects the same flags and register access as the corresponding
+ * ALU register pair. The immediate's public width follows the destination. */
+static void writeGroup1Immediate(cs_insn *insn,
+				 const struct X86SimpleOutput *row,
+				 const uint8_t *code, uint8_t rex,
+				 uint8_t modrm, uint16_t *insn_size)
+{
+	const unsigned offset = 2 + (rex != 0);
+	const int immediate = (int8_t)code[offset];
+	const unsigned group = (modrm >> 3) & 7;
+	const bool logical = group == 1 || group == 4 || group == 6;
+	const bool wide = (rex & 8) != 0;
+	const bool negative = !logical && immediate < 0;
+	const uint64_t value =
+		logical ? (wide ? (uint64_t)(int64_t)immediate :
+				  (uint32_t)immediate) :
+			  (uint64_t)(negative ? -immediate : immediate);
+	const unsigned id = ((rex & 1) << 3) | (modrm & 7);
+	const struct X86SimpleRegister *reg =
+		&x86_simple_registers[wide ? 3 : 2][id];
+	insn->id = row->id;
+	*insn_size = insn->size = (uint16_t)(offset + 1);
+	memcpy(insn->bytes, code, insn->size);
+	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
+	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
+	memset(insn->op_str, 0, sizeof(insn->op_str));
+	memcpy(insn->op_str, reg->name, sizeof(reg->name));
+	char *out = insn->op_str + reg->length;
+	memcpy(out, ", ", 2);
+	out += 2;
+	if (negative)
+		*out++ = '-';
+	if (value <= HEX_THRESHOLD) {
+		*out = (char)('0' + value);
+	} else {
+		static const char digits[] = "0123456789abcdef";
+		char temp[16], *end = temp + sizeof(temp), *start = end;
+		uint64_t n = value;
+		do {
+			*--start = digits[n & 15];
+			n >>= 4;
+		} while (n);
+		memcpy(out, "0x", 2);
+		memcpy(out + 2, start, end - start);
+	}
+	if (insn->detail) {
+		X86_writeSimpleDetail(insn->detail, row, 0x83, rex, modrm,
+				      reg->reg, 0);
+		cs_x86 *x = &insn->detail->x86;
+		x->operands[1].type = X86_OP_IMM;
+		x->operands[1].imm = logical && !wide ?
+					     (int64_t)(uint32_t)immediate :
+					     immediate;
+		x->operands[1].access = 0;
+		x->encoding.imm_offset = (uint8_t)offset;
+		x->encoding.imm_size = 1;
+	}
+}
+
 /* The register rows distinguish AH..BH from SPL..DIL when a REX prefix is
  * present. Memory admission below is limited to MOV with a base or base+disp8. */
 #ifdef CAPSTONE_X86_DEDICATED_OUTPUT
@@ -145,6 +204,17 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
 	    cs_vsnprintf != cs_default_vsnprintf)
 		return false;
 
+	if (plan == X86_PLAN_GROUP1_IMM8) {
+		if (size < 3u + has_rex)
+			return false;
+		unsigned reg_plan =
+			x86_simple_plans[wide][prefix_class][(modrm & 0x38) | 1];
+		if (!reg_plan)
+			return false;
+		writeGroup1Immediate(insn, &x86_simple_outputs[reg_plan >> 2],
+				     code, rex, modrm, insn_size);
+		return true;
+	}
 	const struct X86SimpleOutput *row = &x86_simple_outputs[plan >> 2];
 	const bool relative = form == X86_SIMPLE_RELATIVE;
 	if (relative && size < (size_t)row->imm_offset + row->imm_size)

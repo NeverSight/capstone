@@ -123,6 +123,24 @@ static bool check_memory(csh handles[2], cs_mode mode)
 	return true;
 }
 
+static bool check_group1(csh handles[2], cs_mode mode)
+{
+	uint8_t bytes[4];
+	for (unsigned p = 0; p <= (mode == CS_MODE_64 ? 16u : 0u); ++p) {
+		bytes[0] = p ? (uint8_t)(0x3f + p) : 0;
+		bytes[1] = 0x83;
+		for (unsigned mr = 0xc0; mr < 256; ++mr)
+			for (unsigned imm = 0; imm < 256; ++imm) {
+				bytes[2] = (uint8_t)mr;
+				bytes[3] = (uint8_t)imm;
+				if (!compare(handles, bytes + !p, 3 + !!p,
+					     imm ^ mr ^ p))
+					return false;
+			}
+	}
+	return true;
+}
+
 static bool check_mode(cs_mode mode)
 {
 	csh handles[2] = { 0 };
@@ -138,7 +156,8 @@ static bool check_mode(cs_mode mode)
 			if (cs_option(handles[side], CS_OPT_DETAIL,
 				      detail ? CS_OPT_ON : CS_OPT_OFF))
 				goto done;
-		if (!check_branches(handles) || !check_memory(handles, mode))
+		if (!check_branches(handles) || !check_memory(handles, mode) ||
+		    !check_group1(handles, mode))
 			goto done;
 		for (unsigned op = 0; op < 256; ++op) {
 			uint8_t bytes[3] = { 0, (uint8_t)op, 0 };

@@ -43,6 +43,10 @@ enum X86SimpleForm {
 	X86_SIMPLE_RELATIVE,
 };
 
+/* This plan gets its ALU row from ModR/M.reg. Its low bits select the
+ * same register-only operand check as a register pair. */
+#define X86_PLAN_GROUP1_IMM8 ((UINT16_MAX & ~3u) | X86_SIMPLE_REG_RM)
+
 static inline void X86_writeSimpleDetail(cs_detail *detail,
 					 const struct X86SimpleOutput *row,
 					 uint8_t opcode, uint8_t rex,

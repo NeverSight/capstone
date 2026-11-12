@@ -401,7 +401,7 @@ int main()
 					rows.begin());
 				if (index == rows.size())
 					rows.push_back(row.fields);
-				if (index > UINT16_MAX >> 2)
+				if (index >= UINT16_MAX >> 2)
 					return 1;
 				plans[wide][cls][op] = static_cast<uint16_t>(
 					(index << 2) | form);
@@ -410,6 +410,9 @@ int main()
 			}
 		}
 	}
+	for (unsigned wide = 0; wide < 2; ++wide)
+		for (unsigned cls = 0; cls < (wide ? 3u : 1u); ++cls)
+			plans[wide][cls][0x83] = X86_PLAN_GROUP1_IMM8;
 	emit_tables(plans, regs, rows);
 	std::cerr << "records=" << rows.size() - 1 << " plans=" << admitted
 		  << " encodings_checked=" << checked << " table_bytes="
