@@ -167,7 +167,7 @@ if(capstone_enabled_architectures STREQUAL "SPARC")
 endif()
 
 if(capstone_enabled_architectures STREQUAL "AARCH64")
-    add_compile_definitions(CAPSTONE_AARCH64_SHORT_REGISTER_NAMES)
+    add_compile_definitions(CAPSTONE_AARCH64_SHORT_REGISTER_NAMES CAPSTONE_AARCH64_INIT_CONSTRUCTED_OPERANDS)
 endif()
 
 # Dedicated builds of these backends use their generated mnemonic tries.
