@@ -21,8 +21,15 @@ static bool check(const struct Jump *J, unsigned Syntax) {
   csh Handle;
   if (cs_open(CS_ARCH_X86, J->Mode, &Handle) != CS_ERR_OK)
     return false;
-  bool OK = cs_option(Handle, CS_OPT_DETAIL, CS_OPT_ON) == CS_ERR_OK &&
-            cs_option(Handle, CS_OPT_SYNTAX, Syntax) == CS_ERR_OK;
+  bool OK = cs_option(Handle, CS_OPT_DETAIL, CS_OPT_ON) == CS_ERR_OK;
+  const bool Diet = cs_support(CS_SUPPORT_DIET);
+  const cs_err SyntaxError = cs_option(Handle, CS_OPT_SYNTAX, Syntax);
+  if (Syntax == CS_OPT_SYNTAX_ATT &&
+      (SyntaxError == CS_ERR_X86_ATT || (Diet && SyntaxError == CS_ERR_DIET))) {
+    cs_close(&Handle);
+    return OK;
+  }
+  OK &= SyntaxError == CS_ERR_OK;
   for (unsigned Size = J->Size - 1; Size <= J->Size; ++Size) {
     cs_insn *I = NULL;
     const size_t Count = cs_disasm(Handle, J->Bytes, Size, Address, 1, &I);
@@ -35,9 +42,10 @@ static bool check(const struct Jump *J, unsigned Syntax) {
             X->operands[0].type == X86_OP_IMM &&
             (uint64_t)X->operands[0].imm == J->Target &&
             X->encoding.imm_offset == J->ImmediateOffset &&
-            X->encoding.imm_size == J->ImmediateSize &&
-            cs_insn_group(Handle, I, CS_GRP_JUMP) &&
-            cs_insn_group(Handle, I, CS_GRP_BRANCH_RELATIVE) && !X->eflags;
+            X->encoding.imm_size == J->ImmediateSize && !X->eflags;
+      if (!Diet)
+        OK &= cs_insn_group(Handle, I, CS_GRP_JUMP) &&
+              cs_insn_group(Handle, I, CS_GRP_BRANCH_RELATIVE);
     } else {
       OK = false;
     }
