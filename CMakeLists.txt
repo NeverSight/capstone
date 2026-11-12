@@ -433,11 +433,21 @@ if(CAPSTONE_X86_SUPPORT)
         arch/X86/X86Mapping.c
         arch/X86/X86Module.c
     )
-    # With native MSVC x64 static CRT and LTCG, inlining gives the public
-    # iterator a large probed stack frame, even on its compact scan path.
-    if(CAPSTONE_BUILD_STATIC_MSVC_RUNTIME AND CMAKE_C_COMPILER_ID STREQUAL "MSVC"
-       AND MSVC_C_ARCHITECTURE_ID STREQUAL "x64")
-        set_property(SOURCE arch/X86/X86DisassemblerDecoder.c APPEND PROPERTY COMPILE_OPTIONS /GL-)
+    # MSVC can inline the decoder into the public iterator under LTCG, giving
+    # even a compact scan a very large probed stack frame.
+    if(CMAKE_C_COMPILER_ID STREQUAL "MSVC" AND MSVC_C_ARCHITECTURE_ID STREQUAL "x64")
+        if(CAPSTONE_BUILD_STATIC_MSVC_RUNTIME)
+            set_property(SOURCE arch/X86/X86DisassemblerDecoder.c APPEND PROPERTY COMPILE_OPTIONS /GL-)
+        elseif(capstone_enabled_architectures STREQUAL "X86")
+            set(x86_release_ipo ${CMAKE_INTERPROCEDURAL_OPTIMIZATION})
+            if(DEFINED CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE)
+                set(x86_release_ipo ${CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE})
+            endif()
+            if(x86_release_ipo)
+                set_property(SOURCE arch/X86/X86DisassemblerDecoder.c APPEND PROPERTY COMPILE_OPTIONS "$<$<CONFIG:Release>:/GL->")
+                set_property(SOURCE arch/X86/X86Disassembler.c APPEND PROPERTY COMPILE_DEFINITIONS "$<$<CONFIG:Release>:CAPSTONE_X86_LTCG_WRITEMASK>")
+            endif()
+        endif()
     endif()
     set(SOURCES_X86_NUMBERS arch/X86/X86IntelInstPrinterNumbers.c)
     set(HEADERS_X86

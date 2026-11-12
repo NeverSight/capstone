@@ -380,6 +380,14 @@ def emit_scan(suffix):
     return "\n".join(lines)
 
 
+def ud1_opcode(suffix):
+    return int(
+        re.search(
+            r"X86_UD1\s*=\s*(\d+)", (X86 / f"X86GenInstrInfo{suffix}.inc").read_text()
+        )[1]
+    )
+
+
 def instruction_specifiers(source):
     matches = re.findall(
         r"static const struct InstructionSpecifier x86DisassemblerInstrSpecifiers"
@@ -591,11 +599,7 @@ def legacy_terminal_model(suffix, *, public=False):
             for i, shape in selected.items()
             if tuple(read_operand_calls(shape[0], materialize=False)) in existing_reads
         }
-    ud1 = int(
-        re.search(
-            r"X86_UD1\s*=\s*(\d+)", (X86 / f"X86GenInstrInfo{suffix}.inc").read_text()
-        )[1]
-    )
+    ud1 = ud1_opcode(suffix)
     groups = {}
     public_reader_shapes = {}
     terminals = [(0, 0, 0)]
@@ -1195,11 +1199,7 @@ def emit_vex_scan(suffix):
             | (int(has_vvvv) << 3)
             | (patterns[immediates] << 4)
         )
-    ud1 = int(
-        re.search(
-            r"X86_UD1\s*=\s*(\d+)", (X86 / f"X86GenInstrInfo{suffix}.inc").read_text()
-        )[1]
-    )
+    ud1 = ud1_opcode(suffix)
     flags[ud1] = 0
     tables.require(all(0 <= f <= 255 for f in flags), "VEX scan flags exceed a byte")
     mapping = public_instruction_ids(suffix)
@@ -1237,6 +1237,43 @@ def emit_vex_scan(suffix):
     return "\n".join(emit_vex_scan_rows(suffix) + lines)
 
 
+def emit_writemask_opcodes(suffix):
+    source = X86 / f"X86GenDisassemblerTables{suffix}.inc"
+    sets = read_sets(source)
+    specifiers = instruction_specifiers(source.read_text())
+    masked = [
+        any(encoding == "ENCODING_WRITEMASK" for encoding, _ in sets[index])
+        for index in specifiers
+    ]
+    # UD1 uses hand-written operands instead of its generated descriptor.
+    masked[ud1_opcode(suffix)] = False
+    if not any(masked):
+        return (
+            "static inline bool x86HasWritemaskOperand(unsigned opcode)\n"
+            "{\n\t(void)opcode;\n\treturn false;\n}"
+        )
+    bits = bytearray((len(masked) + 7) // 8)
+    for opcode, flag in enumerate(masked):
+        if flag:
+            bits[opcode // 8] |= 1 << (opcode % 8)
+    rows = [
+        "\t" + ", ".join(f"0x{value:02x}" for value in bits[i : i + 16]) + ","
+        for i in range(0, len(bits), 16)
+    ]
+    return "\n".join(
+        [
+            "static const uint8_t x86WritemaskOpcodes[] = {",
+            *rows,
+            "};",
+            "",
+            "static inline bool x86HasWritemaskOperand(unsigned opcode)",
+            "{",
+            "\treturn (x86WritemaskOpcodes[opcode >> 3] >> (opcode & 7)) & 1;",
+            "}",
+        ]
+    )
+
+
 def generated_output(emit):
     return (
         "/* Capstone Disassembly Engine */\n"
@@ -1260,6 +1297,7 @@ def main():
         (SCAN_OUTPUT, emit_scan),
         (TERMINAL_OUTPUT, emit_terminal),
         (X86 / "X86GenVexScan.inc", emit_vex_scan),
+        (X86 / "X86GenWritemask.inc", emit_writemask_opcodes),
     ]
     generated = [(path, generated_output(emit)) for path, emit in outputs]
     for path, output in generated:
