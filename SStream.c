@@ -145,6 +145,14 @@ void SStream_trimls(SStream *ss)
 		buf_off++;
 	}
 	if (buf_off > 0) {
+		// Keep an overreported cursor, but do not let an underreported
+		// count move the next write into the visible suffix.
+		if (ss->index < buf_off ||
+		    (ss->index < sizeof(ss->buffer) && ss->buffer[ss->index])) {
+			size_t written = buf_off + strlen(ss->buffer + buf_off);
+			if (ss->index < written)
+				ss->index = written;
+		}
 		memmove(ss->buffer, ss->buffer + buf_off,
 			SSTREAM_BUF_LEN - buf_off);
 		ss->index -= buf_off;

@@ -1206,9 +1206,18 @@ bool test_printuint64_bang()
 	return true;
 }
 
+static int trim_reported_length;
+
+static int report_trim_length(char *out, size_t size, const char *fmt,
+			      va_list args)
+{
+	vsnprintf(out, size, fmt, args);
+	return trim_reported_length;
+}
+
 bool test_trimls()
 {
-	printf("Test test_replc\n");
+	printf("Test test_trimls\n");
 
 	SStream OS = { 0 };
 	SStream_Init(&OS);
@@ -1232,11 +1241,33 @@ bool test_trimls()
 	CHECK_OS_EQUAL_RET_FALSE(OS, "");
 
 	// Everywhere tabs
-	char cmp_buf[SSTREAM_BUF_LEN] = { 0 };
-	memset(cmp_buf, '\t', sizeof(cmp_buf) - 1);
+	memset(OS.buffer, '\t', sizeof(OS.buffer) - 1);
+	OS.buffer[sizeof(OS.buffer) - 1] = '\0';
+	OS.index = sizeof(OS.buffer) - 1;
 	SStream_trimls(&OS);
 	CHECK_OS_EQUAL_RET_FALSE(OS, "");
 	CHECK_INT_EQUAL_RET_FALSE(OS.index, 0);
+
+	// Preserve the visible suffix for underestimated counts, and keep a
+	// longer reported position for custom writers that use it to append.
+	for (trim_reported_length = 0; trim_reported_length <= 7;
+	     ++trim_reported_length) {
+		SStream_Init(&OS);
+		cs_vsnprintf_t saved = cs_vsnprintf;
+		cs_vsnprintf = report_trim_length;
+		SStream_concat(&OS, "%s", " \tadd");
+		cs_vsnprintf = saved;
+		SStream_trimls(&OS);
+		int expected = trim_reported_length <= 5 ?
+					  3 :
+					  trim_reported_length - 2;
+		CHECK_OS_EQUAL_RET_FALSE(OS, "add");
+		CHECK_INT_EQUAL_RET_FALSE(OS.index, expected);
+		SStream_concat1(&OS, 'q');
+		if (OS.buffer[expected] != 'q')
+			return false;
+		CHECK_INT_EQUAL_RET_FALSE(OS.index, expected + 1);
+	}
 	return true;
 }
 
