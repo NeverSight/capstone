@@ -96,6 +96,9 @@
 #include "../../cs_priv.h"
 
 #include "X86BaseInfo.h"
+#if defined(CAPSTONE_X86_LTCG_WRITEMASK) && defined(_DLL)
+#include "X86GenWritemask.inc"
+#endif
 #include "X86Disassembler.h"
 #include "X86DisassemblerDecoderCommon.h"
 #include "X86DisassemblerDecoder.h"
@@ -699,6 +702,10 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
 			if (insn.hasLockPrefix)
 				Flags |= X86_IP_HAS_LOCK;
 
+#if defined(CAPSTONE_X86_LTCG_WRITEMASK) && defined(_DLL)
+			if (x86HasWritemaskOperand(insn.instructionID))
+				Flags |= X86_IP_HAS_EVEX_OPMASK;
+#else
 			for (int i = 0; i < X86_MAX_OPERANDS; ++i) {
 				if (insn.operands[i].encoding ==
 				    ENCODING_WRITEMASK) {
@@ -706,6 +713,7 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
 					break;
 				}
 			}
+#endif
 
 			instr->flags = Flags;
 		}
