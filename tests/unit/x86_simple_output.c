@@ -42,6 +42,31 @@ static bool compare(csh handles[2], const uint8_t *input, size_t length,
 	return false;
 }
 
+static bool check_branches(csh handles[2])
+{
+	const uint32_t bits[] = { 0,	1,    9,	  10,	     0x7f,
+				  0x80, 0xff, 0x80000000, 0xffffffff };
+	for (unsigned op = 0; op < 256; ++op) {
+		bool near_jcc = op >= 0x80 && op <= 0x8f;
+		bool short_jump = (op >= 0x70 && op <= 0x7f) || op == 0xeb;
+		if (!near_jcc && !short_jump && op != 0xe8 && op != 0xe9)
+			continue;
+		size_t offset = near_jcc ? 2 : 1, width = short_jump ? 1 : 4;
+		uint8_t bytes[6] = { 0x0f };
+		bytes[offset - 1] = (uint8_t)op;
+		for (unsigned i = 0; i < sizeof(bits) / sizeof(bits[0]); ++i) {
+			for (unsigned j = 0; j < width; ++j)
+				bytes[offset + j] =
+					(uint8_t)(bits[i] >> (8 * j));
+			for (size_t length = 1; length <= offset + width;
+			     ++length)
+				if (!compare(handles, bytes, length, i))
+					return false;
+		}
+	}
+	return true;
+}
+
 static void custom_postprinter(csh handle, cs_insn *insn, SStream *stream,
 			       MCInst *mci)
 {
@@ -87,6 +112,8 @@ static bool check_mode(cs_mode mode)
 			if (cs_option(handles[side], CS_OPT_DETAIL,
 				      detail ? CS_OPT_ON : CS_OPT_OFF))
 				goto done;
+		if (!check_branches(handles))
+			goto done;
 		for (unsigned op = 0; op < 256; ++op) {
 			uint8_t bytes[3] = { 0, (uint8_t)op, 0 };
 			if (!compare(handles, bytes + 1, 1, op))

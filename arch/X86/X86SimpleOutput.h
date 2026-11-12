@@ -26,7 +26,7 @@ struct X86SimpleOutput {
 	uint16_t writes[4];
 	uint8_t groups[4];
 	uint8_t read_count, write_count, group_count, operand_count;
-	uint8_t address_size, modrm_offset;
+	uint8_t address_size, modrm_offset, imm_offset, imm_size;
 	struct X86SimpleOperand ops[2];
 };
 
@@ -40,6 +40,7 @@ enum X86SimpleForm {
 	X86_SIMPLE_FIXED,
 	X86_SIMPLE_RM_REG,
 	X86_SIMPLE_REG_RM,
+	X86_SIMPLE_RELATIVE,
 };
 
 static inline void X86_writeSimpleDetail(cs_detail *detail,
@@ -62,6 +63,8 @@ static inline void X86_writeSimpleDetail(cs_detail *detail,
 	x86->rex = rex;
 	x86->modrm = modrm;
 	x86->encoding.modrm_offset = row->modrm_offset;
+	x86->encoding.imm_offset = row->imm_offset;
+	x86->encoding.imm_size = row->imm_size;
 	x86->op_count = row->operand_count;
 	for (unsigned i = 0; i < x86->op_count; ++i) {
 		cs_x86_op *op = &x86->operands[i];

@@ -102,9 +102,9 @@ std::string initializer(const X86SimpleOutput &row)
 	emit_array(out, row.writes);
 	out << ", ";
 	emit_array(out, row.groups);
-	for (unsigned v :
-	     { row.read_count, row.write_count, row.group_count,
-	       row.operand_count, row.address_size, row.modrm_offset })
+	for (unsigned v : { row.read_count, row.write_count, row.group_count,
+			    row.operand_count, row.address_size,
+			    row.modrm_offset, row.imm_offset, row.imm_size })
 		out << ", " << v;
 	out << ", { ";
 	for (unsigned i = 0; i < 2; ++i) {
@@ -119,7 +119,7 @@ std::string initializer(const X86SimpleOutput &row)
 // its two register IDs. Every other public byte must be reproduced by the row.
 std::string describe(const cs_insn &insn, uint8_t opcode, uint8_t rex,
 		     uint8_t modrm, const X86SimpleRegister *first,
-		     const X86SimpleRegister *second)
+		     const X86SimpleRegister *second, bool branch = false)
 {
 	const auto &d = *insn.detail;
 	const auto &x = d.x86;
@@ -136,7 +136,7 @@ std::string describe(const cs_insn &insn, uint8_t opcode, uint8_t rex,
 		if (x.op_count != 2 || (std::string(first->name) + ", " +
 					second->name) != insn.op_str)
 			return {};
-	} else
+	} else if (!branch)
 		strcpy(row.operands, insn.op_str);
 	row.flags = x.eflags;
 	row.read_count = d.regs_read_count;
@@ -145,21 +145,36 @@ std::string describe(const cs_insn &insn, uint8_t opcode, uint8_t rex,
 	row.operand_count = x.op_count;
 	row.address_size = x.addr_size;
 	row.modrm_offset = x.encoding.modrm_offset;
+	row.imm_offset = x.encoding.imm_offset;
+	row.imm_size = x.encoding.imm_size;
 	std::copy_n(d.regs_read, row.read_count, row.reads);
 	std::copy_n(d.regs_write, row.write_count, row.writes);
 	std::copy_n(d.groups, row.group_count, row.groups);
 	for (unsigned i = 0; i < x.op_count; ++i) {
 		const auto &op = x.operands[i];
-		if (op.type != X86_OP_REG || unsigned(op.reg) > UINT16_MAX ||
+		if (op.type != (branch ? X86_OP_IMM : X86_OP_REG) ||
+		    (!branch && unsigned(op.reg) > UINT16_MAX) ||
 		    unsigned(op.access) > UINT8_MAX)
 			return {};
-		row.ops[i] = { static_cast<uint16_t>(first ? 0 : op.reg),
+		row.ops[i] = { static_cast<uint16_t>(
+				       (first || branch) ? 0 : op.reg),
 			       op.size, static_cast<uint8_t>(op.access) };
 	}
 	cs_detail rebuilt;
 	X86_writeSimpleDetail(&rebuilt, &row, opcode, rex, modrm,
 			      first ? first->reg : row.ops[0].reg,
 			      second ? second->reg : row.ops[1].reg);
+
+	if (branch) {
+		if (x.op_count != 1)
+			return {};
+		if (row.imm_offset == 2) {
+			rebuilt.x86.opcode[0] = 0x0f;
+			rebuilt.x86.opcode[1] = opcode;
+		}
+		rebuilt.x86.operands[0].type = X86_OP_IMM;
+		rebuilt.x86.operands[0].imm = x.operands[0].imm;
+	}
 	if (memcmp(&rebuilt, &d, offsetof(cs_detail, x86) + sizeof(cs_x86)))
 		return {};
 	return initializer(row);
@@ -177,7 +192,7 @@ unsigned register_class(unsigned opcode, unsigned rex)
 	return (opcode & 1) ? ((rex & 8) ? 3 : 2) : (rex != 0);
 }
 using RegisterTable = X86SimpleRegister[4][16];
-using PlanTable = uint16_t[2][3][256];
+using PlanTable = uint16_t[2][4][256];
 
 void describe_registers(Decoder &x64, RegisterTable &regs)
 {
@@ -262,12 +277,64 @@ CheckedRow check_pair(Decoder &decoder, unsigned opcode, unsigned prefix_class,
 	return row;
 }
 
+bool relative_opcode(unsigned cls, unsigned op)
+{
+	if (cls == 3)
+		return op >= 0x80 && op <= 0x8f;
+	return cls == 0 && ((op >= 0x70 && op <= 0x7f) || op == 0xeb ||
+			    op == 0xe8 || op == 0xe9);
+}
+
+CheckedRow check_relative(Decoder &d, bool wide, unsigned cls, unsigned op)
+{
+	CheckedRow row;
+	const unsigned offset = cls == 3 ? 2 : 1;
+	const unsigned width =
+		offset == 1 && (op == 0xeb || (op & 0xf0) == 0x70) ? 1 : 4;
+	uint8_t bytes[6]{};
+	bytes[0] = cls == 3 ? 0x0f : op;
+	bytes[offset - 1] = op;
+	for (uint32_t bits : { 0u, 1u, 9u, 10u, 127u, 128u, 255u, 0x80000000u,
+			       0x7fffffffu, 0xffffffffu }) {
+		for (unsigned j = 0; j < width; ++j)
+			bytes[offset + j] = uint8_t(bits >> (j * 8));
+		const int64_t delta = width == 1 ? int8_t(bits) : int32_t(bits);
+		for (uint64_t target :
+		     { uint64_t(0), uint64_t(1), uint64_t(9), uint64_t(10),
+		       uint64_t(0x12345678), uint64_t(0xffffffffu), UINT64_MAX,
+		       UINT64_C(0x8000000000000000) }) {
+			const uint64_t address =
+				target - delta - offset - width;
+			const uint64_t expected = wide ? target :
+							 uint32_t(target);
+			d.decode(bytes, width + offset, width + offset,
+				 address);
+			const auto &x = d.insn->detail->x86;
+			std::ostringstream text;
+			if (expected > 9)
+				text << "0x" << std::hex;
+			text << expected;
+			if (x.op_count != 1 ||
+			    x.operands[0].type != X86_OP_IMM ||
+			    uint64_t(x.operands[0].imm) != expected ||
+			    text.str() != d.insn->op_str ||
+			    x.encoding.imm_offset != offset ||
+			    x.encoding.imm_size != width)
+				throw std::runtime_error(
+					"unexpected relative address, rendering or immediate extent");
+			row.observe(describe(*d.insn, op, 0, 0, nullptr,
+					     nullptr, true));
+		}
+	}
+	return row;
+}
+
 void emit_tables(const PlanTable &plans, const RegisterTable &regs,
 		 const std::vector<std::string> &rows)
 {
 	std::cout
 		<< "/* Generated by suite/synctools/x86_simple_output.cpp. */\n\n"
-		<< "static const uint16_t x86_simple_plans[2][3][256] = {\n";
+		<< "static const uint16_t x86_simple_plans[2][4][256] = {\n";
 	for (auto &mode : plans) {
 		std::cout << "\t{\n";
 		for (auto &prefix : mode) {
@@ -311,13 +378,19 @@ int main()
 	unsigned checked = 0, admitted = 0;
 	for (unsigned wide = 0; wide < 2; ++wide) {
 		Decoder &decoder = wide ? x64 : x86;
-		for (unsigned cls = 0; cls < (wide ? 3u : 1u); ++cls) {
+		for (unsigned cls = 0; cls < 4; ++cls) {
+			if (!wide && (cls == 1 || cls == 2))
+				continue;
 			for (unsigned op = 0; op < 256; ++op) {
 				X86SimpleForm form = X86_SIMPLE_FIXED;
 				CheckedRow row;
 				if (!cls && fixed_opcode(op, wide))
 					row = check_fixed(decoder, op);
-				else if (pair_opcode(op))
+				else if (relative_opcode(cls, op)) {
+					form = X86_SIMPLE_RELATIVE;
+					row = check_relative(decoder, wide, cls,
+							     op);
+				} else if (cls != 3 && pair_opcode(op))
 					row = check_pair(decoder, op, cls, regs,
 							 form);
 				else

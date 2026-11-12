@@ -11,6 +11,8 @@
 	!defined(_WIN32_WCE)
 #include "X86Disassembler.h"
 #include "X86InstPrinter.h"
+#include "X86InstPrinterCommon.h"
+#include "../../utils.h"
 #include "X86Mapping.h"
 #include "X86SimpleOutput.h"
 #include "X86GenSimpleOutput.inc"
@@ -29,16 +31,20 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
 	const bool wide = handle->mode == CS_MODE_64;
 	const bool has_rex = wide && (code[0] & 0xf0) == 0x40;
 	const uint8_t rex = has_rex ? code[0] : 0;
-	if (size <= (size_t)has_rex)
+	const bool escaped = code[0] == 0x0f;
+	const unsigned lead = has_rex || escaped;
+	if (size <= lead)
 		return false;
-	const uint8_t opcode = code[has_rex];
-	const unsigned prefix_class = has_rex ? ((rex & 8) ? 2 : 1) : 0;
+	const uint8_t opcode = code[lead];
+	const unsigned prefix_class = escaped ? 3 :
+				      has_rex ? ((rex & 8) ? 2 : 1) :
+						0;
 	const unsigned plan = x86_simple_plans[wide][prefix_class][opcode];
 	if (!plan)
 		return false;
 	const unsigned form = plan & 3;
 	uint8_t modrm = 0;
-	if (form != X86_SIMPLE_FIXED) {
+	if (form == X86_SIMPLE_RM_REG || form == X86_SIMPLE_REG_RM) {
 		if (size < 2u + has_rex)
 			return false;
 		modrm = code[1 + has_rex];
@@ -57,6 +63,10 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
 		return false;
 
 	const struct X86SimpleOutput *row = &x86_simple_outputs[plan >> 2];
+	const bool relative = form == X86_SIMPLE_RELATIVE;
+	if (relative && size < (size_t)row->imm_offset + row->imm_size)
+		return false;
+	uint64_t target = 0;
 	uint16_t first = row->ops[0].reg, second = row->ops[1].reg;
 	insn->id = row->id;
 	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
@@ -66,6 +76,38 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
 	if (form == X86_SIMPLE_FIXED) {
 		memcpy(insn->op_str, row->operands, sizeof(row->operands));
 		*insn_size = insn->size = 1;
+	} else if (relative) {
+		const uint8_t *bytes = code + row->imm_offset;
+		int64_t delta;
+		if (row->imm_size == 1) {
+			delta = (int8_t)bytes[0];
+		} else {
+			uint32_t raw = (uint32_t)bytes[0] |
+				       ((uint32_t)bytes[1] << 8) |
+				       ((uint32_t)bytes[2] << 16) |
+				       ((uint32_t)bytes[3] << 24);
+			delta = (int32_t)raw;
+		}
+		const uint16_t length = row->imm_offset + row->imm_size;
+		target = X86_relativeBranchTarget(handle->mode, insn->address,
+						  length, delta, row->imm_size);
+		if (target <= HEX_THRESHOLD) {
+			insn->op_str[0] = (char)('0' + target);
+		} else {
+			char digits[16];
+			char *end = digits + sizeof(digits);
+			char *p = end;
+			uint64_t value = target;
+			do {
+				*--p = "0123456789abcdef"[value & 15];
+				value >>= 4;
+			} while (value);
+			insn->op_str[0] = '0';
+			insn->op_str[1] = 'x';
+			memcpy(insn->op_str + 2, p, (size_t)(end - p));
+		}
+		memcpy(insn->bytes, code, length);
+		*insn_size = insn->size = length;
 	} else {
 		const unsigned width = (opcode & 1) ? ((rex & 8) ? 3 : 2) :
 						      has_rex;
@@ -89,9 +131,19 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
 			insn->bytes[2] = code[2];
 		*insn_size = insn->size = 2 + has_rex;
 	}
-	if (insn->detail)
+	if (insn->detail) {
 		X86_writeSimpleDetail(insn->detail, row, opcode, rex, modrm,
 				      first, second);
+		if (relative) {
+			cs_x86 *x = &insn->detail->x86;
+			if (escaped) {
+				x->opcode[0] = 0x0f;
+				x->opcode[1] = opcode;
+			}
+			x->operands[0].type = X86_OP_IMM;
+			x->operands[0].imm = (int64_t)target;
+		}
+	}
 	return true;
 }
 
