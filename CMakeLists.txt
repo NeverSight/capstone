@@ -154,6 +154,10 @@ foreach(i RANGE ${count})
     endif()
 endforeach()
 
+if(capstone_enabled_architectures STREQUAL "SPARC")
+    add_compile_definitions(CAPSTONE_SPARC_SHORT_STATE_REGISTER_NAMES)
+endif()
+
 if(capstone_enabled_architectures STREQUAL "AARCH64")
     add_compile_definitions(CAPSTONE_AARCH64_SHORT_REGISTER_NAMES)
 endif()

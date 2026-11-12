@@ -61,6 +61,18 @@ static void printRegName(SStream *OS, MCRegister Reg)
 
 static void printRegNameAlt(SStream *OS, MCRegister Reg, unsigned AltIdx)
 {
+#if defined(CAPSTONE_SPARC_SHORT_STATE_REGISTER_NAMES) && !defined(CAPSTONE_DIET) && \
+	(defined(__clang__) || defined(_MSC_VER))
+#include "SparcGenShortStateRegisterNames.inc"
+	if (AltIdx == Sparc_RegNamesStateReg && Reg &&
+	    Reg <= ARR_SIZE(short_names) && short_names[Reg - 1].length &&
+	    !(OS->markup_stream && OS->prefixed_by_markup) &&
+	    OS->index < SSTREAM_BUF_LEN - short_names[Reg - 1].length) {
+		SStream_concat0_small(OS, short_names[Reg - 1].text,
+				      short_names[Reg - 1].length);
+		return;
+	}
+#endif
 	SStream_concat1(OS, '%');
 	SStream_concat0(OS, getRegisterName(Reg, AltIdx));
 }

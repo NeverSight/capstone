@@ -122,6 +122,10 @@ After regenerating the AArch64 assembly writer or translating its printer,
 run `python3 suite/synctools/aarch64_register_names.py`. Run it again with
 `--check` to verify short register spellings against the default name pool.
 
+After regenerating the SPARC assembly writer or translating its printer,
+run `python3 suite/synctools/sparc_state_register_names.py`. Use `--check`
+to verify the resolved V9 state names and their printer hook.
+
 After changing `X86ImmSize.inc` or either `X86GenInstrInfo*.inc` enum, run
 `python3 suite/synctools/x86_immediate_sizes.py`, then run it with `--check`.
 The generated immediate-size lookup preserves the original metadata and uses
