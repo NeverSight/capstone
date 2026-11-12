@@ -7069,6 +7069,40 @@ static const uint64_t x86LegacyPublicDecisions[X86_TERMINAL_ROW_COUNT][2][256] X
 },
 };
 
+#ifdef X86_COMPACT_PUBLIC_HEADER
+static const uint8_t x86LegacyImmediateBytes[3][10] = {
+	{ 0, 1, 2, 4, 2, 2, 3, 4, 8, 4 },
+	{ 0, 1, 4, 6, 4, 2, 3, 4, 8, 8 },
+	{ 0, 1, 4, 6, 8, 2, 3, 4, 8, 8 },
+};
+
+X86_DECODE_INLINE bool selectPublicTerminal(uint64_t decision, uint8_t modrm, uint32_t *terminal)
+{
+	if (decision & X86_TERMINAL_INDEXED) {
+		unsigned int index = decision & X86_DECISION_OFFSET_MASK;
+		switch ((decision >> X86_DECISION_TYPE_SHIFT) & X86_DECISION_TYPE_MASK) {
+		case MODRM_SPLITREG:
+			index += regFromModRM(modrm) + (modrm >= 0xc0 ? 8 : 0);
+			break;
+		case MODRM_SPLITMISC:
+			index += modrm >= 0xc0 ? (modrm & 0x3f) + 8 : regFromModRM(modrm);
+			break;
+		case MODRM_FULL:
+			index += modrm;
+			break;
+		default:
+			return false;
+		}
+		*terminal = x86LegacyPublicTerminals[index];
+	} else {
+		unsigned int shift = (decision & X86_TERMINAL_SPLIT) && modrm >= 0xc0 ?
+			X86_TERMINAL_REGISTER_SHIFT : 0;
+		*terminal = (decision >> shift) & X86_TERMINAL_MASK;
+	}
+	return true;
+}
+#endif
+
 X86_DECODE_INLINE int decodeLegacyTerminal(struct InternalInstruction *insn,
 				MCInst *mcInst, uint16_t *size, uint64_t decision, bool scan, unsigned *publicID, bool readerFlags)
 {
@@ -14399,6 +14433,40 @@ static const uint64_t x86LegacyPublicDecisions[X86_TERMINAL_ROW_COUNT][2][256] X
 },
 },
 };
+
+#ifdef X86_COMPACT_PUBLIC_HEADER
+static const uint8_t x86LegacyImmediateBytes[3][10] = {
+	{ 0, 1, 2, 4, 2, 2, 3, 4, 8, 4 },
+	{ 0, 1, 4, 6, 4, 2, 3, 4, 8, 8 },
+	{ 0, 1, 4, 6, 8, 2, 3, 4, 8, 8 },
+};
+
+X86_DECODE_INLINE bool selectPublicTerminal(uint64_t decision, uint8_t modrm, uint32_t *terminal)
+{
+	if (decision & X86_TERMINAL_INDEXED) {
+		unsigned int index = decision & X86_DECISION_OFFSET_MASK;
+		switch ((decision >> X86_DECISION_TYPE_SHIFT) & X86_DECISION_TYPE_MASK) {
+		case MODRM_SPLITREG:
+			index += regFromModRM(modrm) + (modrm >= 0xc0 ? 8 : 0);
+			break;
+		case MODRM_SPLITMISC:
+			index += modrm >= 0xc0 ? (modrm & 0x3f) + 8 : regFromModRM(modrm);
+			break;
+		case MODRM_FULL:
+			index += modrm;
+			break;
+		default:
+			return false;
+		}
+		*terminal = x86LegacyPublicTerminals[index];
+	} else {
+		unsigned int shift = (decision & X86_TERMINAL_SPLIT) && modrm >= 0xc0 ?
+			X86_TERMINAL_REGISTER_SHIFT : 0;
+		*terminal = (decision >> shift) & X86_TERMINAL_MASK;
+	}
+	return true;
+}
+#endif
 
 X86_DECODE_INLINE int decodeLegacyTerminal(struct InternalInstruction *insn,
 				MCInst *mcInst, uint16_t *size, uint64_t decision, bool scan, unsigned *publicID, bool readerFlags)

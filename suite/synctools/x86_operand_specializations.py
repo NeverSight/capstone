@@ -871,6 +871,32 @@ def emit_full_legacy_handlers(groups):
     return lines
 
 
+def emit_terminal_selection(target, modrm, entries, invalid):
+    return [
+        "\tif (decision & X86_TERMINAL_INDEXED) {",
+        "\t\tunsigned int index = decision & X86_DECISION_OFFSET_MASK;",
+        "\t\tswitch ((decision >> X86_DECISION_TYPE_SHIFT) & X86_DECISION_TYPE_MASK) {",
+        "\t\tcase MODRM_SPLITREG:",
+        f"\t\t\tindex += regFromModRM({modrm}) + ({modrm} >= 0xc0 ? 8 : 0);",
+        "\t\t\tbreak;",
+        "\t\tcase MODRM_SPLITMISC:",
+        f"\t\t\tindex += {modrm} >= 0xc0 ? ({modrm} & 0x3f) + 8 : regFromModRM({modrm});",
+        "\t\t\tbreak;",
+        "\t\tcase MODRM_FULL:",
+        f"\t\t\tindex += {modrm};",
+        "\t\t\tbreak;",
+        "\t\tdefault:",
+        f"\t\t\treturn {invalid};",
+        "\t\t}",
+        f"\t\t{target} = {entries};",
+        "\t} else {",
+        f"\t\tunsigned int shift = (decision & X86_TERMINAL_SPLIT) && {modrm} >= 0xc0 ?",
+        "\t\t\tX86_TERMINAL_REGISTER_SHIFT : 0;",
+        f"\t\t{target} = (decision >> shift) & X86_TERMINAL_MASK;",
+        "\t}",
+    ]
+
+
 def emit_terminal(suffix):
     groups, terminals, rows, selected_counts, words, kinds = legacy_terminal_model(
         suffix
@@ -920,6 +946,40 @@ def emit_terminal(suffix):
     # Both projections retain the same decision kind, invalid entries and readers.
     lines += emit_terminal_tables("Legacy", words, rows, kinds)
     lines += emit_terminal_tables("LegacyPublic", public_words, public_rows, kinds)
+    lines.append("#ifdef X86_COMPACT_PUBLIC_HEADER")
+    immediate_readers = {
+        f"readImmediateImpl(insn, {width}, false)": width
+        for width in IMMEDIATES.values()
+    }
+    lines.append("static const uint8_t x86LegacyImmediateBytes[3][" + str(len(public_tails)) + "] = {")
+    for size, address_size in ((2, 2), (4, 4), (4, 8)):
+        extents = []
+        for tail in public_tails:
+            total, immediate = 0, size
+            for call in tail:
+                if call == "readMemoryOffset(insn, false)":
+                    total += address_size
+                    immediate = 0
+                else:
+                    width = immediate_readers[call]
+                    immediate = immediate if width == "insn->immediateSize" else int(width)
+                    tables.require(immediate > 0, "Invalid immediate extent")
+                    total += immediate
+            extents.append(str(total))
+        lines.append("\t{ " + ", ".join(extents) + " },")
+    lines += [
+        "};",
+        "",
+        "X86_DECODE_INLINE bool selectPublicTerminal(uint64_t decision, uint8_t modrm, uint32_t *terminal)",
+        "{",
+        *emit_terminal_selection(
+            "*terminal", "modrm", "x86LegacyPublicTerminals[index]", "false"
+        ),
+        "\treturn true;",
+        "}",
+        "#endif",
+        "",
+    ]
     lines += [
         "X86_DECODE_INLINE int decodeLegacyTerminal(struct InternalInstruction *insn,",
         "\t\t\t\tMCInst *mcInst, uint16_t *size, uint64_t decision, bool scan, unsigned *publicID, bool readerFlags)",
@@ -935,27 +995,12 @@ def emit_terminal(suffix):
         "\t\t\treturn X86_SCAN_INVALID;",
         "\t\t}",
         "\t}",
-        "\tif (decision & X86_TERMINAL_INDEXED) {",
-        "\t\tunsigned int index = decision & X86_DECISION_OFFSET_MASK;",
-        "\t\tswitch ((decision >> X86_DECISION_TYPE_SHIFT) & X86_DECISION_TYPE_MASK) {",
-        "\t\tcase MODRM_SPLITREG:",
-        "\t\t\tindex += regFromModRM(insn->modRM) + (insn->modRM >= 0xc0 ? 8 : 0);",
-        "\t\t\tbreak;",
-        "\t\tcase MODRM_SPLITMISC:",
-        "\t\t\tindex += insn->modRM >= 0xc0 ? (insn->modRM & 0x3f) + 8 : regFromModRM(insn->modRM);",
-        "\t\t\tbreak;",
-        "\t\tcase MODRM_FULL:",
-        "\t\t\tindex += insn->modRM;",
-        "\t\t\tbreak;",
-        "\t\tdefault:",
-        "\t\t\treturn X86_SCAN_INVALID;",
-        "\t\t}",
-        "\t\tterminal = publicID ? x86LegacyPublicTerminals[index] : x86LegacyTerminals[index];",
-        "\t} else {",
-        "\t\tunsigned int shift = (decision & X86_TERMINAL_SPLIT) && insn->modRM >= 0xc0 ?",
-        "\t\t\tX86_TERMINAL_REGISTER_SHIFT : 0;",
-        "\t\tterminal = (decision >> shift) & X86_TERMINAL_MASK;",
-        "\t}",
+        *emit_terminal_selection(
+            "terminal",
+            "insn->modRM",
+            "publicID ? x86LegacyPublicTerminals[index] : x86LegacyTerminals[index]",
+            "X86_SCAN_INVALID",
+        ),
         "\tunsigned instructionID = terminal & X86_TERMINAL_UID_MASK;",
         "\tif (publicID) {",
         "\t\t/* Retain the original reader before invalid-ID rejection, including truncation. */",

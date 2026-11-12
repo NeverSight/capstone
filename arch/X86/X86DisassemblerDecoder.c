@@ -2942,6 +2942,13 @@ X86_DECODE_INLINE int finishDecodedInstruction(struct InternalInstruction *insn,
 	return 0;
 }
 
+/* AArch64 GCC materializes the general legacy reader state even when
+ * scanning only for the public ID and length. */
+#if defined(CAPSTONE_X86_ONLY) && defined(__linux__) && defined(__aarch64__) && \
+    defined(__GNUC__) && !defined(__clang__)
+#define X86_COMPACT_PUBLIC_HEADER
+#endif
+
 #include "X86GenLegacyTerminal.inc"
 #include "X86GenVexScan.inc"
 
@@ -3506,6 +3513,94 @@ decodeVexTerminalResult(csh ud, const uint8_t *code, size_t code_len,
 					     prefix);
 }
 
+#ifdef X86_COMPACT_PUBLIC_HEADER
+/* This entry sees only a one- or two-byte legacy opcode and at most one
+ * REX. The generated descriptor supplies both public ID and operand shape. */
+X86_DECODE_INLINE int scanInitialPublicTerminal(const uint8_t *code,
+						size_t size, cs_mode mode,
+						uint8_t opcode, unsigned offset,
+						unsigned *id, uint16_t *length)
+{
+	const bool wide = mode == CS_MODE_64;
+	const uint8_t rex = offset ? code[0] : 0;
+	const unsigned rejected = FEATURE_LEGACY_PREFIX | FEATURE_ESCAPE |
+				  FEATURE_VEX2_XOP |
+				  (wide ? FEATURE_REX_PREFIX : 0);
+	if ((feature_prefix_flags[opcode] & rejected) ||
+	    (opcode == 0x90 && bFromREX(rex)))
+		return X86_SCAN_NOT_HANDLED;
+	bool escaped = opcode == 0x0f;
+	unsigned end = offset + 1;
+	if (escaped) {
+		if (end >= size)
+			return X86_SCAN_INVALID;
+		opcode = code[end++];
+		if (opcode == 0x38 || opcode == 0x3a || opcode == 0x0f)
+			return X86_SCAN_NOT_HANDLED;
+	}
+	const unsigned row = wide ? X86_TERMINAL_64 + wFromREX(rex) :
+			     mode == CS_MODE_16 ? X86_TERMINAL_16 :
+						  X86_TERMINAL_32;
+	const uint64_t decision =
+		x86LegacyPublicDecisions[row][escaped][opcode];
+	if (!decision)
+		return X86_SCAN_NOT_HANDLED;
+	const bool needs_modrm =
+		(decision & (X86_TERMINAL_INDEXED | X86_TERMINAL_SPLIT)) != 0;
+	uint8_t modrm = 0;
+	if (needs_modrm) {
+		if (end >= size)
+			return X86_SCAN_INVALID;
+		modrm = code[end];
+	}
+	uint32_t terminal;
+	if (!selectPublicTerminal(decision, modrm, &terminal))
+		return X86_SCAN_INVALID;
+	const unsigned uid = terminal & X86_TERMINAL_UID_MASK;
+	if (!uid)
+		return X86_SCAN_INVALID;
+	const unsigned pattern = (terminal >> X86_TERMINAL_OPERAND_SHIFT) &
+				 X86_TERMINAL_OPERAND_MASK;
+	if (needs_modrm || (pattern & 1)) {
+		if (!needs_modrm) {
+			if (end >= size)
+				return X86_SCAN_INVALID;
+			modrm = code[end];
+		}
+		++end;
+		if (modrm < 0xc0) {
+			const unsigned mod = modrm >> 6, rm = modrm & 7;
+			if (mode == CS_MODE_16) {
+				static const uint8_t displacement[] = { 0, 1,
+									2 };
+				end += displacement[mod] +
+				       ((modrm & 0xc7) == 6 ? 2 : 0);
+			} else {
+				static const uint8_t extra[3][8] = {
+					{ 0, 0, 0, 0, 1, 4, 0, 0 },
+					{ 1, 1, 1, 1, 2, 1, 1, 1 },
+					{ 4, 4, 4, 4, 5, 4, 4, 4 }
+				};
+				if ((modrm & 0xc7) == 4) {
+					if (end >= size)
+						return X86_SCAN_INVALID;
+					if ((code[end] & 7) == 5)
+						end += 4;
+				}
+				end += extra[mod][rm];
+			}
+		}
+	}
+	const unsigned size_class = wide ? 2 : mode == CS_MODE_16 ? 0 : 1;
+	end += x86LegacyImmediateBytes[size_class][pattern >> 1];
+	if (end > size || end > 15)
+		return X86_SCAN_INVALID;
+	*id = uid;
+	*length = (uint16_t)end;
+	return X86_SCAN_COMPLETE;
+}
+#endif
+
 /* Common headers enter the shared readers before the general prefix walk.
  * The extension selector observes CS_MODE_64, while raw mode selection gives
  * 16/32-bit flags precedence. Keep their original ordering for mixed flags. */
@@ -3532,6 +3627,12 @@ X86_DECODE_INLINE int tryInitialLegacyScan(const uint8_t *code, size_t code_len,
 	if (opcode == 0x0f && may_be_0f_feature_extension(
 				      code + offset + 1, code_len - offset - 1))
 		return X86_SCAN_NOT_HANDLED;
+#ifdef X86_COMPACT_PUBLIC_HEADER
+	if (readerFlags)
+		return scanInitialPublicTerminal(code, code_len, mode, opcode,
+						 (unsigned)offset,
+						 instructionID, size);
+#endif
 	return trySimpleLegacyScan(code, code_len, mode, opcode, offset,
 				   instructionID, size, true, readerFlags);
 }
