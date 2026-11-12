@@ -97,6 +97,32 @@ static bool check_callbacks(csh handles[2])
 	return compare(handles, &push, 1, 0xa5);
 }
 
+static bool check_memory(csh handles[2], cs_mode mode)
+{
+	uint8_t bytes[4];
+	for (unsigned prefix = 0; prefix <= (mode == CS_MODE_64 ? 16u : 0u);
+	     ++prefix) {
+		bytes[0] = prefix ? (uint8_t)(0x3f + prefix) : 0;
+		for (unsigned op = 0x88; op <= 0x8b; ++op) {
+			bytes[1] = (uint8_t)op;
+			for (unsigned mr = 0; mr < 0x80; ++mr) {
+				bytes[2] = (uint8_t)mr;
+				for (unsigned n = 0;
+				     n < (mr >= 0x40 ? 256u : 1u); ++n) {
+					bytes[3] = (uint8_t)n;
+					size_t len = 2 + (prefix != 0) +
+						     (mr >= 0x40);
+					if (!compare(handles,
+						     bytes + (prefix == 0), len,
+						     mr ^ n))
+						return false;
+				}
+			}
+		}
+	}
+	return true;
+}
+
 static bool check_mode(cs_mode mode)
 {
 	csh handles[2] = { 0 };
@@ -112,7 +138,7 @@ static bool check_mode(cs_mode mode)
 			if (cs_option(handles[side], CS_OPT_DETAIL,
 				      detail ? CS_OPT_ON : CS_OPT_OFF))
 				goto done;
-		if (!check_branches(handles))
+		if (!check_branches(handles) || !check_memory(handles, mode))
 			goto done;
 		for (unsigned op = 0; op < 256; ++op) {
 			uint8_t bytes[3] = { 0, (uint8_t)op, 0 };

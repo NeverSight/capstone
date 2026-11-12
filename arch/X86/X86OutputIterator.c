@@ -17,9 +17,85 @@
 #include "X86SimpleOutput.h"
 #include "X86GenSimpleOutput.inc"
 
-/* A leading legacy prefix or a memory ModR/M encoding goes through the full
- * decoder. The register rows distinguish the high byte registers from SPL,
- * BPL, SIL and DIL as soon as any REX prefix is present. */
+/* The admitted MOV forms share the register/register row's access and widths.
+ * The ModR/M byte selects an integer base without SIB, RIP or a disp32. */
+static void X86_writeBaseMov(cs_insn *insn, const struct X86SimpleOutput *row,
+			     const uint8_t *code, uint8_t opcode, uint8_t rex,
+			     uint8_t modrm, bool load, bool wide,
+			     uint16_t *insn_size)
+{
+	const bool has_disp = (modrm >> 6) == 1;
+	const unsigned offset = 2 + (rex != 0);
+	const int displacement = has_disp ? (int8_t)code[offset] : 0;
+	const unsigned reg_width = (opcode & 1) ? ((rex & 8) ? 3 : 2) :
+						  rex != 0;
+	const unsigned reg_index = ((rex & 4) << 1) | ((modrm >> 3) & 7);
+	const unsigned rm = ((rex & 1) << 3) | (modrm & 7);
+	const struct X86SimpleRegister *reg =
+		&x86_simple_registers[reg_width][reg_index];
+	const struct X86SimpleRegister *base =
+		&x86_simple_registers[wide ? 3 : 2][rm];
+
+	char *out = insn->op_str;
+	if (load) {
+		memcpy(out, reg->name, sizeof(reg->name));
+		out += reg->length;
+		memcpy(out, ", ", 2);
+		out += 2;
+	}
+	if (row->ops[0].size == 1) {
+		memcpy(out, "byte ptr [", 10);
+		out += 10;
+	} else {
+		memcpy(out,
+		       row->ops[0].size == 8 ? "qword ptr [" : "dword ptr [",
+		       11);
+		out += 11;
+	}
+	memcpy(out, base->name, sizeof(base->name));
+	out += base->length;
+	if (displacement) {
+		const unsigned magnitude = displacement < 0 ? -displacement :
+							      displacement;
+		memcpy(out, displacement < 0 ? " - " : " + ", 3);
+		out += 3;
+		if (magnitude <= HEX_THRESHOLD) {
+			*out++ = (char)('0' + magnitude);
+		} else {
+			static const char digits[] = "0123456789abcdef";
+			memcpy(out, "0x", 2);
+			out += 2;
+			if (magnitude >= 16)
+				*out++ = digits[magnitude >> 4];
+			*out++ = digits[magnitude & 15];
+		}
+	}
+	*out++ = ']';
+	if (!load) {
+		memcpy(out, ", ", 2);
+		memcpy(out + 2, reg->name, sizeof(reg->name));
+	}
+	*insn_size = insn->size = (uint16_t)(offset + has_disp);
+	memcpy(insn->bytes, code, insn->size);
+	if (insn->detail) {
+		X86_writeSimpleDetail(insn->detail, row, opcode, rex, modrm,
+				      load ? reg->reg : 0, load ? 0 : reg->reg);
+		cs_x86 *x = &insn->detail->x86;
+		x->disp = displacement;
+		if (has_disp) {
+			x->encoding.disp_offset = (uint8_t)offset;
+			x->encoding.disp_size = 1;
+		}
+		cs_x86_op *op = &x->operands[load ? 1 : 0];
+		op->type = X86_OP_MEM;
+		op->mem.base = (x86_reg)base->reg;
+		op->mem.scale = 1;
+		op->mem.disp = displacement;
+	}
+}
+
+/* The register rows distinguish AH..BH from SPL..DIL when a REX prefix is
+ * present. Memory admission below is limited to MOV with a base or base+disp8. */
 #ifdef CAPSTONE_X86_DEDICATED_OUTPUT
 CAPSTONE_INTERNAL
 #else
@@ -44,12 +120,19 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
 		return false;
 	const unsigned form = plan & 3;
 	uint8_t modrm = 0;
+	bool base_memory = false;
 	if (form == X86_SIMPLE_RM_REG || form == X86_SIMPLE_REG_RM) {
 		if (size < 2u + has_rex)
 			return false;
 		modrm = code[1 + has_rex];
-		if (modrm < 0xc0)
-			return false;
+		if (modrm < 0xc0) {
+			unsigned rm = modrm & 7;
+			if ((opcode & 0xfc) != 0x88 || modrm >= 0x80 ||
+			    rm == 4 || (modrm < 0x40 && rm == 5) ||
+			    (modrm >= 0x40 && size < 3u + has_rex))
+				return false;
+			base_memory = true;
+		}
 	}
 	if ((!wide && handle->mode != CS_MODE_32) || handle->no_text ||
 	    handle->imm_unsigned || handle->mnem_list || handle->doing_mem ||
@@ -72,6 +155,11 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
 	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
 	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
 	memset(insn->op_str, 0, sizeof(insn->op_str));
+	if (base_memory) {
+		X86_writeBaseMov(insn, row, code, opcode, rex, modrm,
+				 form == X86_SIMPLE_REG_RM, wide, insn_size);
+		return true;
+	}
 	insn->bytes[0] = code[0];
 	if (form == X86_SIMPLE_FIXED) {
 		memcpy(insn->op_str, row->operands, sizeof(row->operands));
