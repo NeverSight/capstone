@@ -20,6 +20,16 @@
 #include "../../MCRegisterInfo.h"
 #include "X86DisassemblerDecoderCommon.h"
 
+#if defined(CAPSTONE_X86_ONLY) && defined(__linux__) && \
+	!defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
+	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(_KERNEL_MODE)
+#include "../../cs_priv.h"
+#define CAPSTONE_X86_DEDICATED_OUTPUT
+CAPSTONE_INTERNAL bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code,
+					 size_t size, cs_insn *insn,
+					 uint16_t *insn_size);
+#endif
+
 bool X86_getInstruction(csh handle, const uint8_t *code, size_t code_len,
 			MCInst *instr, uint16_t *size, uint64_t address,
 			void *info);

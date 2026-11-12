@@ -444,6 +444,7 @@ if(CAPSTONE_X86_SUPPORT)
         arch/X86/X86InstPrinterCommon.c
         arch/X86/X86Mapping.c
         arch/X86/X86Module.c
+        arch/X86/X86OutputIterator.c
     )
     # MSVC can inline the decoder into the public iterator under LTCG, giving
     # even a compact scan a very large probed stack frame.

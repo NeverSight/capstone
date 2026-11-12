@@ -1043,6 +1043,10 @@ CS_PRESERVE_MOST bool
 cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
 		    cs_insn *insn, uint16_t *insn_size, bool batch)
 {
+#ifdef CAPSTONE_X86_DEDICATED_OUTPUT
+	if (size && X86_trySimpleOutput(handle, code, size, insn, insn_size))
+		return true;
+#endif
 	MCInst mci;
 #ifdef CAPSTONE_HAS_X86
 	if (handle->arch == CS_ARCH_X86)

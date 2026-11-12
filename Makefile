@@ -248,6 +248,7 @@ endif
 endif
 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86Mapping.o
 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86Module.o
+	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86OutputIterator.o
 	LIBOBJ_X86_NUMBERS += $(OBJDIR)/arch/X86/X86IntelInstPrinterNumbers.o
 endif
 

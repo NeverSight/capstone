@@ -34,6 +34,12 @@ X86ScanBatchResult X86_scanBatch(csh handle, const uint8_t *code, size_t size,
 uint16_t X86_scanCallTarget(csh handle, const uint8_t *code, size_t size,
 			    uint64_t address, uint64_t *target);
 
+/* Private static-link iterator for x86 consumers that request text. Uses the
+ * same options, cursor, errors, callbacks and public records as cs_disasm_iter.
+ * Other architectures and text-free scans use cs_disasm_iter directly. */
+bool X86_disasmIter(csh handle, const uint8_t **code, size_t *size,
+		    uint64_t *address, cs_insn *insn);
+
 /* Requires CAPSTONE_X86_SCAN_ADAPTER. Private static-link integration, not
  * an installed cs_* API. The callback
  * must use the handle's exact 32/64-bit profile and return (public_id << 8) |
