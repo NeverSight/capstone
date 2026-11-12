@@ -1049,6 +1049,13 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
 		MCInst_InitX86(&mci);
 	else
 #endif
+#ifdef CAPSTONE_HAS_MIPS
+	if (handle->arch == CS_ARCH_MIPS)
+		/* MIPS constructs each MCOperand before reading it. The public
+		 * detail and alias records are reset by the MIPS decoder. */
+		MCInst_InitStorage(&mci, CS_ARCH_MIPS, false);
+	else
+#endif
 		MCInst_Init(&mci, handle->arch);
 	mci.csh = handle;
 	mci.address = insn->address;
