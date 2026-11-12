@@ -154,6 +154,10 @@ foreach(i RANGE ${count})
     endif()
 endforeach()
 
+if(capstone_enabled_architectures STREQUAL "RISCV")
+    add_compile_definitions(CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS)
+endif()
+
 if(capstone_enabled_architectures STREQUAL "SPARC")
     add_compile_definitions(CAPSTONE_SPARC_SHORT_STATE_REGISTER_NAMES)
 endif()

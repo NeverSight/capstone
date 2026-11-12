@@ -1056,7 +1056,12 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
 		MCInst_InitStorage(&mci, CS_ARCH_MIPS, false);
 	else
 #endif
+#ifdef CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS
+	/* The RISC-V decoder constructs each operand before reading it. */
+	MCInst_InitStorage(&mci, CS_ARCH_RISCV, false);
+#else
 		MCInst_Init(&mci, handle->arch);
+#endif
 	mci.csh = handle;
 	mci.address = insn->address;
 	mci.flat_insn = insn;
