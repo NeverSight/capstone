@@ -450,6 +450,14 @@ if(CAPSTONE_X86_SUPPORT)
         arch/X86/X86Module.c
         arch/X86/X86OutputIterator.c
     )
+    # Use scalar/vector stores or libc for the fixed public output buffers.
+    # Generic x64 GCC otherwise emits REP STOS even for the short clears.
+    if(capstone_enabled_architectures STREQUAL "X86" AND CMAKE_C_COMPILER_ID STREQUAL "GNU"
+       AND CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SIZEOF_VOID_P EQUAL 8
+       AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
+        set_property(SOURCE arch/X86/X86OutputIterator.c
+            APPEND PROPERTY COMPILE_OPTIONS "$<$<CONFIG:Release>:-mstringop-strategy=libcall>")
+    endif()
     # MSVC can inline the decoder into the public iterator under LTCG, giving
     # even a compact scan a very large probed stack frame.
     if(CMAKE_C_COMPILER_ID STREQUAL "MSVC" AND MSVC_C_ARCHITECTURE_ID STREQUAL "x64")

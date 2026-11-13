@@ -2942,10 +2942,10 @@ X86_DECODE_INLINE int finishDecodedInstruction(struct InternalInstruction *insn,
 	return 0;
 }
 
-/* AArch64 GCC materializes the general legacy reader state even when
- * scanning only for the public ID and length. */
-#if defined(CAPSTONE_X86_ONLY) && defined(__linux__) && defined(__aarch64__) && \
-    defined(__GNUC__) && !defined(__clang__)
+/* GCC materializes the general legacy reader state on these Linux hosts.
+ * The generated terminal row already provides the public ID and extent. */
+#if defined(CAPSTONE_X86_ONLY) && defined(__linux__) && defined(__GNUC__) && \
+    !defined(__clang__) && (defined(__x86_64__) || defined(__aarch64__))
 #define X86_COMPACT_PUBLIC_HEADER
 #endif
 

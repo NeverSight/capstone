@@ -646,6 +646,18 @@ else
 	@echo "Skipping tests on whole corpus"
 endif
 
+# Match the Release x86-only formatter tuning for the compiler's target.
+ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
+ifneq (,$(filter -O2 -O3,$(CFLAGS)))
+X86_OUTPUT_STORE_FLAG := $(shell $(CC) $(CFLAGS) -dM -E -x c - < /dev/null 2>/dev/null | \
+    awk '$$2 == "__linux__" { linux_target=1 } $$2 == "__x86_64__" { x64=1 } \
+         $$2 == "__GNUC__" { gcc=1 } $$2 == "__clang__" { clang_cc=1 } \
+         $$2 == "__SIZEOF_POINTER__" { ptr=$$3 } \
+         END { if (linux_target && x64 && gcc && !clang_cc && ptr==8) print "-mstringop-strategy=libcall" }')
+$(OBJDIR)/arch/X86/X86OutputIterator.o: CFLAGS += $(X86_OUTPUT_STORE_FLAG)
+endif
+endif
+
 $(OBJDIR)/%.o: %.c
 	@mkdir -p $(@D)
 ifeq ($(V),0)
