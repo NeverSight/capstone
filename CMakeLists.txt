@@ -170,6 +170,10 @@ if(capstone_enabled_architectures STREQUAL "SPARC")
     add_compile_definitions(CAPSTONE_SPARC_SHORT_STATE_REGISTER_NAMES)
 endif()
 
+if(capstone_enabled_architectures STREQUAL "ARM")
+    add_compile_definitions(CAPSTONE_ARM_DEDICATED_MAPPING)
+endif()
+
 if(capstone_enabled_architectures STREQUAL "AARCH64")
     add_compile_definitions(CAPSTONE_AARCH64_SHORT_REGISTER_NAMES CAPSTONE_AARCH64_INIT_CONSTRUCTED_OPERANDS CAPSTONE_AARCH64_DEDICATED_SCAN)
 endif()
