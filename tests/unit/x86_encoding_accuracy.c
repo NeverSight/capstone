@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../../utils.h"
 #include "../../arch/X86/X86DisassemblerDecoder.h"
 #include "../../arch/X86/X86Disassembler.h"
 #include "../../arch/X86/X86Mapping.h"
@@ -459,6 +460,139 @@ struct reader_case {
 };
 
 #ifndef CAPSTONE_X86_REDUCE
+/* EVEX.W selects a 64-bit vector element independently of GPR width. */
+static bool check_vector_element_width(csh handle)
+{
+	static const struct {
+		uint8_t bytes[8], length;
+		unsigned id;
+	} cases[] = {
+		{ { 0x62, 0xf3, 0xfd, 0x2b, 0x19, 0x50, 0x01, 0xa5 },
+		  8,
+		  X86_INS_VEXTRACTF64X2 },
+		{ { 0x62, 0xf3, 0xfd, 0x4b, 0x1b, 0x50, 0x01, 0xa5 },
+		  8,
+		  X86_INS_VEXTRACTF64X4 },
+		{ { 0x62, 0xf3, 0xfd, 0x2b, 0x39, 0x50, 0x01, 0xa5 },
+		  8,
+		  X86_INS_VEXTRACTI64X2 },
+		{ { 0x62, 0xf3, 0xfd, 0x4b, 0x3b, 0x50, 0x01, 0xa5 },
+		  8,
+		  X86_INS_VEXTRACTI64X4 },
+		{ { 0x62, 0xf3, 0xcd, 0x2b, 0x18, 0x50, 0x01, 0xa5 },
+		  8,
+		  X86_INS_VINSERTF64X2 },
+		{ { 0x62, 0xf3, 0xcd, 0x4b, 0x1a, 0x50, 0x01, 0xa5 },
+		  8,
+		  X86_INS_VINSERTF64X4 },
+		{ { 0x62, 0xf3, 0xcd, 0x2b, 0x38, 0x50, 0x01, 0xa5 },
+		  8,
+		  X86_INS_VINSERTI64X2 },
+		{ { 0x62, 0xf3, 0xcd, 0x4b, 0x3a, 0x50, 0x01, 0xa5 },
+		  8,
+		  X86_INS_VINSERTI64X4 },
+		{ { 0x62, 0xf1, 0xfd, 0x08, 0x6f, 0x50, 0x01 },
+		  7,
+		  X86_INS_VMOVDQA64 },
+		{ { 0x62, 0xf1, 0xfe, 0x08, 0x6f, 0x50, 0x01 },
+		  7,
+		  X86_INS_VMOVDQU64 },
+		{ { 0x62, 0xf3, 0xcd, 0x2b, 0x23, 0x50, 0x01, 0xa5 },
+		  8,
+		  X86_INS_VSHUFF64X2 },
+		{ { 0x62, 0xf3, 0xcd, 0x2b, 0x43, 0x50, 0x01, 0xa5 },
+		  8,
+		  X86_INS_VSHUFI64X2 },
+	};
+	for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i)
+		if (!decode(handle, cases[i].bytes, cases[i].length,
+			    cases[i].id, cases[i].length))
+			return false;
+	return true;
+}
+
+/* AVX-512 tuple broadcasts read the old destination only when merging. */
+static bool check_broadcast_access(csh handle, cs_mode mode, bool att)
+{
+	static const struct {
+		uint8_t opcode, w, ll;
+		unsigned id;
+	} forms[] = {
+		{ 0x1a, 0, 1, X86_INS_VBROADCASTF32X4 },
+		{ 0x1a, 0, 2, X86_INS_VBROADCASTF32X4 },
+		{ 0x1a, 1, 1, X86_INS_VBROADCASTF64X2 },
+		{ 0x1a, 1, 2, X86_INS_VBROADCASTF64X2 },
+		{ 0x1b, 0, 2, X86_INS_VBROADCASTF32X8 },
+		{ 0x1b, 1, 2, X86_INS_VBROADCASTF64X4 },
+		{ 0x5a, 0, 1, X86_INS_VBROADCASTI32X4 },
+		{ 0x5a, 0, 2, X86_INS_VBROADCASTI32X4 },
+		{ 0x5a, 1, 1, X86_INS_VBROADCASTI64X2 },
+		{ 0x5a, 1, 2, X86_INS_VBROADCASTI64X2 },
+		{ 0x5b, 0, 2, X86_INS_VBROADCASTI32X8 },
+		{ 0x5b, 1, 2, X86_INS_VBROADCASTI64X4 },
+	};
+	for (size_t f = 0; f < sizeof(forms) / sizeof(forms[0]); ++f) {
+		for (unsigned pred = 0; pred < 3; ++pred) {
+			const bool masked = pred != 0, merging = pred == 1;
+			const uint8_t bytes[] = {
+				0x62,
+				0xf2,
+				(uint8_t)(0x7d | forms[f].w << 7),
+				(uint8_t)(8 | forms[f].ll << 5 |
+					  (masked ? 3 : 0) |
+					  (pred == 2 ? 0x80 : 0)),
+				forms[f].opcode,
+				0x50,
+				1
+			};
+			cs_insn *insn = NULL;
+			if (cs_disasm(handle, bytes, sizeof(bytes), 0, 1,
+				      &insn) != 1)
+				return false;
+			const cs_x86 *x = &insn->detail->x86;
+			const x86_reg dest = forms[f].ll == 1 ? X86_REG_YMM2 :
+								X86_REG_ZMM2;
+			const x86_reg base = mode == CS_MODE_64 ? X86_REG_RAX :
+								  X86_REG_EAX;
+			const cs_x86_op *dst = &x->operands[att ? 1 : 0];
+			const cs_x86_op *mem =
+				&x->operands[att ? 0 : 1 + masked];
+			const cs_x86_op *mask = &x->operands[att ? 2 : 1];
+			cs_regs reads, writes;
+			uint8_t nr = 0, nw = 0;
+			bool ok = insn->id == forms[f].id &&
+				  x->op_count == 2 + masked &&
+				  dst->type == X86_OP_REG && dst->reg == dest &&
+				  dst->access == (merging ? CS_AC_READ_WRITE :
+							    CS_AC_WRITE) &&
+				  mem->type == X86_OP_MEM &&
+				  mem->access == CS_AC_READ &&
+				  (!masked || (mask->type == X86_OP_REG &&
+					       mask->reg == X86_REG_K3 &&
+					       mask->access == CS_AC_READ)) &&
+				  cs_regs_access(handle, insn, reads, &nr,
+						 writes, &nw) == CS_ERR_OK &&
+				  nw == 1 && writes[0] == dest &&
+				  nr == 1 + masked + merging &&
+				  arr_exist_inline(reads, nr, base) &&
+				  arr_exist_inline(reads, nr, dest) ==
+					  merging &&
+				  arr_exist_inline(reads, nr, X86_REG_K3) ==
+					  masked;
+			if (!ok) {
+				fprintf(stderr,
+					"broadcast access mismatch %s %s mode=%u AT&T=%d mask=%u\n",
+					insn->mnemonic, insn->op_str,
+					(unsigned)mode, att, pred);
+			}
+			cs_free(insn, 1);
+			if (!ok)
+				return false;
+		}
+	}
+	return true;
+}
+
 /* XBEGIN sign-extends its encoded relative immediate and keeps the full
  * fallback EIP/RIP. The address-size override does not change that width. */
 static bool check_xbegin_target(csh handle, cs_mode mode)
@@ -1612,8 +1746,18 @@ int main(void)
 						handle, modes[m],
 						detail && text);
 #ifndef CAPSTONE_X86_REDUCE
+					if (modes[m] != CS_MODE_16)
+						ok &= check_vector_element_width(
+							handle);
 					if (detail && text)
 						ok &= check_xbegin_target(handle, modes[m]);
+					if (modes[m] != CS_MODE_16 && detail &&
+					    text &&
+					    !cs_support(CS_SUPPORT_DIET))
+						ok &= check_broadcast_access(
+							handle, modes[m],
+							syntaxes[s] ==
+								CS_OPT_SYNTAX_ATT);
 #endif
 					ok &= check_far_pointer_encoding(
 						handle, modes[m], detail);
