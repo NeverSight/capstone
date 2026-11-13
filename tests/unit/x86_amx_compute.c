@@ -199,11 +199,13 @@ int main(void)
 	}
 	for (i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i)
 		success &= test_case(handle64, &cases[i], false);
+#ifndef CAPSTONE_X86_ATT_DISABLE
 	success &= check(cs_option(handle64, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
 				 CS_ERR_OK,
 			 "select AT&T syntax");
 	for (i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i)
 		success &= test_case(handle64, &cases[i], true);
+#endif
 	success &= rejects(handle64, truncated, sizeof(truncated),
 			   "truncated compute encoding is rejected");
 	success &= is_not_amx_compute(handle64, bad_map, sizeof(bad_map),
@@ -213,7 +215,11 @@ int main(void)
 	{
 		compute_case x_case = { { 0 }, X86_INS_TDPBSSD, "tdpbssd" };
 		memcpy(x_case.code, x_ignored, sizeof(x_case.code));
+#ifdef CAPSTONE_X86_ATT_DISABLE
+		success &= test_case(handle64, &x_case, false);
+#else
 		success &= test_case(handle64, &x_case, true);
+#endif
 	}
 	success &= rejects(handle64, bad_b, sizeof(bad_b),
 			   "extended source is rejected");

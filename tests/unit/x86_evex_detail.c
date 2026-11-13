@@ -206,10 +206,12 @@ int main(void)
 	}
 
 	success &= test_broadcast(handle);
+#ifndef CAPSTONE_X86_ATT_DISABLE
 	success &= check(cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
 				 CS_ERR_OK,
 			 "select AT&T syntax");
 	success &= test_broadcast(handle);
+#endif
 	success &= check(cs_option(handle, CS_OPT_SYNTAX,
 				   CS_OPT_SYNTAX_INTEL) == CS_ERR_OK,
 			 "restore Intel syntax");

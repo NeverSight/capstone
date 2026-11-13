@@ -216,8 +216,12 @@ int main(void)
 		for (index = 0; index < sizeof(cases) / sizeof(cases[0]);
 		     ++index)
 			success &= check_case(handle, &cases[index], att_syntax);
+#ifdef CAPSTONE_X86_ATT_DISABLE
+		break;
+#else
 		if (att_syntax)
 			break;
+#endif
 	}
 
 	success &= rejects(handle, zero_without_mask, CS_MODE_64,

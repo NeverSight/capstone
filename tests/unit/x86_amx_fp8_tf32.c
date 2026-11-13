@@ -243,11 +243,13 @@ int main(void)
 
 	for (i = 0; i < sizeof(test_cases) / sizeof(test_cases[0]); ++i)
 		success &= test_case(handle, &test_cases[i], false);
+#ifndef CAPSTONE_X86_ATT_DISABLE
 	success &= check(cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
 				 CS_ERR_OK,
 			 "select AT&T syntax");
 	for (i = 0; i < sizeof(test_cases) / sizeof(test_cases[0]); ++i)
 		success &= test_case(handle, &test_cases[i], true);
+#endif
 	for (i = 0; i < sizeof(invalid_cases) / sizeof(invalid_cases[0]); ++i)
 		success &= rejects(handle, &invalid_cases[i]);
 

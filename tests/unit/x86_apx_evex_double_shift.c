@@ -28,7 +28,9 @@ int main(void)
 	{const uint8_t w66[]={0x62,0xf4,0xfd,0x10,0xa5,0xc1};const uint8_t hex[]={0x62,0xf4,0xfd,0x08,0x24,0xc1,0xbf};
 	ok&=ck(h,w66,sizeof(w66),X86_INS_SHLD,"shld","r16, rcx, rax, cl",4,false);
 	ok&=ck(h,hex,sizeof(hex),X86_INS_SHLD,"shld","rcx, rax, 0xbf",3,false);}
+#ifndef CAPSTONE_X86_ATT_DISABLE
 	cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_ATT);ok&=ck(h,e,sizeof(e),X86_INS_SHRD,"{nf} shrdq","%cl, %r26, %fs:0x20(%r29,%r14,4), %r17",4,true);cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_INTEL);
+#endif
 	for(unsigned k=0;k<4;k++){bad[3]=(uint8_t[]){0x09,0x28,0x48,0x88}[k];if(cs_disasm(h,bad,sizeof(bad),0,1,&i)){ok=false;cs_free(i,1);i=NULL;}}
 	bad[2]=0x7e;bad[3]=8;if(cs_disasm(h,bad,sizeof(bad),0,1,&i)){ok=false;cs_free(i,1);}cs_close(&h);if(!ok)fprintf(stderr,"APX double shift failure\n");return ok?0:1;
 }

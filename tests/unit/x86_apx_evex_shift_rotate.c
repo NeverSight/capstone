@@ -772,7 +772,9 @@ static bool test_encoding_anchors(csh handle)
 		      "memory SHR encoding matches current XED");
 	for (i = 0; i < sizeof(anchors) / sizeof(anchors[0]); ++i) {
 		success &= check_anchor(handle, &anchors[i], false);
+#ifndef CAPSTONE_X86_ATT_DISABLE
 		success &= check_anchor(handle, &anchors[i], true);
+#endif
 		if (!success)
 			return false;
 	}
@@ -1017,7 +1019,9 @@ int main(void)
 	}
 	success &= test_encoding_anchors(handle);
 	success &= run_matrix(handle, false);
+#ifndef CAPSTONE_X86_ATT_DISABLE
 	success &= run_matrix(handle, true);
+#endif
 	success &= test_legal_variants(handle);
 	success &= test_invalid_encodings(handle);
 	cs_close(&handle);

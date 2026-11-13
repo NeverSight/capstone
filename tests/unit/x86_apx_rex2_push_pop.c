@@ -176,15 +176,22 @@ int main(void)
 	}
 	cs_option(intel, CS_OPT_DETAIL, CS_OPT_ON);
 	cs_option(att, CS_OPT_DETAIL, CS_OPT_ON);
-	cs_option(att, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
+#ifdef CAPSTONE_X86_ATT_DISABLE
+	success &= cs_option(att, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
+		   CS_ERR_X86_ATT;
+#else
+	success &= cs_option(att, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) == CS_ERR_OK;
+#endif
 
 	for (push = 0; push < 2; ++push) {
 		for (hint = 0; hint < 2; ++hint) {
 			for (number = 0; number < 32; ++number) {
 				success &= check_case(intel, false, push != 0,
 						      hint != 0, false, number);
+#ifndef CAPSTONE_X86_ATT_DISABLE
 				success &= check_case(att, true, push != 0,
 						      hint != 0, false, number);
+#endif
 			}
 		}
 		for (number = 0; number < 32; ++number) {

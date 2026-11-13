@@ -190,6 +190,10 @@ static bool test_register_names(csh handle)
 
 static bool test_att_detail_order(csh handle)
 {
+#ifdef CAPSTONE_X86_ATT_DISABLE
+	return cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
+		   CS_ERR_X86_ATT;
+#else
 	static const uint8_t addq[] = { 0xd5, 0x5d, 0x01, 0xc7 };
 	cs_insn *insn = NULL;
 	bool success = true;
@@ -253,6 +257,7 @@ static bool test_att_detail_order(csh handle)
 				 CS_ERR_OK,
 			 "restore Intel syntax");
 	return success;
+#endif
 }
 
 /* mov dword ptr [r16], eax: REX2.B4 extends the ModR/M base. */

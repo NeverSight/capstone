@@ -47,9 +47,11 @@ int main(void) {
            "r26d, dword ptr fs:[r29 + r28*4 + 0x20]", X86_REG_R26D, 4);
   ok &= ck(h, x4a32, sizeof(x4a32), "movrs",
            "r26d, dword ptr fs:[r29d + r28d*4 + 0x20]", X86_REG_R26D, 4);
+#ifndef CAPSTONE_X86_ATT_DISABLE
   cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
   ok &= ck(h, b64, sizeof(b64), "movrsq", "%fs:(%r17d), %r18", X86_REG_R18, 8);
   cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_INTEL);
+#endif
   /* W selects 64-bit operands over 66, as in XED; the byte form is W0. */
   {
     const uint8_t w66[] = {0x62, 0xec, 0xfd, 8, 0x8b, 0x11};

@@ -545,7 +545,9 @@ static bool test_encoding_anchors(csh handle)
 			 "64-bit NDD+NF IMUL encoding matches current XED");
 	for (i = 0; i < sizeof(anchors) / sizeof(anchors[0]); ++i) {
 		success &= check_anchor(handle, &anchors[i], false);
+#ifndef CAPSTONE_X86_ATT_DISABLE
 		success &= check_anchor(handle, &anchors[i], true);
+#endif
 		if (!success)
 			return false;
 	}
@@ -787,6 +789,7 @@ static bool test_immediate_and_one_operand_forms(csh handle)
 		insn = NULL;
 	}
 
+#ifndef CAPSTONE_X86_ATT_DISABLE
 	success &= check(cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
 				 CS_ERR_OK,
 			 "select AT&T syntax for extended IMUL forms");
@@ -797,6 +800,7 @@ static bool test_immediate_and_one_operand_forms(csh handle)
 	success &= decodes_as(handle, imul_f7_nf, sizeof(imul_f7_nf),
 			      X86_INS_IMUL, "{nf} imulq", "%r19",
 			      "IMUL F7 AT&T form is exact");
+#endif
 	memcpy(invalid, imul6b_zu_nf, sizeof(imul6b_zu_nf));
 	invalid[2] ^= 0x08;
 	success &= rejects(handle, invalid, sizeof(imul6b_zu_nf),
@@ -915,7 +919,9 @@ int main(void)
 	}
 	success &= test_encoding_anchors(handle);
 	success &= run_matrix(handle, false);
+#ifndef CAPSTONE_X86_ATT_DISABLE
 	success &= run_matrix(handle, true);
+#endif
 	success &= test_legal_variants(handle);
 	success &= test_immediate_and_one_operand_forms(handle);
 	success &= test_invalid_encodings(handle);

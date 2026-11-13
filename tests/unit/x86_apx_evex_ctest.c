@@ -48,9 +48,11 @@ int main(void)
       ok&=check(h,q,7,X86_INS_CTESTB,"ctestb","{dfv=sf,cf} r17b, 7");
       q[5]=0xc9;ok&=check(h,q,7,X86_INS_CTESTB,"ctestb","{dfv=sf,cf} r17b, 7");
       q[5]=0xd1;if(cs_disasm(h,q,7,0,1,&i)){ok=false;cs_free(i,1);}}
+#ifndef CAPSTONE_X86_ATT_DISABLE
     cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_ATT);
     ok&=check(h,b,6,X86_INS_CTESTB,"ctestbq","{dfv=sf,cf} %r26, %r17");
     cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_INTEL);
+#endif
     /* W overrides 66, byte forms ignore W, and byte immediates are
      * zero-extended as for TEST. */
     b[2]=0xad;ok&=check(h,b,6,X86_INS_CTESTB,"ctestb","{dfv=sf,cf} r17, r26");

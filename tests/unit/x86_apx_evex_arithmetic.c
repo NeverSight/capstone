@@ -1077,7 +1077,9 @@ static bool test_encoding_anchors(csh handle)
 			 "immediate encoding matches current XED");
 	for (i = 0; i < sizeof(anchors) / sizeof(anchors[0]); ++i) {
 		success &= check_anchor(handle, &anchors[i], false);
+#ifndef CAPSTONE_X86_ATT_DISABLE
 		success &= check_anchor(handle, &anchors[i], true);
+#endif
 		if (!success)
 			return false;
 	}
@@ -1255,7 +1257,9 @@ int main(void)
 		return 1;
 	}
 	success &= run_matrix(handle, false);
+#ifndef CAPSTONE_X86_ATT_DISABLE
 	success &= run_matrix(handle, true);
+#endif
 	success &= test_encoding_anchors(handle);
 	success &= test_invalid_encodings(handle);
 	encode_binary_register(wrong_mode_code, ADC_OPERATION, 4, false, false,

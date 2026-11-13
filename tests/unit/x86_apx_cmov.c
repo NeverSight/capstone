@@ -559,7 +559,12 @@ int main(void)
 	}
 	cs_option(intel, CS_OPT_DETAIL, CS_OPT_ON);
 	cs_option(att, CS_OPT_DETAIL, CS_OPT_ON);
-	cs_option(att, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
+#ifdef CAPSTONE_X86_ATT_DISABLE
+	success &= cs_option(att, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
+		   CS_ERR_X86_ATT;
+#else
+	success &= cs_option(att, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) == CS_ERR_OK;
+#endif
 
 	for (cc = 0; cc < 16; ++cc) {
 		for (nd = 0; nd < 2; ++nd) {
@@ -572,17 +577,25 @@ int main(void)
 								intel, false, cc, nd != 0,
 								nf != 0, w != 0, pp,
 								number);
+#ifndef CAPSTONE_X86_ATT_DISABLE
 							success &= check_register_case(
 								att, true, cc, nd != 0,
 								nf != 0, w != 0, pp,
 								number);
+#endif
 						}
 						success &= check_memory_case(
 							intel, false, false, nd != 0,
 							nf != 0, w != 0, pp, cc);
+#ifndef CAPSTONE_X86_ATT_DISABLE
 						success &= check_memory_case(
 							att, true, true, nd != 0,
 							nf != 0, w != 0, pp, cc);
+#else
+						success &= check_memory_case(
+							intel, false, true, nd != 0,
+							nf != 0, w != 0, pp, cc);
+#endif
 					}
 				}
 			}

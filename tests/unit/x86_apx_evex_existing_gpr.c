@@ -249,6 +249,7 @@ int main(void)
 		"zmm1 {k2}, zmmword ptr [r29 + zmm30*4]", X86_REG_R29,
 		X86_REG_ZMM30, 4, 0);
 
+#ifndef CAPSTONE_X86_ATT_DISABLE
 	success &= check(cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
 				 CS_ERR_OK,
 			 "setup", "select AT&T syntax");
@@ -258,7 +259,7 @@ int main(void)
 		"0x40(%r29, %r30, 4), %zmm1 {%k3} {z}", X86_REG_R29,
 		X86_REG_R30, 4, 0x40);
 	success &= check_gpr_source(handle, true);
-
+#endif
 	success &= rejects_outside_64_bit(gpr_source, sizeof(gpr_source));
 	cs_close(&handle);
 	return success ? 0 : 1;

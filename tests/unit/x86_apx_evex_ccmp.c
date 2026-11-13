@@ -32,9 +32,11 @@ int main(void)
         X86_INS_CCMPO+k,names[k],"{dfv=sf,cf} r17d, r26d"); }
     b[2]=0xac; b[3]=2;
     ok &= check(h,b,sizeof(b),X86_INS_CCMPB,"ccmpb","{dfv=sf,cf} r17, r26");
+#ifndef CAPSTONE_X86_ATT_DISABLE
     cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_ATT);
     ok &= check(h,b,sizeof(b),X86_INS_CCMPB,"ccmpbq","{dfv=sf,cf} %r26, %r17");
     cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_INTEL);
+#endif
     { const uint8_t m[]={0x62,0x6c,0x2c,0x02,0x39,0x11};
       ok &= check(h,m,sizeof(m),X86_INS_CCMPB,"ccmpb",
                   "{dfv=sf,cf} dword ptr [r17], r26d"); }

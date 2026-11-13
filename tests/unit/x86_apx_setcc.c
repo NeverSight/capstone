@@ -316,7 +316,12 @@ int main(void)
 	}
 	cs_option(intel, CS_OPT_DETAIL, CS_OPT_ON);
 	cs_option(att, CS_OPT_DETAIL, CS_OPT_ON);
-	cs_option(att, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
+#ifdef CAPSTONE_X86_ATT_DISABLE
+	success &= cs_option(att, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
+		   CS_ERR_X86_ATT;
+#else
+	success &= cs_option(att, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) == CS_ERR_OK;
+#endif
 
 	for (cc = 0; cc < 16; ++cc) {
 		for (zu = 0; zu < 2; ++zu) {
@@ -325,18 +330,24 @@ int main(void)
 					success &= check_register_case(
 						intel, false, cc, zu != 0, w != 0,
 						number);
+#ifndef CAPSTONE_X86_ATT_DISABLE
 					success &= check_register_case(
 						att, true, cc, zu != 0, w != 0,
 						number);
+#endif
 				}
 			}
 		}
 	}
 	success &= check_memory_case(intel, false, false, false);
 	success &= check_memory_case(intel, false, false, true);
+#ifndef CAPSTONE_X86_ATT_DISABLE
 	success &= check_memory_case(att, true, false, true);
+#endif
 	success &= check_memory_case(intel, false, true, true);
+#ifndef CAPSTONE_X86_ATT_DISABLE
 	success &= check_memory_case(att, true, true, true);
+#endif
 	success &= check_addr32_displacement_forms(intel);
 
 	encode_register(invalid, 5, true, false, 29);

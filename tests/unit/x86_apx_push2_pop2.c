@@ -179,14 +179,21 @@ int main(void)
 	}
 	cs_option(intel, CS_OPT_DETAIL, CS_OPT_ON);
 	cs_option(att, CS_OPT_DETAIL, CS_OPT_ON);
-	cs_option(att, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
+#ifdef CAPSTONE_X86_ATT_DISABLE
+	success &= cs_option(att, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
+		   CS_ERR_X86_ATT;
+#else
+	success &= cs_option(att, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) == CS_ERR_OK;
+#endif
 
 	for (push_index = 0; push_index < 2; ++push_index) {
 		for (ppx_index = 0; ppx_index < 2; ++ppx_index) {
 			success &= check_case(intel, false, push_index != 0,
 					      ppx_index != 0, 29, 20);
+#ifndef CAPSTONE_X86_ATT_DISABLE
 			success &= check_case(att, true, push_index != 0,
 					      ppx_index != 0, 29, 20);
+#endif
 		}
 	}
 

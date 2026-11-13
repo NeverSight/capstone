@@ -36,6 +36,7 @@ int main(void)
 				i = NULL;
 			}
 		}
+#ifndef CAPSTONE_X86_ATT_DISABLE
 	cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
 	{
 		uint8_t c[] = { 0x62, 0xec, 0xfd, 8, 0xf7, 0xf3 };
@@ -46,6 +47,7 @@ int main(void)
 			cs_free(i, 1);
 		}
 	}
+#endif
 	cs_close(&h);
 	if (!ok)
 		fprintf(stderr, "APX MUL/DIV focused failure\n");

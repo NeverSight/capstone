@@ -64,6 +64,7 @@ int main(void)
 			i = NULL;
 		}
 	}
+#ifndef CAPSTONE_X86_ATT_DISABLE
 	cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
 	b[4] = 0xf7;
 	b[5] = 0xdb;
@@ -74,6 +75,7 @@ int main(void)
 		      !strcmp(i->op_str, "%r19, %r17");
 		cs_free(i, 1);
 	}
+#endif
 	cs_close(&h);
 	if (!ok)
 		fprintf(stderr, "APX unary focused failure\n");

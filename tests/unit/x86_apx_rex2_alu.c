@@ -337,6 +337,7 @@ static bool test_fixed_forms(csh handle, uint64_t add_eflags)
 	return success;
 }
 
+#ifndef CAPSTONE_X86_ATT_DISABLE
 static bool test_att_case(csh handle, const uint8_t *code, size_t code_size,
 			  const char *mnemonic, const char *op_str,
 			  x86_reg first_reg, uint8_t first_access,
@@ -370,9 +371,14 @@ static bool test_att_case(csh handle, const uint8_t *code, size_t code_size,
 	cs_free(insn, count);
 	return success;
 }
+#endif
 
 static bool test_att_syntax(csh handle)
 {
+#ifdef CAPSTONE_X86_ATT_DISABLE
+	return cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
+		   CS_ERR_X86_ATT;
+#else
 	static const uint8_t reverse_subq[] = { 0xd5, 0x5d, 0x2b, 0xc7 };
 	static const uint8_t reverse_cmpb[] = { 0xd5, 0x55, 0x3a, 0xc7 };
 	static const uint8_t testw[] = { 0x66, 0xd5, 0x55, 0x85, 0xc7 };
@@ -398,6 +404,7 @@ static bool test_att_syntax(csh handle)
 				 CS_ERR_OK,
 			 "restore Intel syntax");
 	return success;
+#endif
 }
 
 static bool test_invalid(csh handle, const uint8_t *code, size_t code_size,

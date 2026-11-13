@@ -64,10 +64,12 @@ int main(void) {
     ok &= one(h, mw, sizeof(mw), X86_INS_MOVBE, "movbe", "r18, r19");
     ok &= one(h, cw66, sizeof(cw66), X86_INS_CRC32, "crc32", "r18, r19");
   }
+#ifndef CAPSTONE_X86_ATT_DISABLE
   cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
   ok &= one(h, cq, sizeof(cq), X86_INS_CRC32, "crc32q",
             "%fs:0x20(%r29,%r14,4), %r26");
   cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_INTEL);
+#endif
   for (unsigned k = 0; k < 4; k++) {
     bad[3] = (uint8_t[]){0x00, 0x0c, 0x18, 0x28}[k];
     if (cs_disasm(h, bad, sizeof(bad), 0, 1, &i)) {

@@ -45,9 +45,11 @@ int main(void) {
     const uint8_t a[] = {0x64, 0x67, 0x62, 0xec, 0x7a, 8, 0xf2, 0x11};
     ok &= ck(h, a, sizeof(a), X86_INS_INVPCID, "invpcid",
              "r18, xmmword ptr fs:[r17d]");
+#ifndef CAPSTONE_X86_ATT_DISABLE
     cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
     ok &= ck(h, a, sizeof(a), X86_INS_INVPCID, "invpcid", "%fs:(%r17d), %r18");
     cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_INTEL);
+#endif
   }
   {
     uint8_t x[] = {0x62, 0xec, 0x7e, 8, 0xf0, 0xd1};

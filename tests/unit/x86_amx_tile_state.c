@@ -205,6 +205,10 @@ static bool test_case(csh handle, const amx_case *test)
 
 static bool test_att_syntax(csh handle)
 {
+#ifdef CAPSTONE_X86_ATT_DISABLE
+	return cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
+		   CS_ERR_X86_ATT;
+#else
 	static const uint8_t load[] = { 0xc4, 0x82, 0x79, 0x4b, 0x14, 0x6c };
 	static const uint8_t store[] = { 0xc4, 0x82, 0x7a, 0x4b, 0x3c, 0xbe };
 	cs_insn *insn = NULL;
@@ -259,6 +263,7 @@ static bool test_att_syntax(csh handle)
 				 CS_ERR_OK,
 			 "restore Intel syntax");
 	return success;
+#endif
 }
 
 static bool expect_invalid(csh handle, const uint8_t *code, size_t code_size,

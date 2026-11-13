@@ -273,9 +273,10 @@ static bool check_case(csh handle, const alu_operation *operation,
 			"destination and optional EFLAGS writes are exact");
 	}
 
-	cs_free(insn, count);
-	if (success)
+	if (success) {
+		cs_free(insn, count);
 		return true;
+	}
 failed:
 	fprintf(stderr,
 		"case: op=%s width=%u reverse=%u nd=%u nf=%u seed=%u syntax=%s\n",
@@ -641,6 +642,7 @@ int main(void)
 	success &= run_matrix(handle, operations,
 			      sizeof(operations) / sizeof(operations[0]),
 			      false);
+#ifndef CAPSTONE_X86_ATT_DISABLE
 	if (success) {
 		success &= check(cs_option(handle, CS_OPT_SYNTAX,
 					   CS_OPT_SYNTAX_ATT) == CS_ERR_OK,
@@ -649,6 +651,10 @@ int main(void)
 			handle, operations,
 			sizeof(operations) / sizeof(operations[0]), true);
 	}
+#else
+	success &= cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
+		   CS_ERR_X86_ATT;
+#endif
 	if (success) {
 		success &= check(cs_option(handle, CS_OPT_SYNTAX,
 					   CS_OPT_SYNTAX_INTEL) == CS_ERR_OK,

@@ -65,10 +65,12 @@ int main(void)
 		return 1;
 	}
 	success &= test_vpcmp(handle, true);
+#ifndef CAPSTONE_X86_ATT_DISABLE
 	success &= check(cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
 				 CS_ERR_OK,
 			 "select AT&T syntax");
 	success &= test_vpcmp(handle, true);
+#endif
 	cs_close(&handle);
 	return success ? 0 : 1;
 }

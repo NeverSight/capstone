@@ -130,6 +130,10 @@ static bool check_implicit_msr(void)
 			return false;
 		cs_option(handle, CS_OPT_DETAIL, CS_OPT_ON);
 		for (syntax = 0; syntax < 2; ++syntax) {
+#ifdef CAPSTONE_X86_ATT_DISABLE
+			if (syntax)
+				break;
+#endif
 			cs_option(handle, CS_OPT_SYNTAX,
 				  syntax ? CS_OPT_SYNTAX_ATT :
 					   CS_OPT_SYNTAX_INTEL);
@@ -377,6 +381,10 @@ int main(void)
 		return 1;
 	ok = cs_option(handle, CS_OPT_DETAIL, CS_OPT_ON) == CS_ERR_OK;
 	for (syntax = 0; syntax < 2; ++syntax) {
+#ifdef CAPSTONE_X86_ATT_DISABLE
+		if (syntax)
+			break;
+#endif
 		ok &= cs_option(handle, CS_OPT_SYNTAX,
 				syntax ? CS_OPT_SYNTAX_ATT :
 					 CS_OPT_SYNTAX_INTEL) == CS_ERR_OK;

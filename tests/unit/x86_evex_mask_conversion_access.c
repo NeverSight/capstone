@@ -271,8 +271,12 @@ int main(void)
 		  1,
 		  64 },
 	};
-	static const cs_opt_value syntaxes[] = { CS_OPT_SYNTAX_INTEL,
-						 CS_OPT_SYNTAX_ATT };
+	static const cs_opt_value syntaxes[] = {
+		CS_OPT_SYNTAX_INTEL,
+#ifndef CAPSTONE_X86_ATT_DISABLE
+		CS_OPT_SYNTAX_ATT,
+#endif
+	};
 	csh handle = 0;
 	bool success = true;
 

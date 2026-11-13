@@ -82,6 +82,7 @@ int main(void)
 			i = NULL;
 		}
 	}
+#ifndef CAPSTONE_X86_ATT_DISABLE
 	cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
 	ok &= ck(dec(h, cx, 6, &i), "AT&T");
 	if (i) {
@@ -90,6 +91,7 @@ int main(void)
 			 "AT&T text");
 		cs_free(i, 1);
 	}
+#endif
 	cs_close(&h);
 	return ok ? 0 : 1;
 }

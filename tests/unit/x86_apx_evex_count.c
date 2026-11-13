@@ -210,7 +210,6 @@ static bool check_16_bit_text_and_size(csh handle)
 		uint8_t reg[] = { 0x62, 0xec, 0x7d, 0x08, form->opcode, 0xd3 };
 		uint8_t memory[] = { 0x64, 0x62, 0x8c, 0x79, 0x08,
 				     form->opcode, 0x54, 0xa5, 0x20 };
-		char att_mnemonic[16];
 		size_t count;
 
 		cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_INTEL);
@@ -242,6 +241,8 @@ static bool check_16_bit_text_and_size(csh handle)
 			instruction = NULL;
 		}
 
+#ifndef CAPSTONE_X86_ATT_DISABLE
+		char att_mnemonic[16];
 		snprintf(att_mnemonic, sizeof(att_mnemonic), "%sw",
 			 form->mnemonic);
 		cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
@@ -271,6 +272,7 @@ static bool check_16_bit_text_and_size(csh handle)
 			cs_free(instruction, count);
 			instruction = NULL;
 		}
+#endif
 	}
 	return ok;
 }
