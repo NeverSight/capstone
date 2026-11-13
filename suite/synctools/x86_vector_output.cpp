@@ -51,6 +51,9 @@ struct Decoder {
 	}
 	unsigned decode(const uint8_t *bytes, unsigned length)
 	{
+		insn->is_alias = false;
+		insn->usesAliasDetails = false;
+		insn->illegal = false;
 		const uint8_t *cursor = bytes;
 		uint64_t ip = 0x100000012;
 		size_t left = length;
