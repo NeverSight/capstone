@@ -293,15 +293,47 @@ const char *AArch64_reg_name(csh handle, unsigned int reg)
 	return AArch64_LLVM_getRegisterName(reg, AArch64_NoRegAltName);
 }
 
+/* The template changes text-only dispatch layout on Apple arm64. */
+#if defined(CAPSTONE_AARCH64_INIT_CONSTRUCTED_OPERANDS) && \
+    !(defined(__APPLE__) && defined(__aarch64__))
+#define AARCH64_COPY_OPERAND_DEFAULTS
+/* Build all public operand defaults in one copy, including unused slots. */
+#if NUM_AARCH64_OPS != 16
+#error Update the AArch64 operand defaults for the new slot count
+#endif
+#define AARCH64_EMPTY_OP { .vector_index = -1, .type = AARCH64_OP_INVALID }
+#define AARCH64_FOUR_EMPTY_OPS \
+	AARCH64_EMPTY_OP, AARCH64_EMPTY_OP, AARCH64_EMPTY_OP, AARCH64_EMPTY_OP
+static const cs_aarch64 empty_aarch64_detail = {
+	.cc = AArch64CC_Invalid,
+	.operands = { AARCH64_FOUR_EMPTY_OPS, AARCH64_FOUR_EMPTY_OPS,
+		      AARCH64_FOUR_EMPTY_OPS, AARCH64_FOUR_EMPTY_OPS },
+};
+#undef AARCH64_FOUR_EMPTY_OPS
+#undef AARCH64_EMPTY_OP
+#endif
+
 void AArch64_setup_op(cs_aarch64_op *op)
 {
+#ifdef AARCH64_COPY_OPERAND_DEFAULTS
+	memcpy(op, empty_aarch64_detail.operands, sizeof(*op));
+#else
 	memset(op, 0, sizeof(cs_aarch64_op));
 	op->type = AARCH64_OP_INVALID;
 	op->vector_index = -1;
+#endif
 }
 
 void AArch64_init_cs_detail(MCInst *MI)
 {
+#ifdef AARCH64_COPY_OPERAND_DEFAULTS
+	if (!detail_is_set(MI))
+		return;
+	cs_detail *detail = get_detail(MI);
+	memset(detail, 0, offsetof(cs_detail, aarch64));
+	memcpy(&detail->aarch64, &empty_aarch64_detail,
+	       sizeof(empty_aarch64_detail));
+#else
 	if (detail_is_set(MI)) {
 		memset(get_detail(MI), 0,
 		       offsetof(cs_detail, aarch64) + sizeof(cs_aarch64));
@@ -310,6 +342,7 @@ void AArch64_init_cs_detail(MCInst *MI)
 			AArch64_setup_op(&AArch64_get_detail(MI)->operands[i]);
 		AArch64_get_detail(MI)->cc = AArch64CC_Invalid;
 	}
+#endif
 }
 
 static void AArch64_check_updates_flags(MCInst *MI)
