@@ -376,6 +376,19 @@ void LoongArch_rewrite_address_operand(MCInst *MI)
 
 void LoongArch_set_instr_map_data(MCInst *MI)
 {
+#ifdef CAPSTONE_LOONGARCH_DEDICATED_MAPPING
+	/* Public ID, implicit effects and format share the generated opcode row. */
+	const insn_map *row = &loongarch_insns[MCInst_getOpcode(MI)];
+	MI->flat_insn->id = row->mapid;
+#ifndef CAPSTONE_DIET
+	if (!MI->flat_insn->detail)
+		return;
+	map_implicit_reads(MI, loongarch_insns);
+	map_implicit_writes(MI, loongarch_insns);
+	map_groups(MI, loongarch_insns);
+	LoongArch_get_detail(MI)->format = row->suppl_info.loongarch.form;
+#endif
+#else
 	map_cs_id(MI, loongarch_insns, ARR_SIZE(loongarch_insns));
 	map_implicit_reads(MI, loongarch_insns);
 	map_implicit_writes(MI, loongarch_insns);
@@ -385,6 +398,7 @@ void LoongArch_set_instr_map_data(MCInst *MI)
 	if (suppl_info) {
 		LoongArch_get_detail(MI)->format = suppl_info->form;
 	}
+#endif
 }
 
 bool LoongArch_getInstruction(csh handle, const uint8_t *code, size_t code_len,
