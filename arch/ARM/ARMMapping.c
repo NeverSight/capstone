@@ -941,6 +941,46 @@ void ARM_reg_access(const cs_insn *insn, cs_regs regs_read,
 }
 #endif
 
+#ifdef CAPSTONE_ARM_COPY_OPERAND_DEFAULTS
+/* Unused operands have observable invalid indices and zeroed padding too. */
+#define ARM_EMPTY_OP \
+	{ .vector_index = -1, .type = ARM_OP_INVALID, .neon_lane = -1 }
+#define ARM_FOUR_EMPTY_OPS \
+	ARM_EMPTY_OP, ARM_EMPTY_OP, ARM_EMPTY_OP, ARM_EMPTY_OP
+static const cs_arm_op arm_empty_operands[] = {
+	ARM_FOUR_EMPTY_OPS, ARM_FOUR_EMPTY_OPS, ARM_FOUR_EMPTY_OPS,
+	ARM_FOUR_EMPTY_OPS, ARM_FOUR_EMPTY_OPS, ARM_FOUR_EMPTY_OPS,
+	ARM_FOUR_EMPTY_OPS, ARM_FOUR_EMPTY_OPS, ARM_FOUR_EMPTY_OPS
+};
+#undef ARM_FOUR_EMPTY_OPS
+#undef ARM_EMPTY_OP
+/* Capstone builds as C99, including with MSVC. */
+typedef char ARMOperandDefaultsCoverSlots
+	[ARR_SIZE(arm_empty_operands) == NUM_ARM_OPS ? 1 : -1];
+typedef char ARMOperandDefaultsCoverTail
+	[offsetof(cs_arm, operands) + sizeof(arm_empty_operands) ==
+			 sizeof(cs_arm) ?
+		 1 :
+		 -1];
+
+void ARM_setup_op(cs_arm_op *op)
+{
+	memcpy(op, arm_empty_operands, sizeof(*op));
+}
+
+void ARM_init_cs_detail(MCInst *MI)
+{
+	if (!detail_is_set(MI))
+		return;
+	cs_detail *detail = get_detail(MI);
+	memset(detail, 0,
+	       offsetof(cs_detail, arm) + offsetof(cs_arm, operands));
+	detail->arm.cc = ARMCC_UNDEF;
+	detail->arm.vcc = ARMVCC_None;
+	memcpy(detail->arm.operands, arm_empty_operands,
+	       sizeof(arm_empty_operands));
+}
+#else
 void ARM_setup_op(cs_arm_op *op)
 {
 	memset(op, 0, sizeof(cs_arm_op));
@@ -963,6 +1003,7 @@ void ARM_init_cs_detail(MCInst *MI)
 		ARM_get_detail(MI)->vcc = ARMVCC_None;
 	}
 }
+#endif
 
 static uint64_t t_add_pc(MCInst *MI, uint64_t v)
 {

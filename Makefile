@@ -119,6 +119,10 @@ ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
 CFLAGS += -DCAPSTONE_X86_ONLY
 endif
 
+ifeq ($(sort $(CAPSTONE_ARCHS)),arm)
+CFLAGS += -DCAPSTONE_ARM_COPY_OPERAND_DEFAULTS
+endif
+
 ifeq ($(sort $(CAPSTONE_ARCHS)),mips)
 CFLAGS += -DCAPSTONE_MIPS_ONLY
 endif
