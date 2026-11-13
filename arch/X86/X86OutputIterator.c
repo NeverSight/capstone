@@ -17,173 +17,8 @@
 #include "X86SimpleOutput.h"
 #include "X86GenSimpleOutput.inc"
 
-/* The admitted MOV forms have a single integer base and at most a disp8. */
-static void X86_writeBaseMov(cs_insn *insn, const struct X86SimpleOutput *row,
-			     const uint8_t *code, uint8_t opcode, uint8_t rex,
-			     uint8_t modrm, bool load, bool wide,
-			     uint16_t *insn_size)
-{
-	const bool has_disp = (modrm >> 6) == 1;
-	const bool has_sib = (modrm & 7) == 4;
-	const unsigned offset = 2 + (rex != 0) + has_sib;
-	const int displacement = has_disp ? (int8_t)code[offset] : 0;
-	const unsigned reg_width = (opcode & 1) ? ((rex & 8) ? 3 : 2) :
-						  rex != 0;
-	const unsigned reg_index = ((rex & 4) << 1) | ((modrm >> 3) & 7);
-	const unsigned rm = ((rex & 1) << 3) | (modrm & 7);
-	const struct X86SimpleRegister *reg =
-		&x86_simple_registers[reg_width][reg_index];
-	const struct X86SimpleRegister *base =
-		&x86_simple_registers[wide ? 3 : 2][rm];
-
-	char *out = insn->op_str;
-	if (load) {
-		memcpy(out, reg->name, sizeof(reg->name));
-		out += reg->length;
-		memcpy(out, ", ", 2);
-		out += 2;
-	}
-	if (row->ops[0].size == 1) {
-		memcpy(out, "byte ptr [", 10);
-		out += 10;
-	} else {
-		memcpy(out,
-		       row->ops[0].size == 8 ? "qword ptr [" : "dword ptr [",
-		       11);
-		out += 11;
-	}
-	memcpy(out, base->name, sizeof(base->name));
-	out += base->length;
-	out = X86_writeDisp8(out, displacement);
-	*out++ = ']';
-	if (!load) {
-		memcpy(out, ", ", 2);
-		memcpy(out + 2, reg->name, sizeof(reg->name));
-	}
-	*insn_size = insn->size = (uint16_t)(offset + has_disp);
-	memcpy(insn->bytes, code, insn->size);
-	if (insn->detail) {
-		X86_writeSimpleDetail(insn->detail, row, opcode, rex, modrm,
-				      load ? reg->reg : 0, load ? 0 : reg->reg);
-		cs_x86 *x = &insn->detail->x86;
-		if (has_sib) {
-			x->sib = code[offset - 1];
-			x->sib_base = (x86_reg)base->reg;
-			x->sib_scale = 1;
-		}
-		x->disp = displacement;
-		if (has_disp) {
-			x->encoding.disp_offset = (uint8_t)offset;
-			x->encoding.disp_size = 1;
-		}
-		cs_x86_op *op = &x->operands[load ? 1 : 0];
-		op->type = X86_OP_MEM;
-		op->mem.base = (x86_reg)base->reg;
-		op->mem.scale = 1;
-		op->mem.disp = displacement;
-	}
-}
-
-static void writeUnsignedImmediate(char *out, uint64_t value)
-{
-	if (value <= HEX_THRESHOLD) {
-		*out = (char)('0' + value);
-	} else {
-		static const char digits[] = "0123456789abcdef";
-		char temp[16], *end = temp + sizeof(temp), *start = end;
-		uint64_t n = value;
-		do {
-			*--start = digits[n & 15];
-			n >>= 4;
-		} while (n);
-		memcpy(out, "0x", 2);
-		memcpy(out + 2, start, end - start);
-	}
-}
-
-static void writeMovRegImm32(cs_insn *insn, const struct X86SimpleOutput *row,
-			     const uint8_t *code, uint8_t opcode, uint8_t rex,
-			     uint16_t *insn_size)
-{
-	const unsigned offset = 1 + (rex != 0);
-	const uint8_t *raw = code + offset;
-	const uint32_t value = (uint32_t)raw[0] | ((uint32_t)raw[1] << 8) |
-			       ((uint32_t)raw[2] << 16) |
-			       ((uint32_t)raw[3] << 24);
-	const unsigned number = ((rex & 1) << 3) | (opcode & 7);
-	const struct X86SimpleRegister *reg = &x86_simple_registers[2][number];
-	insn->id = row->id;
-	*insn_size = insn->size = (uint16_t)(offset + 4);
-	memcpy(insn->bytes, code, insn->size);
-	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
-	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
-	memset(insn->op_str, 0, sizeof(insn->op_str));
-	memcpy(insn->op_str, reg->name, sizeof(reg->name));
-	char *out = insn->op_str + reg->length;
-	memcpy(out, ", ", 2);
-	writeUnsignedImmediate(out + 2, value);
-	if (insn->detail) {
-		X86_writeSimpleDetail(insn->detail, row, opcode, rex, 0,
-				      reg->reg, 0);
-		cs_x86 *x = &insn->detail->x86;
-		x->encoding.modrm_offset = 0;
-		x->encoding.imm_offset = (uint8_t)offset;
-		x->encoding.imm_size = 4;
-		x->operands[1].type = X86_OP_IMM;
-		x->operands[1].imm = value;
-		x->operands[1].access = 0;
-	}
-}
-
-/* The /digit selects the same flags and register access as the corresponding
- * ALU register pair. The immediate's public width follows the destination. */
-static void writeGroup1Immediate(cs_insn *insn,
-				 const struct X86SimpleOutput *row,
-				 const uint8_t *code, uint8_t rex,
-				 uint8_t modrm, uint16_t *insn_size)
-{
-	const unsigned offset = 2 + (rex != 0);
-	const int immediate = (int8_t)code[offset];
-	const unsigned group = (modrm >> 3) & 7;
-	const bool logical = group == 1 || group == 4 || group == 6;
-	const bool wide = (rex & 8) != 0;
-	const bool negative = !logical && immediate < 0;
-	const uint64_t value =
-		logical ? (wide ? (uint64_t)(int64_t)immediate :
-				  (uint32_t)immediate) :
-			  (uint64_t)(negative ? -immediate : immediate);
-	const unsigned id = ((rex & 1) << 3) | (modrm & 7);
-	const struct X86SimpleRegister *reg =
-		&x86_simple_registers[wide ? 3 : 2][id];
-	insn->id = row->id;
-	*insn_size = insn->size = (uint16_t)(offset + 1);
-	memcpy(insn->bytes, code, insn->size);
-	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
-	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
-	memset(insn->op_str, 0, sizeof(insn->op_str));
-	memcpy(insn->op_str, reg->name, sizeof(reg->name));
-	char *out = insn->op_str + reg->length;
-	memcpy(out, ", ", 2);
-	out += 2;
-	if (negative)
-		*out++ = '-';
-	writeUnsignedImmediate(out, value);
-	if (insn->detail) {
-		X86_writeSimpleDetail(insn->detail, row, 0x83, rex, modrm,
-				      reg->reg, 0);
-		cs_x86 *x = &insn->detail->x86;
-		x->operands[1].type = X86_OP_IMM;
-		x->operands[1].imm = logical && !wide ?
-					     (int64_t)(uint32_t)immediate :
-					     immediate;
-		x->operands[1].access = 0;
-		x->encoding.imm_offset = (uint8_t)offset;
-		x->encoding.imm_size = 1;
-	}
-}
-
 /* The register rows distinguish AH..BH from SPL..DIL when a REX prefix is
- * present. Memory admission below is limited to MOV with a base or base+disp8. */
+ * present. Memory admission and bounds checks belong to the address writer. */
 #ifdef CAPSTONE_X86_DEDICATED_OUTPUT
 CAPSTONE_INTERNAL
 #else
@@ -214,18 +49,11 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
 			return false;
 		modrm = code[1 + has_rex];
 		if (modrm < 0xc0) {
-			unsigned rm = modrm & 7;
-			if ((opcode & 0xfc) != 0x88 || modrm >= 0x80)
-				return false;
-			/* ESP, RSP and R12 require a SIB. Redundant encodings with other
-			 * bases can expose EIZ or RIZ in the ordinary public output. */
-			if (rm == 4 && (size < 3u + has_rex || (rex & 2) ||
-					code[2 + has_rex] != 0x24))
-				return false;
-			if ((modrm < 0x40 && rm == 5) ||
-			    (modrm >= 0x40 && size < 3u + has_rex + (rm == 4)))
+			if ((opcode & 0xfc) != 0x88 && opcode != 0x8d)
 				return false;
 			base_memory = true;
+		} else if (opcode == 0x8d) {
+			return false;
 		}
 	}
 	if ((!wide && handle->mode != CS_MODE_32) || handle->no_text ||
@@ -239,31 +67,46 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
 	    cs_vsnprintf != cs_default_vsnprintf)
 		return false;
 
-	if (plan >= X86_PLAN_MOV_REG_IMM32) {
-		if (plan == X86_PLAN_MOV_REG_IMM32) {
-			if (size < 5u + has_rex)
-				return false;
-			const unsigned pair =
-				x86_simple_plans[wide][prefix_class][0x8b];
-			writeMovRegImm32(insn, &x86_simple_outputs[pair >> 2],
-					 code, opcode, rex, insn_size);
-			return true;
-		}
+	if (plan >= X86_PLAN_PUSH_IMMEDIATE) {
 		if (plan == X86_PLAN_VECTOR)
 			return X86_writeVectorOutput(code, size, insn,
 						     insn_size,
-						     x86_simple_registers[3]);
-		if (size < 3u + has_rex)
-			return false;
-		unsigned reg_plan =
-			x86_simple_plans[wide][prefix_class][(modrm & 0x38) | 1];
-		if (!reg_plan)
-			return false;
-		writeGroup1Immediate(insn, &x86_simple_outputs[reg_plan >> 2],
-				     code, rex, modrm, insn_size);
+						     x86_simple_registers[3],
+						     wide);
+		unsigned row;
+		const struct X86SimpleRegister *reg = NULL;
+		if (plan == X86_PLAN_PUSH_IMMEDIATE) {
+			const bool imm8 = opcode == 0x6a;
+			if (size < (imm8 ? 2u : 5u))
+				return false;
+			row = x86_push_rows[wide][imm8];
+		} else if (plan == X86_PLAN_MOV_REG_IMM32) {
+			if (size < 5u + has_rex)
+				return false;
+			row = x86_simple_plans[wide][prefix_class][0x8b] >> 2;
+			reg = &x86_simple_registers[2][((rex & 1) << 3) |
+						       (opcode & 7)];
+		} else {
+			if (size < 3u + has_rex)
+				return false;
+			const unsigned group = (modrm >> 3) & 7;
+			row = plan == X86_PLAN_SHIFT_IMM8 ?
+				      x86_shift_rows[wide][prefix_class][group] :
+				      x86_simple_plans[wide][prefix_class]
+						      [(group << 3) | 1] >>
+					      2;
+			reg = &x86_simple_registers[(rex & 8) ? 3 : 2]
+						   [((rex & 1) << 3) |
+						    (modrm & 7)];
+		}
+		X86_writeImmediateOutput(code, insn, insn_size, rex,
+					 &x86_simple_outputs[row], reg);
 		return true;
 	}
 	const struct X86SimpleOutput *row = &x86_simple_outputs[plan >> 2];
+	if (base_memory)
+		return X86_writeMemoryOutput(code, size, insn, insn_size, row,
+					     x86_simple_registers);
 	const bool relative = form == X86_SIMPLE_RELATIVE;
 	if (relative && size < (size_t)row->imm_offset + row->imm_size)
 		return false;
@@ -273,11 +116,6 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
 	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
 	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
 	memset(insn->op_str, 0, sizeof(insn->op_str));
-	if (base_memory) {
-		X86_writeBaseMov(insn, row, code, opcode, rex, modrm,
-				 form == X86_SIMPLE_REG_RM, wide, insn_size);
-		return true;
-	}
 	insn->bytes[0] = code[0];
 	if (form == X86_SIMPLE_FIXED) {
 		memcpy(insn->op_str, row->operands, sizeof(row->operands));

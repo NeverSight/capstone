@@ -256,6 +256,8 @@ endif
 endif
 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86Mapping.o
 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86Module.o
+	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86ImmediateOutput.o
+	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86MemoryOutput.o
 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86OutputIterator.o
 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86VectorOutput.o
 	LIBOBJ_X86_NUMBERS += $(OBJDIR)/arch/X86/X86IntelInstPrinterNumbers.o
@@ -659,7 +661,7 @@ X86_OUTPUT_STORE_FLAG := $(shell $(CC) $(CFLAGS) -dM -E -x c - < /dev/null 2>/de
          $$2 == "__GNUC__" { gcc=1 } $$2 == "__clang__" { clang_cc=1 } \
          $$2 == "__SIZEOF_POINTER__" { ptr=$$3 } \
          END { if (linux_target && x64 && gcc && !clang_cc && ptr==8) print "-mstringop-strategy=libcall" }')
-$(OBJDIR)/arch/X86/X86OutputIterator.o $(OBJDIR)/arch/X86/X86VectorOutput.o: CFLAGS += $(X86_OUTPUT_STORE_FLAG)
+$(OBJDIR)/arch/X86/X86ImmediateOutput.o $(OBJDIR)/arch/X86/X86MemoryOutput.o $(OBJDIR)/arch/X86/X86OutputIterator.o $(OBJDIR)/arch/X86/X86VectorOutput.o: CFLAGS += $(X86_OUTPUT_STORE_FLAG)
 endif
 endif
 

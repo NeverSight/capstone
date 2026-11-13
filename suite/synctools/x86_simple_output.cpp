@@ -119,7 +119,8 @@ std::string initializer(const X86SimpleOutput &row)
 // its two register IDs. Every other public byte must be reproduced by the row.
 std::string describe(const cs_insn &insn, uint8_t opcode, uint8_t rex,
 		     uint8_t modrm, const X86SimpleRegister *first,
-		     const X86SimpleRegister *second, bool branch = false)
+		     const X86SimpleRegister *second, bool branch = false,
+		     bool lea = false)
 {
 	const auto &d = *insn.detail;
 	const auto &x = d.x86;
@@ -136,7 +137,7 @@ std::string describe(const cs_insn &insn, uint8_t opcode, uint8_t rex,
 		if (x.op_count != 2 || (std::string(first->name) + ", " +
 					second->name) != insn.op_str)
 			return {};
-	} else if (!branch)
+	} else if (!branch && !lea)
 		strcpy(row.operands, insn.op_str);
 	row.flags = x.eflags;
 	row.read_count = d.regs_read_count;
@@ -152,12 +153,19 @@ std::string describe(const cs_insn &insn, uint8_t opcode, uint8_t rex,
 	std::copy_n(d.groups, row.group_count, row.groups);
 	for (unsigned i = 0; i < x.op_count; ++i) {
 		const auto &op = x.operands[i];
+		if (lea && i == 1) {
+			if (op.type != X86_OP_MEM)
+				return {};
+			row.ops[1] = { 0, op.size,
+				       static_cast<uint8_t>(op.access) };
+			continue;
+		}
 		if (op.type != (branch ? X86_OP_IMM : X86_OP_REG) ||
 		    (!branch && unsigned(op.reg) > UINT16_MAX) ||
 		    unsigned(op.access) > UINT8_MAX)
 			return {};
 		row.ops[i] = { static_cast<uint16_t>(
-				       (first || branch) ? 0 : op.reg),
+				       (first || branch || lea) ? 0 : op.reg),
 			       op.size, static_cast<uint8_t>(op.access) };
 	}
 	cs_detail rebuilt;
@@ -165,6 +173,13 @@ std::string describe(const cs_insn &insn, uint8_t opcode, uint8_t rex,
 			      first ? first->reg : row.ops[0].reg,
 			      second ? second->reg : row.ops[1].reg);
 
+	if (lea) {
+		if (x.op_count != 2 || x.operands[0].type != X86_OP_REG)
+			return {};
+		rebuilt.x86.operands[0].reg = x.operands[0].reg;
+		rebuilt.x86.operands[1].type = X86_OP_MEM;
+		rebuilt.x86.operands[1].mem = x.operands[1].mem;
+	}
 	if (branch) {
 		if (x.op_count != 1)
 			return {};
@@ -272,6 +287,105 @@ CheckedRow check_pair(Decoder &decoder, unsigned opcode, unsigned prefix_class,
 				std::swap(reg, rm);
 			row.observe(describe(*decoder.insn, opcode, rex, mr,
 					     &names[reg], &names[rm]));
+		}
+	}
+	return row;
+}
+
+// The register/imm8 form reuses the register row builder. Reconstruct the
+// one varying immediate separately after checking its public value and text.
+CheckedRow check_shift(Decoder &decoder, unsigned cls, unsigned group,
+		       const RegisterTable &regs)
+{
+	CheckedRow row;
+	const unsigned start = cls == 0 ? 0 : cls == 1 ? 0x40 : 0x48;
+	for (unsigned rex = start; rex <= start + (cls ? 7 : 0); ++rex) {
+		for (unsigned rm = 0; rm < 8; ++rm) {
+			const auto &reg =
+				regs[cls == 2 ? 3 : 2][rm | ((rex & 1) << 3)];
+			for (unsigned imm : { 0u, 1u, 9u, 10u, 31u, 32u, 63u,
+					      64u, 127u, 128u, 255u }) {
+				const uint8_t modrm =
+					uint8_t(0xc0 | (group << 3) | rm);
+				uint8_t bytes[] = { uint8_t(rex), 0xc1, modrm,
+						    uint8_t(imm) };
+				unsigned length = 3 + !!rex;
+				decoder.decode(bytes + !rex, length, length, 0);
+				cs_insn projected = *decoder.insn;
+				cs_detail detail = *projected.detail;
+				auto &x = detail.x86;
+				std::ostringstream printed;
+				printed << reg.name << ", ";
+				if (imm > HEX_THRESHOLD)
+					printed << "0x" << std::hex;
+				printed << imm;
+				if (projected.op_str != printed.str() ||
+				    x.op_count != 2 ||
+				    x.operands[0].type != X86_OP_REG ||
+				    x.operands[0].reg != reg.reg ||
+				    x.operands[1].type != X86_OP_IMM ||
+				    x.operands[1].imm != imm ||
+				    x.encoding.imm_offset != length - 1 ||
+				    x.encoding.imm_size != 1)
+					throw std::runtime_error(
+						"unexpected register shift count or spelling");
+				// The runtime assigns this operand's type and value after
+				// writing the row. Keep its generated size and access.
+				projected.detail = &detail;
+				projected.op_str[0] = 0;
+				x.operands[0].reg = X86_REG_INVALID;
+				x.operands[1].type = X86_OP_REG;
+				x.operands[1].imm = 0;
+				row.observe(describe(projected, 0xc1,
+						     uint8_t(rex), modrm,
+						     nullptr, nullptr));
+			}
+		}
+	}
+	return row;
+}
+
+CheckedRow check_push_immediate(Decoder &d, unsigned op)
+{
+	CheckedRow row;
+	const unsigned width = op == 0x6a ? 1 : 4;
+	for (uint32_t value : { 0u, 1u, 9u, 10u, 0x7fu, 0x80u, 0xffu,
+				0x7fffffffu, 0x80000000u, 0xffffffffu }) {
+		uint8_t data[] = { uint8_t(op), uint8_t(value),
+				   uint8_t(value >> 8), uint8_t(value >> 16),
+				   uint8_t(value >> 24) };
+		d.decode(data, width + 1, width + 1, 0);
+		row.observe(
+			describe(*d.insn, op, 0, 0, nullptr, nullptr, true));
+	}
+	return row;
+}
+
+CheckedRow check_lea(Decoder &d, unsigned cls, const RegisterTable &regs,
+		     bool wide)
+{
+	CheckedRow row;
+	const unsigned start = !cls ? 0 : cls == 1 ? 0x40 : 0x48;
+	for (unsigned rex = start; rex <= start + (cls ? 7 : 0); ++rex) {
+		for (unsigned mr = 0; mr < 0x40; ++mr) {
+			if ((mr & 7) == 4 || (mr & 7) == 5)
+				continue;
+			decode_pair(d, rex, 0x8d, mr);
+			const auto &reg =
+				regs[(rex & 8) ? 3 : 2]
+				    [((rex & 4) << 1) | ((mr >> 3) & 7)];
+			const auto &base =
+				regs[wide ? 3 : 2][((rex & 1) << 3) | (mr & 7)];
+			if (d.insn->detail->x86.operands[0].reg !=
+				    (x86_reg)reg.reg ||
+			    d.insn->detail->x86.operands[1].mem.base !=
+				    (x86_reg)base.reg ||
+			    std::string(reg.name) + ", [" + base.name + "]" !=
+				    d.insn->op_str)
+				throw std::runtime_error(
+					"unexpected effective address");
+			row.observe(describe(*d.insn, 0x8d, rex, mr, nullptr,
+					     nullptr, false, true));
 		}
 	}
 	return row;
@@ -390,6 +504,10 @@ int main()
 					form = X86_SIMPLE_RELATIVE;
 					row = check_relative(decoder, wide, cls,
 							     op);
+				} else if (cls != 3 && op == 0x8d) {
+					form = X86_SIMPLE_REG_RM;
+					row = check_lea(decoder, cls, regs,
+							wide);
 				} else if (cls != 3 && pair_opcode(op))
 					row = check_pair(decoder, op, cls, regs,
 							 form);
@@ -401,7 +519,7 @@ int main()
 					rows.begin());
 				if (index == rows.size())
 					rows.push_back(row.fields);
-				if (index >= UINT16_MAX >> 2)
+				if (index >= (X86_PLAN_PUSH_IMMEDIATE >> 2))
 					return 1;
 				plans[wide][cls][op] = static_cast<uint16_t>(
 					(index << 2) | form);
@@ -411,6 +529,7 @@ int main()
 		}
 	}
 	// Reserve unprefixed EVEX for its own verified vector output records.
+	plans[0][0][0x66] = plans[1][0][0x66] = X86_PLAN_VECTOR;
 	plans[1][0][0x62] = X86_PLAN_VECTOR;
 	plans[1][0][0xc4] = X86_PLAN_VECTOR;
 	plans[1][0][0xc5] = X86_PLAN_VECTOR;
@@ -435,7 +554,63 @@ int main()
 					X86_PLAN_MOV_REG_IMM32;
 		}
 	}
+	uint16_t shifts[2][3][8]{};
+	for (unsigned wide = 0; wide < 2; ++wide) {
+		Decoder &decoder = wide ? x64 : x86;
+		for (unsigned cls = 0; cls < (wide ? 3u : 1u); ++cls) {
+			plans[wide][cls][0xc1] = X86_PLAN_SHIFT_IMM8;
+			for (unsigned group = 0; group < 8; ++group) {
+				auto row =
+					check_shift(decoder, cls, group, regs);
+				size_t index = std::find(rows.begin(),
+							 rows.end(),
+							 row.fields) -
+					       rows.begin();
+				if (index >= (X86_PLAN_PUSH_IMMEDIATE >> 2))
+					return 1;
+				if (index == rows.size())
+					rows.push_back(row.fields);
+				shifts[wide][cls][group] = uint16_t(index);
+				checked += row.encodings;
+			}
+		}
+	}
+	uint16_t pushes[2][2];
+	for (unsigned wide = 0; wide < 2; ++wide) {
+		Decoder &decoder = wide ? x64 : x86;
+		for (unsigned index = 0; index < 2; ++index) {
+			const unsigned op = index ? 0x6a : 0x68;
+			CheckedRow row = check_push_immediate(decoder, op);
+			if (rows.size() >= (X86_PLAN_PUSH_IMMEDIATE >> 2))
+				return 1;
+			pushes[wide][index] =
+				static_cast<uint16_t>(rows.size());
+			rows.push_back(row.fields);
+			checked += row.encodings;
+			plans[wide][0][op] = X86_PLAN_PUSH_IMMEDIATE;
+		}
+	}
 	emit_tables(plans, regs, rows);
+	std::cout << "\nstatic const uint16_t x86_shift_rows[2][3][8] = {\n";
+	for (const auto &mode : shifts) {
+		std::cout << "\t{\n";
+		for (const auto &cls : mode) {
+			std::cout << "\t\t";
+			emit_array(std::cout, cls);
+			std::cout << ",\n";
+		}
+		std::cout << "\t},\n";
+	}
+	std::cout << "};\n";
+
+	std::cout << "\nstatic const uint16_t x86_push_rows[2][2] = {\n";
+	for (const auto &mode : pushes) {
+		std::cout << "\t";
+		emit_array(std::cout, mode);
+		std::cout << ",\n";
+	}
+	std::cout << "};\n";
+
 	std::cerr << "records=" << rows.size() - 1 << " plans=" << admitted
 		  << " encodings_checked=" << checked << " table_bytes="
 		  << sizeof(plans) + sizeof(regs) +

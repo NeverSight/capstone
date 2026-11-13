@@ -49,13 +49,24 @@ enum X86SimpleForm {
 #define X86_PLAN_GROUP1_IMM8 ((UINT16_MAX & ~3u) | X86_SIMPLE_REG_RM)
 
 /* The vector escape uses the next reserved plan and has no register-pair ModR/M. */
+#define X86_PLAN_PUSH_IMMEDIATE ((UINT16_MAX & ~7u) | X86_SIMPLE_FIXED)
 #define X86_PLAN_VECTOR UINT16_MAX
+#define X86_PLAN_SHIFT_IMM8 ((UINT16_MAX & ~3u) | X86_SIMPLE_RM_REG)
 #define X86_PLAN_MOV_REG_IMM32 ((UINT16_MAX & ~3u) | X86_SIMPLE_FIXED)
 
 CAPSTONE_INTERNAL bool
+X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
+		      uint16_t *insn_size, const struct X86SimpleOutput *row,
+		      const struct X86SimpleRegister regs[4][16]);
+
+CAPSTONE_INTERNAL void X86_writeImmediateOutput(
+	const uint8_t *code, cs_insn *insn, uint16_t *insn_size, uint8_t rex,
+	const struct X86SimpleOutput *row, const struct X86SimpleRegister *reg);
+
+CAPSTONE_INTERNAL bool
 X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
-		      uint16_t *insn_size,
-		      const struct X86SimpleRegister *regs);
+		      uint16_t *insn_size, const struct X86SimpleRegister *regs,
+		      bool wide);
 
 static inline char *X86_writeDisp8(char *out, int displacement)
 {

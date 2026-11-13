@@ -31,12 +31,12 @@ struct Decoder {
 	csh handle = 0;
 	cs_insn *insn = nullptr;
 	uint64_t probes = 0;
-	Decoder()
+	explicit Decoder(cs_mode mode = CS_MODE_64)
 	{
 		// Text, detail and a custom name make regeneration independent of
 		// both the compact scan reader and the optimized output records.
 		cs_opt_mnem name = { X86_INS_UD2, "ud2" };
-		if (cs_open(CS_ARCH_X86, CS_MODE_64, &handle) ||
+		if (cs_open(CS_ARCH_X86, mode, &handle) ||
 		    cs_option(handle, CS_OPT_DETAIL, CS_OPT_ON) ||
 		    cs_option(handle, CS_OPT_MNEMONIC,
 			      reinterpret_cast<size_t>(&name)) ||
@@ -197,6 +197,119 @@ void emit_vex_indexed(Decoder &decoder)
 	std::puts("};");
 }
 
+// Describe only legacy 66 0F register pairs whose entire public x86 detail
+// can be recovered from the prefix, opcode and ModR/M. Generate against
+// the ordinary decoder so special encodings and aliases retain its behavior.
+std::string legacy_register_row(Decoder &decoder, bool wide, unsigned rex,
+				unsigned opcode, unsigned modrm, bool reverse)
+{
+	uint8_t bytes[5] = { 0x66, uint8_t(rex), 0x0f, uint8_t(opcode),
+			     uint8_t(modrm) };
+	const unsigned size = rex ? 5 : 4;
+	if (!rex)
+		std::memmove(bytes + 1, bytes + 2, 3);
+	const unsigned id = decoder.decode(bytes, size);
+	if (!id)
+		return {};
+	const cs_insn &insn = *decoder.insn;
+	const auto &d = *insn.detail;
+	const auto &x = d.x86;
+	if (insn.is_alias || insn.usesAliasDetails || insn.illegal ||
+	    std::strlen(insn.mnemonic) >= 16 || d.regs_read_count ||
+	    d.regs_write_count || d.groups_count > 4 || x.op_count != 2)
+		return {};
+	const unsigned reg = ((modrm >> 3) & 7) + ((rex & 4) << 1);
+	const unsigned rm = (modrm & 7) + ((rex & 1) << 3);
+	const unsigned nums[] = { reverse ? rm : reg, reverse ? reg : rm };
+	cs_x86 expected{};
+	expected.prefix[2] = 0x66;
+	expected.opcode[0] = 0x0f;
+	expected.opcode[1] = uint8_t(opcode);
+	expected.rex = uint8_t(rex);
+	expected.addr_size = wide ? 8 : 4;
+	expected.modrm = uint8_t(modrm);
+	expected.encoding.modrm_offset = uint8_t(size - 1);
+	expected.op_count = 2;
+	Bytes4 access{}, groups{};
+	std::copy_n(d.groups, d.groups_count, groups.begin());
+	for (unsigned i = 0; i < 2; ++i) {
+		auto &op = expected.operands[i];
+		op.type = X86_OP_REG;
+		op.reg = x86_reg(X86_REG_XMM0 + nums[i]);
+		op.size = 16;
+		op.access = x.operands[i].access;
+		access[i] = unsigned(op.access);
+	}
+	const auto text = "xmm" + std::to_string(nums[0]) + ", xmm" +
+			  std::to_string(nums[1]);
+	if (text != insn.op_str || std::memcmp(&expected, &x, sizeof(x)))
+		return {};
+	return "{ " + decoder.symbol(id) + ", \"" + insn.mnemonic + "\", " +
+	       std::to_string(d.groups_count) + ", " + fields(groups) + ", " +
+	       fields(access) + ", 0 }";
+}
+
+void emit_legacy_registers(Decoder &wide)
+{
+	Decoder narrow(CS_MODE_32);
+	std::vector<std::string> rows;
+	std::array<unsigned, 256> plans{};
+	for (unsigned opcode = 0; opcode < plans.size(); ++opcode) {
+		bool reverse = false;
+		auto row = legacy_register_row(narrow, false, 0, opcode, 0xd9,
+					       reverse);
+		if (row.empty()) {
+			reverse = true;
+			row = legacy_register_row(narrow, false, 0, opcode,
+						  0xd9, reverse);
+		}
+		if (row.empty())
+			continue;
+		bool uniform = true;
+		for (unsigned prefix = 0; prefix < 18 && uniform; ++prefix) {
+			const bool mode64 = prefix != 0;
+			const unsigned rex = prefix >= 2 ? 0x40 + prefix - 2 :
+							   0;
+			for (unsigned mr = 0xc0; mr <= 0xff; ++mr) {
+				if (legacy_register_row(mode64 ? wide : narrow,
+							mode64, rex, opcode, mr,
+							reverse) != row) {
+					uniform = false;
+					break;
+				}
+			}
+		}
+		if (!uniform)
+			continue;
+		const auto it = std::find(rows.begin(), rows.end(), row);
+		const unsigned index = unsigned(it - rows.begin()) + 1;
+		if (index >= 128)
+			throw std::runtime_error(
+				"too many legacy register output rows");
+		if (it == rows.end())
+			rows.push_back(row);
+		plans[opcode] = index | (reverse ? 128 : 0);
+	}
+	if (!plans[0x6f] || !plans[0x7f] || !plans[0x61] || !plans[0xfe])
+		throw std::runtime_error("missing SSE2 register forms");
+	std::puts(
+		"static const struct VectorOutputRow legacy_register_rows[] = {\n\t{ 0 },");
+	for (const auto &row : rows)
+		std::printf("\t%s,\n", row.c_str());
+	std::puts(
+		"};\n/* Low seven bits index legacy_register_rows; bit 7 reverses the operands. */\nstatic const uint8_t legacy_register_plans[256] = {");
+	for (unsigned i = 0; i < plans.size(); i += 16) {
+		std::putchar('\t');
+		for (unsigned j = 0; j < 16; ++j)
+			std::printf("%s%u,", j ? " " : "", plans[i + j]);
+		std::putchar('\n');
+	}
+	std::puts("};");
+	std::fprintf(stderr, "%zu legacy register rows, %llu 32-bit probes\n",
+		     rows.size(),
+		     static_cast<unsigned long long>(narrow.probes));
+}
+
 void emit_output(Decoder &decoder)
 {
 	std::vector<std::string> records;
@@ -239,6 +352,7 @@ void emit_output(Decoder &decoder)
 	}
 	std::puts("\tdefault: return NULL;\n\t}\n}");
 	emit_vex_indexed(decoder);
+	emit_legacy_registers(decoder);
 }
 }
 

@@ -452,6 +452,8 @@ if(CAPSTONE_X86_SUPPORT)
         arch/X86/X86InstPrinterCommon.c
         arch/X86/X86Mapping.c
         arch/X86/X86Module.c
+        arch/X86/X86ImmediateOutput.c
+        arch/X86/X86MemoryOutput.c
         arch/X86/X86OutputIterator.c
         arch/X86/X86VectorOutput.c
     )
@@ -460,7 +462,7 @@ if(CAPSTONE_X86_SUPPORT)
     if(capstone_enabled_architectures STREQUAL "X86" AND CMAKE_C_COMPILER_ID STREQUAL "GNU"
        AND CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SIZEOF_VOID_P EQUAL 8
        AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
-        set_property(SOURCE arch/X86/X86OutputIterator.c arch/X86/X86VectorOutput.c
+        set_property(SOURCE arch/X86/X86ImmediateOutput.c arch/X86/X86MemoryOutput.c arch/X86/X86OutputIterator.c arch/X86/X86VectorOutput.c
             APPEND PROPERTY COMPILE_OPTIONS "$<$<CONFIG:Release>:-mstringop-strategy=libcall>")
     endif()
     # MSVC can inline the decoder into the public iterator under LTCG, giving

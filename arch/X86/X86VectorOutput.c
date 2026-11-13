@@ -212,10 +212,70 @@ static bool writeVexIndexedOutput(const uint8_t *code, size_t size,
 	return true;
 }
 
+static bool writeLegacyRegisterOutput(const uint8_t *code, size_t size,
+				      cs_insn *insn, uint16_t *insn_size,
+				      bool wide)
+{
+	if (size < 4)
+		return false;
+	const bool has_rex = wide && (code[1] & 0xf0) == 0x40;
+	const unsigned length = 4 + has_rex;
+	if (size < length || code[1 + has_rex] != 0x0f)
+		return false;
+	const uint8_t opcode = code[2 + has_rex];
+	const unsigned plan = legacy_register_plans[opcode];
+	const uint8_t modrm = code[3 + has_rex];
+	if (!plan || modrm < 0xc0)
+		return false;
+
+	const struct VectorOutputRow *row = &legacy_register_rows[plan & 127];
+	const uint8_t rex = has_rex ? code[1] : 0;
+	const unsigned reg = ((modrm >> 3) & 7) | ((rex & 4) << 1);
+	const unsigned rm = (modrm & 7) | ((rex & 1) << 3);
+	const unsigned first = plan & 128 ? rm : reg;
+	const unsigned second = plan & 128 ? reg : rm;
+	*insn_size = insn->size = (uint16_t)length;
+	insn->id = row->id;
+	memcpy(insn->bytes, code, length);
+	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
+	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
+	memset(insn->op_str, 0, sizeof(insn->op_str));
+	char *out = writeVectorRegister(insn->op_str, 0, first);
+	memcpy(out, ", ", 2);
+	writeVectorRegister(out + 2, 0, second);
+	if (insn->detail) {
+		cs_detail *d = insn->detail;
+		memset(d, 0, offsetof(cs_detail, x86) + sizeof(cs_x86));
+		memcpy(d->groups, row->groups, sizeof(row->groups));
+		d->groups_count = row->group_count;
+		cs_x86 *x = &d->x86;
+		x->prefix[2] = 0x66;
+		x->opcode[0] = 0x0f;
+		x->opcode[1] = opcode;
+		x->rex = rex;
+		x->addr_size = wide ? 8 : 4;
+		x->modrm = modrm;
+		x->encoding.modrm_offset = (uint8_t)(length - 1);
+		x->op_count = 2;
+		for (unsigned i = 0; i < 2; ++i) {
+			cs_x86_op *op = &x->operands[i];
+			op->type = X86_OP_REG;
+			op->reg =
+				(x86_reg)(X86_REG_XMM0 + (i ? second : first));
+			op->size = 16;
+			op->access = (cs_ac_type)row->access[i];
+		}
+	}
+	return true;
+}
+
 bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
 			   uint16_t *insn_size,
-			   const struct X86SimpleRegister *regs)
+			   const struct X86SimpleRegister *regs, bool wide)
 {
+	if (code[0] == 0x66)
+		return writeLegacyRegisterOutput(code, size, insn, insn_size,
+						 wide);
 	if (code[0] == 0x62)
 		return writeEvexRegisterOutput(code, size, insn, insn_size);
 	return writeVexIndexedOutput(code, size, insn, insn_size, regs);
