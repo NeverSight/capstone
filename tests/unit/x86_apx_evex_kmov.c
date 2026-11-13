@@ -103,12 +103,14 @@ int main(void) {
     ok &= ck(h, b, sizeof(b), X86_INS_KMOVD, "kmovd",
              "k2, dword ptr fs:[r29d + r28d*4 + 0x20]", 4, 4);
   }
+#ifndef CAPSTONE_X86_ATT_DISABLE
   {
     const uint8_t b[] = {0x62, 0xf9, 0xff, 8, 0x92, 0xd9};
     cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
     ok &= ck(h, b, 6, X86_INS_KMOVQ, "kmovq", "%r17, %k3", 8, 8);
     cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_INTEL);
   }
+#endif
   {
     uint8_t x[] = {0x62, 0xf9, 0x7d, 8, 0x92, 0x19};
     if (cs_disasm(h, x, 6, 0, 1, &i)) {

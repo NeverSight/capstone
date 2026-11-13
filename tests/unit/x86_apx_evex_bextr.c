@@ -63,6 +63,7 @@ int main(void)
 			i = NULL;
 		}
 	}
+#ifndef CAPSTONE_X86_ATT_DISABLE
 	cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
 	reg[3] = 0;
 	if (cs_disasm(h, reg, 6, 0, 1, &i) != 1)
@@ -71,6 +72,7 @@ int main(void)
 		ok &= i->op_str[0] == '%';
 		cs_free(i, 1);
 	}
+#endif
 	cs_close(&h);
 	if (!ok)
 		fprintf(stderr, "APX BEXTR failure\n");

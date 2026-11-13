@@ -45,6 +45,7 @@ int main(void)
 			cs_free(i, 1);
 			i = NULL;
 		}
+#ifndef CAPSTONE_X86_ATT_DISABLE
 		cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
 		if (cs_disasm(h, mem, sizeof(mem), 0, 1, &i) != 1)
 			ok = false;
@@ -60,6 +61,7 @@ int main(void)
 			i = NULL;
 		}
 		cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_INTEL);
+#endif
 	}
 	{
 		const uint8_t mem[] = { 0x64, 0x62, 0x8a, 0xf3, 0x00,

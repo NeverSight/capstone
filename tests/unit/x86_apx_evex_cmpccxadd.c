@@ -94,11 +94,13 @@ int main(void)
 			 "cmpbexadd",
 			 "qword ptr fs:[r29 + r14*4 + 0x20], r26, r17",
 			 X86_REG_R29, X86_REG_R14, 8);
+#ifndef CAPSTONE_X86_ATT_DISABLE
 	cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
 	ok &= check_case(handle, code, sizeof(code), X86_INS_CMPBEXADD,
 			 "cmpbexaddq", "%r17, %r26, %fs:0x20(%r29,%r14,4)",
 			 X86_REG_R29, X86_REG_R14, 8);
 	cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_INTEL);
+#endif
 
 	code[3] = 0x71;
 	code[5] = 0xe0;

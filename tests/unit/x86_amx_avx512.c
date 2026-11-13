@@ -54,6 +54,12 @@ static bool test_case(csh handle, const row_case *test, bool att_syntax)
 	bool success = true;
 	size_t count;
 
+#ifdef CAPSTONE_X86_ATT_DISABLE
+	if (att_syntax)
+		return check(cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
+				     CS_ERR_X86_ATT,
+			     test->name, "disabled syntax reports CS_ERR_X86_ATT");
+#endif
 	success &=
 		check(cs_option(handle, CS_OPT_SYNTAX,
 				att_syntax ? CS_OPT_SYNTAX_ATT :
