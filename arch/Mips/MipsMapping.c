@@ -22,6 +22,11 @@
 #include "MipsLinkage.h"
 #include "MipsDisassembler.h"
 
+#if defined(CAPSTONE_MIPS_ONLY) && defined(__linux__) && defined(__aarch64__) && \
+    defined(__GNUC__)
+#define MIPS_DEDICATED_MAPPING
+#endif
+
 #define GET_SUBTARGETINFO_ENUM
 #include "MipsGenSubtargetInfo.inc"
 
@@ -247,6 +252,12 @@ void Mips_set_instr_map_data(MCInst *MI)
 #endif
 		return;
 	}
+#ifdef MIPS_DEDICATED_MAPPING
+	/* Implicit effects below use this same dense generated opcode index. */
+	MI->flat_insn->id = mips_insns[MCInst_getOpcode(MI)].mapid;
+	if (!MI->flat_insn->detail)
+		return;
+#endif
 	// Fixes for missing groups.
 	if (MCInst_getOpcode(MI) == Mips_JR) {
 		unsigned Reg = MCInst_getOpVal(MI, 0);
@@ -258,7 +269,9 @@ void Mips_set_instr_map_data(MCInst *MI)
 		}
 	}
 
+#ifndef MIPS_DEDICATED_MAPPING
 	map_cs_id(MI, mips_insns, ARR_SIZE(mips_insns));
+#endif
 	map_implicit_reads(MI, mips_insns);
 	map_implicit_writes(MI, mips_insns);
 	map_groups(MI, mips_insns);
@@ -290,8 +303,7 @@ bool Mips_getInstruction(csh handle, const uint8_t *code, size_t code_len,
 	Mips_init_cs_detail(instr);
 /* The dedicated scan shortens the ordinary table walk on Linux AArch64
  * hosts without adding work to the time-critical formatted path on x64. */
-#if defined(CAPSTONE_MIPS_ONLY) && defined(__linux__) && defined(__aarch64__) && \
-    defined(__GNUC__)
+#ifdef MIPS_DEDICATED_MAPPING
 	const cs_mode mode = instr->csh->mode & ~CS_MODE_BIG_ENDIAN;
 	if (code_len >= 4 && instr->csh->no_text && !instr->flat_insn->detail &&
 	    instr->csh->disasm == Mips_getInstruction &&
@@ -334,7 +346,7 @@ bool Mips_getInstruction(csh handle, const uint8_t *code, size_t code_len,
 		}
 		if (opcode) {
 			MCInst_setOpcode(instr, opcode);
-			map_cs_id(instr, mips_insns, ARR_SIZE(mips_insns));
+			instr->flat_insn->id = mips_insns[opcode].mapid;
 			*size = 4;
 			return true;
 		}
