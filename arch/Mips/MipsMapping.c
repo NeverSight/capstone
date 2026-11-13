@@ -288,6 +288,58 @@ bool Mips_getInstruction(csh handle, const uint8_t *code, size_t code_len,
 {
 	uint64_t size64;
 	Mips_init_cs_detail(instr);
+/* The dedicated scan shortens the ordinary table walk on Linux AArch64
+ * hosts without adding work to the time-critical formatted path on x64. */
+#if defined(CAPSTONE_MIPS_ONLY) && defined(__linux__) && defined(__aarch64__) && \
+    defined(__GNUC__)
+	const cs_mode mode = instr->csh->mode & ~CS_MODE_BIG_ENDIAN;
+	if (code_len >= 4 && instr->csh->no_text && !instr->flat_insn->detail &&
+	    instr->csh->disasm == Mips_getInstruction &&
+	    (mode == CS_MODE_MIPS32 || mode == CS_MODE_MIPS64)) {
+		/* For these standard immediate and load/store encodings all
+		 * register and immediate bits are operands. */
+		const unsigned major = readBytes32(instr, code) >> 26;
+		unsigned opcode = 0;
+		switch (major) {
+		case 9:
+			opcode = Mips_ADDiu;
+			break;
+		case 12:
+			opcode = Mips_ANDi;
+			break;
+		case 13:
+			opcode = Mips_ORi;
+			break;
+		case 14:
+			opcode = Mips_XORi;
+			break;
+		case 25:
+			if (mode == CS_MODE_MIPS64)
+				opcode = Mips_DADDiu;
+			break;
+		case 35:
+			opcode = Mips_LW;
+			break;
+		case 43:
+			opcode = Mips_SW;
+			break;
+		case 55:
+			if (mode == CS_MODE_MIPS64)
+				opcode = Mips_LD;
+			break;
+		case 63:
+			if (mode == CS_MODE_MIPS64)
+				opcode = Mips_SD;
+			break;
+		}
+		if (opcode) {
+			MCInst_setOpcode(instr, opcode);
+			map_cs_id(instr, mips_insns, ARR_SIZE(mips_insns));
+			*size = 4;
+			return true;
+		}
+	}
+#endif
 	instr->MRI = (MCRegisterInfo *)info;
 	map_set_fill_detail_ops(instr, true);
 

@@ -158,6 +158,10 @@ if(capstone_enabled_architectures STREQUAL "X86")
     add_compile_definitions(CAPSTONE_X86_ONLY)
 endif()
 
+if(capstone_enabled_architectures STREQUAL "MIPS")
+    add_compile_definitions(CAPSTONE_MIPS_ONLY)
+endif()
+
 if(capstone_enabled_architectures STREQUAL "RISCV")
     add_compile_definitions(CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS)
 endif()
