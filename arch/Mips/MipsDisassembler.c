@@ -1979,6 +1979,7 @@ static DecodeStatus DecodeMem(MCInst *Inst, uint32_t Insn, uint64_t Address,
 	Base = getReg(Inst, Mips_GPR32RegClassID, Base);
 
 	if (MCInst_getOpcode(Inst) == Mips_SC ||
+	    MCInst_getOpcode(Inst) == Mips_SC64 ||
 	    MCInst_getOpcode(Inst) == Mips_SCD)
 		MCOperand_CreateReg0(Inst, (Reg));
 
@@ -2607,6 +2608,7 @@ static DecodeStatus DecodeSpecial3LlSc(MCInst *Inst, uint32_t Insn,
 	Base = getReg(Inst, Mips_GPR32RegClassID, Base);
 
 	if (MCInst_getOpcode(Inst) == Mips_SC_R6 ||
+	    MCInst_getOpcode(Inst) == Mips_SC64_R6 ||
 	    MCInst_getOpcode(Inst) == Mips_SCD_R6) {
 		MCOperand_CreateReg0(Inst, (Rt));
 	}
