@@ -458,6 +458,56 @@ struct reader_case {
 	int64_t value;
 };
 
+#ifndef CAPSTONE_X86_REDUCE
+/* XBEGIN sign-extends its encoded relative immediate and keeps the full
+ * fallback EIP/RIP. The address-size override does not change that width. */
+static bool check_xbegin_target(csh handle, cs_mode mode)
+{
+	const uint64_t ip = UINT64_C(0x123450000);
+	for (unsigned prefix = 0; prefix < 4; ++prefix) {
+		uint8_t bytes[8];
+		unsigned n = 0;
+		if (prefix & 1)
+			bytes[n++] = 0x66;
+		if (prefix & 2)
+			bytes[n++] = 0x67;
+		bytes[n++] = 0xc7;
+		bytes[n++] = 0xf8;
+		const unsigned width =
+			((mode == CS_MODE_16) != ((prefix & 1) != 0)) ? 2 : 4;
+		const unsigned offset = n;
+		bytes[n++] = 0;
+		bytes[n++] = 0x80;
+		if (width == 4) {
+			bytes[n++] = 0x34;
+			bytes[n++] = 0x12;
+		}
+		const int64_t delta = width == 2 ? -INT64_C(0x8000) :
+						   INT64_C(0x12348000);
+		const uint64_t target =
+			(ip + n + (uint64_t)delta) &
+			(mode == CS_MODE_64 ? UINT64_MAX : UINT32_MAX);
+		cs_insn *insn = NULL;
+		size_t count = cs_disasm(handle, bytes, n, ip, 1, &insn);
+		bool ok = count == 1 && insn->id == X86_INS_XBEGIN &&
+			  insn->size == n &&
+			  insn->detail->x86.encoding.imm_offset == offset &&
+			  insn->detail->x86.encoding.imm_size == width &&
+			  insn->detail->x86.op_count == 1 &&
+			  insn->detail->x86.operands[0].type == X86_OP_IMM &&
+			  (uint64_t)insn->detail->x86.operands[0].imm == target;
+		cs_free(insn, count);
+		if (!ok) {
+			fprintf(stderr,
+				"incorrect XBEGIN target for mode %u, prefix combination %u\n",
+				(unsigned)mode, prefix);
+			return false;
+		}
+	}
+	return true;
+}
+#endif
+
 static bool check_far_pointer_encoding(csh handle, cs_mode mode, bool detail)
 {
 	static const struct {
@@ -1561,6 +1611,10 @@ int main(void)
 					ok &= check_reader_bounds(
 						handle, modes[m],
 						detail && text);
+#ifndef CAPSTONE_X86_REDUCE
+					if (detail && text)
+						ok &= check_xbegin_target(handle, modes[m]);
+#endif
 					ok &= check_far_pointer_encoding(
 						handle, modes[m], detail);
 					ok &= check_lock(handle, modes[m]);

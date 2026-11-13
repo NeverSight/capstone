@@ -314,8 +314,16 @@ X86_TRANSLATE_INLINE void translateImmediate(MCInst *mcInst, uint64_t immediate,
 
 	type = (OperandType)operand->type;
 	if (type == TYPE_REL) {
-		immediate = translateRelativeImmediate(immediate, operand,
-						       insn->displacementSize);
+		uint8_t width = insn->displacementSize;
+#ifndef CAPSTONE_X86_REDUCE
+		/* XBEGIN adds a signed rel16/rel32 to the full EIP/RIP. Its
+         * encoded offset is independent of the address-size override. */
+		if (insn->instructionID == X86_XBEGIN_2 ||
+		    insn->instructionID == X86_XBEGIN_4)
+			width = insn->immediateSize;
+#endif
+		immediate =
+			translateRelativeImmediate(immediate, operand, width);
 	} // By default sign-extend all X86 immediates based on their encoding.
 	else if (type == TYPE_IMM) {
 		switch (operand->encoding) {
