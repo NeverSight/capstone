@@ -117,6 +117,8 @@ LIBNAME = capstone
 
 ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
 CFLAGS += -DCAPSTONE_X86_ONLY
+else ifeq ($(sort $(CAPSTONE_ARCHS)),mips x86)
+CFLAGS += -DCAPSTONE_X86_MIPS_ONLY
 endif
 
 ifeq ($(sort $(CAPSTONE_ARCHS)),arm)
@@ -661,8 +663,9 @@ else
 	@echo "Skipping tests on whole corpus"
 endif
 
-# Match the Release x86-only formatter tuning for the compiler's target.
-ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
+# Match the Release x86 formatter tuning for the compiler's target.
+ifneq (,$(filter x86,$(CAPSTONE_ARCHS)))
+ifeq (,$(filter-out mips x86,$(CAPSTONE_ARCHS)))
 ifneq (,$(filter -O2 -O3,$(CFLAGS)))
 X86_OUTPUT_STORE_FLAG := $(shell $(CC) $(CFLAGS) -dM -E -x c - < /dev/null 2>/dev/null | \
     awk '$$2 == "__linux__" { linux_target=1 } $$2 == "__x86_64__" { x64=1 } \
@@ -670,6 +673,7 @@ X86_OUTPUT_STORE_FLAG := $(shell $(CC) $(CFLAGS) -dM -E -x c - < /dev/null 2>/de
          $$2 == "__SIZEOF_POINTER__" { ptr=$$3 } \
          END { if (linux_target && x64 && gcc && !clang_cc && ptr==8) print "-mstringop-strategy=libcall" }')
 $(OBJDIR)/arch/X86/X86ImmediateOutput.o $(OBJDIR)/arch/X86/X86MemoryOutput.o $(OBJDIR)/arch/X86/X86OutputIterator.o $(OBJDIR)/arch/X86/X86VectorOutput.o: CFLAGS += $(X86_OUTPUT_STORE_FLAG)
+endif
 endif
 endif
 

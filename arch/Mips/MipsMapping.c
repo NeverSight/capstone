@@ -22,9 +22,10 @@
 #include "MipsLinkage.h"
 #include "MipsDisassembler.h"
 
-#if defined(CAPSTONE_MIPS_ONLY) && defined(__linux__) && defined(__aarch64__) && \
-    defined(__GNUC__)
-#define MIPS_DEDICATED_MAPPING
+#if defined(__linux__) && defined(__GNUC__) && \
+    ((defined(CAPSTONE_MIPS_ONLY) && defined(__aarch64__)) || \
+     (defined(CAPSTONE_X86_MIPS_ONLY) && defined(__x86_64__) && !defined(__clang__)))
+#define MIPS_DIRECT_MAPPING
 #endif
 
 #define GET_SUBTARGETINFO_ENUM
@@ -252,7 +253,7 @@ void Mips_set_instr_map_data(MCInst *MI)
 #endif
 		return;
 	}
-#ifdef MIPS_DEDICATED_MAPPING
+#ifdef MIPS_DIRECT_MAPPING
 	/* Implicit effects below use this same dense generated opcode index. */
 	MI->flat_insn->id = mips_insns[MCInst_getOpcode(MI)].mapid;
 	if (!MI->flat_insn->detail)
@@ -269,7 +270,7 @@ void Mips_set_instr_map_data(MCInst *MI)
 		}
 	}
 
-#ifndef MIPS_DEDICATED_MAPPING
+#ifndef MIPS_DIRECT_MAPPING
 	map_cs_id(MI, mips_insns, ARR_SIZE(mips_insns));
 #endif
 	map_implicit_reads(MI, mips_insns);
@@ -301,9 +302,8 @@ bool Mips_getInstruction(csh handle, const uint8_t *code, size_t code_len,
 {
 	uint64_t size64;
 	Mips_init_cs_detail(instr);
-/* The dedicated scan shortens the ordinary table walk on Linux AArch64
- * hosts without adding work to the time-critical formatted path on x64. */
-#ifdef MIPS_DEDICATED_MAPPING
+/* These standard encodings have no extra operands to validate in a scan. */
+#ifdef MIPS_DIRECT_MAPPING
 	const cs_mode mode = instr->csh->mode & ~CS_MODE_BIG_ENDIAN;
 	if (code_len >= 4 && instr->csh->no_text && !instr->flat_insn->detail &&
 	    instr->csh->disasm == Mips_getInstruction &&
