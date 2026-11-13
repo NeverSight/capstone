@@ -52310,7 +52310,7 @@
 {
 	X86_VMOVDQA32Z128rr_REV, X86_INS_VMOVDQA32, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -52324,7 +52324,7 @@
 {
 	X86_VMOVDQA32Z128rrk_REV, X86_INS_VMOVDQA32, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -52338,7 +52338,7 @@
 {
 	X86_VMOVDQA32Z128rrkz_REV, X86_INS_VMOVDQA32, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -52387,7 +52387,7 @@
 {
 	X86_VMOVDQA32Z256rr_REV, X86_INS_VMOVDQA32, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -52401,7 +52401,7 @@
 {
 	X86_VMOVDQA32Z256rrk_REV, X86_INS_VMOVDQA32, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -52415,7 +52415,7 @@
 {
 	X86_VMOVDQA32Z256rrkz_REV, X86_INS_VMOVDQA32, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -52464,7 +52464,7 @@
 {
 	X86_VMOVDQA32Zrr_REV, X86_INS_VMOVDQA32, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
 #endif
 },
 
@@ -52478,7 +52478,7 @@
 {
 	X86_VMOVDQA32Zrrk_REV, X86_INS_VMOVDQA32, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
 #endif
 },
 
@@ -52492,7 +52492,7 @@
 {
 	X86_VMOVDQA32Zrrkz_REV, X86_INS_VMOVDQA32, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
 #endif
 },
 
@@ -52541,7 +52541,7 @@
 {
 	X86_VMOVDQA64Z128rr_REV, X86_INS_VMOVDQA64, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -52555,7 +52555,7 @@
 {
 	X86_VMOVDQA64Z128rrk_REV, X86_INS_VMOVDQA64, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -52569,7 +52569,7 @@
 {
 	X86_VMOVDQA64Z128rrkz_REV, X86_INS_VMOVDQA64, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -52618,7 +52618,7 @@
 {
 	X86_VMOVDQA64Z256rr_REV, X86_INS_VMOVDQA64, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -52632,7 +52632,7 @@
 {
 	X86_VMOVDQA64Z256rrk_REV, X86_INS_VMOVDQA64, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -52646,7 +52646,7 @@
 {
 	X86_VMOVDQA64Z256rrkz_REV, X86_INS_VMOVDQA64, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -52695,7 +52695,7 @@
 {
 	X86_VMOVDQA64Zrr_REV, X86_INS_VMOVDQA64, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
 #endif
 },
 
@@ -52709,7 +52709,7 @@
 {
 	X86_VMOVDQA64Zrrk_REV, X86_INS_VMOVDQA64, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
 #endif
 },
 
@@ -52723,7 +52723,7 @@
 {
 	X86_VMOVDQA64Zrrkz_REV, X86_INS_VMOVDQA64, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
 #endif
 },
 
@@ -52828,7 +52828,7 @@
 {
 	X86_VMOVDQU16Z128rr_REV, X86_INS_VMOVDQU16, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_BWI, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -52842,7 +52842,7 @@
 {
 	X86_VMOVDQU16Z128rrk_REV, X86_INS_VMOVDQU16, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_BWI, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -52856,7 +52856,7 @@
 {
 	X86_VMOVDQU16Z128rrkz_REV, X86_INS_VMOVDQU16, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_BWI, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -52905,7 +52905,7 @@
 {
 	X86_VMOVDQU16Z256rr_REV, X86_INS_VMOVDQU16, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_BWI, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -52919,7 +52919,7 @@
 {
 	X86_VMOVDQU16Z256rrk_REV, X86_INS_VMOVDQU16, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_BWI, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -52933,7 +52933,7 @@
 {
 	X86_VMOVDQU16Z256rrkz_REV, X86_INS_VMOVDQU16, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_BWI, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -52982,7 +52982,7 @@
 {
 	X86_VMOVDQU16Zrr_REV, X86_INS_VMOVDQU16, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_BWI, 0 }, 0, 0
 #endif
 },
 
@@ -52996,7 +52996,7 @@
 {
 	X86_VMOVDQU16Zrrk_REV, X86_INS_VMOVDQU16, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_BWI, 0 }, 0, 0
 #endif
 },
 
@@ -53010,7 +53010,7 @@
 {
 	X86_VMOVDQU16Zrrkz_REV, X86_INS_VMOVDQU16, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_BWI, 0 }, 0, 0
 #endif
 },
 
@@ -53059,7 +53059,7 @@
 {
 	X86_VMOVDQU32Z128rr_REV, X86_INS_VMOVDQU32, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -53073,7 +53073,7 @@
 {
 	X86_VMOVDQU32Z128rrk_REV, X86_INS_VMOVDQU32, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -53087,7 +53087,7 @@
 {
 	X86_VMOVDQU32Z128rrkz_REV, X86_INS_VMOVDQU32, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -53136,7 +53136,7 @@
 {
 	X86_VMOVDQU32Z256rr_REV, X86_INS_VMOVDQU32, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -53150,7 +53150,7 @@
 {
 	X86_VMOVDQU32Z256rrk_REV, X86_INS_VMOVDQU32, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -53164,7 +53164,7 @@
 {
 	X86_VMOVDQU32Z256rrkz_REV, X86_INS_VMOVDQU32, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -53213,7 +53213,7 @@
 {
 	X86_VMOVDQU32Zrr_REV, X86_INS_VMOVDQU32, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
 #endif
 },
 
@@ -53227,7 +53227,7 @@
 {
 	X86_VMOVDQU32Zrrk_REV, X86_INS_VMOVDQU32, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
 #endif
 },
 
@@ -53241,7 +53241,7 @@
 {
 	X86_VMOVDQU32Zrrkz_REV, X86_INS_VMOVDQU32, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
 #endif
 },
 
@@ -53290,7 +53290,7 @@
 {
 	X86_VMOVDQU64Z128rr_REV, X86_INS_VMOVDQU64, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -53304,7 +53304,7 @@
 {
 	X86_VMOVDQU64Z128rrk_REV, X86_INS_VMOVDQU64, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -53318,7 +53318,7 @@
 {
 	X86_VMOVDQU64Z128rrkz_REV, X86_INS_VMOVDQU64, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -53367,7 +53367,7 @@
 {
 	X86_VMOVDQU64Z256rr_REV, X86_INS_VMOVDQU64, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -53381,7 +53381,7 @@
 {
 	X86_VMOVDQU64Z256rrk_REV, X86_INS_VMOVDQU64, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -53395,7 +53395,7 @@
 {
 	X86_VMOVDQU64Z256rrkz_REV, X86_INS_VMOVDQU64, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -53444,7 +53444,7 @@
 {
 	X86_VMOVDQU64Zrr_REV, X86_INS_VMOVDQU64, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
 #endif
 },
 
@@ -53458,7 +53458,7 @@
 {
 	X86_VMOVDQU64Zrrk_REV, X86_INS_VMOVDQU64, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
 #endif
 },
 
@@ -53472,7 +53472,7 @@
 {
 	X86_VMOVDQU64Zrrkz_REV, X86_INS_VMOVDQU64, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
 #endif
 },
 
@@ -53521,7 +53521,7 @@
 {
 	X86_VMOVDQU8Z128rr_REV, X86_INS_VMOVDQU8, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_BWI, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -53535,7 +53535,7 @@
 {
 	X86_VMOVDQU8Z128rrk_REV, X86_INS_VMOVDQU8, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_BWI, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -53549,7 +53549,7 @@
 {
 	X86_VMOVDQU8Z128rrkz_REV, X86_INS_VMOVDQU8, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_BWI, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -53598,7 +53598,7 @@
 {
 	X86_VMOVDQU8Z256rr_REV, X86_INS_VMOVDQU8, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_BWI, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -53612,7 +53612,7 @@
 {
 	X86_VMOVDQU8Z256rrk_REV, X86_INS_VMOVDQU8, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_BWI, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -53626,7 +53626,7 @@
 {
 	X86_VMOVDQU8Z256rrkz_REV, X86_INS_VMOVDQU8, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_BWI, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -53675,7 +53675,7 @@
 {
 	X86_VMOVDQU8Zrr_REV, X86_INS_VMOVDQU8, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_BWI, 0 }, 0, 0
 #endif
 },
 
@@ -53689,7 +53689,7 @@
 {
 	X86_VMOVDQU8Zrrk_REV, X86_INS_VMOVDQU8, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_BWI, 0 }, 0, 0
 #endif
 },
 
@@ -53703,7 +53703,7 @@
 {
 	X86_VMOVDQU8Zrrkz_REV, X86_INS_VMOVDQU8, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_BWI, 0 }, 0, 0
 #endif
 },
 
