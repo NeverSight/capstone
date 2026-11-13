@@ -361,6 +361,47 @@ CheckedRow check_push_immediate(Decoder &d, unsigned op)
 	return row;
 }
 
+// Project the explicit memory operand out of the ordinary PUSH record. The
+// stack effects, operand size, access and encoding offsets belong to its row.
+CheckedRow check_push_memory(Decoder &d, unsigned cls,
+			     const RegisterTable &regs, bool wide)
+{
+	CheckedRow row;
+	const unsigned first = !cls ? 0 : cls == 1 ? 0x40 : 0x48;
+	for (unsigned rex = first; rex <= first + (cls ? 7 : 0); ++rex) {
+		for (unsigned rm = 0; rm < 8; ++rm) {
+			if (rm == 4 || rm == 5)
+				continue;
+			uint8_t modrm = uint8_t(0x30 | rm);
+			decode_pair(d, rex, 0xff, modrm);
+			cs_insn projected = *d.insn;
+			cs_detail detail = *projected.detail;
+			projected.detail = &detail;
+			auto &op = detail.x86.operands[0];
+			const auto &base =
+				regs[wide ? 3 : 2][((rex & 1) << 3) | rm];
+			if (projected.id != X86_INS_PUSH ||
+			    detail.x86.op_count != 1 || op.type != X86_OP_MEM ||
+			    op.mem.base != (x86_reg)base.reg ||
+			    std::string(wide ? "qword ptr [" : "dword ptr [") +
+					    base.name + "]" !=
+				    projected.op_str)
+				throw std::runtime_error(
+					"unexpected push address or operand size");
+			projected.op_str[0] = 0;
+			auto access = op.access;
+			auto size = op.size;
+			op = {};
+			op.type = X86_OP_REG;
+			op.access = access;
+			op.size = size;
+			row.observe(describe(projected, 0xff, uint8_t(rex),
+					     modrm, nullptr, nullptr));
+		}
+	}
+	return row;
+}
+
 CheckedRow check_lea(Decoder &d, unsigned cls, const RegisterTable &regs,
 		     bool wide)
 {
@@ -443,6 +484,48 @@ CheckedRow check_relative(Decoder &d, bool wide, unsigned cls, unsigned op)
 	return row;
 }
 
+// The low and extended register records are adjacent. Redundant REX.WRX bits
+// still appear in the public prefix and leave the stack operand unchanged.
+void add_rex_stack(Decoder &decoder, const RegisterTable &regs,
+		   PlanTable &plans, std::vector<std::string> &rows,
+		   unsigned &checked, unsigned &admitted)
+{
+	for (unsigned opcode = 0x50; opcode <= 0x5f; ++opcode) {
+		CheckedRow by_base[2];
+		for (unsigned rex = 0x40; rex < 0x50; ++rex) {
+			const uint8_t bytes[] = { uint8_t(rex),
+						  uint8_t(opcode) };
+			decoder.decode(bytes, sizeof(bytes), sizeof(bytes),
+				       UINT64_MAX - 1);
+			const auto &insn = *decoder.insn;
+			const auto &x = insn.detail->x86;
+			const auto &reg =
+				regs[3][((rex & 1) << 3) | (opcode & 7)];
+			if (insn.id != (opcode < 0x58 ? X86_INS_PUSH :
+							X86_INS_POP) ||
+			    strcmp(insn.op_str, reg.name) || x.op_count != 1 ||
+			    x.operands[0].type != X86_OP_REG ||
+			    x.operands[0].reg != reg.reg)
+				throw std::runtime_error(
+					"unexpected REX stack operand");
+			by_base[rex & 1].observe(describe(insn, uint8_t(opcode),
+							  uint8_t(rex), 0,
+							  nullptr, nullptr));
+		}
+		if (rows.size() + 1 >= (X86_PLAN_PUSH_IMMEDIATE >> 2))
+			throw std::runtime_error(
+				"too many fixed output records");
+		const uint16_t plan =
+			uint16_t((rows.size() << 2) | X86_SIMPLE_FIXED);
+		plans[1][1][opcode] = plans[1][2][opcode] = plan;
+		for (const auto &entry : by_base) {
+			rows.push_back(entry.fields);
+			checked += entry.encodings;
+		}
+		admitted += 2;
+	}
+}
+
 void emit_tables(const PlanTable &plans, const RegisterTable &regs,
 		 const std::vector<std::string> &rows)
 {
@@ -504,6 +587,10 @@ int main()
 					form = X86_SIMPLE_RELATIVE;
 					row = check_relative(decoder, wide, cls,
 							     op);
+				} else if (cls != 3 && op == 0xff) {
+					form = X86_SIMPLE_RM_REG;
+					row = check_push_memory(decoder, cls,
+								regs, wide);
 				} else if (cls != 3 && op == 0x8d) {
 					form = X86_SIMPLE_REG_RM;
 					row = check_lea(decoder, cls, regs,
@@ -530,6 +617,8 @@ int main()
 	}
 	// Reserve unprefixed EVEX for its own verified vector output records.
 	plans[0][0][0x66] = plans[1][0][0x66] = X86_PLAN_VECTOR;
+	plans[0][3][0x1f] = plans[1][3][0x1f] = X86_PLAN_VECTOR;
+	plans[0][0][0xf3] = plans[1][0][0xf3] = X86_PLAN_VECTOR;
 	plans[1][0][0x62] = X86_PLAN_VECTOR;
 	plans[1][0][0xc4] = X86_PLAN_VECTOR;
 	plans[1][0][0xc5] = X86_PLAN_VECTOR;
@@ -540,7 +629,8 @@ int main()
 					throw std::runtime_error(
 						"missing group-1 register row");
 			}
-			plans[wide][cls][0x83] = X86_PLAN_GROUP1_IMM8;
+			plans[wide][cls][0x81] = X86_PLAN_GROUP1_IMMEDIATE;
+			plans[wide][cls][0x83] = X86_PLAN_GROUP1_IMMEDIATE;
 		}
 	}
 	for (unsigned wide = 0; wide < 2; ++wide) {
@@ -590,6 +680,7 @@ int main()
 			plans[wide][0][op] = X86_PLAN_PUSH_IMMEDIATE;
 		}
 	}
+	add_rex_stack(x64, regs, plans, rows, checked, admitted);
 	emit_tables(plans, regs, rows);
 	std::cout << "\nstatic const uint16_t x86_shift_rows[2][3][8] = {\n";
 	for (const auto &mode : shifts) {

@@ -46,7 +46,7 @@ enum X86SimpleForm {
 
 /* This plan gets its ALU row from ModR/M.reg. Its low bits select the
  * same register-only operand check as a register pair. */
-#define X86_PLAN_GROUP1_IMM8 ((UINT16_MAX & ~3u) | X86_SIMPLE_REG_RM)
+#define X86_PLAN_GROUP1_IMMEDIATE ((UINT16_MAX & ~3u) | X86_SIMPLE_REG_RM)
 
 /* The vector escape uses the next reserved plan and has no register-pair ModR/M. */
 #define X86_PLAN_PUSH_IMMEDIATE ((UINT16_MAX & ~7u) | X86_SIMPLE_FIXED)
@@ -87,6 +87,30 @@ static inline char *X86_writeDisp8(char *out, int displacement)
 		}
 	}
 	return out;
+}
+
+static inline int32_t X86_readDisp32(const uint8_t *p)
+{
+	return (int32_t)((uint32_t)p[0] | (uint32_t)p[1] << 8 |
+			 (uint32_t)p[2] << 16 | (uint32_t)p[3] << 24);
+}
+
+static inline char *X86_writeDisplacement(char *out, int32_t displacement)
+{
+	if (displacement >= -128 && displacement <= 127)
+		return X86_writeDisp8(out, displacement);
+	memcpy(out, displacement < 0 ? " - 0x" : " + 0x", 5);
+	out += 5;
+	uint32_t magnitude = displacement < 0 ? 0u - (uint32_t)displacement :
+						(uint32_t)displacement;
+	char digits[8], *start = digits + sizeof(digits);
+	do {
+		*--start = "0123456789abcdef"[magnitude & 15];
+		magnitude >>= 4;
+	} while (magnitude);
+	const size_t length = (size_t)(digits + sizeof(digits) - start);
+	memcpy(out, start, length);
+	return out + length;
 }
 
 static inline void X86_writeSimpleDetail(cs_detail *detail,

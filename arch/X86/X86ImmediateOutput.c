@@ -100,11 +100,20 @@ static void writeRegisterImmediate(cs_insn *insn,
 				   const struct X86SimpleOutput *row,
 				   const struct X86SimpleRegister *reg,
 				   const uint8_t *code, uint8_t rex,
-				   uint8_t modrm, bool shift,
+				   uint8_t modrm, uint8_t opcode,
 				   uint16_t *insn_size)
 {
 	const unsigned offset = 2 + (rex != 0);
-	const int immediate = shift ? code[offset] : (int8_t)code[offset];
+	const bool shift = opcode == 0xc1;
+	const bool imm32 = opcode == 0x81;
+	const unsigned imm_size = imm32 ? 4 : 1;
+	int64_t immediate;
+	if (imm32) {
+		uint32_t raw = (uint32_t)X86_readDisp32(code + offset);
+		immediate = (rex & 8) ? (int64_t)(int32_t)raw : (int64_t)raw;
+	} else {
+		immediate = shift ? code[offset] : (int8_t)code[offset];
+	}
 	const unsigned group = (modrm >> 3) & 7;
 	const bool logical = !shift && (group == 1 || group == 4 || group == 6);
 	const bool wide = (rex & 8) != 0;
@@ -114,7 +123,7 @@ static void writeRegisterImmediate(cs_insn *insn,
 				  (uint32_t)immediate) :
 			  (uint64_t)(negative ? -immediate : immediate);
 	insn->id = row->id;
-	*insn_size = insn->size = (uint16_t)(offset + 1);
+	*insn_size = insn->size = (uint16_t)(offset + imm_size);
 	memcpy(insn->bytes, code, insn->size);
 	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
 	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
@@ -127,8 +136,8 @@ static void writeRegisterImmediate(cs_insn *insn,
 		*out++ = '-';
 	writeUnsignedImmediate(out, value);
 	if (insn->detail) {
-		X86_writeSimpleDetail(insn->detail, row, shift ? 0xc1 : 0x83,
-				      rex, modrm, reg->reg, 0);
+		X86_writeSimpleDetail(insn->detail, row, opcode, rex, modrm,
+				      reg->reg, 0);
 		cs_x86 *x = &insn->detail->x86;
 		x->operands[1].type = X86_OP_IMM;
 		x->operands[1].imm = logical && !wide ?
@@ -137,7 +146,7 @@ static void writeRegisterImmediate(cs_insn *insn,
 		if (!shift)
 			x->operands[1].access = 0;
 		x->encoding.imm_offset = (uint8_t)offset;
-		x->encoding.imm_size = 1;
+		x->encoding.imm_size = (uint8_t)imm_size;
 	}
 }
 
@@ -154,8 +163,7 @@ void X86_writeImmediateOutput(const uint8_t *code, cs_insn *insn,
 		writeMovRegImm32(insn, row, reg, code, rex, insn_size);
 	else
 		writeRegisterImmediate(insn, row, reg, code, rex,
-				       code[1 + (rex != 0)], opcode == 0xc1,
-				       insn_size);
+				       code[1 + (rex != 0)], opcode, insn_size);
 }
 #endif
 #endif

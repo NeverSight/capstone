@@ -834,14 +834,10 @@ void ARM_check_updates_flags(MCInst *MI)
 
 void ARM_set_instr_map_data(MCInst *MI)
 {
-#ifdef CAPSTONE_ARM_DEDICATED_MAPPING
 	/* The ARM decoder indexes this same generated map for implicit effects. */
 	MI->flat_insn->id = arm_insns[MCInst_getOpcode(MI)].mapid;
 	if (!MI->flat_insn->detail)
 		return;
-#else
-	map_cs_id(MI, arm_insns, ARR_SIZE(arm_insns));
-#endif
 	map_implicit_reads(MI, arm_insns);
 	map_implicit_writes(MI, arm_insns);
 	ARM_check_updates_flags(MI);

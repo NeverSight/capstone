@@ -49,10 +49,18 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
 			return false;
 		modrm = code[1 + has_rex];
 		if (modrm < 0xc0) {
-			if ((opcode & 0xfc) != 0x88 && opcode != 0x8d)
+			/* The generated ALU, TEST and MOV register rows also
+             * describe their memory forms. XCHG and immediates
+             * require different memory records. */
+			const bool alu = opcode < 0x40;
+			const bool test_or_mov = (opcode & 0xfe) == 0x84 ||
+						 (opcode & 0xfc) == 0x88;
+			const bool push = opcode == 0xff &&
+					  (modrm & 0x38) == 0x30;
+			if (!alu && !test_or_mov && opcode != 0x8d && !push)
 				return false;
 			base_memory = true;
-		} else if (opcode == 0x8d) {
+		} else if (opcode == 0x8d || opcode == 0xff) {
 			return false;
 		}
 	}
@@ -87,7 +95,7 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
 			reg = &x86_simple_registers[2][((rex & 1) << 3) |
 						       (opcode & 7)];
 		} else {
-			if (size < 3u + has_rex)
+			if (size < (opcode == 0x81 ? 6u : 3u) + has_rex)
 				return false;
 			const unsigned group = (modrm >> 3) & 7;
 			row = plan == X86_PLAN_SHIFT_IMM8 ?
@@ -118,8 +126,14 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
 	memset(insn->op_str, 0, sizeof(insn->op_str));
 	insn->bytes[0] = code[0];
 	if (form == X86_SIMPLE_FIXED) {
+		if (has_rex) {
+			// REX-prefixed fixed rows describe low and extended stack registers.
+			row += rex & 1;
+			first = row->ops[0].reg;
+			insn->bytes[1] = opcode;
+		}
 		memcpy(insn->op_str, row->operands, sizeof(row->operands));
-		*insn_size = insn->size = 1;
+		*insn_size = insn->size = (uint16_t)(1 + has_rex);
 	} else if (relative) {
 		const uint8_t *bytes = code + row->imm_offset;
 		int64_t delta;
