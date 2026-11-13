@@ -42,15 +42,27 @@ const insn_map systemz_insns[] = {
 void SystemZ_set_instr_map_data(MCInst *MI, const uint8_t *Bytes,
 				size_t BytesLen)
 {
+#ifdef CAPSTONE_SYSTEMZ_DEDICATED_MAPPING
+	/* The generated opcode row also owns the implicit effects and format. */
+	const insn_map *row = &systemz_insns[MCInst_getOpcode(MI)];
+	MI->flat_insn->id = row->mapid;
+	if (!MI->flat_insn->detail)
+		return;
+#else
 	map_cs_id(MI, systemz_insns, ARR_SIZE(systemz_insns));
+#endif
 	map_implicit_reads(MI, systemz_insns);
 	map_implicit_writes(MI, systemz_insns);
 	map_groups(MI, systemz_insns);
+#if defined(CAPSTONE_SYSTEMZ_DEDICATED_MAPPING) && !defined(CAPSTONE_DIET)
+	SystemZ_get_detail(MI)->format = row->suppl_info.systemz.form;
+#else
 	const systemz_suppl_info *suppl_info =
 		map_get_suppl_info(MI, systemz_insns);
 	if (suppl_info) {
 		SystemZ_get_detail(MI)->format = suppl_info->form;
 	}
+#endif
 }
 
 void SystemZ_init_mri(MCRegisterInfo *MRI)
