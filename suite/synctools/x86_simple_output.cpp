@@ -410,9 +410,31 @@ int main()
 			}
 		}
 	}
-	for (unsigned wide = 0; wide < 2; ++wide)
-		for (unsigned cls = 0; cls < (wide ? 3u : 1u); ++cls)
+	// Reserve unprefixed EVEX for its own verified vector output records.
+	plans[1][0][0x62] = X86_PLAN_VECTOR;
+	plans[1][0][0xc4] = X86_PLAN_VECTOR;
+	plans[1][0][0xc5] = X86_PLAN_VECTOR;
+	for (unsigned wide = 0; wide < 2; ++wide) {
+		for (unsigned cls = 0; cls < (wide ? 3u : 1u); ++cls) {
+			for (unsigned alu = 1; alu < 0x40; alu += 8) {
+				if (!plans[wide][cls][alu])
+					throw std::runtime_error(
+						"missing group-1 register row");
+			}
 			plans[wide][cls][0x83] = X86_PLAN_GROUP1_IMM8;
+		}
+	}
+	for (unsigned wide = 0; wide < 2; ++wide) {
+		// B8+rd with no REX.W uses an unsigned immediate and a 32-bit destination.
+		for (unsigned cls = 0; cls <= wide; ++cls) {
+			if (!plans[wide][cls][0x8b])
+				throw std::runtime_error(
+					"missing 32-bit register MOV row");
+			for (unsigned opcode = 0xb8; opcode <= 0xbf; ++opcode)
+				plans[wide][cls][opcode] =
+					X86_PLAN_MOV_REG_IMM32;
+		}
+	}
 	emit_tables(plans, regs, rows);
 	std::cerr << "records=" << rows.size() - 1 << " plans=" << admitted
 		  << " encodings_checked=" << checked << " table_bytes="

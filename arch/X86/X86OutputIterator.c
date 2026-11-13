@@ -17,15 +17,15 @@
 #include "X86SimpleOutput.h"
 #include "X86GenSimpleOutput.inc"
 
-/* The admitted MOV forms share the register/register row's access and widths.
- * The ModR/M byte selects an integer base without SIB, RIP or a disp32. */
+/* The admitted MOV forms have a single integer base and at most a disp8. */
 static void X86_writeBaseMov(cs_insn *insn, const struct X86SimpleOutput *row,
 			     const uint8_t *code, uint8_t opcode, uint8_t rex,
 			     uint8_t modrm, bool load, bool wide,
 			     uint16_t *insn_size)
 {
 	const bool has_disp = (modrm >> 6) == 1;
-	const unsigned offset = 2 + (rex != 0);
+	const bool has_sib = (modrm & 7) == 4;
+	const unsigned offset = 2 + (rex != 0) + has_sib;
 	const int displacement = has_disp ? (int8_t)code[offset] : 0;
 	const unsigned reg_width = (opcode & 1) ? ((rex & 8) ? 3 : 2) :
 						  rex != 0;
@@ -54,22 +54,7 @@ static void X86_writeBaseMov(cs_insn *insn, const struct X86SimpleOutput *row,
 	}
 	memcpy(out, base->name, sizeof(base->name));
 	out += base->length;
-	if (displacement) {
-		const unsigned magnitude = displacement < 0 ? -displacement :
-							      displacement;
-		memcpy(out, displacement < 0 ? " - " : " + ", 3);
-		out += 3;
-		if (magnitude <= HEX_THRESHOLD) {
-			*out++ = (char)('0' + magnitude);
-		} else {
-			static const char digits[] = "0123456789abcdef";
-			memcpy(out, "0x", 2);
-			out += 2;
-			if (magnitude >= 16)
-				*out++ = digits[magnitude >> 4];
-			*out++ = digits[magnitude & 15];
-		}
-	}
+	out = X86_writeDisp8(out, displacement);
 	*out++ = ']';
 	if (!load) {
 		memcpy(out, ", ", 2);
@@ -81,6 +66,11 @@ static void X86_writeBaseMov(cs_insn *insn, const struct X86SimpleOutput *row,
 		X86_writeSimpleDetail(insn->detail, row, opcode, rex, modrm,
 				      load ? reg->reg : 0, load ? 0 : reg->reg);
 		cs_x86 *x = &insn->detail->x86;
+		if (has_sib) {
+			x->sib = code[offset - 1];
+			x->sib_base = (x86_reg)base->reg;
+			x->sib_scale = 1;
+		}
 		x->disp = displacement;
 		if (has_disp) {
 			x->encoding.disp_offset = (uint8_t)offset;
@@ -91,6 +81,57 @@ static void X86_writeBaseMov(cs_insn *insn, const struct X86SimpleOutput *row,
 		op->mem.base = (x86_reg)base->reg;
 		op->mem.scale = 1;
 		op->mem.disp = displacement;
+	}
+}
+
+static void writeUnsignedImmediate(char *out, uint64_t value)
+{
+	if (value <= HEX_THRESHOLD) {
+		*out = (char)('0' + value);
+	} else {
+		static const char digits[] = "0123456789abcdef";
+		char temp[16], *end = temp + sizeof(temp), *start = end;
+		uint64_t n = value;
+		do {
+			*--start = digits[n & 15];
+			n >>= 4;
+		} while (n);
+		memcpy(out, "0x", 2);
+		memcpy(out + 2, start, end - start);
+	}
+}
+
+static void writeMovRegImm32(cs_insn *insn, const struct X86SimpleOutput *row,
+			     const uint8_t *code, uint8_t opcode, uint8_t rex,
+			     uint16_t *insn_size)
+{
+	const unsigned offset = 1 + (rex != 0);
+	const uint8_t *raw = code + offset;
+	const uint32_t value = (uint32_t)raw[0] | ((uint32_t)raw[1] << 8) |
+			       ((uint32_t)raw[2] << 16) |
+			       ((uint32_t)raw[3] << 24);
+	const unsigned number = ((rex & 1) << 3) | (opcode & 7);
+	const struct X86SimpleRegister *reg = &x86_simple_registers[2][number];
+	insn->id = row->id;
+	*insn_size = insn->size = (uint16_t)(offset + 4);
+	memcpy(insn->bytes, code, insn->size);
+	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
+	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
+	memset(insn->op_str, 0, sizeof(insn->op_str));
+	memcpy(insn->op_str, reg->name, sizeof(reg->name));
+	char *out = insn->op_str + reg->length;
+	memcpy(out, ", ", 2);
+	writeUnsignedImmediate(out + 2, value);
+	if (insn->detail) {
+		X86_writeSimpleDetail(insn->detail, row, opcode, rex, 0,
+				      reg->reg, 0);
+		cs_x86 *x = &insn->detail->x86;
+		x->encoding.modrm_offset = 0;
+		x->encoding.imm_offset = (uint8_t)offset;
+		x->encoding.imm_size = 4;
+		x->operands[1].type = X86_OP_IMM;
+		x->operands[1].imm = value;
+		x->operands[1].access = 0;
 	}
 }
 
@@ -126,19 +167,7 @@ static void writeGroup1Immediate(cs_insn *insn,
 	out += 2;
 	if (negative)
 		*out++ = '-';
-	if (value <= HEX_THRESHOLD) {
-		*out = (char)('0' + value);
-	} else {
-		static const char digits[] = "0123456789abcdef";
-		char temp[16], *end = temp + sizeof(temp), *start = end;
-		uint64_t n = value;
-		do {
-			*--start = digits[n & 15];
-			n >>= 4;
-		} while (n);
-		memcpy(out, "0x", 2);
-		memcpy(out + 2, start, end - start);
-	}
+	writeUnsignedImmediate(out, value);
 	if (insn->detail) {
 		X86_writeSimpleDetail(insn->detail, row, 0x83, rex, modrm,
 				      reg->reg, 0);
@@ -186,9 +215,15 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
 		modrm = code[1 + has_rex];
 		if (modrm < 0xc0) {
 			unsigned rm = modrm & 7;
-			if ((opcode & 0xfc) != 0x88 || modrm >= 0x80 ||
-			    rm == 4 || (modrm < 0x40 && rm == 5) ||
-			    (modrm >= 0x40 && size < 3u + has_rex))
+			if ((opcode & 0xfc) != 0x88 || modrm >= 0x80)
+				return false;
+			/* ESP, RSP and R12 require a SIB. Redundant encodings with other
+			 * bases can expose EIZ or RIZ in the ordinary public output. */
+			if (rm == 4 && (size < 3u + has_rex || (rex & 2) ||
+					code[2 + has_rex] != 0x24))
+				return false;
+			if ((modrm < 0x40 && rm == 5) ||
+			    (modrm >= 0x40 && size < 3u + has_rex + (rm == 4)))
 				return false;
 			base_memory = true;
 		}
@@ -204,7 +239,20 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
 	    cs_vsnprintf != cs_default_vsnprintf)
 		return false;
 
-	if (plan == X86_PLAN_GROUP1_IMM8) {
+	if (plan >= X86_PLAN_MOV_REG_IMM32) {
+		if (plan == X86_PLAN_MOV_REG_IMM32) {
+			if (size < 5u + has_rex)
+				return false;
+			const unsigned pair =
+				x86_simple_plans[wide][prefix_class][0x8b];
+			writeMovRegImm32(insn, &x86_simple_outputs[pair >> 2],
+					 code, opcode, rex, insn_size);
+			return true;
+		}
+		if (plan == X86_PLAN_VECTOR)
+			return X86_writeVectorOutput(code, size, insn,
+						     insn_size,
+						     x86_simple_registers[3]);
 		if (size < 3u + has_rex)
 			return false;
 		unsigned reg_plan =

@@ -7,6 +7,7 @@
 #include <stddef.h>
 #include <string.h>
 #include <capstone/capstone.h>
+#include "../../utils.h"
 
 /* The generated records describe the same register operands and implicit
  * effects as the ordinary Intel printer. Only the public x86 prefix of the
@@ -46,6 +47,36 @@ enum X86SimpleForm {
 /* This plan gets its ALU row from ModR/M.reg. Its low bits select the
  * same register-only operand check as a register pair. */
 #define X86_PLAN_GROUP1_IMM8 ((UINT16_MAX & ~3u) | X86_SIMPLE_REG_RM)
+
+/* The vector escape uses the next reserved plan and has no register-pair ModR/M. */
+#define X86_PLAN_VECTOR UINT16_MAX
+#define X86_PLAN_MOV_REG_IMM32 ((UINT16_MAX & ~3u) | X86_SIMPLE_FIXED)
+
+CAPSTONE_INTERNAL bool
+X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
+		      uint16_t *insn_size,
+		      const struct X86SimpleRegister *regs);
+
+static inline char *X86_writeDisp8(char *out, int displacement)
+{
+	if (displacement) {
+		const unsigned magnitude = displacement < 0 ? -displacement :
+							      displacement;
+		memcpy(out, displacement < 0 ? " - " : " + ", 3);
+		out += 3;
+		if (magnitude <= HEX_THRESHOLD) {
+			*out++ = (char)('0' + magnitude);
+		} else {
+			static const char digits[] = "0123456789abcdef";
+			memcpy(out, "0x", 2);
+			out += 2;
+			if (magnitude >= 16)
+				*out++ = digits[magnitude >> 4];
+			*out++ = digits[magnitude & 15];
+		}
+	}
+	return out;
+}
 
 static inline void X86_writeSimpleDetail(cs_detail *detail,
 					 const struct X86SimpleOutput *row,

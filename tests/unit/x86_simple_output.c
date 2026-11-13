@@ -123,6 +123,72 @@ static bool check_memory(csh handles[2], cs_mode mode)
 	return true;
 }
 
+static bool check_mov_imm32(csh handles[2], cs_mode mode)
+{
+	static const uint32_t boundaries[] = {
+		0,    1,     9,	     10,	 15,	     16,	0x7f,
+		0x80, 0x100, 0xffff, 0x7fffffff, 0x80000000, 0xffffffff
+	};
+	for (unsigned p = 0; p <= (mode == CS_MODE_64 ? 16u : 0u); ++p) {
+		for (unsigned op = 0xb8; op <= 0xbf; ++op) {
+			for (unsigned sample = 0; sample < 1024; ++sample) {
+				uint32_t imm =
+					sample < sizeof(boundaries) /
+								sizeof(boundaries
+									       [0]) ?
+						boundaries[sample] :
+						sample * UINT32_C(2654435761);
+				uint8_t bytes[] = { (uint8_t)(0x3f + p),
+						    (uint8_t)op,
+						    (uint8_t)imm,
+						    (uint8_t)(imm >> 8),
+						    (uint8_t)(imm >> 16),
+						    (uint8_t)(imm >> 24),
+						    0x11,
+						    0x22,
+						    0x33,
+						    0x44 };
+				const uint8_t *code = bytes + !p;
+				size_t size = sizeof(bytes) - !p;
+				if (!compare(handles, code, size, sample) ||
+				    !compare(handles, code,
+					     (sample + op) % size, p))
+					return false;
+			}
+		}
+	}
+	return true;
+}
+
+static bool check_sib_base_mov(csh handles[2], cs_mode mode)
+{
+	for (unsigned p = 0; p <= (mode == CS_MODE_64 ? 16u : 0u); ++p)
+		for (unsigned opcode = 0x88; opcode <= 0x8b; ++opcode)
+			for (unsigned reg_mod = 0; reg_mod < 16; ++reg_mod)
+				for (unsigned sib = 0; sib < 256; ++sib) {
+					uint8_t bytes[] = {
+						(uint8_t)(0x3f + p),
+						(uint8_t)opcode,
+						(uint8_t)(((reg_mod & 8) << 3) |
+							  ((reg_mod & 7) << 3) |
+							  4),
+						(uint8_t)sib,
+						(uint8_t)(sib ^ reg_mod ^ p),
+						0xfe,
+						0xff,
+						0
+					};
+					const uint8_t *code = bytes + !p;
+					size_t len = sizeof(bytes) - !p;
+					if (!compare(handles, code, len, sib) ||
+					    !compare(handles, code,
+						     (reg_mod + sib + p) % len,
+						     opcode))
+						return false;
+				}
+	return true;
+}
+
 static bool check_group1(csh handles[2], cs_mode mode)
 {
 	uint8_t bytes[4];
@@ -138,6 +204,85 @@ static bool check_group1(csh handles[2], cs_mode mode)
 					return false;
 			}
 	}
+	return true;
+}
+
+static bool check_evex(csh handles[2])
+{
+	static const uint16_t forms[] = { 0x1ef, 0x2dc, 0x2dd, 0x2de, 0x2df,
+					  0x344, 0x325, 0x1fe, 0x200 };
+	static const uint8_t tails[] = { 0,    4,    0x45, 0x85,
+					 0xc0, 0xcb, 0xf7, 0xff };
+	for (unsigned i = 0; i < sizeof(forms) / sizeof(forms[0]); ++i)
+		for (unsigned reg = 0; reg < 32; ++reg)
+			for (unsigned wl = 0; wl < 8; ++wl)
+				for (unsigned j = 0; j < sizeof(tails); ++j) {
+					uint8_t bytes[12] = {
+						0x62,
+						(uint8_t)((reg << 4) |
+							  (forms[i] >> 8)),
+						(uint8_t)(((wl & 4) << 5) |
+							  ((reg & 15) << 3) |
+							  5),
+						(uint8_t)(((wl & 3) << 5) |
+							  ((reg >> 4) << 3)),
+						(uint8_t)forms[i],
+						tails[j],
+						5,
+						0x80,
+						0xff,
+						9,
+						0,
+						0x7f
+					};
+					for (size_t n = 5; n <= sizeof(bytes);
+					     ++n)
+						if (!compare(handles, bytes, n,
+							     reg ^ wl ^ j))
+							return false;
+				}
+	return true;
+}
+
+static bool check_vex_indexed(csh handles[2])
+{
+	for (unsigned fma = 0; fma < 2; ++fma)
+		for (unsigned p = 0; p < (fma ? 128u : 4u); ++p)
+			for (unsigned m = 0; m < 16; ++m)
+				for (unsigned sib = 0; sib < 256; ++sib) {
+					const unsigned rxb = p & 7;
+					uint8_t bytes[] = {
+						0xc4,
+						(uint8_t)((rxb << 5) | 2),
+						(uint8_t)(((p >> 3) << 3) |
+							  ((m & 1) << 2) | 1),
+						0xa8,
+						(uint8_t)(((m & 8) << 3) |
+							  ((m & 7) << 3) | 4),
+						(uint8_t)sib,
+						(uint8_t)(sib ^ p ^ m),
+						0x80,
+						1,
+						0xff,
+						0
+					};
+					if (!fma) {
+						bytes[1] = 0xc5;
+						bytes[2] = (uint8_t)(0x78 |
+								     ((p & 1)
+								      << 7) |
+								     ((p & 2)
+								      << 1));
+						bytes[3] = 0x28;
+					}
+					const uint8_t *start = bytes + !fma;
+					const size_t len = sizeof(bytes) - !fma;
+					if (!compare(handles, start, len,
+						     sib ^ p) ||
+					    !compare(handles, start,
+						     (sib + p + m) % len, m))
+						return false;
+				}
 	return true;
 }
 
@@ -157,7 +302,11 @@ static bool check_mode(cs_mode mode)
 				      detail ? CS_OPT_ON : CS_OPT_OFF))
 				goto done;
 		if (!check_branches(handles) || !check_memory(handles, mode) ||
-		    !check_group1(handles, mode))
+		    !check_group1(handles, mode) ||
+		    !check_mov_imm32(handles, mode) ||
+		    !check_sib_base_mov(handles, mode) ||
+		    (mode == CS_MODE_64 &&
+		     (!check_evex(handles) || !check_vex_indexed(handles))))
 			goto done;
 		for (unsigned op = 0; op < 256; ++op) {
 			uint8_t bytes[3] = { 0, (uint8_t)op, 0 };
