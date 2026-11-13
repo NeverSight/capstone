@@ -1682,6 +1682,12 @@ cs_insn *CAPSTONE_API cs_malloc(csh ud)
 		handle->errnum = CS_ERR_MEM;
 		return NULL;
 	} else {
+		/* Backends can leave alias metadata untouched. Start an iterator
+		 * record with the same status as a freshly allocated batch record. */
+		insn->alias_id = 0;
+		insn->is_alias = false;
+		insn->usesAliasDetails = false;
+		insn->illegal = false;
 		if (handle->detail_opt) {
 			// allocate memory for @detail pointer
 			insn->detail = cs_mem_malloc(sizeof(cs_detail));
