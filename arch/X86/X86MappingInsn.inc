@@ -51554,7 +51554,7 @@
 {
 	X86_VMOVAPDZ128rr_REV, X86_INS_VMOVAPD, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -51568,7 +51568,7 @@
 {
 	X86_VMOVAPDZ128rrk_REV, X86_INS_VMOVAPD, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -51582,7 +51582,7 @@
 {
 	X86_VMOVAPDZ128rrkz_REV, X86_INS_VMOVAPD, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -51631,7 +51631,7 @@
 {
 	X86_VMOVAPDZ256rr_REV, X86_INS_VMOVAPD, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -51645,7 +51645,7 @@
 {
 	X86_VMOVAPDZ256rrk_REV, X86_INS_VMOVAPD, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -51659,7 +51659,7 @@
 {
 	X86_VMOVAPDZ256rrkz_REV, X86_INS_VMOVAPD, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -51708,7 +51708,7 @@
 {
 	X86_VMOVAPDZrr_REV, X86_INS_VMOVAPD, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
 #endif
 },
 
@@ -51722,7 +51722,7 @@
 {
 	X86_VMOVAPDZrrk_REV, X86_INS_VMOVAPD, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
 #endif
 },
 
@@ -51736,7 +51736,7 @@
 {
 	X86_VMOVAPDZrrkz_REV, X86_INS_VMOVAPD, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
 #endif
 },
 
@@ -51841,7 +51841,7 @@
 {
 	X86_VMOVAPSZ128rr_REV, X86_INS_VMOVAPS, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -51855,7 +51855,7 @@
 {
 	X86_VMOVAPSZ128rrk_REV, X86_INS_VMOVAPS, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -51869,7 +51869,7 @@
 {
 	X86_VMOVAPSZ128rrkz_REV, X86_INS_VMOVAPS, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -51918,7 +51918,7 @@
 {
 	X86_VMOVAPSZ256rr_REV, X86_INS_VMOVAPS, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -51932,7 +51932,7 @@
 {
 	X86_VMOVAPSZ256rrk_REV, X86_INS_VMOVAPS, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -51946,7 +51946,7 @@
 {
 	X86_VMOVAPSZ256rrkz_REV, X86_INS_VMOVAPS, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -51995,7 +51995,7 @@
 {
 	X86_VMOVAPSZrr_REV, X86_INS_VMOVAPS, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
 #endif
 },
 
@@ -52009,7 +52009,7 @@
 {
 	X86_VMOVAPSZrrk_REV, X86_INS_VMOVAPS, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
 #endif
 },
 
@@ -52023,7 +52023,7 @@
 {
 	X86_VMOVAPSZrrkz_REV, X86_INS_VMOVAPS, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
 #endif
 },
 
@@ -54816,7 +54816,7 @@
 {
 	X86_VMOVUPDZ128rr_REV, X86_INS_VMOVUPD, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -54830,7 +54830,7 @@
 {
 	X86_VMOVUPDZ128rrk_REV, X86_INS_VMOVUPD, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -54844,7 +54844,7 @@
 {
 	X86_VMOVUPDZ128rrkz_REV, X86_INS_VMOVUPD, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -54893,7 +54893,7 @@
 {
 	X86_VMOVUPDZ256rr_REV, X86_INS_VMOVUPD, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -54907,7 +54907,7 @@
 {
 	X86_VMOVUPDZ256rrk_REV, X86_INS_VMOVUPD, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -54921,7 +54921,7 @@
 {
 	X86_VMOVUPDZ256rrkz_REV, X86_INS_VMOVUPD, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -54970,7 +54970,7 @@
 {
 	X86_VMOVUPDZrr_REV, X86_INS_VMOVUPD, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
 #endif
 },
 
@@ -54984,7 +54984,7 @@
 {
 	X86_VMOVUPDZrrk_REV, X86_INS_VMOVUPD, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
 #endif
 },
 
@@ -54998,7 +54998,7 @@
 {
 	X86_VMOVUPDZrrkz_REV, X86_INS_VMOVUPD, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
 #endif
 },
 
@@ -55103,7 +55103,7 @@
 {
 	X86_VMOVUPSZ128rr_REV, X86_INS_VMOVUPS, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -55117,7 +55117,7 @@
 {
 	X86_VMOVUPSZ128rrk_REV, X86_INS_VMOVUPS, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -55131,7 +55131,7 @@
 {
 	X86_VMOVUPSZ128rrkz_REV, X86_INS_VMOVUPS, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -55180,7 +55180,7 @@
 {
 	X86_VMOVUPSZ256rr_REV, X86_INS_VMOVUPS, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -55194,7 +55194,7 @@
 {
 	X86_VMOVUPSZ256rrk_REV, X86_INS_VMOVUPS, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -55208,7 +55208,7 @@
 {
 	X86_VMOVUPSZ256rrkz_REV, X86_INS_VMOVUPS, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
 #endif
 },
 
@@ -55257,7 +55257,7 @@
 {
 	X86_VMOVUPSZrr_REV, X86_INS_VMOVUPS, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
 #endif
 },
 
@@ -55271,7 +55271,7 @@
 {
 	X86_VMOVUPSZrrk_REV, X86_INS_VMOVUPS, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
 #endif
 },
 
@@ -55285,7 +55285,7 @@
 {
 	X86_VMOVUPSZrrkz_REV, X86_INS_VMOVUPS, 0,
 #ifndef CAPSTONE_DIET
-	{ 0 }, { 0 }, { 0 }, 0, 0
+	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
 #endif
 },
 
