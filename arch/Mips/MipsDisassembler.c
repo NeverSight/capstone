@@ -1460,14 +1460,17 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
 #ifdef CAPSTONE_MIPS_PRIMARY_DISPATCH
 	uint64_t major;
 	const cs_mode isa = mode & ~CS_MODE_BIG_ENDIAN;
-	if (isa == CS_MODE_MIPS32 || isa == CS_MODE_MIPS64) {
-		/* The unextended modes use standard byte order and only the
-		 * GP64, FP64, DSP and base tables below, in their usual order. */
+	if (isa == CS_MODE_MIPS32 || isa == CS_MODE_MIPS64 ||
+	    isa == CS_MODE_MIPS32R2 || isa == CS_MODE_MIPS64R2) {
+		/* These standard modes use the GP64, FP64, DSP and base tables
+		 * in their usual order, with the original feature predicates. */
 		if (readInstruction32(Bytes, BytesLen, Address, Size, &Insn,
 				      IsBigEndian, false) == MCDisassembler_Fail)
 			return MCDisassembler_Fail;
 		*Size = 4;
-		IsGP64 = IsFP64 = isa == CS_MODE_MIPS64;
+		/* MIPS32r2 has 64-bit FPRs. GPR width follows the 64-bit modes. */
+		IsGP64 = isa == CS_MODE_MIPS64 || isa == CS_MODE_MIPS64R2;
+		IsFP64 = isa != CS_MODE_MIPS32;
 		goto DecodeStandard;
 	}
 #endif
