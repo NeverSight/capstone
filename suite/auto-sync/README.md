@@ -126,6 +126,12 @@ After regenerating the SPARC assembly writer or translating its printer,
 run `python3 suite/synctools/sparc_state_register_names.py`. Use `--check`
 to verify the resolved V9 state names and their printer hook.
 
+The legacy x86 operand-access tables are outside Auto-Sync. After regenerating
+them, retain `suite/auto-sync/inc_patches/X86/01_test_accumulator_access.patch`
+if the source still marks `TEST EAX, imm32` as writing EAX. Apply the patch
+with `git apply` from the repository root and run `unit_x86_reg_access`;
+it checks accumulator widths and ModR/M equivalents with Intel and AT&T printers.
+
 After changing `X86ImmSize.inc` or either `X86GenInstrInfo*.inc` enum, run
 `python3 suite/synctools/x86_immediate_sizes.py`, then run it with `--check`.
 The generated immediate-size lookup preserves the original metadata and uses
