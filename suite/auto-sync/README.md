@@ -122,6 +122,10 @@ After regenerating the AArch64 assembly writer or translating its printer,
 run `python3 suite/synctools/aarch64_register_names.py`. Run it again with
 `--check` to verify short register spellings against the default name pool.
 
+After regenerating the MIPS assembly writer or translating its printer,
+run `python3 suite/synctools/mips_register_names.py`. Use `--check` to
+verify the short spellings, ABI aliases and combined dollar-prefix append.
+
 After regenerating the SPARC assembly writer or translating its printer,
 run `python3 suite/synctools/sparc_state_register_names.py`. Use `--check`
 to verify the resolved V9 state names and their printer hook.

@@ -112,9 +112,34 @@ static const char *MipsFCCToString(Mips_CondCode CC)
 
 const char *Mips_LLVM_getRegisterName(unsigned RegNo, bool noRegName);
 
+#if defined(__linux__) && defined(__x86_64__) && defined(__GNUC__) && \
+    !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
+    !defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
+    !defined(_WIN32_WCE)
+#define MIPS_SHORT_REGISTER_NAMES
+__attribute__((noinline))
+#endif
 static void printRegName(MCInst *MI, SStream *OS, MCRegister Reg)
 {
 	int syntax_opt = MI->csh->syntax;
+#ifdef MIPS_SHORT_REGISTER_NAMES
+#include "MipsGenShortRegisterNames.inc"
+	if (!(syntax_opt & CS_OPT_SYNTAX_NOREGNAME) && Reg &&
+	    Reg <= ARR_SIZE(mips_short_name_indices)) {
+		const unsigned index = mips_short_name_indices[Reg - 1];
+		const unsigned length = mips_short_names[index].length;
+		if (length && cs_vsnprintf == cs_default_vsnprintf &&
+		    !OS->markup_stream && !OS->prefixed_by_markup &&
+		    OS->index < SSTREAM_BUF_LEN - length) {
+			const unsigned skip =
+				!!(syntax_opt & CS_OPT_SYNTAX_NO_DOLLAR);
+			SStream_concat0_small(
+				OS, mips_short_names[index].text + skip,
+				length - skip);
+			return;
+		}
+	}
+#endif
 	if (!(syntax_opt & CS_OPT_SYNTAX_NO_DOLLAR)) {
 		SStream_concat1(OS, '$');
 	}
