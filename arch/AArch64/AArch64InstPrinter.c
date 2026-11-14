@@ -80,7 +80,8 @@ DECLARE_printComplexRotationOp(90, 0);
 
 void printRegName(SStream *OS, unsigned Reg)
 {
-#if defined(CAPSTONE_AARCH64_SHORT_REGISTER_NAMES) && !defined(CAPSTONE_DIET) && \
+#if (defined(CAPSTONE_AARCH64_SHORT_REGISTER_NAMES) || \
+     defined(CAPSTONE_AARCH64_FOUR_OUTPUT)) && !defined(CAPSTONE_DIET) && \
 	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
 	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
 #include "AArch64GenShortRegisterNames.inc"

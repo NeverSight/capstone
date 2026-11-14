@@ -7,6 +7,7 @@
 #include "../../include/capstone/capstone.h"
 #include "../../utils.h"
 #include "../../Mapping.h"
+#include "../../MCInstPrinter.h"
 #include "ARMBaseInfo.h"
 
 typedef enum {
@@ -20,6 +21,29 @@ ARMSysReg_lookupMClassSysRegByEncoding(uint16_t Encoding);
 
 // return name of register in friendly string
 const char *ARM_reg_name(csh handle, unsigned int reg);
+
+/* A disabled markup tag contributes no text. A callback can observe
+ * even an empty argument, and a markup stream can close a pending tag. */
+#if defined(CAPSTONE_ARM_AARCH64_MIPS_X86) && defined(__linux__) && \
+	defined(__x86_64__) && defined(__GNUC__) && !defined(__clang__)
+#define CAPSTONE_ARM_FORMAT_MARKUP
+#endif
+#if defined(CAPSTONE_ARM_FORMAT_MARKUP) && !defined(CAPSTONE_DIET) && \
+	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
+	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
+static inline void ARM_printMarkup(SStream *O, const char *tag)
+{
+	const char *text = markup(tag);
+	if (!text[0] && cs_vsnprintf == cs_default_vsnprintf &&
+	    !O->is_closed && !O->markup_stream && O->index < SSTREAM_BUF_LEN - 1) {
+		O->buffer[O->index] = '\0';
+		return;
+	}
+	SStream_concat(O, "%s", text);
+}
+#else
+#define ARM_printMarkup(stream, tag) SStream_concat((stream), "%s", markup(tag))
+#endif
 
 void ARM_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info);
 

@@ -4,6 +4,11 @@
 #ifndef CS_AARCH64_MAP_H
 #define CS_AARCH64_MAP_H
 
+#if defined(CAPSTONE_ARM_AARCH64_MIPS_X86) && defined(__linux__) && \
+	defined(__x86_64__) && defined(__GNUC__) && !defined(__clang__)
+#define CAPSTONE_AARCH64_FOUR_OUTPUT
+#endif
+
 #include "capstone/capstone.h"
 #include "../../MCInst.h"
 #include "../../SStream.h"

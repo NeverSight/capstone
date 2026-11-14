@@ -158,6 +158,8 @@ if(capstone_enabled_architectures STREQUAL "X86")
     add_compile_definitions(CAPSTONE_X86_ONLY)
 elseif(capstone_enabled_architectures STREQUAL "MIPS;X86")
     add_compile_definitions(CAPSTONE_X86_MIPS_ONLY)
+elseif(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;X86")
+    add_compile_definitions(CAPSTONE_ARM_AARCH64_MIPS_X86)
 endif()
 
 if(capstone_enabled_architectures STREQUAL "ARM")
@@ -469,7 +471,8 @@ if(CAPSTONE_X86_SUPPORT)
     )
     # Use scalar/vector stores or libc for the fixed public output buffers.
     # Generic x64 GCC otherwise emits REP STOS even for the short clears.
-    if((capstone_enabled_architectures STREQUAL "X86" OR capstone_enabled_architectures STREQUAL "MIPS;X86")
+    if((capstone_enabled_architectures STREQUAL "X86" OR capstone_enabled_architectures STREQUAL "MIPS;X86"
+        OR capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;X86")
        AND CMAKE_C_COMPILER_ID STREQUAL "GNU"
        AND CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SIZEOF_VOID_P EQUAL 8
        AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")

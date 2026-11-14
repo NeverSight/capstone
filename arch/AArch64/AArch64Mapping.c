@@ -293,8 +293,15 @@ const char *AArch64_reg_name(csh handle, unsigned int reg)
 	return AArch64_LLVM_getRegisterName(reg, AArch64_NoRegAltName);
 }
 
+/* Dedicated builds select their features separately. The standard GNU
+ * four-backend build also uses the validated scan, detail and printer paths. */
+#if defined(CAPSTONE_AARCH64_DEDICATED_SCAN) || defined(CAPSTONE_AARCH64_FOUR_OUTPUT)
+#define CAPSTONE_AARCH64_SCAN_IMMEDIATES
+#endif
+
 /* The template changes text-only dispatch layout on Apple arm64. */
-#if defined(CAPSTONE_AARCH64_INIT_CONSTRUCTED_OPERANDS) && \
+#if (defined(CAPSTONE_AARCH64_INIT_CONSTRUCTED_OPERANDS) || \
+     defined(CAPSTONE_AARCH64_FOUR_OUTPUT)) && \
     !(defined(__APPLE__) && defined(__aarch64__))
 #define AARCH64_COPY_OPERAND_DEFAULTS
 /* Build all public operand defaults in one copy, including unused slots. */
@@ -906,7 +913,8 @@ void AArch64_set_instr_map_data(MCInst *MI)
 	map_groups(MI, aarch64_insns);
 }
 
-#ifdef CAPSTONE_AARCH64_DEDICATED_SCAN
+
+#ifdef CAPSTONE_AARCH64_SCAN_IMMEDIATES
 /* These A64 classes have no reserved operand encodings. For a text-free
  * scan, the table's internal opcode suffices for the normal public mapper. */
 static unsigned scanImmediateOpcode(uint32_t word)
@@ -938,7 +946,7 @@ bool AArch64_getInstruction(csh handle, const uint8_t *code, size_t code_len,
 			    MCInst *MI, uint16_t *size, uint64_t address,
 			    void *info)
 {
-#ifdef CAPSTONE_AARCH64_DEDICATED_SCAN
+#ifdef CAPSTONE_AARCH64_SCAN_IMMEDIATES
 	if (code_len >= 4 && MI->csh->no_text && !MI->flat_insn->detail &&
 	    MI->csh->disasm == AArch64_getInstruction) {
 		unsigned opcode = scanImmediateOpcode(readBytes32(MI, code));

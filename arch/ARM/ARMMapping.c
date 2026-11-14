@@ -832,6 +832,11 @@ void ARM_check_updates_flags(MCInst *MI)
 #endif // CAPSTONE_DIET
 }
 
+#if defined(CAPSTONE_ARM_AARCH64_MIPS_X86) && defined(__linux__) && \
+	defined(__x86_64__) && defined(__GNUC__) && !defined(__clang__)
+#define ARM_GNU_MIXED_SCAN
+#endif
+
 void ARM_set_instr_map_data(MCInst *MI)
 {
 	/* The ARM decoder indexes this same generated map for implicit effects. */
@@ -844,10 +849,57 @@ void ARM_set_instr_map_data(MCInst *MI)
 	map_groups(MI, arm_insns);
 }
 
+#ifdef ARM_GNU_MIXED_SCAN
+static unsigned armScanImmediateOpcode(const uint8_t *code)
+{
+	const unsigned cond = code[3] >> 4;
+	if ((code[3] & 0x0e) == 0x0a) {
+		if (cond == 15)
+			return ARM_BLXi;
+		if (code[3] & 1)
+			return cond == 14 ? ARM_BL : ARM_BL_pred;
+		return ARM_Bcc;
+	}
+	/* A32 data-processing immediates have no register-shift encoding.
+	 * Keep reserved condition codes, PC operands and malformed aliases
+	 * on the full decoder, which also records soft failures. */
+	if (cond == 15 || (code[3] & 0x0e) != 2)
+		return 0;
+	const unsigned op = ((code[3] & 1) << 3) | (code[2] >> 5);
+	const unsigned rd = code[1] >> 4, rn = code[2] & 15;
+	if (rd == 15 || rn == 15)
+		return 0;
+	static const uint16_t opcodes[] = {
+		ARM_ANDri, ARM_EORri, ARM_SUBri, ARM_RSBri,
+		ARM_ADDri, ARM_ADCri, ARM_SBCri, ARM_RSCri,
+		ARM_TSTri, ARM_TEQri, ARM_CMPri, ARM_CMNri,
+		ARM_ORRri, ARM_MOVi, ARM_BICri, ARM_MVNi,
+	};
+	if (op >= 8 && op <= 11 && (rd != 0 || !(code[2] & 0x10)))
+		return 0;
+	if ((op == 13 || op == 15) && rn != 0)
+		return 0;
+	return opcodes[op];
+}
+#endif
+
 bool ARM_getInstruction(csh handle, const uint8_t *code, size_t code_len,
 			MCInst *instr, uint16_t *size, uint64_t address,
 			void *info)
 {
+#ifdef ARM_GNU_MIXED_SCAN
+	if (instr->csh->no_text && !instr->flat_insn->detail &&
+	    (instr->csh->mode & ~CS_MODE_V8) == CS_MODE_ARM &&
+	    instr->csh->disasm == ARM_getInstruction && code_len >= 4) {
+		const unsigned opcode = armScanImmediateOpcode(code);
+		if (opcode) {
+			MCInst_setOpcode(instr, opcode);
+			ARM_set_instr_map_data(instr);
+			*size = 4;
+			return true;
+		}
+	}
+#endif
 	ARM_init_cs_detail(instr);
 	DecodeStatus Result = ARM_LLVM_getInstruction(
 		handle, code, code_len, instr, size, address, info);
@@ -941,7 +993,7 @@ void ARM_reg_access(const cs_insn *insn, cs_regs regs_read,
 }
 #endif
 
-#ifdef CAPSTONE_ARM_COPY_OPERAND_DEFAULTS
+#if defined(CAPSTONE_ARM_COPY_OPERAND_DEFAULTS) || defined(ARM_GNU_MIXED_SCAN)
 /* Unused operands have observable invalid indices and zeroed padding too. */
 #define ARM_EMPTY_OP \
 	{ .vector_index = -1, .type = ARM_OP_INVALID, .neon_lane = -1 }

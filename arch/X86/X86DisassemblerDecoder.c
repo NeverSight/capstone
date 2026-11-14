@@ -2946,7 +2946,8 @@ X86_DECODE_INLINE int finishDecodedInstruction(struct InternalInstruction *insn,
  * The generated terminal row already provides the public ID and extent. */
 #if defined(__linux__) && defined(__GNUC__) && !defined(__clang__) && \
     ((defined(CAPSTONE_X86_ONLY) && (defined(__x86_64__) || defined(__aarch64__))) || \
-     (defined(CAPSTONE_X86_MIPS_ONLY) && defined(__x86_64__)))
+     ((defined(CAPSTONE_X86_MIPS_ONLY) || defined(CAPSTONE_ARM_AARCH64_MIPS_X86)) && \
+      defined(__x86_64__)))
 #define X86_COMPACT_PUBLIC_HEADER
 #endif
 

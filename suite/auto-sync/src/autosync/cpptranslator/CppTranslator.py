@@ -303,7 +303,7 @@ class Translator:
                 case GetOperandRegImm.__name__:
                     patch = GetOperandRegImm(p)
                 case StreamOperations.__name__:
-                    patch = StreamOperations(p)
+                    patch = StreamOperations(p, self.arch)
                 case SubtargetInfoParam.__name__:
                     patch = SubtargetInfoParam(p)
                 case SizeAssignment.__name__:

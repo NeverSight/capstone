@@ -24,7 +24,8 @@
 
 #if defined(__linux__) && defined(__GNUC__) && \
     ((defined(CAPSTONE_MIPS_ONLY) && defined(__aarch64__)) || \
-     (defined(CAPSTONE_X86_MIPS_ONLY) && defined(__x86_64__) && !defined(__clang__)))
+     ((defined(CAPSTONE_X86_MIPS_ONLY) || defined(CAPSTONE_ARM_AARCH64_MIPS_X86)) && \
+      defined(__x86_64__) && !defined(__clang__)))
 #define MIPS_DIRECT_MAPPING
 #endif
 

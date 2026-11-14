@@ -135,7 +135,7 @@ static inline void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
 		unsigned Reg = MCOperand_getReg(Op);
 		printRegName(O, Reg);
 	} else if (MCOperand_isImm(Op)) {
-		SStream_concat(O, "%s", markup("<imm:"));
+		ARM_printMarkup(O, "<imm:");
 		SStream_concat1(O, '#');
 		printInt64(O, MCOperand_getImm(Op));
 		SStream_concat0(O, markup(">"));
@@ -208,7 +208,7 @@ static inline void printThumbLdrLabelOperand(MCInst *MI, unsigned OpNum,
 		return;
 	}
 
-	SStream_concat(O, "%s", markup("<mem:"));
+	ARM_printMarkup(O, "<mem:");
 	SStream_concat0(O, "[pc, ");
 
 	int32_t OffImm = (int32_t)MCOperand_getImm(MO1);
@@ -216,7 +216,7 @@ static inline void printThumbLdrLabelOperand(MCInst *MI, unsigned OpNum,
 	// Special value for #-0. All others are normal.
 	if (OffImm == INT32_MIN)
 		OffImm = 0;
-	SStream_concat(O, "%s", markup("<imm:"));
+	ARM_printMarkup(O, "<imm:");
 	printInt32Bang(O, OffImm);
 	SStream_concat0(O, markup(">"));
 	SStream_concat(O, "%s", "]");
@@ -274,7 +274,7 @@ static inline void printAM2PreOrOffsetIndexOp(MCInst *MI, unsigned Op,
 	MCOperand *MO2 = MCInst_getOperand(MI, (Op + 1));
 	MCOperand *MO3 = MCInst_getOperand(MI, (Op + 2));
 
-	SStream_concat(O, "%s", markup("<mem:"));
+	ARM_printMarkup(O, "<mem:");
 	SStream_concat0(O, "[");
 	printRegName(O, MCOperand_getReg(MO1));
 
@@ -310,7 +310,7 @@ static inline void printAddrModeTBB(MCInst *MI, unsigned Op, SStream *O)
 	ARM_add_cs_detail_0(MI, ARM_OP_GROUP_AddrModeTBB, Op);
 	MCOperand *MO1 = MCInst_getOperand(MI, (Op));
 	MCOperand *MO2 = MCInst_getOperand(MI, (Op + 1));
-	SStream_concat(O, "%s", markup("<mem:"));
+	ARM_printMarkup(O, "<mem:");
 	SStream_concat0(O, "[");
 	printRegName(O, MCOperand_getReg(MO1));
 	SStream_concat0(O, ", ");
@@ -324,7 +324,7 @@ static inline void printAddrModeTBH(MCInst *MI, unsigned Op, SStream *O)
 	ARM_add_cs_detail_0(MI, ARM_OP_GROUP_AddrModeTBH, Op);
 	MCOperand *MO1 = MCInst_getOperand(MI, (Op));
 	MCOperand *MO2 = MCInst_getOperand(MI, (Op + 1));
-	SStream_concat(O, "%s", markup("<mem:"));
+	ARM_printMarkup(O, "<mem:");
 	SStream_concat0(O, "[");
 	printRegName(O, MCOperand_getReg(MO1));
 	SStream_concat0(O, ", ");
@@ -357,7 +357,7 @@ static inline void printAddrMode2OffsetOperand(MCInst *MI, unsigned OpNum,
 
 	if (!MCOperand_getReg(MO1)) {
 		unsigned ImmOffs = ARM_AM_getAM2Offset(MCOperand_getImm(MO2));
-		SStream_concat(O, "%s", markup("<imm:"));
+		ARM_printMarkup(O, "<imm:");
 		SStream_concat1(O, '#');
 		SStream_concat(O, "%s",
 			       ARM_AM_getAddrOpcStr(
@@ -387,7 +387,7 @@ static inline void printAM3PreOrOffsetIndexOp(MCInst *MI, unsigned Op,
 	MCOperand *MO2 = MCInst_getOperand(MI, (Op + 1));
 	MCOperand *MO3 = MCInst_getOperand(MI, (Op + 2));
 
-	SStream_concat(O, "%s", markup("<mem:"));
+	ARM_printMarkup(O, "<mem:");
 	SStream_concat0(O, "[");
 
 	printRegName(O, MCOperand_getReg(MO1));
@@ -450,7 +450,7 @@ static inline void printAddrMode3OffsetOperand(MCInst *MI, unsigned OpNum,
 	}
 
 	unsigned ImmOffs = ARM_AM_getAM3Offset(MCOperand_getImm(MO2));
-	SStream_concat(O, "%s", markup("<imm:"));
+	ARM_printMarkup(O, "<imm:");
 	SStream_concat1(O, '#');
 	SStream_concat(
 		O, "%s",
@@ -465,7 +465,7 @@ static inline void printPostIdxImm8Operand(MCInst *MI, unsigned OpNum,
 	ARM_add_cs_detail_0(MI, ARM_OP_GROUP_PostIdxImm8Operand, OpNum);
 	MCOperand *MO = MCInst_getOperand(MI, (OpNum));
 	unsigned Imm = MCOperand_getImm(MO);
-	SStream_concat(O, "%s", markup("<imm:"));
+	ARM_printMarkup(O, "<imm:");
 	SStream_concat1(O, '#');
 	SStream_concat(O, "%s", ((Imm & 256) ? "" : "-"));
 	printUInt32(O, (Imm & 0xff));
@@ -489,7 +489,7 @@ static inline void printPostIdxImm8s4Operand(MCInst *MI, unsigned OpNum,
 	ARM_add_cs_detail_0(MI, ARM_OP_GROUP_PostIdxImm8s4Operand, OpNum);
 	MCOperand *MO = MCInst_getOperand(MI, (OpNum));
 	unsigned Imm = MCOperand_getImm(MO);
-	SStream_concat(O, "%s", markup("<imm:"));
+	ARM_printMarkup(O, "<imm:");
 	SStream_concat1(O, '#');
 	SStream_concat(O, "%s", ((Imm & 256) ? "" : "-"));
 	printUInt32(O, (Imm & 0xff) << 2);
@@ -506,7 +506,7 @@ static inline void printPostIdxImm8s4Operand(MCInst *MI, unsigned OpNum,
 		MCOperand *MO1 = MCInst_getOperand(MI, (OpNum)); \
 		MCOperand *MO2 = MCInst_getOperand(MI, (OpNum + 1)); \
 \
-		SStream_concat(O, "%s", markup("<mem:")); \
+		ARM_printMarkup(O, "<mem:"); \
 		SStream_concat0(O, "["); \
 		printRegName(O, MCOperand_getReg(MO1)); \
 		SStream_concat0(O, ", "); \
@@ -535,7 +535,7 @@ DEFINE_printMveAddrModeRQOperand(2);
 		MCOperand *MO1 = MCInst_getOperand(MI, (OpNum)); \
 		MCOperand *MO2 = MCInst_getOperand(MI, (OpNum + 1)); \
 \
-		SStream_concat(O, "%s", markup("<mem:")); \
+		ARM_printMarkup(O, "<mem:"); \
 		SStream_concat0(O, "["); \
 		printRegName(O, MCOperand_getReg(MO1)); \
 \
@@ -569,7 +569,7 @@ DEFINE_printAddrMode5Operand(true);
 			return; \
 		} \
 \
-		SStream_concat(O, "%s", markup("<mem:")); \
+		ARM_printMarkup(O, "<mem:"); \
 		SStream_concat0(O, "["); \
 		printRegName(O, MCOperand_getReg(MO1)); \
 \
@@ -595,7 +595,7 @@ static inline void printAddrMode6Operand(MCInst *MI, unsigned OpNum, SStream *O)
 	MCOperand *MO1 = MCInst_getOperand(MI, (OpNum));
 	MCOperand *MO2 = MCInst_getOperand(MI, (OpNum + 1));
 
-	SStream_concat(O, "%s", markup("<mem:"));
+	ARM_printMarkup(O, "<mem:");
 	SStream_concat0(O, "[");
 	printRegName(O, MCOperand_getReg(MO1));
 	if (MCOperand_getImm(MO2)) {
@@ -610,7 +610,7 @@ static inline void printAddrMode7Operand(MCInst *MI, unsigned OpNum, SStream *O)
 {
 	ARM_add_cs_detail_0(MI, ARM_OP_GROUP_AddrMode7Operand, OpNum);
 	MCOperand *MO1 = MCInst_getOperand(MI, (OpNum));
-	SStream_concat(O, "%s", markup("<mem:"));
+	ARM_printMarkup(O, "<mem:");
 	SStream_concat0(O, "[");
 	printRegName(O, MCOperand_getReg(MO1));
 	SStream_concat(O, "%s", "]");
@@ -639,7 +639,7 @@ static inline void printBitfieldInvMaskImmOperand(MCInst *MI, unsigned OpNum,
 	int32_t lsb = CountTrailingZeros_32(v);
 	int32_t width = (32 - countLeadingZeros(v)) - lsb;
 
-	SStream_concat(O, "%s", markup("<imm:"));
+	ARM_printMarkup(O, "<imm:");
 	SStream_concat1(O, '#');
 	printInt32(O, lsb);
 	SStream_concat(O, "%s%s%s", markup(">"), ", ", markup("<imm:"));
@@ -963,7 +963,7 @@ static inline void printThumbS4ImmOperand(MCInst *MI, unsigned OpNum,
 					  SStream *O)
 {
 	ARM_add_cs_detail_0(MI, ARM_OP_GROUP_ThumbS4ImmOperand, OpNum);
-	SStream_concat(O, "%s", markup("<imm:"));
+	ARM_printMarkup(O, "<imm:");
 	printInt64Bang(O, MCOperand_getImm(MCInst_getOperand(MI, (OpNum))) * 4);
 	SStream_concat0(O, markup(">"));
 }
@@ -972,7 +972,7 @@ static inline void printThumbSRImm(MCInst *MI, unsigned OpNum, SStream *O)
 {
 	ARM_add_cs_detail_0(MI, ARM_OP_GROUP_ThumbSRImm, OpNum);
 	unsigned Imm = MCOperand_getImm(MCInst_getOperand(MI, (OpNum)));
-	SStream_concat(O, "%s", markup("<imm:"));
+	ARM_printMarkup(O, "<imm:");
 	printUInt32Bang(O, (Imm == 0 ? 32 : Imm));
 	SStream_concat0(O, markup(">"));
 }
@@ -1006,7 +1006,7 @@ static inline void printThumbAddrModeRROperand(MCInst *MI, unsigned Op,
 		return;
 	}
 
-	SStream_concat(O, "%s", markup("<mem:"));
+	ARM_printMarkup(O, "<mem:");
 	SStream_concat0(O, "[");
 	printRegName(O, MCOperand_getReg(MO1));
 	unsigned RegNum = MCOperand_getReg(MO2);
@@ -1030,7 +1030,7 @@ static inline void printThumbAddrModeImm5SOperand(MCInst *MI, unsigned Op,
 		return;
 	}
 
-	SStream_concat(O, "%s", markup("<mem:"));
+	ARM_printMarkup(O, "<mem:");
 	SStream_concat0(O, "[");
 	printRegName(O, MCOperand_getReg(MO1));
 	unsigned ImmOffs = MCOperand_getImm(MO2);
@@ -1107,7 +1107,7 @@ static inline void printT2SOOperand(MCInst *MI, unsigned OpNum, SStream *O)
 			return; \
 		} \
 \
-		SStream_concat(O, "%s", markup("<mem:")); \
+		ARM_printMarkup(O, "<mem:"); \
 		SStream_concat0(O, "["); \
 		printRegName(O, MCOperand_getReg(MO1)); \
 \
@@ -1143,7 +1143,7 @@ DEFINE_printAddrModeImm12Operand(true);
 		MCOperand *MO1 = MCInst_getOperand(MI, (OpNum)); \
 		MCOperand *MO2 = MCInst_getOperand(MI, (OpNum + 1)); \
 \
-		SStream_concat(O, "%s", markup("<mem:")); \
+		ARM_printMarkup(O, "<mem:"); \
 		SStream_concat0(O, "["); \
 		printRegName(O, MCOperand_getReg(MO1)); \
 \
@@ -1185,7 +1185,7 @@ DEFINE_printT2AddrModeImm8Operand(false);
 			return; \
 		} \
 \
-		SStream_concat(O, "%s", markup("<mem:")); \
+		ARM_printMarkup(O, "<mem:"); \
 		SStream_concat0(O, "["); \
 		printRegName(O, MCOperand_getReg(MO1)); \
 \
@@ -1218,7 +1218,7 @@ static inline void printT2AddrModeImm0_1020s4Operand(MCInst *MI, unsigned OpNum,
 	MCOperand *MO1 = MCInst_getOperand(MI, (OpNum));
 	MCOperand *MO2 = MCInst_getOperand(MI, (OpNum + 1));
 
-	SStream_concat(O, "%s", markup("<mem:"));
+	ARM_printMarkup(O, "<mem:");
 	SStream_concat0(O, "[");
 	printRegName(O, MCOperand_getReg(MO1));
 	if (MCOperand_getImm(MO2)) {
@@ -1277,7 +1277,7 @@ static inline void printT2AddrModeSoRegOperand(MCInst *MI, unsigned OpNum,
 	MCOperand *MO2 = MCInst_getOperand(MI, (OpNum + 1));
 	MCOperand *MO3 = MCInst_getOperand(MI, (OpNum + 2));
 
-	SStream_concat(O, "%s", markup("<mem:"));
+	ARM_printMarkup(O, "<mem:");
 	SStream_concat0(O, "[");
 	printRegName(O, MCOperand_getReg(MO1));
 
@@ -1298,7 +1298,7 @@ static inline void printFPImmOperand(MCInst *MI, unsigned OpNum, SStream *O)
 {
 	ARM_add_cs_detail_0(MI, ARM_OP_GROUP_FPImmOperand, OpNum);
 	MCOperand *MO = MCInst_getOperand(MI, (OpNum));
-	SStream_concat(O, "%s", markup("<imm:"));
+	ARM_printMarkup(O, "<imm:");
 	printFloatBang(O, ARM_AM_getFPImmFloat(MCOperand_getImm(MO)));
 	SStream_concat0(O, markup(">"));
 }
@@ -1310,7 +1310,7 @@ static inline void printVMOVModImmOperand(MCInst *MI, unsigned OpNum,
 	unsigned EncodedImm = MCOperand_getImm(MCInst_getOperand(MI, (OpNum)));
 	unsigned EltBits;
 	uint64_t Val = ARM_AM_decodeVMOVModImm(EncodedImm, &EltBits);
-	SStream_concat(O, "%s", markup("<imm:"));
+	ARM_printMarkup(O, "<imm:");
 	printUInt64Bang(O, Val);
 	SStream_concat0(O, markup(">"));
 }
@@ -1320,7 +1320,7 @@ static inline void printImmPlusOneOperand(MCInst *MI, unsigned OpNum,
 {
 	ARM_add_cs_detail_0(MI, ARM_OP_GROUP_ImmPlusOneOperand, OpNum);
 	unsigned Imm = MCOperand_getImm(MCInst_getOperand(MI, (OpNum)));
-	SStream_concat(O, "%s", markup("<imm:"));
+	ARM_printMarkup(O, "<imm:");
 	printUInt32Bang(O, Imm + 1);
 	SStream_concat0(O, markup(">"));
 }

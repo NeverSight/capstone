@@ -15309,6 +15309,8 @@ Decode:
 	return decodeToMCInst_4(S, DecodeIdx, insn, MI, Address, Decoder, &DecodeComplete);
 }
 
+#define DecoderTableMips6432_MAJOR_MASK UINT64_C(0x9090f0809f250001)
+
 static DecodeStatus direct_DecoderTableMips6432(MCInst *MI, uint32_t insn, uint64_t Address, const void *Decoder)
 {
 	uint64_t CurFieldValue = 0;
@@ -15905,6 +15907,8 @@ Decode:
 	return decodeToMCInst_4(S, DecodeIdx, insn, MI, Address, Decoder, &DecodeComplete);
 }
 
+#define DecoderTableMipsDSP32_MAJOR_MASK UINT64_C(0x0000080800000000)
+
 static DecodeStatus direct_DecoderTableMipsDSP32(MCInst *MI, uint32_t insn, uint64_t Address, const void *Decoder)
 {
 	uint64_t CurFieldValue = 0;
@@ -15939,6 +15943,8 @@ Decode:
 	MCInst_setOpcode(MI, Opc);
 	return decodeToMCInst_4(S, DecodeIdx, insn, MI, Address, Decoder, &DecodeComplete);
 }
+
+#define DecoderTableMipsFP6432_MAJOR_MASK UINT64_C(0x20200000000a0000)
 
 static DecodeStatus direct_DecoderTableMipsFP6432(MCInst *MI, uint32_t insn, uint64_t Address, const void *Decoder)
 {

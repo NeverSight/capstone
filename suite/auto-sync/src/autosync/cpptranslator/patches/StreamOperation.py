@@ -13,8 +13,9 @@ class StreamOperations(Patch):
     to      SStream_concat(OS, ...)
     """
 
-    def __init__(self, priority: int):
+    def __init__(self, priority: int, arch: str = ""):
         super().__init__(priority)
+        self.arch = arch
 
     def get_search_pattern(self) -> str:
         return (
@@ -30,8 +31,18 @@ class StreamOperations(Patch):
     def get_main_capture_name(self) -> str:
         return "stream"
 
-    @staticmethod
-    def _concat_strings(s_name: bytes, ops: list[Node], src: bytes) -> bytes:
+    def _concat_strings(self, s_name: bytes, ops: list[Node], src: bytes) -> bytes:
+        if self.arch == "ARM" and len(ops) == 1 and ops[0].type == "call_expression":
+            function = ops[0].child_by_field_name("function")
+            arguments = ops[0].child_by_field_name("arguments")
+            if (
+                function is not None
+                and get_text_from_node(src, function) == b"markup"
+                and arguments is not None
+                and len(arguments.named_children) == 1
+            ):
+                tag = get_text_from_node(src, arguments.named_children[0])
+                return b"ARM_printMarkup(" + s_name + b", " + tag + b");\n"
         args = b", ".join(get_text_from_node(src, op) for op in ops)
         if len(ops) == 2:
             return b"SStream_concat2(" + s_name + b", " + args + b");\n"

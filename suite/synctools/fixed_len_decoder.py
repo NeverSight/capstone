@@ -144,6 +144,22 @@ def successors(n):
     return [n.end] + ([] if n.target is None else [n.target])
 
 
+def primary_opcode_mask(nodes):
+    """A top-level miss must reach Fail without modifying the instruction."""
+    root = nodes[0]
+    require(root.op == "ExtractField" and root.args == (26, 6),
+            "Review MIPS primary opcode field")
+    node = nodes[root.end]
+    mask = 0
+    while node.op == "FilterValue":
+        value = node.args[0]
+        require(value < 64, "Invalid MIPS primary opcode")
+        mask |= 1 << value
+        node = nodes[node.target]
+    require(node.op == "Fail", "Review MIPS primary opcode fallback")
+    return mask
+
+
 def emit(name, nodes, width, w):
     incoming = {p: set() for p in nodes}
     for p, n in nodes.items():
@@ -274,6 +290,11 @@ def main():
                 "Review changed decoder input width before regenerating",
             )
             nodes = parse(body)
+            if arch == "Mips" and name in (
+                "DecoderTableMips6432", "DecoderTableMipsFP6432", "DecoderTableMipsDSP32"
+            ):
+                mask = primary_opcode_mask(nodes)
+                output.append(f"#define {name}_MAJOR_MASK UINT64_C(0x{mask:016x})")
             output.append(emit(name, nodes, width, w))
             counts.append((name, len(nodes)))
         for w, width in sorted(set(inputs.values())):

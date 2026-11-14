@@ -634,6 +634,20 @@ public:
         syntax = b"{ int y = 1; int x = 1; OS << x; }"
         self.check_patching_result(patch, syntax, b"printInt32(OS, x);")
 
+    def test_arm_single_markup_before_operand(self):
+        source = b"""{ O << markup("<imm:") << '#' << amount; }"""
+        suffix = b"SStream_concat1(O, '#');\nSStream_concat0(O, amount);"
+        self.check_patching_result(
+            StreamOperations(0, "ARM"),
+            source,
+            b'ARM_printMarkup(O, "<imm:");\n' + suffix,
+        )
+        self.check_patching_result(
+            StreamOperations(0, "AArch64"),
+            source,
+            b'SStream_concat(O, "%s", markup("<imm:"));\n' + suffix,
+        )
+
     def test_streamoperation_string_groups(self):
         patch = StreamOperations(0)
         for syntax, expected in [
