@@ -125,7 +125,7 @@ static bool check_test_operands(void)
 							if (form)
 								*end++ = 0xc0;
 							unsigned immediate_size =
-								width == 8 ?
+								width > 4 ?
 									4 :
 									width;
 							for (unsigned b = 0;
