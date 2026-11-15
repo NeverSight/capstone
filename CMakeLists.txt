@@ -1022,6 +1022,10 @@ if(CAPSTONE_BUILD_STATIC_LIBS)
     add_library(capstone_static STATIC $<TARGET_OBJECTS:capstone>)
     # Use normal capstone name. Otherwise we get libcapstone_static.a
     set_target_properties(capstone_static PROPERTIES OUTPUT_NAME "capstone")
+    if(MSVC AND CAPSTONE_BUILD_SHARED_LIBS)
+        # The DLL import library also uses capstone.lib.
+        set_target_properties(capstone_static PROPERTIES OUTPUT_NAME "capstone_static")
+    endif()
     target_include_directories(capstone_static PUBLIC
         $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
     )

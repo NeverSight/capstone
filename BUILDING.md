@@ -30,6 +30,12 @@ cmake.exe --build build --config Release # For debug build change "Release" to "
 cmake.exe --install build
 ```
 
+When MSVC builds both static and shared libraries, the static archive is
+`capstone_static.lib`; `capstone.lib` is the import library for `capstone.dll`.
+A static-only build keeps the name `capstone.lib`. The CMake targets
+`capstone::capstone_static` and `capstone::capstone_shared` select the corresponding
+installed libraries in either configuration.
+
 ## Tailor Capstone to your needs.
 
 Enable and disable options in the "configure" step (first `cmake` command from above).
