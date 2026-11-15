@@ -9,6 +9,9 @@
 #include <cpuid.h>
 #include <signal.h>
 #include <sys/mman.h>
+#ifdef __linux__
+#include <sys/prctl.h>
+#endif
 #include <sys/resource.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -27,6 +30,11 @@ static int execute(const uint8_t *bytes, size_t length, unsigned available,
 	if (child == 0) {
 		const struct rlimit no_core = { 0, 0 };
 		setrlimit(RLIMIT_CORE, &no_core);
+#ifdef __linux__
+		/* Piped crash collectors can ignore RLIMIT_CORE for intentional faults. */
+		if (prctl(PR_SET_DUMPABLE, 0L, 0L, 0L, 0L))
+			_exit(2);
+#endif
 		signal(SIGSEGV, SIG_DFL);
 		signal(SIGBUS, SIG_DFL);
 		signal(SIGILL, SIG_DFL);
