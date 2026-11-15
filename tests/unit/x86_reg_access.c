@@ -240,6 +240,159 @@ static bool check_test_operands(void)
 	return true;
 }
 
+static bool check_scalar_move_flags(void)
+{
+	const cs_mode modes[] = { CS_MODE_16, CS_MODE_32, CS_MODE_64 };
+	for (unsigned mode = 0; mode < sizeof(modes) / sizeof(modes[0]);
+	     ++mode) {
+		csh h;
+		if (cs_open(CS_ARCH_X86, modes[mode], &h) ||
+		    cs_option(h, CS_OPT_DETAIL, CS_OPT_ON))
+			return false;
+		cs_insn *insn = cs_malloc(h);
+		if (!insn) {
+			cs_close(&h);
+			return false;
+		}
+		bool ok = true;
+		for (unsigned att = 0; att < 2 && ok; ++att) {
+			cs_err err = cs_option(h, CS_OPT_SYNTAX,
+					       att ? CS_OPT_SYNTAX_ATT :
+						     CS_OPT_SYNTAX_INTEL);
+			if (att && err == CS_ERR_X86_ATT)
+				continue;
+			if (err != CS_ERR_OK) {
+				ok = false;
+				break;
+			}
+			/* The shared MOVSD public ID also names a direction-dependent string move. */
+			static const uint8_t strings[][3] = {
+				{ 0xa4 },	{ 0xa5 },	{ 0x66, 0xa5 },
+				{ 0x67, 0xa5 }, { 0xf3, 0xa5 }, { 0xf2, 0xa5 }
+			};
+			for (unsigned n = 0;
+			     n < sizeof(strings) / sizeof(strings[0]); ++n) {
+				const uint8_t *p = strings[n];
+				size_t left = sizeof(strings[n]);
+				uint64_t pc = 0;
+				if (!cs_disasm_iter(h, &p, &left, &pc, insn) ||
+				    insn->detail->x86.eflags !=
+					    X86_EFLAGS_TEST_DF) {
+					fprintf(stderr,
+						"string move DF: mode=%u syntax=%u case=%u\n",
+						modes[mode], att, n);
+					ok = false;
+					break;
+				}
+			}
+			if (cs_support(CS_SUPPORT_X86_REDUCE))
+				continue;
+			for (unsigned prefix = 0xf2; prefix <= 0xf3 && ok;
+			     ++prefix)
+				for (unsigned opcode = 0x10;
+				     opcode <= 0x11 && ok; ++opcode)
+					for (unsigned rex = 0;
+					     rex <= (mode == 2 ? 16u : 0u) &&
+					     ok;
+					     ++rex)
+						for (unsigned modrm = 0;
+						     modrm < 256 && ok;
+						     ++modrm) {
+							uint8_t bytes[15] = { 0 },
+								*end = bytes;
+							*end++ =
+								(uint8_t)prefix;
+							if (rex)
+								*end++ =
+									(uint8_t)(0x3f +
+										  rex);
+							*end++ = 0x0f;
+							*end++ =
+								(uint8_t)opcode;
+							*end++ = (uint8_t)modrm;
+							*end++ = 0x24;
+							*end++ = 0x80;
+							*end++ = 0xff;
+							const uint8_t *p =
+								bytes;
+							size_t left =
+								sizeof(bytes);
+							uint64_t pc = 0;
+							if (!cs_disasm_iter(
+								    h, &p,
+								    &left, &pc,
+								    insn) ||
+							    insn->id !=
+								    (prefix == 0xf2 ?
+									     X86_INS_MOVSD :
+									     X86_INS_MOVSS) ||
+							    insn->detail->x86.eflags !=
+								    0) {
+								fprintf(stderr,
+									"scalar move flags: mode=%u syntax=%u prefix=%x opcode=%x rex=%u modrm=%x\n",
+									modes[mode],
+									att,
+									prefix,
+									opcode,
+									rex,
+									modrm);
+								ok = false;
+								break;
+							}
+							cs_regs reads, writes;
+							uint8_t nr, nw;
+							if (cs_regs_access(
+								    h, insn,
+								    reads, &nr,
+								    writes,
+								    &nw) !=
+							    CS_ERR_OK) {
+								ok = false;
+								break;
+							}
+							for (unsigned n = 0;
+							     n < nr; ++n)
+								if (reads[n] ==
+								    X86_REG_EFLAGS)
+									ok = false;
+							for (unsigned n = 0;
+							     n < nw; ++n)
+								if (writes[n] ==
+								    X86_REG_EFLAGS)
+									ok = false;
+						}
+			/* Vector forms already have separate metadata and must retain zero flags. */
+			static const uint8_t vectors[][6] = {
+				{ 0xc5, 0xea, 0x10, 0xc1 },
+				{ 0xc5, 0xeb, 0x11, 0xc1 },
+				{ 0x62, 0xf1, 0x6e, 0x08, 0x10, 0xc1 },
+				{ 0x62, 0xf1, 0xef, 0x08, 0x11, 0xc1 }
+			};
+			if (mode != 0)
+				for (unsigned n = 0;
+				     n < sizeof(vectors) / sizeof(vectors[0]) &&
+				     ok;
+				     ++n) {
+					const uint8_t *p = vectors[n];
+					size_t left = sizeof(vectors[n]);
+					uint64_t pc = 0;
+					if (!cs_disasm_iter(h, &p, &left, &pc,
+							    insn) ||
+					    insn->id !=
+						    (n % 2 ? X86_INS_VMOVSD :
+							     X86_INS_VMOVSS) ||
+					    insn->detail->x86.eflags != 0)
+						ok = false;
+				}
+		}
+		cs_free(insn, 1);
+		cs_close(&h);
+		if (!ok)
+			return false;
+	}
+	return true;
+}
+
 int main(void)
 {
 	if (cs_support(CS_SUPPORT_DIET))
@@ -251,7 +404,8 @@ int main(void)
 		cs_close(&handle);
 		return 1;
 	}
-	bool success = check_implicit_copies(handle) && check_test_operands();
+	bool success = check_implicit_copies(handle) && check_test_operands() &&
+		       check_scalar_move_flags();
 	cs_close(&handle);
 	return success ? 0 : 1;
 }
