@@ -138,6 +138,10 @@ it checks accumulator widths and ModR/M equivalents with Intel and AT&T printers
 Apply `suite/auto-sync/inc_patches/X86/02_scalar_move_flags.patch` if regenerated
 SSE `MOVSS`/`MOVSD` rows incorrectly test DF. `unit_x86_reg_access` checks their
 register and memory forms while retaining DF reads for string moves.
+Apply `suite/auto-sync/inc_patches/X86/03_vector_compare_flags.patch` if regenerated
+SSE `CMPPD`/`CMPPS`/`CMPSD`/`CMPSS` rows incorrectly modify arithmetic flags.
+`unit_x86_reg_access` checks predicate aliases and retains the flag effects of
+integer/string comparisons and `(U)COMISD`/`(U)COMISS`.
 
 After changing `X86ImmSize.inc` or either `X86GenInstrInfo*.inc` enum, run
 `python3 suite/synctools/x86_immediate_sizes.py`, then run it with `--check`.

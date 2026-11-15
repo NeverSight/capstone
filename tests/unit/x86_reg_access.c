@@ -393,6 +393,220 @@ static bool check_scalar_move_flags(void)
 	return true;
 }
 
+static bool check_vector_compare_flags(void)
+{
+	const cs_mode modes[] = { CS_MODE_16, CS_MODE_32, CS_MODE_64 };
+	for (unsigned mode = 0; mode < sizeof(modes) / sizeof(modes[0]);
+	     ++mode) {
+		csh h;
+		if (cs_open(CS_ARCH_X86, modes[mode], &h))
+			return false;
+		if (cs_option(h, CS_OPT_DETAIL, CS_OPT_ON)) {
+			cs_close(&h);
+			return false;
+		}
+		cs_insn *insn = cs_malloc(h);
+		if (!insn) {
+			cs_close(&h);
+			return false;
+		}
+		bool ok = true;
+		for (unsigned att = 0; att < 2 && ok; ++att) {
+			cs_err err = cs_option(h, CS_OPT_SYNTAX,
+					       att ? CS_OPT_SYNTAX_ATT :
+						     CS_OPT_SYNTAX_INTEL);
+			if (att && err == CS_ERR_X86_ATT)
+				continue;
+			if (err) {
+				ok = false;
+				break;
+			}
+			const uint8_t integer_controls[][4] = {
+				{ 0x39, 0xc8 }, { 0xa7 }, { 0x66, 0xa7 }
+			};
+			for (unsigned n = 0;
+			     n < sizeof(integer_controls) /
+					 sizeof(integer_controls[0]);
+			     ++n) {
+				const uint8_t *p = integer_controls[n];
+				size_t left = sizeof(integer_controls[n]);
+				uint64_t pc = 0;
+				if (!cs_disasm_iter(h, &p, &left, &pc, insn) ||
+				    !(insn->detail->x86.eflags &
+				      X86_EFLAGS_MODIFY_ZF) ||
+				    (n && !(insn->detail->x86.eflags &
+					    X86_EFLAGS_TEST_DF))) {
+					ok = false;
+					break;
+				}
+			}
+			if (cs_support(CS_SUPPORT_X86_REDUCE))
+				continue;
+			const uint8_t floating_controls[][4] = {
+				{ 0x0f, 0x2e, 0xc1 },
+				{ 0x0f, 0x2f, 0xc1 },
+				{ 0x66, 0x0f, 0x2e, 0xc1 },
+				{ 0x66, 0x0f, 0x2f, 0xc1 }
+			};
+			for (unsigned n = 0;
+			     n < sizeof(floating_controls) /
+					 sizeof(floating_controls[0]);
+			     ++n) {
+				const uint8_t *p = floating_controls[n];
+				size_t left = sizeof(floating_controls[n]);
+				uint64_t pc = 0;
+				if (!cs_disasm_iter(h, &p, &left, &pc, insn) ||
+				    !(insn->detail->x86.eflags &
+				      X86_EFLAGS_MODIFY_ZF)) {
+					ok = false;
+					break;
+				}
+			}
+			const uint8_t prefixes[] = { 0, 0x66, 0xf2, 0xf3 };
+			for (unsigned prefix = 0;
+			     prefix < sizeof(prefixes) && ok; ++prefix)
+				for (unsigned rex = 0;
+				     rex <= (modes[mode] == CS_MODE_64 ? 16u :
+									 0u) &&
+				     ok;
+				     ++rex)
+					for (unsigned imm = 0; imm < 256 && ok;
+					     ++imm)
+						for (unsigned mr = 0;
+						     mr < 256 && ok; ++mr) {
+							/* Every predicate byte, plus all addressing forms at alias boundaries. */
+							if (imm > 8 &&
+							    imm != 255 &&
+							    mr != 0xc1 &&
+							    mr != 1)
+								continue;
+							uint8_t bytes[15] = { 0 },
+								*end = bytes;
+							if (prefixes[prefix])
+								*end++ = prefixes
+									[prefix];
+							if (rex)
+								*end++ =
+									(uint8_t)(0x3f +
+										  rex);
+							*end++ = 0x0f;
+							*end++ = 0xc2;
+							*end++ = (uint8_t)mr;
+							if (mr < 0xc0) {
+								const unsigned
+									mod = mr >>
+									      6,
+									rm = mr &
+									     7;
+								if (modes[mode] !=
+									    CS_MODE_16 &&
+								    rm == 4)
+									*end++ =
+										0x24;
+								unsigned displacement =
+									mod == 1 ?
+										1 :
+									mod == 2 ?
+										(modes[mode] == CS_MODE_16 ?
+											 2 :
+											 4) :
+										(rm == (modes[mode] == CS_MODE_16 ?
+												6u :
+												5u) ?
+											 (modes[mode] == CS_MODE_16 ?
+												  2u :
+												  4u) :
+											 0u);
+								while (displacement--)
+									*end++ =
+										0x12;
+							}
+							*end++ = (uint8_t)imm;
+							const uint8_t *p =
+								bytes;
+							size_t left =
+								(size_t)(end -
+									 bytes);
+							uint64_t pc = 0;
+							if (!cs_disasm_iter(
+								    h, &p,
+								    &left, &pc,
+								    insn) ||
+							    left ||
+							    insn->detail->x86
+								    .eflags) {
+								fprintf(stderr,
+									"vector compare flags: mode=%u syntax=%u prefix=%x rex=%u modrm=%x imm=%x flags=%llx\n",
+									modes[mode],
+									att,
+									prefixes[prefix],
+									rex, mr,
+									imm,
+									(unsigned long long)insn
+										->detail
+										->x86
+										.eflags);
+								ok = false;
+								break;
+							}
+							cs_regs reads, writes;
+							uint8_t nr, nw;
+							if (cs_regs_access(
+								    h, insn,
+								    reads, &nr,
+								    writes,
+								    &nw)) {
+								ok = false;
+								break;
+							}
+							for (unsigned i = 0;
+							     i < nr; ++i)
+								if (reads[i] ==
+								    X86_REG_EFLAGS)
+									ok = false;
+							for (unsigned i = 0;
+							     i < nw; ++i)
+								if (writes[i] ==
+								    X86_REG_EFLAGS)
+									ok = false;
+						}
+			if (modes[mode] != CS_MODE_16) {
+				const uint8_t vectors[][8] = {
+					{ 0xc5, 0xf8, 0xc2, 0xc1, 0 },
+					{ 0xc5, 0xf9, 0xc2, 0xc1, 0 },
+					{ 0xc5, 0xfa, 0xc2, 0xc1, 0 },
+					{ 0xc5, 0xfb, 0xc2, 0xc1, 0 },
+					{ 0x62, 0xf1, 0x7c, 0x08, 0xc2, 0xc1,
+					  0 },
+					{ 0x62, 0xf1, 0xfd, 0x08, 0xc2, 0xc1,
+					  0 },
+					{ 0x62, 0xf1, 0x7e, 0x08, 0xc2, 0xc1,
+					  0 },
+					{ 0x62, 0xf1, 0xff, 0x08, 0xc2, 0xc1,
+					  0 }
+				};
+				for (unsigned n = 0;
+				     n < sizeof(vectors) / sizeof(vectors[0]) &&
+				     ok;
+				     ++n) {
+					const uint8_t *p = vectors[n];
+					size_t left = sizeof(vectors[n]);
+					uint64_t pc = 0;
+					if (!cs_disasm_iter(h, &p, &left, &pc,
+							    insn) ||
+					    insn->detail->x86.eflags)
+						ok = false;
+				}
+			}
+		}
+		cs_free(insn, 1);
+		cs_close(&h);
+		if (!ok)
+			return false;
+	}
+	return true;
+}
+
 int main(void)
 {
 	if (cs_support(CS_SUPPORT_DIET))
@@ -405,7 +619,8 @@ int main(void)
 		return 1;
 	}
 	bool success = check_implicit_copies(handle) && check_test_operands() &&
-		       check_scalar_move_flags();
+		       check_scalar_move_flags() &&
+		       check_vector_compare_flags();
 	cs_close(&handle);
 	return success ? 0 : 1;
 }
