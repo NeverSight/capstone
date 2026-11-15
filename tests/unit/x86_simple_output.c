@@ -770,10 +770,10 @@ static bool check_mode(cs_mode mode)
 		    !check_alu_memory(handles, mode) ||
 		    !check_alu_immediates(handles, mode) ||
 		    !check_legacy_vectors(handles, mode) ||
+		    !check_vex_register_forms(handles) ||
 		    (mode == CS_MODE_64 &&
 		     (!check_evex(handles) || !check_evex_extract(handles) ||
-		      (!check_vex_register_forms(handles) ||
-		       !check_vex_indexed(handles)))))
+		      !check_vex_indexed(handles))))
 			goto done;
 		for (unsigned op = 0; op < 256; ++op) {
 			uint8_t bytes[3] = { 0, (uint8_t)op, 0 };

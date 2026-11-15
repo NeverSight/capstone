@@ -671,7 +671,7 @@ std::string vex_register_row(Decoder &decoder, unsigned map, unsigned opcode,
 			     unsigned w, unsigned ll, unsigned rxb,
 			     unsigned dst, unsigned src, unsigned rm,
 			     bool short_prefix, bool immediate, unsigned value,
-			     bool group_shift = false)
+			     bool group_shift = false, bool mode32 = false)
 {
 	const unsigned prefix = short_prefix ? 2 : 3;
 	const unsigned length = prefix + 2 + immediate;
@@ -700,8 +700,8 @@ std::string vex_register_row(Decoder &decoder, unsigned map, unsigned opcode,
 				     rm | ((rxb & 1) << 3) };
 	cs_x86 expected{};
 	std::memcpy(expected.opcode, bytes, prefix);
-	expected.addr_size = 8;
-	expected.rex = uint8_t(0x40 | w << 3 | rxb);
+	expected.addr_size = mode32 ? 4 : 8;
+	expected.rex = mode32 ? 0 : uint8_t(0x40 | w << 3 | rxb);
 	expected.modrm = bytes[prefix + 1];
 	expected.encoding.modrm_offset = uint8_t(prefix + 1);
 	expected.op_count = uint8_t(reg_count + immediate);
@@ -747,6 +747,7 @@ std::string vex_register_row(Decoder &decoder, unsigned map, unsigned opcode,
 // in vvvv and the only source register in ModR/M.r/m.
 void emit_vex_shifts(Decoder &decoder)
 {
+	Decoder decoder32(CS_MODE_32);
 	unsigned plans[3][8][4] = {};
 	std::vector<std::string> rows;
 	for (unsigned op = 0x71; op <= 0x73; ++op) {
@@ -769,6 +770,18 @@ void emit_vex_shifts(Decoder &decoder)
 					valid = probe(k, false) == value &&
 						(wl >= 2 ||
 						 probe(k, true) == value);
+				if (valid && wl < 2) {
+					for (unsigned k = 0; k < 512; ++k)
+						if (vex_register_row(
+							    decoder32, 1, op, 0,
+							    wl, 0, group,
+							    (k >> 3) & 7, k & 7,
+							    true, true, k & 255,
+							    true,
+							    true) != value)
+							throw std::runtime_error(
+								"32-bit VEX shift row differs");
+				}
 				if (!valid)
 					continue;
 				auto index = static_cast<unsigned>(
@@ -802,6 +815,7 @@ void emit_vex_shifts(Decoder &decoder)
 
 void emit_vex_registers(Decoder &decoder)
 {
+	Decoder decoder32(CS_MODE_32);
 	std::vector<std::string> rows;
 	std::vector<Bytes4> widths(1);
 	std::array<std::array<unsigned, 256>, 3> plans{};
@@ -840,6 +854,18 @@ void emit_vex_registers(Decoder &decoder)
 						uniform = probe(rxb & 4, dst,
 								src, rm, true,
 								imm, n) == row;
+				}
+				if (uniform && map == 1 && !w) {
+					for (unsigned k = 0; k < 512; ++k)
+						if (vex_register_row(
+							    decoder32, 1,
+							    opcode, 0, ll, 0,
+							    (k >> 6) & 7,
+							    (k >> 3) & 7, k & 7,
+							    true, imm, k & 255,
+							    false, true) != row)
+							throw std::runtime_error(
+								"32-bit VEX register row differs");
 				}
 				if (!uniform)
 					continue;
