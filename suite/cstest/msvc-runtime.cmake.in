@@ -1,0 +1,5 @@
+# External projects may predate CMP0091. Select its runtime abstraction before
+# their first project() call, and preserve the parent's per-configuration value.
+set(CMAKE_POLICY_DEFAULT_CMP0091 NEW CACHE STRING "" FORCE)
+set(CMAKE_MSVC_RUNTIME_LIBRARY [==[@CMAKE_MSVC_RUNTIME_LIBRARY@]==]
+    CACHE STRING "" FORCE)

@@ -15,6 +15,15 @@ if(APPLE)
         "-DCMAKE_OSX_SYSROOT:STRING=${CMAKE_OSX_SYSROOT}"
         "-DCMAKE_OSX_DEPLOYMENT_TARGET:STRING=${CMAKE_OSX_DEPLOYMENT_TARGET}")
 endif()
+# Keep runtime generator expressions in the child projects so one build
+# directory can switch between Release and Debug without changing CRT models.
+set(CSTEST_MSVC_CMAKE_ARGS)
+if(MSVC AND DEFINED CMAKE_MSVC_RUNTIME_LIBRARY)
+    set(CSTEST_MSVC_INITIAL_CACHE "${CMAKE_CURRENT_BINARY_DIR}/msvc-runtime.cmake")
+    configure_file(msvc-runtime.cmake.in "${CSTEST_MSVC_INITIAL_CACHE}" @ONLY)
+    list(APPEND CSTEST_MSVC_CMAKE_ARGS "-C${CSTEST_MSVC_INITIAL_CACHE}")
+endif()
+
 # ExternalProject uses our generator. Multi-config generators place each
 # archive in the active configuration's subdirectory.
 function(cstest_import_archive target file byproduct)
@@ -51,6 +60,7 @@ ExternalProject_Add(cmocka_ext
     URL_HASH SHA256=0994a7cd6b67c46b1cbfbb56c3b22ac379e1ac26fbe68e9cf7cea259b60e201c
     CMAKE_ARGS
         ${CSTEST_APPLE_CMAKE_ARGS}
+        ${CSTEST_MSVC_CMAKE_ARGS}
         -DBUILD_SHARED_LIBS=OFF
         -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
         -DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
@@ -87,6 +97,7 @@ if (NOT libyaml OR NOT LIBYAML_INCLUDE_DIRS)
         # URL_HASH SHA256=e1884d0fa1eec8cf869ac6bebbf25391e81956aa2970267f974a9fa5e0b968e2
         CMAKE_ARGS
             ${CSTEST_APPLE_CMAKE_ARGS}
+            ${CSTEST_MSVC_CMAKE_ARGS}
             -DCMAKE_POLICY_VERSION_MINIMUM=3.5
             -DBUILD_TESTING=OFF
             -DBUILD_SHARED_LIBS=OFF
@@ -123,6 +134,7 @@ ExternalProject_Add(libcyaml_ext
     PATCH_COMMAND cmake -E copy_if_different ${EXTERNAL_PROJ_PATCH_DIR}/libcyaml/CMakeLists.txt ${LIBCYAML_SRC_DIR}
     CMAKE_ARGS
         ${CSTEST_APPLE_CMAKE_ARGS}
+        ${CSTEST_MSVC_CMAKE_ARGS}
         -DUSE_BUILT_LIBYAML=${USE_BUILT_LIBYAML}
         -DLIBYAML_INCLUDE_DIRS=${LIBYAML_INCLUDE_DIRS}
         -DLIBYAML_LIBRARY_DIRS=${LIBYAML_LIBRARY_DIRS}
@@ -134,6 +146,15 @@ ExternalProject_Add(libcyaml_ext
     BUILD_BYPRODUCTS "${LIBCYAML_LIB_FILE}"
     INSTALL_COMMAND ""
 )
+
+if(CSTEST_MSVC_INITIAL_CACHE)
+    foreach(dependency cmocka_ext libyaml_ext libcyaml_ext)
+        if(TARGET ${dependency})
+            ExternalProject_Add_StepDependencies(${dependency} configure
+                "${CSTEST_MSVC_INITIAL_CACHE}")
+        endif()
+    endforeach()
+endif()
 
 ExternalProject_Add_StepDependencies(libcyaml_ext patch
     "${EXTERNAL_PROJ_PATCH_DIR}/libcyaml/CMakeLists.txt")
@@ -156,6 +177,12 @@ file(GLOB CSTEST_SRC ${CSTEST_DIR}/src/*.c)
 add_executable(cstest ${CSTEST_SRC})
 add_library(libcstest STATIC ${CSTEST_SRC})
 set_property(TARGET libcstest PROPERTY OUTPUT_NAME cstest)
+if(MSVC)
+    # cstest.exe also writes an import library and a linker PDB.
+    set_target_properties(libcstest PROPERTIES
+        OUTPUT_NAME cstest_static
+        COMPILE_PDB_NAME cstest_static)
+endif()
 
 add_dependencies(cstest cmocka_ext)
 add_dependencies(cstest libcyaml_ext)
