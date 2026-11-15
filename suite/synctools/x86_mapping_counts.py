@@ -28,7 +28,7 @@ def entries(text):
 
 
 def implicit_repair_ids(source):
-    """Derive eligibility from the guarded public-ID switches themselves."""
+    """Derive candidate IDs from the guarded public-ID switches themselves."""
     source = re.sub(r"/\*.*?\*/|//[^\n]*", "", source, flags=re.S)
     guards = list(
         re.finditer(
@@ -149,7 +149,16 @@ def generate(directory, suffix):
         read, write, group = counts
         # Fixed fields are checked against the owning array capacities above.
         value = read | (write << 5) | (group << 10)
-        if row[2] in repairs:
+        repair = row[2] in repairs
+        # MOVSD/CMPSD also name SSE forms with no implicit string registers.
+        # Classify the internal opcode before enabling string-only repairs.
+        if row[2] in ("X86_INS_MOVSD", "X86_INS_CMPSD") and name not in (
+            "X86_MOVSL",
+            "X86_CMPSL",
+        ):
+            require(read == write == 0, "Unexpected shared-ID implicit registers")
+            repair = False
+        if repair:
             value |= 1 << 14
         lines.append(f"\t{value}, // {name}")
     return "\n".join(lines + ["};", ""])

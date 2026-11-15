@@ -2099,12 +2099,12 @@ static const uint16_t x86_mapping_counts[] = {
 	1024, // X86_CMPPSrri
 	1024, // X86_CMPPSrri_alt
 	16483, // X86_CMPSB
-	17408, // X86_CMPSDrm
-	16384, // X86_CMPSDrm_Int
-	17408, // X86_CMPSDrm_alt
-	17408, // X86_CMPSDrr
-	16384, // X86_CMPSDrr_Int
-	17408, // X86_CMPSDrr_alt
+	1024, // X86_CMPSDrm
+	0, // X86_CMPSDrm_Int
+	1024, // X86_CMPSDrm_alt
+	1024, // X86_CMPSDrr
+	0, // X86_CMPSDrr_Int
+	1024, // X86_CMPSDrr_alt
 	16483, // X86_CMPSL
 	16483, // X86_CMPSQ
 	1024, // X86_CMPSSrm
@@ -3092,10 +3092,10 @@ static const uint16_t x86_mapping_counts[] = {
 	1024, // X86_MOVPQIto64rr
 	1024, // X86_MOVQI2PQIrm
 	16451, // X86_MOVSB
-	17408, // X86_MOVSDmr
-	17408, // X86_MOVSDrm
-	17408, // X86_MOVSDrr
-	17408, // X86_MOVSDrr_REV
+	1024, // X86_MOVSDmr
+	1024, // X86_MOVSDrm
+	1024, // X86_MOVSDrr
+	1024, // X86_MOVSDrr_REV
 	1024, // X86_MOVSDto64mr
 	1024, // X86_MOVSDto64rr
 	1024, // X86_MOVSHDUPrm

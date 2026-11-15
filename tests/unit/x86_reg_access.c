@@ -607,6 +607,171 @@ static bool check_vector_compare_flags(void)
 	return true;
 }
 
+static bool check_scalar_segment_reads(void)
+{
+	const cs_mode modes[] = { CS_MODE_16, CS_MODE_32, CS_MODE_64 };
+	for (unsigned mode = 0; mode < sizeof(modes) / sizeof(modes[0]);
+	     ++mode) {
+		csh h;
+		if (cs_open(CS_ARCH_X86, modes[mode], &h))
+			return false;
+		if (cs_option(h, CS_OPT_DETAIL, CS_OPT_ON)) {
+			cs_close(&h);
+			return false;
+		}
+		cs_insn *insn = cs_malloc(h);
+		if (!insn) {
+			cs_close(&h);
+			return false;
+		}
+		bool ok = true;
+		for (unsigned att = 0; att < 2 && ok; ++att) {
+			cs_err err = cs_option(h, CS_OPT_SYNTAX,
+					       att ? CS_OPT_SYNTAX_ATT :
+						     CS_OPT_SYNTAX_INTEL);
+			if (att && err == CS_ERR_X86_ATT)
+				continue;
+			if (err) {
+				ok = false;
+				break;
+			}
+			const uint8_t strings[][3] = {
+				{ 0xa4 },	{ 0xa5 },	{ 0xa6 },
+				{ 0xa7 },	{ 0x66, 0xa5 }, { 0x66, 0xa7 },
+				{ 0x67, 0xa5 }, { 0x67, 0xa7 }, { 0xf3, 0xa5 },
+				{ 0xf2, 0xa7 }
+			};
+			for (unsigned n = 0;
+			     n < sizeof(strings) / sizeof(strings[0]); ++n) {
+				const uint8_t *p = strings[n];
+				size_t left = sizeof(strings[n]);
+				uint64_t pc = 0;
+				if (!cs_disasm_iter(h, &p, &left, &pc, insn)) {
+					ok = false;
+					break;
+				}
+				bool ds = false;
+				for (unsigned i = 0;
+				     i < insn->detail->regs_read_count; ++i)
+					ds |= insn->detail->regs_read[i] ==
+					      X86_REG_DS;
+				if (n < 6) {
+					x86_reg source =
+						modes[mode] == CS_MODE_16 ?
+							X86_REG_SI :
+						modes[mode] == CS_MODE_32 ?
+							X86_REG_ESI :
+							X86_REG_RSI;
+					x86_reg destination =
+						modes[mode] == CS_MODE_16 ?
+							X86_REG_DI :
+						modes[mode] == CS_MODE_32 ?
+							X86_REG_EDI :
+							X86_REG_RDI;
+					bool has_source = false,
+					     has_destination = false;
+					for (unsigned i = 0;
+					     i < insn->detail->regs_read_count;
+					     ++i) {
+						has_source |=
+							insn->detail
+								->regs_read[i] ==
+							source;
+						has_destination |=
+							insn->detail
+								->regs_read[i] ==
+							destination;
+					}
+					if (!has_source || !has_destination) {
+						fprintf(stderr,
+							"string indices: mode=%u syntax=%u case=%u\n",
+							modes[mode], att, n);
+						ok = false;
+						break;
+					}
+				}
+				if (ds != (modes[mode] != CS_MODE_64)) {
+					fprintf(stderr,
+						"string DS: mode=%u syntax=%u case=%u\n",
+						modes[mode], att, n);
+					ok = false;
+					break;
+				}
+			}
+			if (cs_support(CS_SUPPORT_X86_REDUCE))
+				continue;
+			const uint8_t opcodes[] = { 0x10, 0x11, 0xc2 };
+			for (unsigned o = 0; o < sizeof(opcodes) && ok; ++o)
+				for (unsigned rex = 0;
+				     rex <= (modes[mode] == CS_MODE_64 ? 16u :
+									 0u) &&
+				     ok;
+				     ++rex)
+					for (unsigned mr = 0; mr < 256 && ok;
+					     ++mr) {
+						uint8_t bytes[15] = { 0 },
+							*end = bytes;
+						*end++ = 0xf2;
+						if (rex)
+							*end++ =
+								(uint8_t)(0x3f +
+									  rex);
+						*end++ = 0x0f;
+						*end++ = opcodes[o];
+						*end++ = (uint8_t)mr;
+						*end++ = 0x24;
+						*end++ = 0x80;
+						*end++ = 0xff;
+						const uint8_t *p = bytes;
+						size_t left = sizeof(bytes);
+						uint64_t pc = 0;
+						if (!cs_disasm_iter(h, &p,
+								    &left, &pc,
+								    insn)) {
+							ok = false;
+							break;
+						}
+						if (insn->detail
+							    ->regs_read_count) {
+							fprintf(stderr,
+								"scalar DS: mode=%u syntax=%u opcode=%x rex=%u modrm=%x implicit=%u first=%u\n",
+								modes[mode],
+								att, opcodes[o],
+								rex, mr,
+								insn->detail
+									->regs_read_count,
+								insn->detail->regs_read
+									[0]);
+							ok = false;
+							break;
+						}
+						if (mr >= 0xc0) {
+							cs_regs reads, writes;
+							uint8_t nr, nw;
+							if (cs_regs_access(
+								    h, insn,
+								    reads, &nr,
+								    writes,
+								    &nw)) {
+								ok = false;
+								break;
+							}
+							for (unsigned i = 0;
+							     i < nr; ++i)
+								if (reads[i] ==
+								    X86_REG_DS)
+									ok = false;
+						}
+					}
+		}
+		cs_free(insn, 1);
+		cs_close(&h);
+		if (!ok)
+			return false;
+	}
+	return true;
+}
+
 int main(void)
 {
 	if (cs_support(CS_SUPPORT_DIET))
@@ -620,6 +785,7 @@ int main(void)
 	}
 	bool success = check_implicit_copies(handle) && check_test_operands() &&
 		       check_scalar_move_flags() &&
+		       check_scalar_segment_reads() &&
 		       check_vector_compare_flags();
 	cs_close(&handle);
 	return success ? 0 : 1;

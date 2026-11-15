@@ -611,9 +611,12 @@ definition.
 Implicit register and group counts are projected from `X86MappingInsn*.inc`
 by `suite/synctools/x86_mapping_counts.py`. Counts stop at the same first zero as
 the runtime helpers and use each array's declared capacity. Bit 14 of the same
-record marks public IDs handled by the implicit-register repair switches in
-`X86_get_insn_id`. The generator derives eligibility from those switches and
-requires their defaults to do no work; other IDs skip the entire repair block.
+record marks internal opcodes handled by the implicit-register repair switches in
+`X86_get_insn_id`. The generator derives candidate public IDs from those switches
+and requires their defaults to do no work. It distinguishes the `MOVSL` and
+`CMPSL` string opcodes from SSE forms sharing their public IDs; those SSE forms
+have no implicit string registers and skip the repair block. Other public IDs
+also skip the block.
 Full-array copies, correction order and branch-group insertion remain unchanged.
 Run the generator after changing either mapping table or the repair switches.
 Its `--check` mode and unit checks validate the full/reduced projection and reject
