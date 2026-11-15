@@ -1033,12 +1033,24 @@ void ARM_init_cs_detail(MCInst *MI)
 	       sizeof(arm_empty_operands));
 }
 #else
+#if defined(CAPSTONE_ARM_AARCH64_MIPS_X86) && defined(__linux__) && \
+	defined(__aarch64__) && defined(__GNUC__) && !defined(__clang__)
+#define ARM_INIT_CLEARED_OPERANDS
+#endif
+
+static inline void ARM_set_op_defaults(cs_arm_op *op)
+{
+#ifndef ARM_INIT_CLEARED_OPERANDS
+	op->type = ARM_OP_INVALID;
+#endif
+	op->vector_index = -1;
+	op->neon_lane = -1;
+}
+
 void ARM_setup_op(cs_arm_op *op)
 {
 	memset(op, 0, sizeof(cs_arm_op));
-	op->type = ARM_OP_INVALID;
-	op->vector_index = -1;
-	op->neon_lane = -1;
+	ARM_set_op_defaults(op);
 }
 
 void ARM_init_cs_detail(MCInst *MI)
@@ -1050,11 +1062,16 @@ void ARM_init_cs_detail(MCInst *MI)
 		       offsetof(cs_detail, arm) + sizeof(cs_arm));
 
 		for (i = 0; i < ARR_SIZE(ARM_get_detail(MI)->operands); i++)
+#ifdef ARM_INIT_CLEARED_OPERANDS
+			ARM_set_op_defaults(&ARM_get_detail(MI)->operands[i]);
+#else
 			ARM_setup_op(&ARM_get_detail(MI)->operands[i]);
+#endif
 		ARM_get_detail(MI)->cc = ARMCC_UNDEF;
 		ARM_get_detail(MI)->vcc = ARMVCC_None;
 	}
 }
+#undef ARM_INIT_CLEARED_OPERANDS
 #endif
 
 static uint64_t t_add_pc(MCInst *MI, uint64_t v)
