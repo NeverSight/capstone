@@ -51,3 +51,14 @@ EFLAGS: MOD_AF MOD_CF MOD_SF MOD_ZF MOD_PF MOD_OF
 ```
 
 To see all the supported options, run ./cstool
+
+For RISC-V, append `+bitmanip` to `riscv32` or `riscv64` to enable the
+standard B extension: Zba, Zbb, and Zbs. For example:
+
+```
+$ cstool riscv64+bitmanip "b3 22 73 20"
+```
+
+This decodes `sh1add t0, t1, t2`. Carry-less multiplication remains a separate
+extension; append `+zbc` when needed. The extension grouping follows the
+[RISC-V Bit Manipulation specification](https://docs.riscv.org/reference/isa/unpriv/b-st-ext.html).

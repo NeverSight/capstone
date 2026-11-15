@@ -207,3 +207,10 @@ if(CAPSTONE_X86_SUPPORT)
     set_tests_properties(unit_x86_x87_environment_hardware PROPERTIES
         SKIP_RETURN_CODE 77 TIMEOUT 120)
 endif()
+
+if(CAPSTONE_RISCV_SUPPORT AND TARGET cstool AND Python3_Interpreter_FOUND
+   AND NOT CAPSTONE_BUILD_DIET)
+    add_test(NAME unit_cstool_riscv_bitmanip
+        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/test_cstool_riscv_bitmanip.py"
+                "$<TARGET_FILE:cstool>")
+endif()

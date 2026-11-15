@@ -201,7 +201,7 @@ static struct {
 	  { CS_ARCH_RISCV, CS_ARCH_MAX },
 	  0,
 	  CS_MODE_RISCV_ZCMP_ZCMT_ZCE },
-	{ "a",
+	{ "+a",
 	  "Enables the RISCV A extension",
 	  { CS_ARCH_RISCV, CS_ARCH_MAX },
 	  0,
@@ -262,10 +262,10 @@ static struct {
 	  0,
 	  CS_MODE_RISCV_VENTANA },
 	{ "+bitmanip",
-	  "Enables the RISCV bit manipulation extension",
+	  "Enables the RISCV B extension (Zba, Zbb, Zbs)",
 	  { CS_ARCH_RISCV, CS_ARCH_MAX },
 	  0,
-	  CS_MODE_RISCV_BITMANIP },
+	  CS_MODE_RISCV_ZBA | CS_MODE_RISCV_ZBB | CS_MODE_RISCV_ZBS },
 	{ NULL }
 };
 
