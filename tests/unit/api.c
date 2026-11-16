@@ -38,6 +38,10 @@ static bool test_cs_mem_setup_fail()
 						    (size_t)&mem),
 				  CS_ERR_MEMSETUP);
 
+	mem.free = free;
+	CHECK_INT_EQUAL_RET_FALSE(
+		(size_t)cs_option(0, CS_OPT_MEM, (size_t)&mem), CS_ERR_OK);
+
 	return true;
 }
 
