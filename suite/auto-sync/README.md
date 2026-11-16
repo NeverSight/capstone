@@ -106,7 +106,7 @@ ASUpdater -a <ARCH>
 and update them if necessary (some architectures don't have this file).
 3. Try to build Capstone and fix the build errors.
 
-After updating ARM, AArch64, ARC, RISC-V, LoongArch, SPARC, PowerPC, MIPS, SystemZ or Xtensa, run
+After updating ARM, AArch64, ARC, RISC-V, LoongArch, SPARC, PowerPC, MIPS, SystemZ, TriCore or Xtensa, run
 `python3 suite/synctools/fixed_len_decoder.py` from the repository root, then
 run it with `--check`. This derives the direct decoder from the updated tables.
 If the interpreter fingerprint changed, review its state transitions and update
@@ -117,6 +117,9 @@ width, including PowerPC prefixed instructions, NanoMIPS 48-bit words and
 SystemZ's shared 64-bit input for all three instruction lengths. Xtensa's
 table calls share the generated 64-bit `_3` helper; the translator preserves
 that choice instead of inferring a helper suffix from the encoded width.
+TriCore emits direct branches only when
+`CAPSTONE_TRICORE_DIRECT_DECODER` selects the dedicated build. Retain
+that guard around the short-width admission during the Differ step.
 
 After regenerating the AArch64 assembly writer or translating its printer,
 run `python3 suite/synctools/aarch64_register_names.py`. Run it again with

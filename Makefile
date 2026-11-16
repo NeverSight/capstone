@@ -667,7 +667,7 @@ endif
 
 # Match the isolated TriCore decoder configuration.
 ifeq ($(sort $(CAPSTONE_ARCHS)),tricore)
-$(OBJDIR)/arch/TriCore/TriCoreDisassembler.o: CFLAGS += -DCAPSTONE_TRICORE_WIDTH_ADMISSION
+$(OBJDIR)/arch/TriCore/TriCoreDisassembler.o: CFLAGS += -DCAPSTONE_TRICORE_DIRECT_DECODER
 endif
 
 # Match the Release x86 formatter tuning for the compiler's target.

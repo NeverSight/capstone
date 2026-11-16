@@ -427,6 +427,7 @@ public:
             "SystemZ",
             "Xtensa",
             "ARC",
+            "TriCore",
         ):
             with self.subTest(arch=arch):
                 syntax = f'#include "{arch}GenDisassemblerTables.inc"\n'.encode()

@@ -23,7 +23,7 @@ and controlling the decoding procedure.
 
 ### Direct decoder generation
 
-ARM, AArch64, ARC, RISC-V, LoongArch, SPARC, PowerPC, MIPS, SystemZ and Xtensa lower their
+ARM, AArch64, ARC, RISC-V, LoongArch, SPARC, PowerPC, MIPS, SystemZ, TriCore and Xtensa lower their
 generated decoder state machines to C branches with
 `suite/synctools/fixed_len_decoder.py`.
 The existing LLVM tables
@@ -57,8 +57,9 @@ TriCore-only builds check the instruction width bit before entering the short
 tables: both primary filter chains reject odd values without touching
 instruction state. Version-specific and long-table fallback order is
 unchanged. The decoder table regression checks this admission contract.
-Mixed-backend builds retain their existing code layout; the width check is
-qualified only for the isolated TriCore configuration.
+TriCore direct lowering and width admission are selected together only
+for TriCore-only builds. Mixed-backend builds retain the interpreter
+and their existing code layout.
 
 ARM, AArch64 and RISC-V define their feature queries in the existing
 disassembler extension headers. Constant feature numbers can then fold into

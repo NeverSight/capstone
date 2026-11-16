@@ -21,6 +21,7 @@ BACKENDS = (
     ("ARM", "ARM", {16: (2, 16), 32: (4, 32)}),
     ("ARC", "ARC", {16: (2, 16), 32: (4, 32), 48: (8, 64), 64: (8, 64)}),
     ("RISCV", "RISCV", {16: (2, 16), 32: (4, 32)}),
+    ("TriCore", "TriCore", {16: (2, 16), 32: (4, 32)}),
     ("LoongArch", "LoongArch", {32: (4, 32)}),
     ("Sparc", "Sparc", {32: (4, 32)}),
     ("PowerPC", "PPC", {32: (4, 64), 64: (4, 64)}),
@@ -317,6 +318,9 @@ def main():
             ]
         if arch == "ARC":
             output.insert(1, "#if !defined(__GNUC__) || defined(__clang__) || __GNUC__ != 11")
+            output.append("#endif")
+        if arch == "TriCore":
+            output.insert(1, "#ifdef CAPSTONE_TRICORE_DIRECT_DECODER")
             output.append("#endif")
         generated = "\n\n".join(output) + "\n"
         dst = ROOT / f"arch/{arch}/{prefix}GenDirectDecoder.inc"

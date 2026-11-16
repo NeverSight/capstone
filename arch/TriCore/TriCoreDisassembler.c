@@ -210,6 +210,7 @@ bool TriCore_getFeatureBits(unsigned int mode, unsigned int feature)
 }
 
 #include "TriCoreGenDisassemblerTables.inc"
+#include "TriCoreGenDirectDecoder.inc"
 
 #define GET_REGINFO_ENUM
 #define GET_REGINFO_MC_DESC
@@ -1674,7 +1675,7 @@ static inline bool decodeInstruction2_or_4(const uint8_t *code, size_t code_len,
 		/* Both short tables reject odd primary opcodes before
 		 * touching MI. Keep the long-table fallback below. */
 		DecodeStatus Result =
-#ifdef CAPSTONE_TRICORE_WIDTH_ADMISSION
+#ifdef CAPSTONE_TRICORE_DIRECT_DECODER
 			(insn2 & 1) ? MCDisassembler_Fail :
 #endif
 				      decodeInstruction_2(tbl2, MI, insn2,
