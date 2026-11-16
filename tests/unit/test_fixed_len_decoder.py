@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Generated decoder checks must not depend on checkout newline conversion."""
+"""Check generated decoder contracts and checkout newline independence."""
 
 import contextlib
 import importlib.util
 import io
+import re
 from pathlib import Path
 import sys
 import tempfile
@@ -90,6 +91,29 @@ class CheckoutNewlines(unittest.TestCase):
                     )
                     with self.assertRaisesRegex(ValueError, "input width"):
                         self.check(root)
+
+
+class TriCoreShortTableAdmission(unittest.TestCase):
+    def test_odd_halfwords_fail_before_touching_instruction_state(self):
+        text = (ROOT / "arch/TriCore/TriCoreGenDisassemblerTables.inc").read_text()
+        tables = dict(re.findall(
+            r"static const uint8_t (DecoderTable\w*)\[\] = \{(.*?)\n\};",
+            text, re.S))
+        for name in ("DecoderTable16", "DecoderTablev11016"):
+            with self.subTest(table=name):
+                nodes = DECODER.parse(tables[name])
+                root = nodes[0]
+                self.assertEqual(root.op, "ExtractField")
+                self.assertEqual(root.args, (0, 6))
+                position = root.end
+                filters = 0
+                while nodes[position].op == "FilterValue":
+                    node = nodes[position]
+                    self.assertEqual(node.args[0] & 1, 0)
+                    position = node.target
+                    filters += 1
+                self.assertGreater(filters, 0)
+                self.assertEqual(nodes[position].op, "Fail")
 
 
 if __name__ == "__main__":

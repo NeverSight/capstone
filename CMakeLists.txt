@@ -819,6 +819,9 @@ endif()
 
 if (CAPSTONE_TRICORE_SUPPORT)
     add_definitions(-DCAPSTONE_HAS_TRICORE)
+    if(capstone_enabled_architectures STREQUAL "TRICORE")
+        set_property(SOURCE arch/TriCore/TriCoreDisassembler.c APPEND PROPERTY COMPILE_DEFINITIONS CAPSTONE_TRICORE_WIDTH_ADMISSION)
+    endif()
     set(CSTOOL_SRC
         ${CSTOOL_SRC}
         cstool/cstool_tricore.c)

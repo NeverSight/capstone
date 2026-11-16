@@ -1671,8 +1671,14 @@ static inline bool decodeInstruction2_or_4(const uint8_t *code, size_t code_len,
 			return false;
 		}
 		uint16_t insn2 = readBytes16(MI, code);
+		/* Both short tables reject odd primary opcodes before
+		 * touching MI. Keep the long-table fallback below. */
 		DecodeStatus Result =
-			decodeInstruction_2(tbl2, MI, insn2, address, NULL);
+#ifdef CAPSTONE_TRICORE_WIDTH_ADMISSION
+			(insn2 & 1) ? MCDisassembler_Fail :
+#endif
+				      decodeInstruction_2(tbl2, MI, insn2,
+							  address, NULL);
 		if (Result == MCDisassembler_Success) {
 			*size = 2;
 			return true;

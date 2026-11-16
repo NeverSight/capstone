@@ -665,6 +665,11 @@ else
 	@echo "Skipping tests on whole corpus"
 endif
 
+# Match the isolated TriCore decoder configuration.
+ifeq ($(sort $(CAPSTONE_ARCHS)),tricore)
+$(OBJDIR)/arch/TriCore/TriCoreDisassembler.o: CFLAGS += -DCAPSTONE_TRICORE_WIDTH_ADMISSION
+endif
+
 # Match the Release x86 formatter tuning for the compiler's target.
 ifneq (,$(filter -DCAPSTONE_X86_ONLY -DCAPSTONE_X86_MIPS_ONLY -DCAPSTONE_ARM_AARCH64_MIPS_X86,$(CFLAGS)))
 ifneq (,$(filter -O2 -O3,$(CFLAGS)))

@@ -53,6 +53,12 @@ ARC's 48- and 64-bit tables share the 64-bit `_8` helper. Its 16- and
 remain unchanged. GCC 11 retains the ARC interpreter: direct lowering
 regresses MIPS scan throughput in the combined library on that compiler.
 Other qualified compiler profiles use the generated branches.
+TriCore-only builds check the instruction width bit before entering the short
+tables: both primary filter chains reject odd values without touching
+instruction state. Version-specific and long-table fallback order is
+unchanged. The decoder table regression checks this admission contract.
+Mixed-backend builds retain their existing code layout; the width check is
+qualified only for the isolated TriCore configuration.
 
 ARM, AArch64 and RISC-V define their feature queries in the existing
 disassembler extension headers. Constant feature numbers can then fold into
