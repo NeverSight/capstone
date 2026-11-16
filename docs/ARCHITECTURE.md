@@ -23,7 +23,7 @@ and controlling the decoding procedure.
 
 ### Direct decoder generation
 
-ARM, AArch64, RISC-V, LoongArch, SPARC, PowerPC, MIPS, SystemZ and Xtensa lower their
+ARM, AArch64, ARC, RISC-V, LoongArch, SPARC, PowerPC, MIPS, SystemZ and Xtensa lower their
 generated decoder state machines to C branches with
 `suite/synctools/fixed_len_decoder.py`.
 The existing LLVM tables
@@ -48,6 +48,11 @@ all use the 64-bit `_8` input. Xtensa uses its generated 64-bit `_3` helper
 for every table, regardless of encoded width; the translator selects that
 same helper at its call sites. The wrappers retain those exact types
 and the original reader, table-selection order and fallback interpreter.
+ARC's 48- and 64-bit tables share the 64-bit `_8` helper. Its 16- and
+32-bit readers and the long-instruction attempt before short-form fallback
+remain unchanged. GCC 11 retains the ARC interpreter: direct lowering
+regresses MIPS scan throughput in the combined library on that compiler.
+Other qualified compiler profiles use the generated branches.
 
 ARM, AArch64 and RISC-V define their feature queries in the existing
 disassembler extension headers. Constant feature numbers can then fold into

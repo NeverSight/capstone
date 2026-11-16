@@ -52,6 +52,7 @@ class Includes(Patch):
                 "Mips",
                 "SystemZ",
                 "Xtensa",
+                "ARC",
             ):
                 result += (
                     b'#include "'

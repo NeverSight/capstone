@@ -176,6 +176,7 @@ static DecodeStatus DecodeGBR32ShortRegister(MCInst *Inst, unsigned RegNo,
 }
 
 #include "ARCGenDisassemblerTables.inc"
+#include "ARCGenDirectDecoder.inc"
 
 static unsigned decodeCField(unsigned Insn)
 {
