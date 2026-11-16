@@ -1082,7 +1082,10 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
 		MCInst_InitStorage(&mci, CS_ARCH_MIPS, false);
 	else
 #endif
-#ifdef CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS
+#ifdef CAPSTONE_ARM_INIT_CONSTRUCTED_OPERANDS
+		/* ARM constructs each operand before reading or inserting it. */
+		MCInst_InitStorage(&mci, CS_ARCH_ARM, false);
+#elif defined(CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS)
 	/* The RISC-V decoder constructs each operand before reading it. */
 	MCInst_InitStorage(&mci, CS_ARCH_RISCV, false);
 #elif defined(CAPSTONE_AARCH64_INIT_CONSTRUCTED_OPERANDS) && \
@@ -1092,7 +1095,7 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
 	 * initializer below. */
 	MCInst_InitStorage(&mci, CS_ARCH_AARCH64, false);
 #else
-		MCInst_Init(&mci, handle->arch);
+	MCInst_Init(&mci, handle->arch);
 #endif
 	mci.csh = handle;
 	mci.address = insn->address;

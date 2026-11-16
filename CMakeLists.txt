@@ -163,7 +163,7 @@ elseif(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;X86")
 endif()
 
 if(capstone_enabled_architectures STREQUAL "ARM")
-    add_compile_definitions(CAPSTONE_ARM_COPY_OPERAND_DEFAULTS)
+    add_compile_definitions(CAPSTONE_ARM_COPY_OPERAND_DEFAULTS CAPSTONE_ARM_INIT_CONSTRUCTED_OPERANDS)
 endif()
 
 if(capstone_enabled_architectures STREQUAL "MIPS")
