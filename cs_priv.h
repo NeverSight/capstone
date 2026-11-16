@@ -13,7 +13,10 @@
 
 /* Keep iterator state in registers across private decoder calls. Every
  * declaration and definition uses the same internal calling convention. */
-#if defined(__clang__) && (defined(__aarch64__) || defined(__x86_64__))
+/* Before LLVM 17, x86-64 preserve_most restores RAX over return values.
+ * See LLVM D143425. AArch64 does not use the affected return lowering. */
+#if defined(__clang__) && \
+    (defined(__aarch64__) || (defined(__x86_64__) && __clang_major__ >= 17))
 #if __has_attribute(preserve_most)
 #define CS_PRESERVE_MOST __attribute__((preserve_most))
 #endif
