@@ -986,6 +986,11 @@ void ARM_reg_access(const cs_insn *insn, cs_regs regs_read,
 		default:
 			break;
 		}
+		if (op->shift.type >= ARM_SFT_ASR_REG &&
+		    !arr_exist_inline(regs_read, read_count, op->shift.value)) {
+			regs_read[read_count] = (uint16_t)op->shift.value;
+			read_count++;
+		}
 	}
 
 	*regs_read_count = read_count;

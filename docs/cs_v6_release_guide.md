@@ -888,3 +888,10 @@ IDs are unchanged. Encoding authority: MD00076 revision 2.63, pages 118–127.
 MIPS16e2 decoding includes LL/SC, RDHWR and DI/EI. The RDHWR hardware index is
 an immediate in `cs_mips` (followed by selector zero), not a general register
 read. SC's GPR is read/write and its memory operand is write-only.
+
+## ARM register-controlled shifts
+
+`cs_regs_access` now includes the register supplying a shift amount
+for A32 ASR, LSL, LSR and ROR operands. For example,
+`add r0, r1, r2, lsl r3` reads `r1`, `r2` and `r3`. Repeated input
+registers and the explicit shift operand in MOV aliases are deduplicated.
