@@ -389,13 +389,23 @@ returns to the existing extension and generated decoders. Non-EVEX and
 non-64-bit inputs bypass the new plan helper. DIET, reduced, custom-runtime,
 kernel and other host builds retain their original scan entry.
 
+The same opcode index also tags ordinary packed EVEX moves and full-tuple
+broadcasts. Their canonical ID depends on the mandatory prefix, W and vector
+length. Reserved vvvv/V' fields, masking and broadcast/rounding modifiers keep
+their existing validation. A 32-entry ModR/M table supplies ordinary register
+and memory extents; only mod=0 with SIB needs the SIB base to distinguish a
+disp32 address. The complete instruction must fit before its ID and length
+are returned. Address, register and operand details still use the full reader.
+
 The scan helper and plans occupy their own code and read-only sections.
 `suite/synctools/x86_vector_output.cpp --evex-scan` emits
 `X86GenEvexScan.inc` from the same canonical probes as the full vector output
 rows. Rebuild this generator against the current Capstone library after
 changing those forms, and regenerate both the default output and the scan
-projection. The generator rejects opcode-index collisions and IDs outside
-the compact representation.
+projection. Transfer probes cover load/store direction, extension registers,
+ModR/M and SIB values and displacement extents before admitting an ID. The
+generator rejects opcode-index collisions and IDs outside the compact
+representation.
 
 Legacy RAO-INT (`0F 38 FC` with its operation-selecting mandatory prefix) and
 VEX CMPccXADD use the source-owned atomic handler in `X86Mapping.c`. They

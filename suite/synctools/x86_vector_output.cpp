@@ -917,6 +917,62 @@ void emit_vex_registers(Decoder &decoder)
 	std::fprintf(stderr, "%zu VEX register rows, %zu opcode plans\n",
 		     rows.size(), widths.size() - 1);
 }
+void emit_evex_transfer_scan(Decoder &decoder)
+{
+	std::puts("static const uint16_t evex_transfer_scan_ids[4][2][3]\n\t__attribute__((section(\".cs_x86_evex_transfer_rodata\"))) = {");
+	for (unsigned kind = 0; kind < 4; ++kind) {
+		std::puts("\t{");
+		for (unsigned w = 0; w < 2; ++w) {
+			std::printf("\t\t{ ");
+			for (unsigned ll = 0; ll < 3; ++ll) {
+				const unsigned pp = kind ? kind : 1;
+				const unsigned map = kind ? 1 : 2;
+				uint8_t bytes[11] = {
+					0x62, uint8_t(0xf0 | map),
+					uint8_t(0x7c | pp | w << 7),
+					uint8_t(8 | ll << 5),
+					uint8_t(kind ? 0x6f : 0x1a), 0x58, 0x80
+				};
+				unsigned id = decoder.decode(bytes, 7);
+				if (id > UINT16_MAX)
+					throw std::runtime_error("EVEX transfer ID exceeds uint16_t");
+				if (id) {
+					for (unsigned store = 0; store < (kind ? 2u : 1u); ++store) {
+						bytes[4] = uint8_t(kind ? 0x6f | store << 4 : 0x1a);
+						for (unsigned ext = 0; ext < 16; ++ext) {
+							bytes[1] = uint8_t(ext << 4 | map);
+							for (unsigned modrm = 0; modrm < (kind ? 256u : 192u); ++modrm) {
+								bytes[5] = uint8_t(modrm);
+								const unsigned mod = modrm >> 6, rm = modrm & 7;
+								const bool sib = mod < 3 && rm == 4;
+								for (unsigned address = 0; address < (sib ? 256u : 1u); ++address) {
+									unsigned length = 6;
+									if (sib)
+										bytes[length++] = uint8_t(address);
+									unsigned displacement = 0;
+									if (mod == 1)
+										displacement = 1;
+									else if (mod == 2 || (mod == 0 && (sib ? (address & 7) == 5 : rm == 5)))
+										displacement = 4;
+									for (unsigned j = 0; j < displacement; ++j)
+										bytes[length++] = uint8_t(0x81 + j * 37);
+									if (decoder.decode(bytes, length) != id)
+										throw std::runtime_error("EVEX transfer ID depends on address or register fields");
+								}
+							}
+						}
+					}
+				}
+				std::printf("%s%s", ll ? ", " : "", decoder.symbol(id).c_str());
+			}
+			std::puts(" },");
+		}
+		std::puts("\t},");
+	}
+	std::puts("};");
+	std::fprintf(stderr, "%llu canonical EVEX transfer probes\n", static_cast<unsigned long long>(decoder.probes));
+}
+
 void emit_evex_scan(Decoder &decoder, const std::map<unsigned, WidthRows> &ids)
 {
 	std::array<unsigned, 256> index{};
@@ -935,6 +991,11 @@ void emit_evex_scan(Decoder &decoder, const std::map<unsigned, WidthRows> &ids)
 			throw std::runtime_error("EVEX scan opcode plan collision");
 		index[key & 255] = plan;
 	}
+	if (index[0x6f] || index[0x7f] || index[0x1a] || plan >= 128)
+		throw std::runtime_error("EVEX transfer opcode plan collision");
+	index[0x6f] = index[0x7f] = 128;
+	index[0x1a] = 129;
+	std::puts("enum { EVEX_SCAN_MOVE = 128, EVEX_SCAN_BROADCAST = 129 };");
 	std::puts("struct EvexScanPlan {\n\tuint8_t map, length;\n\tuint16_t ids[2][3];\n};");
 	std::puts("static const struct EvexScanPlan evex_scan_plans[]\n\t__attribute__((section(\".cs_x86_evex_scan_rodata\"))) = {\n\t{ 0 },");
 	for (const auto &[key, widths] : ids) {
@@ -960,6 +1021,8 @@ void emit_evex_scan(Decoder &decoder, const std::map<unsigned, WidthRows> &ids)
 		std::putchar('\n');
 	}
 	std::puts("};");
+	emit_evex_transfer_scan(decoder);
+	std::puts("static const uint8_t evex_transfer_lengths[32]\n\t__attribute__((section(\".cs_x86_evex_transfer_rodata\"))) = {\n\t6, 6, 6, 6, 0, 10, 6, 6,\n\t7, 7, 7, 7, 8, 7, 7, 7,\n\t10, 10, 10, 10, 11, 10, 10, 10,\n\t6, 6, 6, 6, 6, 6, 6, 6,\n};");
 }
 
 void emit_output(Decoder &decoder, bool scan_only)
