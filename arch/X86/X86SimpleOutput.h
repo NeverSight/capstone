@@ -68,6 +68,27 @@ X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
 		      uint16_t *insn_size, const struct X86SimpleRegister *regs,
 		      bool wide);
 
+/* Externalizing the broadcast reader preserves Clang's surrounding code.
+ * Other compilers retain the established static reader. */
+#if defined(__clang__)
+#define CAPSTONE_X86_EVEX_MEMORY_OUTPUT
+CAPSTONE_INTERNAL bool
+X86_writeEvexMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
+			  uint16_t *insn_size,
+			  const struct X86SimpleRegister *regs);
+
+/* These private entries require six bytes, checked by writeEvexOutput. */
+CAPSTONE_INTERNAL bool
+X86_writeEvexMemoryDispatch(const uint8_t *code, size_t size, cs_insn *insn,
+			    uint16_t *insn_size,
+			    const struct X86SimpleRegister *regs);
+CAPSTONE_INTERNAL bool
+X86_writeEvexBroadcastPrechecked(const uint8_t *code, size_t size,
+				 cs_insn *insn, uint16_t *insn_size,
+				 const struct X86SimpleRegister *regs);
+
+#endif
+
 static inline char *X86_writeDisp8(char *out, int displacement)
 {
 	if (displacement) {

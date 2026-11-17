@@ -114,6 +114,7 @@
 		1FF1851645C11683FAAD600E /* X86InstPrinterCommon.c in Sources */ = {isa = PBXBuildFile; fileRef = CC7598114250B3634D5EE151 /* X86InstPrinterCommon.c */; };
 		622C10B6D0FEFA1B71266515 /* X86VectorOutput.c in Sources */ = {isa = PBXBuildFile; fileRef = 3F9102488E04AC94E9D265E8 /* X86VectorOutput.c */; };
 		E33028ACC3DA98FC0470062D /* X86EvexScan.c in Sources */ = {isa = PBXBuildFile; fileRef = 96AF8FF8D75E5BF886DBDB98 /* X86EvexScan.c */; };
+		C2833ED7038B1DE56F26F2D2 /* X86EvexMemoryOutput.c in Sources */ = {isa = PBXBuildFile; fileRef = 8E4BCD368926E4FDFBC1ACC5 /* X86EvexMemoryOutput.c */; };
 		DC474FB519DE6FDA00BCA449 /* X86DisassemblerDecoder.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE243819DDCD8800EF8EA9 /* X86DisassemblerDecoder.c */; };
 		DC474FB619DE6FDA00BCA449 /* X86IntelInstPrinter.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE244519DDCD8800EF8EA9 /* X86IntelInstPrinter.c */; };
 		FD474FB619DE6FDA00BCA449 /* X86IntelInstPrinterPrechecked.c in Sources */ = {isa = PBXBuildFile; fileRef = FDFE244519DDCD8800EF8EA9 /* X86IntelInstPrinterPrechecked.c */; };
@@ -163,6 +164,7 @@
 		6F07D2770C5E4BF523EBC9C5 /* X86InstPrinterCommon.c in Sources */ = {isa = PBXBuildFile; fileRef = CC7598114250B3634D5EE151 /* X86InstPrinterCommon.c */; };
 		C72D2A93431E319146708B3E /* X86VectorOutput.c in Sources */ = {isa = PBXBuildFile; fileRef = 3F9102488E04AC94E9D265E8 /* X86VectorOutput.c */; };
 		84EA56EA2616D916C1E70CF9 /* X86EvexScan.c in Sources */ = {isa = PBXBuildFile; fileRef = 96AF8FF8D75E5BF886DBDB98 /* X86EvexScan.c */; };
+		652E884DFEF2599162749DCD /* X86EvexMemoryOutput.c in Sources */ = {isa = PBXBuildFile; fileRef = 8E4BCD368926E4FDFBC1ACC5 /* X86EvexMemoryOutput.c */; };
 		DC474FD919DE6FDA00BCA449 /* X86DisassemblerDecoder.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE243819DDCD8800EF8EA9 /* X86DisassemblerDecoder.c */; };
 		DC474FDA19DE6FDA00BCA449 /* X86IntelInstPrinter.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE244519DDCD8800EF8EA9 /* X86IntelInstPrinter.c */; };
 		FD474FDA19DE6FDA00BCA449 /* X86IntelInstPrinterPrechecked.c in Sources */ = {isa = PBXBuildFile; fileRef = FDFE244519DDCD8800EF8EA9 /* X86IntelInstPrinterPrechecked.c */; };
@@ -231,6 +233,7 @@
 		9105DF150F055252784A38B6 /* X86InstPrinterCommon.c in Sources */ = {isa = PBXBuildFile; fileRef = CC7598114250B3634D5EE151 /* X86InstPrinterCommon.c */; };
 		417BE6BB325645C04D6B8E07 /* X86VectorOutput.c in Sources */ = {isa = PBXBuildFile; fileRef = 3F9102488E04AC94E9D265E8 /* X86VectorOutput.c */; };
 		F237EC1CB49B9025109FA311 /* X86EvexScan.c in Sources */ = {isa = PBXBuildFile; fileRef = 96AF8FF8D75E5BF886DBDB98 /* X86EvexScan.c */; };
+		19F43F251FA282D78ED51DF1 /* X86EvexMemoryOutput.c in Sources */ = {isa = PBXBuildFile; fileRef = 8E4BCD368926E4FDFBC1ACC5 /* X86EvexMemoryOutput.c */; };
 		DCFE248B19DDCDC000EF8EA9 /* X86DisassemblerDecoder.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE243819DDCD8800EF8EA9 /* X86DisassemblerDecoder.c */; };
 		DCFE248C19DDCDC000EF8EA9 /* X86IntelInstPrinter.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE244519DDCD8800EF8EA9 /* X86IntelInstPrinter.c */; };
 		FDFE248C19DDCDC000EF8EA9 /* X86IntelInstPrinterPrechecked.c in Sources */ = {isa = PBXBuildFile; fileRef = FDFE244519DDCD8800EF8EA9 /* X86IntelInstPrinterPrechecked.c */; };
@@ -517,6 +520,7 @@
 		CC7598114250B3634D5EE151 /* X86InstPrinterCommon.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86InstPrinterCommon.c; sourceTree = "<group>"; };
 		3F9102488E04AC94E9D265E8 /* X86VectorOutput.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86VectorOutput.c; sourceTree = "<group>"; };
 		96AF8FF8D75E5BF886DBDB98 /* X86EvexScan.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86EvexScan.c; sourceTree = "<group>"; };
+		8E4BCD368926E4FDFBC1ACC5 /* X86EvexMemoryOutput.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86EvexMemoryOutput.c; sourceTree = "<group>"; };
 		DCFE243719DDCD8800EF8EA9 /* X86Disassembler.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = X86Disassembler.h; sourceTree = "<group>"; };
 		DCFE243819DDCD8800EF8EA9 /* X86DisassemblerDecoder.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86DisassemblerDecoder.c; sourceTree = "<group>"; };
 		DCFE243919DDCD8800EF8EA9 /* X86DisassemblerDecoder.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = X86DisassemblerDecoder.h; sourceTree = "<group>"; };
@@ -993,6 +997,7 @@
 				CC7598114250B3634D5EE151 /* X86InstPrinterCommon.c */,
 				3F9102488E04AC94E9D265E8 /* X86VectorOutput.c */,
 				96AF8FF8D75E5BF886DBDB98 /* X86EvexScan.c */,
+				8E4BCD368926E4FDFBC1ACC5 /* X86EvexMemoryOutput.c */,
 				DCFE243719DDCD8800EF8EA9 /* X86Disassembler.h */,
 				DCFE243819DDCD8800EF8EA9 /* X86DisassemblerDecoder.c */,
 				DCFE243919DDCD8800EF8EA9 /* X86DisassemblerDecoder.h */,
@@ -1650,6 +1655,7 @@
 				6F07D2770C5E4BF523EBC9C5 /* X86InstPrinterCommon.c in Sources */,
 				C72D2A93431E319146708B3E /* X86VectorOutput.c in Sources */,
 				84EA56EA2616D916C1E70CF9 /* X86EvexScan.c in Sources */,
+				652E884DFEF2599162749DCD /* X86EvexMemoryOutput.c in Sources */,
 				DC474FC519DE6FDA00BCA449 /* ARMModule.c in Sources */,
 				DC474FC719DE6FDA00BCA449 /* MipsInstPrinter.c in Sources */,
 				DC474F9319DE6FCD00BCA449 /* cs.c in Sources */,
@@ -1752,6 +1758,7 @@
 				9105DF150F055252784A38B6 /* X86InstPrinterCommon.c in Sources */,
 				417BE6BB325645C04D6B8E07 /* X86VectorOutput.c in Sources */,
 				F237EC1CB49B9025109FA311 /* X86EvexScan.c in Sources */,
+				19F43F251FA282D78ED51DF1 /* X86EvexMemoryOutput.c in Sources */,
 				DCFE249719DDCDD000EF8EA9 /* XCoreMapping.c in Sources */,
 				DCA357831BC2C0290094BB3F /* M68KDisassembler.c in Sources */,
 				DCFE247719DDCDAD00EF8EA9 /* SparcDisassembler.c in Sources */,
@@ -1800,6 +1807,7 @@
 				1FF1851645C11683FAAD600E /* X86InstPrinterCommon.c in Sources */,
 				622C10B6D0FEFA1B71266515 /* X86VectorOutput.c in Sources */,
 				E33028ACC3DA98FC0470062D /* X86EvexScan.c in Sources */,
+				C2833ED7038B1DE56F26F2D2 /* X86EvexMemoryOutput.c in Sources */,
 				DC474FA119DE6FDA00BCA449 /* ARMModule.c in Sources */,
 				DC474FA319DE6FDA00BCA449 /* MipsInstPrinter.c in Sources */,
 				DC474F8D19DE6FCD00BCA449 /* cs.c in Sources */,

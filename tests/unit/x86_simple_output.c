@@ -562,6 +562,60 @@ static bool check_rex_stack(csh handles[2])
 	return true;
 }
 
+static bool check_evex_memory_moves(csh handles[2])
+{
+	static const uint32_t displacements[] = {
+		0, 1, 0x7f, 0x80, 0xff, 0x80000000, 0x7fffffff, 0xffffffff
+	};
+	for (unsigned pp = 1; pp <= 2; ++pp)
+		for (unsigned store = 0; store < 2; ++store)
+			for (unsigned ll = 0; ll < 4; ++ll)
+				for (unsigned ext = 0; ext < 16; ++ext)
+					for (unsigned mr = 0; mr < 256; ++mr) {
+						const unsigned sib =
+							(mr & 7) == 4 &&
+							mr < 0xc0;
+						uint8_t bytes[11] = {
+							0x62,
+							(uint8_t)(ext << 4 | 1),
+							(uint8_t)(0xfc | pp),
+							(uint8_t)(ll << 5 | 8),
+							(uint8_t)(0x6f |
+								  store << 4),
+							(uint8_t)mr,
+							0x24
+						};
+						const uint32_t value =
+							displacements[(mr + ext) %
+								      8];
+						for (unsigned n = 0; n < 4; ++n)
+							bytes[6 + sib + n] =
+								(uint8_t)(value >>
+									  (8 *
+									   n));
+						if (!compare(handles, bytes,
+							     sizeof(bytes),
+							     mr + ext) ||
+						    !compare(
+							    handles, bytes,
+							    (mr + ext) %
+								    sizeof(bytes),
+							    ll))
+							return false;
+					}
+	/* Sweep reserved fields, masks, W, map and both neighboring opcodes. */
+	uint8_t bytes[] = { 0x62, 0xf1, 0xfe, 0x48, 0x6f, 0x58, 0x80 };
+	for (unsigned field = 1; field <= 4; ++field) {
+		const uint8_t save = bytes[field];
+		for (unsigned value = 0; value < 256; ++value) {
+			bytes[field] = (uint8_t)value;
+			if (!compare(handles, bytes, sizeof(bytes), value))
+				return false;
+		}
+		bytes[field] = save;
+	}
+	return true;
+}
 static bool check_broadcast(csh handles[2])
 {
 	static const uint8_t disp[] = { 0, 1, 0x7f, 0x80, 0xff };
@@ -766,6 +820,7 @@ static bool check_mode(cs_mode mode)
 		    (mode == CS_MODE_64 && !check_vex_rip_loads(handles)) ||
 		    !check_rex_stack(handles) ||
 		    (mode == CS_MODE_64 && !check_broadcast(handles)) ||
+		    !check_evex_memory_moves(handles) ||
 		    !check_padding(handles) ||
 		    !check_alu_memory(handles, mode) ||
 		    !check_alu_immediates(handles, mode) ||

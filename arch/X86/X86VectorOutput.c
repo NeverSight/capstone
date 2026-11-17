@@ -21,17 +21,7 @@ struct PaddingOutput {
 };
 
 #include "X86GenVectorOutput.inc"
-static char *writeVectorRegister(char *out, unsigned length_code,
-				 unsigned number)
-{
-	*out++ = "xyz"[length_code];
-	*out++ = 'm';
-	*out++ = 'm';
-	if (number >= 10)
-		*out++ = (char)('0' + number / 10);
-	*out++ = (char)('0' + number % 10);
-	return out;
-}
+#include "X86VectorRegisterWriter.h"
 
 static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
 				 uint16_t *insn_size,
@@ -102,9 +92,11 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
 	return true;
 }
 
+#ifndef CAPSTONE_X86_EVEX_MEMORY_OUTPUT
 static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
 			       uint16_t *insn_size,
 			       const struct X86SimpleRegister *regs);
+#endif
 
 #if defined(_MSC_VER)
 __declspec(noinline)
@@ -116,8 +108,13 @@ static bool writeEvexOutput(const uint8_t *code, size_t size, cs_insn *insn,
 			    const struct X86SimpleRegister *address_regs)
 {
 	if (size >= 6 && code[5] < 0xc0)
+#ifdef CAPSTONE_X86_EVEX_MEMORY_OUTPUT
+		return X86_writeEvexMemoryDispatch(code, size, insn, insn_size,
+						   address_regs);
+#else
 		return writeEvexBroadcast(code, size, insn, insn_size,
 					  address_regs);
+#endif
 	if (X86_EVEX_REGISTER_PREFIX_REJECTS(code, size))
 		return false;
 	const unsigned ll = code[3] >> 5;
@@ -530,12 +527,22 @@ __declspec(noinline)
 #elif defined(__GNUC__)
 __attribute__((noinline))
 #endif
+#ifdef CAPSTONE_X86_EVEX_MEMORY_OUTPUT
+bool X86_writeEvexBroadcastPrechecked(const uint8_t *code, size_t size,
+				      cs_insn *insn, uint16_t *insn_size,
+				      const struct X86SimpleRegister *regs)
+#else
 static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
 			       uint16_t *insn_size,
 			       const struct X86SimpleRegister *regs)
+#endif
 {
-	if (size < 6 || (code[1] & 15) != 2 || (code[2] & 0x7f) != 0x7d ||
-	    (code[3] & 0x9f) != 8 || code[4] != 0x1a)
+	if (
+#ifndef CAPSTONE_X86_EVEX_MEMORY_OUTPUT
+		size < 6 ||
+#endif
+		(code[1] & 15) != 2 || (code[2] & 0x7f) != 0x7d ||
+		(code[3] & 0x9f) != 8 || code[4] != 0x1a)
 		return false;
 	const unsigned ll = code[3] >> 5, w = code[2] >> 7;
 	const uint8_t modrm = code[5];

@@ -407,6 +407,25 @@ ModR/M and SIB values and displacement extents before admitting an ID. The
 generator rejects opcode-index collisions and IDs outside the compact
 representation.
 
+In full userspace Clang builds, the standard 64-bit Intel output path also
+admits unmasked EVEX.W1 packed load/store forms with 66/F3 prefixes and
+ordinary base or RIP-relative addresses. The existing output eligibility
+checks preserve custom callbacks, syntax and option behavior. Reserved
+fields, vector lengths and complete displacement extents are checked before
+writing text or details. A disp8 uses the full vector tuple; disp32 stays
+unscaled. Indexed and absolute SIB forms retain the general reader.
+
+The existing memory branch calls a separate dispatcher, which tries the
+canonical broadcast reader before the packed-move writer. Its private
+broadcast entry reuses the caller's six-byte extent check. Both writers
+retain their encoding checks. Other compilers keep the original static
+broadcast reader. The separate writer and its records use dedicated ELF
+sections; the vector-register formatter remains shared with the established
+vector writer. `suite/synctools/x86_vector_output.cpp --evex-memory` derives
+`X86GenEvexMemoryOutput.inc` and checks the complete operand record against
+the canonical decoder. Regenerate this projection alongside the default
+vector rows and `--evex-scan` after changing those instruction forms.
+
 Legacy RAO-INT (`0F 38 FC` with its operation-selecting mandatory prefix) and
 VEX CMPccXADD use the source-owned atomic handler in `X86Mapping.c`. They
 reuse the existing atomic mapping and printers while retaining their own
