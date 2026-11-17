@@ -4816,14 +4816,48 @@ static bool has_duplicate_feature_evex_prefixes(const uint8_t *code,
 	       (code[prefix_offset + 1] & 7) <= 4;
 }
 
+#if defined(__ELF__) && defined(__x86_64__) && defined(__GNUC__)
+/* Complete EVEX opcodes that may belong to a source-owned extension.
+ * Each byte is a map bitset. The original handlers own validation and
+ * precedence; short encodings still enter those handlers unchanged. */
+#if defined(__ELF__) && defined(__GNUC__)
+__attribute__((section(".cs_x86_feature_rodata")))
+#endif
+static const uint8_t evex_feature_maps[256] = {
+	/* 0x00 */ 0, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 0x10 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 0x20 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 0x30 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 0x40 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0,
+	/* 0x50 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 0x60 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0,
+	/* 0x70 */ 0, 0, 0, 0, 0, 0, 0, 8, 0, 0, 4, 4, 4, 0, 0, 0,
+	/* 0x80 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 0x90 */ 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 0xa0 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 0xb0 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 0xc0 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 0xd0 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 0xe0 */ 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
+	/* 0xf0 */ 8, 0, 4, 4, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0,
+};
+
+#endif
+
 #if defined(_MSC_VER)
 __declspec(noinline)
 #elif defined(__GNUC__)
 __attribute__((noinline))
 #endif
+#if defined(__ELF__) && defined(__x86_64__) && defined(__GNUC__)
+CAPSTONE_INTERNAL x86_feature_decode_result
+X86_decodeFeatureExtensionSlow(csh handle, const uint8_t *code, size_t code_len,
+			   MCInst *instr, uint16_t *size, uint8_t opcode)
+#else
 x86_feature_decode_result
 X86_decodeFeatureExtension(csh handle, const uint8_t *code, size_t code_len,
 			   MCInst *instr, uint16_t *size, uint8_t opcode)
+#endif
 {
 	x86_feature_decode_result result;
 
@@ -5015,6 +5049,33 @@ X86_decodeFeatureExtension(csh handle, const uint8_t *code, size_t code_len,
 		return decode_apx_msr(handle, code, code_len, instr, size);
 	}
 }
+
+#if defined(__ELF__) && defined(__x86_64__) && defined(__GNUC__)
+/* Reject ordinary unprefixed EVEX before the extension decoder needs its
+ * full working state. All other inputs retain its original validation order. */
+#if defined(_MSC_VER)
+__declspec(noinline)
+#elif defined(__GNUC__)
+__attribute__((noinline))
+#endif
+#if defined(__ELF__) && defined(__GNUC__)
+__attribute__((section(".cs_x86_feature_text")))
+#endif
+x86_feature_decode_result
+X86_decodeFeatureExtension(csh handle, const uint8_t *code, size_t code_len,
+			   MCInst *instr, uint16_t *size, uint8_t opcode)
+{
+	if (opcode == 0x62 && code_len >= 6 && code[0] == 0x62 &&
+	    (((cs_struct *)(uintptr_t)handle)->mode & CS_MODE_64)) {
+		const unsigned map = code[1] & 7;
+		if (map >= 1 && map <= 3 &&
+		    !(evex_feature_maps[code[4]] & (1u << map)))
+			return X86_FEATURE_NOT_HANDLED;
+	}
+	return X86_decodeFeatureExtensionSlow(handle, code, code_len, instr, size,
+				      opcode);
+}
+#endif
 
 static bool print_tilezero(MCInst *instr, SStream *stream, bool att_syntax)
 {

@@ -304,6 +304,13 @@ static inline bool X86_mayDecodeFeatureExtension(const uint8_t *code,
 x86_feature_decode_result
 X86_decodeFeatureExtension(csh handle, const uint8_t *code, size_t code_len,
 			   MCInst *instr, uint16_t *size, uint8_t opcode);
+#if defined(__ELF__) && defined(__x86_64__) && defined(__GNUC__)
+/* Internal full decoder behind the isolated extension entry. */
+CAPSTONE_INTERNAL x86_feature_decode_result
+X86_decodeFeatureExtensionSlow(csh handle, const uint8_t *code,
+			       size_t code_len, MCInst *instr,
+			       uint16_t *size, uint8_t opcode);
+#endif
 bool X86_printFeatureExtension(MCInst *instr, SStream *stream, bool att_syntax);
 bool X86_mapFeatureExtension(cs_insn *insn, unsigned int opcode, cs_mode mode);
 const char *X86_featureExtensionRegisterName(unsigned int reg);
