@@ -8,6 +8,7 @@
 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
 	!defined(_WIN32_WCE)
 #include "X86SimpleOutput.h"
+#include "X86EvexAdmission.h"
 struct PaddingOutput {
 	unsigned id;
 	uint8_t length;
@@ -117,8 +118,7 @@ static bool writeEvexOutput(const uint8_t *code, size_t size, cs_insn *insn,
 	if (size >= 6 && code[5] < 0xc0)
 		return writeEvexBroadcast(code, size, insn, insn_size,
 					  address_regs);
-	if (size < 6 || (code[2] & 7) != 5 || (code[3] & 0x97) ||
-	    (code[3] & 0x60) == 0x60)
+	if (X86_EVEX_REGISTER_PREFIX_REJECTS(code, size))
 		return false;
 	const unsigned ll = code[3] >> 5;
 	const unsigned w = code[2] >> 7;
@@ -134,8 +134,8 @@ static bool writeEvexOutput(const uint8_t *code, size_t size, cs_insn *insn,
 				  (code[5] & 7) | ((rxb & 3) << 3) };
 	/* These EVEX.0F3A extracts use r/m as the narrow destination, reg as
      * the full-width source, and reserve vvvv/V'. */
-	if ((key & ~0x22u) == 0x319) {
-		if ((code[2] & 0x78) != 0x78 || !(code[3] & 8))
+	if (X86_EVEX_REGISTER_EXTRACT(key)) {
+		if (X86_EVEX_EXTRACT_SOURCE_REJECTS(code))
 			return false;
 		const unsigned pair[] = { regs[2], regs[0] };
 		return writeVectorRegisters(code, insn, insn_size, row, 4, ll,

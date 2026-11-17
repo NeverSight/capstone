@@ -272,6 +272,7 @@ endif
 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86MemoryOutput.o
 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86OutputIterator.o
 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86VectorOutput.o
+	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86EvexScan.o
 	LIBOBJ_X86_NUMBERS += $(OBJDIR)/arch/X86/X86IntelInstPrinterNumbers.o
 endif
 

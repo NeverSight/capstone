@@ -377,6 +377,26 @@ decoder still owns legality and handler precedence; prefixed, short and
 non-64-bit inputs retain that decoder. Other host targets retain the original
 entry and table layout.
 
+On the same ELF host configuration, full userspace builds have a separate
+raw-scan entry for unprefixed, unmasked EVEX register forms already owned by
+the vector output generator. A byte-sized opcode index selects a compact
+map/length/ID plan; W and vector length select the canonical public ID.
+The shared prefix predicate and extract-source checks retain reserved-field
+validation, and immediate forms require their final byte before admission.
+Successful plans return only the compact ID and length; they do not construct
+operands or text. Installed scan adapters retain precedence, and every miss
+returns to the existing extension and generated decoders. Non-EVEX and
+non-64-bit inputs bypass the new plan helper. DIET, reduced, custom-runtime,
+kernel and other host builds retain their original scan entry.
+
+The scan helper and plans occupy their own code and read-only sections.
+`suite/synctools/x86_vector_output.cpp --evex-scan` emits
+`X86GenEvexScan.inc` from the same canonical probes as the full vector output
+rows. Rebuild this generator against the current Capstone library after
+changing those forms, and regenerate both the default output and the scan
+projection. The generator rejects opcode-index collisions and IDs outside
+the compact representation.
+
 Legacy RAO-INT (`0F 38 FC` with its operation-selecting mandatory prefix) and
 VEX CMPccXADD use the source-owned atomic handler in `X86Mapping.c`. They
 reuse the existing atomic mapping and printers while retaining their own

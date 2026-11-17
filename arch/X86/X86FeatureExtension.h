@@ -311,6 +311,17 @@ X86_decodeFeatureExtensionSlow(csh handle, const uint8_t *code,
 			       size_t code_len, MCInst *instr,
 			       uint16_t *size, uint8_t opcode);
 #endif
+#if defined(__ELF__) && defined(__x86_64__) && defined(__GNUC__) && \
+	!defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
+	defined(CAPSTONE_USE_SYS_DYN_MEM) && \
+	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
+	!defined(_WIN32_WCE)
+#define X86_EVEX_REGISTER_SCAN
+CAPSTONE_INTERNAL x86_feature_decode_result
+X86_decodeScanFeatureExtension(csh handle, const uint8_t *code, size_t code_len,
+			       MCInst *instr, uint16_t *size, uint8_t opcode);
+#endif
+
 bool X86_printFeatureExtension(MCInst *instr, SStream *stream, bool att_syntax);
 bool X86_mapFeatureExtension(cs_insn *insn, unsigned int opcode, cs_mode mode);
 const char *X86_featureExtensionRegisterName(unsigned int reg);

@@ -3308,8 +3308,13 @@ decodeScanResultGeneric(csh ud, const uint8_t *code, size_t code_len,
 	uint16_t size;
 	x86_feature_decode_result extension = X86_FEATURE_NOT_HANDLED;
 	if (tryExtension)
+#ifdef X86_EVEX_REGISTER_SCAN
+		extension = X86_decodeScanFeatureExtension(
+			ud, code, code_len, &instr, &size, opcode);
+#else
 		extension = X86_decodeFeatureExtension(ud, code, code_len,
 						       &instr, &size, opcode);
+#endif
 	if (extension == X86_FEATURE_INVALID)
 		return false;
 	if (extension != X86_FEATURE_DECODED) {

@@ -468,6 +468,7 @@ if(CAPSTONE_X86_SUPPORT)
         arch/X86/X86MemoryOutput.c
         arch/X86/X86OutputIterator.c
         arch/X86/X86VectorOutput.c
+        arch/X86/X86EvexScan.c
     )
     # Use scalar/vector stores or libc for the fixed public output buffers.
     # Generic x64 GCC otherwise emits REP STOS even for the short clears.
