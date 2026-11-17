@@ -29,6 +29,7 @@ static bool test_x86(void)
 	cs_insn *expected = NULL, *actual = NULL;
 	size_t expected_count, actual_count, i;
 	bool success = true;
+	const bool diet = cs_support(CS_SUPPORT_DIET);
 
 	if (!check(cs_open(CS_ARCH_X86, CS_MODE_64, &printed) == CS_ERR_OK &&
 			   cs_open(CS_ARCH_X86, CS_MODE_64, &bare) == CS_ERR_OK,
@@ -90,11 +91,12 @@ static bool test_x86(void)
 	cs_free(actual, actual_count);
 	actual_count =
 		cs_disasm(bare, x86_code, sizeof(x86_code), 0x1000, 0, &actual);
-	success &= check(actual_count == X86_COUNT &&
-				 strcmp(actual[0].mnemonic, "mov") == 0 &&
-				 actual[X86_COMPARE].id ==
-					 expected[X86_COMPARE].id,
-			 "text is printed again");
+	success &= check(
+		actual_count == X86_COUNT &&
+			strcmp(actual[0].mnemonic, diet ? "" : "mov") == 0 &&
+			(!diet || actual[0].op_str[0] == '\0') &&
+			actual[X86_COMPARE].id == expected[X86_COMPARE].id,
+		"text follows the build policy after re-enabling");
 
 	cs_free(expected, expected_count);
 	cs_free(actual, actual_count);
@@ -289,6 +291,7 @@ static bool test_x86_scan_option_transition(void)
 	const unsigned ids[] = { 0, X86_INS_INC, X86_INS_RET };
 	const uint16_t lengths[] = { 3, 1, 1 };
 	bool success = true;
+	const bool diet = cs_support(CS_SUPPORT_DIET);
 	for (unsigned batch = 0; batch != 2; ++batch) {
 		struct scan_transition state = { 0, 0, true };
 		if (!check(cs_open(CS_ARCH_X86, CS_MODE_64, &state.handle) ==
@@ -338,14 +341,24 @@ static bool test_x86_scan_option_transition(void)
 				success &= check(
 					iter->detail == saved_detail,
 					"callback retains iterator detail ownership");
-			if (i == 1)
+			if (i == 1) {
+				const cs_x86 *x86 =
+					actual->detail ? &actual->detail->x86 :
+							 NULL;
 				success &= check(
-					actual->detail &&
+					x86 && x86->op_count == 1 &&
+						x86->operands[0].type ==
+							X86_OP_REG &&
+						x86->operands[0].reg ==
+							X86_REG_AX &&
+						x86->operands[0].size == 2 &&
 						strcmp(actual->mnemonic,
-						       "inc") == 0 &&
-						strcmp(actual->op_str, "ax") ==
-							0,
+						       diet ? "" : "inc") ==
+							0 &&
+						strcmp(actual->op_str,
+						       diet ? "" : "ax") == 0,
 					"next instruction uses new bitness, text and detail");
+			}
 		}
 		if (!batch)
 			success &= check(cursor == code + sizeof(code) &&
