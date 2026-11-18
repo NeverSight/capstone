@@ -1080,8 +1080,16 @@ void AArch64_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
 	}
 	AArch64_check_updates_flags(MI);
 	AArch64_add_sysreg_alias_access(MI);
+#ifdef CAPSTONE_USE_ALIAS_TRIE
 	MAP_SET_ALIAS_ID(MI, O, insn_alias_mnem_map,
 			ARR_SIZE(insn_alias_mnem_map) - 1, alias_trie);
+#elif defined(CAPSTONE_ISOLATED_ALIAS_LOOKUP)
+	map_set_aarch64_alias_id(MI, O, insn_alias_mnem_map,
+				 ARR_SIZE(insn_alias_mnem_map) - 1);
+#else
+	MAP_SET_ALIAS_ID(MI, O, insn_alias_mnem_map,
+			 ARR_SIZE(insn_alias_mnem_map) - 1, alias_trie);
+#endif
 	int syntax_opt = MI->csh->syntax;
 	if (syntax_opt & CS_OPT_SYNTAX_CS_REG_ALIAS)
 		patch_cs_reg_alias(O->buffer);

@@ -830,6 +830,17 @@ copy, append and free in their original order, even for empty or closed streams.
 The owning emitter is `PrinterCapstone::asmWriterEmitPrintAliasInstrBody` in
 the source-built NeverSight LLVM generator branch described by Auto-Sync.
 
+In mixed-architecture Clang builds, AArch64 and non-DIET MIPS resolve
+printed alias IDs through their generated mnemonic tries in `AliasMapping.c`.
+The existing printer call shape is retained. Both dedicated-backend lookup
+and the isolated implementation share `MappingAlias.h`, which owns mnemonic
+terminators, the 15-byte lookup limit and the no-alias result. Only the private
+isolated parser uses `minsize` to keep the traversal compact. On ELF its code
+and tables use separate sections. The implementation is compiled only when
+an enabled backend calls it; other compilers and dedicated trie builds keep
+their existing dispatch. `suite/synctools/alias_mnemonic_trie.py --check`
+verifies the generated tables against the canonical alias-name maps.
+
 The final public-output copy combines mnemonic extraction and the internal
 `|` prefix separator conversion. It retains the full output-buffer clearing,
 postprinter ordering and custom mnemonic replacement; the general stream

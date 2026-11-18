@@ -459,8 +459,16 @@ void Mips_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
 	}
 #endif
 #ifndef CAPSTONE_DIET
+#ifdef CAPSTONE_USE_ALIAS_TRIE
 	MAP_SET_ALIAS_ID(MI, O, insn_alias_mnem_map,
 			ARR_SIZE(insn_alias_mnem_map), alias_trie);
+#elif defined(CAPSTONE_ISOLATED_ALIAS_LOOKUP)
+	map_set_mips_alias_id(MI, O, insn_alias_mnem_map,
+			      ARR_SIZE(insn_alias_mnem_map));
+#else
+	MAP_SET_ALIAS_ID(MI, O, insn_alias_mnem_map,
+			 ARR_SIZE(insn_alias_mnem_map), alias_trie);
+#endif
 #endif
 }
 

@@ -260,6 +260,7 @@ set(EXTERNAL_PROJ_PATCH_DIR ${PROJECT_SOURCE_DIR}/ext_patches/)
 set(SOURCES_ENGINE
     cs.c
     Mapping.c
+    AliasMapping.c
     MCInst.c
     MCInstrDesc.c
     MCInstPrinter.c

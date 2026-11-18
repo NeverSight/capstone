@@ -296,12 +296,27 @@ bool map_use_alias_details(const MCInst *MI);
 void map_set_alias_id(MCInst *MI, const SStream *O,
 		      const name_map *alias_mnem_id_map, int map_size);
 
-#ifdef CAPSTONE_USE_ALIAS_TRIE
 typedef struct {
 	uint16_t offset;
 	uint16_t parent;
 	unsigned int id;
 } alias_trie_node;
+
+#if defined(__clang__)
+#define CAPSTONE_ISOLATED_ALIAS_LOOKUP
+#endif
+
+#ifdef CAPSTONE_HAS_AARCH64
+CAPSTONE_INTERNAL void map_set_aarch64_alias_id(MCInst *MI, const SStream *O,
+						const name_map *map,
+						int map_size);
+#endif
+#if defined(CAPSTONE_HAS_MIPS) && !defined(CAPSTONE_DIET)
+CAPSTONE_INTERNAL void map_set_mips_alias_id(MCInst *MI, const SStream *O,
+					     const name_map *map, int map_size);
+#endif
+
+#ifdef CAPSTONE_USE_ALIAS_TRIE
 
 CAPSTONE_INTERNAL void map_set_alias_id_trie(MCInst *MI, const SStream *O,
 					    const alias_trie_node *trie,
