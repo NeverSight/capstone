@@ -304,14 +304,16 @@ static inline bool X86_mayDecodeFeatureExtension(const uint8_t *code,
 x86_feature_decode_result
 X86_decodeFeatureExtension(csh handle, const uint8_t *code, size_t code_len,
 			   MCInst *instr, uint16_t *size, uint8_t opcode);
-#if defined(__ELF__) && defined(__x86_64__) && defined(__GNUC__)
+#if defined(__ELF__) && defined(__GNUC__) && \
+	(defined(__x86_64__) || defined(__aarch64__))
+#define X86_SEPARATE_FEATURE_ENTRY
 /* Internal full decoder behind the isolated extension entry. */
 CAPSTONE_INTERNAL x86_feature_decode_result
 X86_decodeFeatureExtensionSlow(csh handle, const uint8_t *code,
 			       size_t code_len, MCInst *instr,
 			       uint16_t *size, uint8_t opcode);
 #endif
-#if defined(__ELF__) && defined(__x86_64__) && defined(__GNUC__) && \
+#if defined(X86_SEPARATE_FEATURE_ENTRY) && \
 	!defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
 	defined(CAPSTONE_USE_SYS_DYN_MEM) && \
 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \

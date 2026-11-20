@@ -367,9 +367,9 @@ must be routed to its handler here as well as validated by that handler. The
 legacy pointer-load ambiguity, duplicate-prefix policy and reserved-map-4
 rejection remain ahead of fallback to the generated decoder.
 
-On ELF x86-64 builds with GCC-compatible section attributes, a small entry
-rejects ordinary, complete, unprefixed EVEX encodings using a map/opcode
-bitset before constructing the extension decoder's working state. The entry
+On x86-64 and AArch64 ELF hosts with GCC-compatible section attributes,
+a small entry rejects ordinary, complete, unprefixed EVEX encodings using a
+map/opcode bitset before constructing the extension decoder's working state. The entry
 and its constant table occupy separate sections to preserve the layout of
 existing code and tables. A new source-owned EVEX encoding in maps 1 through
 3 must also be admitted by `evex_feature_maps` in `X86Mapping.c`. The full
@@ -377,7 +377,7 @@ decoder still owns legality and handler precedence; prefixed, short and
 non-64-bit inputs retain that decoder. Other host targets retain the original
 entry and table layout.
 
-On the same ELF host configuration, full userspace builds have a separate
+On these ELF hosts, full userspace builds have a separate
 raw-scan entry for unprefixed, unmasked EVEX register forms already owned by
 the vector output generator. A byte-sized opcode index selects a compact
 map/length/ID plan; W and vector length select the canonical public ID.

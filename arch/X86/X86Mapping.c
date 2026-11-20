@@ -4816,7 +4816,7 @@ static bool has_duplicate_feature_evex_prefixes(const uint8_t *code,
 	       (code[prefix_offset + 1] & 7) <= 4;
 }
 
-#if defined(__ELF__) && defined(__x86_64__) && defined(__GNUC__)
+#ifdef X86_SEPARATE_FEATURE_ENTRY
 /* Complete EVEX opcodes that may belong to a source-owned extension.
  * Each byte is a map bitset. The original handlers own validation and
  * precedence; short encodings still enter those handlers unchanged. */
@@ -4849,7 +4849,7 @@ __declspec(noinline)
 #elif defined(__GNUC__)
 __attribute__((noinline))
 #endif
-#if defined(__ELF__) && defined(__x86_64__) && defined(__GNUC__)
+#ifdef X86_SEPARATE_FEATURE_ENTRY
 CAPSTONE_INTERNAL x86_feature_decode_result
 X86_decodeFeatureExtensionSlow(csh handle, const uint8_t *code, size_t code_len,
 			   MCInst *instr, uint16_t *size, uint8_t opcode)
@@ -5050,7 +5050,7 @@ X86_decodeFeatureExtension(csh handle, const uint8_t *code, size_t code_len,
 	}
 }
 
-#if defined(__ELF__) && defined(__x86_64__) && defined(__GNUC__)
+#ifdef X86_SEPARATE_FEATURE_ENTRY
 /* Reject ordinary unprefixed EVEX before the extension decoder needs its
  * full working state. All other inputs retain its original validation order. */
 #if defined(_MSC_VER)
