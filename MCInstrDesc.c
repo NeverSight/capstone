@@ -31,9 +31,10 @@ int MCOperandInfo_getOperandConstraint(const MCInstrDesc *InstrDesc,
 				       unsigned OpNum,
 				       MCOI_OperandConstraint Constraint)
 {
+	if (OpNum >= InstrDesc->NumOperands)
+		return -1;
 	const MCOperandInfo OpInfo = InstrDesc->OpInfo[OpNum];
-	if (OpNum < InstrDesc->NumOperands &&
-	    (OpInfo.Constraints & (1 << Constraint))) {
+	if (OpInfo.Constraints & (1 << Constraint)) {
 		unsigned ValuePos = 4 + Constraint * 4;
 		return (OpInfo.Constraints >> ValuePos) & 0xf;
 	}

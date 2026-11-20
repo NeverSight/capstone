@@ -20,6 +20,20 @@ static bool check_ties(const MCInst *MI, uint64_t tied, uint64_t tying)
 	return true;
 }
 
+static bool test_operand_constraint_bounds(void)
+{
+	MCInstrDesc desc = { 0 };
+	if (MCOperandInfo_getOperandConstraint(&desc, 0, MCOI_TIED_TO) != -1)
+		return false;
+
+	const MCOperandInfo op = { .Constraints = CONSTRAINT_MCOI_TIED_TO(15) };
+	desc.NumOperands = 1;
+	desc.OpInfo = &op;
+	return MCOperandInfo_getOperandConstraint(&desc, 0, MCOI_TIED_TO) ==
+		       15 &&
+	       MCOperandInfo_getOperandConstraint(&desc, 1, MCOI_TIED_TO) == -1;
+}
+
 static bool test_tie_membership(void)
 {
 	MCInst MI;
@@ -246,7 +260,8 @@ static bool check_operands(bool registers_first, bool x86_private)
 
 int main(void)
 {
-	return check_init_metadata() && check_x86_init_metadata() &&
+	return test_operand_constraint_bounds() && check_init_metadata() &&
+			       check_x86_init_metadata() &&
 			       test_tie_membership() && test_alias_lookup() &&
 			       check_operands(false, false) &&
 			       check_operands(true, false) &&
