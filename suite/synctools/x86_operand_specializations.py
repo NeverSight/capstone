@@ -981,7 +981,7 @@ def emit_terminal(suffix):
         "",
     ]
     lines += [
-        "X86_DECODE_INLINE int decodeLegacyTerminal(struct InternalInstruction *insn,",
+        "X86_LEGACY_SCAN_INLINE int decodeLegacyTerminal(struct InternalInstruction *insn,",
         "\t\t\t\tMCInst *mcInst, uint16_t *size, uint64_t decision, bool scan, unsigned *publicID, bool readerFlags)",
         "{",
         "\tuint32_t terminal;",

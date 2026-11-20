@@ -2951,7 +2951,14 @@ X86_DECODE_INLINE int finishDecodedInstruction(struct InternalInstruction *insn,
 #define X86_COMPACT_PUBLIC_HEADER
 #endif
 
+/* Keep the generated legacy scan switch out of its callers on native MSVC. */
+#if defined(_MSC_VER) && _MSC_VER >= 1952 && !defined(__clang__)
+#define X86_LEGACY_SCAN_INLINE static __declspec(noinline)
+#else
+#define X86_LEGACY_SCAN_INLINE X86_DECODE_INLINE
+#endif
 #include "X86GenLegacyTerminal.inc"
+#undef X86_LEGACY_SCAN_INLINE
 #include "X86GenVexScan.inc"
 
 int decodeInstruction(struct InternalInstruction *insn, const uint8_t *code,

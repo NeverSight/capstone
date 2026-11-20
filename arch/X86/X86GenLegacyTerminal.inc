@@ -7103,7 +7103,7 @@ X86_DECODE_INLINE bool selectPublicTerminal(uint64_t decision, uint8_t modrm, ui
 }
 #endif
 
-X86_DECODE_INLINE int decodeLegacyTerminal(struct InternalInstruction *insn,
+X86_LEGACY_SCAN_INLINE int decodeLegacyTerminal(struct InternalInstruction *insn,
 				MCInst *mcInst, uint16_t *size, uint64_t decision, bool scan, unsigned *publicID, bool readerFlags)
 {
 	uint32_t terminal;
@@ -14468,7 +14468,7 @@ X86_DECODE_INLINE bool selectPublicTerminal(uint64_t decision, uint8_t modrm, ui
 }
 #endif
 
-X86_DECODE_INLINE int decodeLegacyTerminal(struct InternalInstruction *insn,
+X86_LEGACY_SCAN_INLINE int decodeLegacyTerminal(struct InternalInstruction *insn,
 				MCInst *mcInst, uint16_t *size, uint64_t decision, bool scan, unsigned *publicID, bool readerFlags)
 {
 	uint32_t terminal;
