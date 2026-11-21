@@ -33,13 +33,16 @@ bool X86_writeEvexMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
 			       uint16_t *insn_size,
 			       const struct X86SimpleRegister *regs)
 {
-	if (size < 6 || (code[1] & 15) != 1 || (code[2] & 0xfc) != 0xfc ||
-	    (code[3] & 0x9f) != 8 || (code[4] & 0xef) != 0x6f)
+	if (size < 6 || (code[1] & 15) != 1 || (code[2] & 0x7c) != 0x7c ||
+	    (code[3] & 0x9f) != 8)
 		return false;
-	const unsigned pp = code[2] & 3, ll = code[3] >> 5;
+	const unsigned opcode = evex_memory_opcodes[code[4]];
+	const unsigned wpp = ((code[2] >> 5) & 4) | (code[2] & 3);
+	const unsigned form = evex_memory_prefixes[opcode >> 1][wpp];
+	const unsigned ll = code[3] >> 5;
 	const uint8_t modrm = code[5];
 	const unsigned mod = modrm >> 6, rm = modrm & 7;
-	if (pp < 1 || pp > 2 || ll >= 3 || mod == 3)
+	if (!form || ll >= 3 || mod == 3)
 		return false;
 	const unsigned rxb = (~(unsigned)code[1] >> 5) & 7;
 	const bool sib = rm == 4, rip = !mod && rm == 5;
@@ -48,11 +51,9 @@ bool X86_writeEvexMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
 	const unsigned length = offset + disp_size;
 	if (size < length || (sib && ((rxb & 2) || code[6] != 0x24)))
 		return false;
-	const unsigned store = (code[4] >> 4) & 1;
+	const unsigned store = opcode & 1;
 	const struct EvexMemoryOutputRow *row =
-		&evex_memory_rows[pp - 1][store][ll];
-	if (!row->id)
-		return false;
+		&evex_memory_rows[form - 1][store][ll];
 	const unsigned number = ((modrm >> 3) & 7) | ((rxb & 4) << 1) |
 				(~(unsigned)code[1] & 16);
 	const struct X86SimpleRegister *base = &regs[rm | ((rxb & 1) << 3)];
@@ -96,7 +97,7 @@ bool X86_writeEvexMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
 		memcpy(d->groups, row->groups, sizeof(row->groups));
 		cs_x86 *x = &d->x86;
 		memcpy(x->opcode, code, sizeof(x->opcode));
-		x->rex = (uint8_t)(0x48 | rxb);
+		x->rex = (uint8_t)(0x40 | ((code[2] >> 4) & 8) | rxb);
 		x->addr_size = 8;
 		x->modrm = modrm;
 		x->encoding.modrm_offset = 5;

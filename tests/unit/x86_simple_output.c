@@ -3,6 +3,7 @@
 
 #include "../../arch/X86/X86ScanAdapter.h"
 #include "../../cs_priv.h"
+#include "../../utils.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -562,57 +563,60 @@ static bool check_rex_stack(csh handles[2])
 	return true;
 }
 
-static bool check_evex_memory_moves(csh handles[2])
+static bool check_evex_memory_modrm(csh handles[2], uint8_t opcode,
+				    unsigned wpp, unsigned ll, unsigned ext)
 {
 	static const uint32_t displacements[] = {
 		0, 1, 0x7f, 0x80, 0xff, 0x80000000, 0x7fffffff, 0xffffffff
 	};
-	for (unsigned pp = 1; pp <= 2; ++pp)
-		for (unsigned store = 0; store < 2; ++store)
-			for (unsigned ll = 0; ll < 4; ++ll)
-				for (unsigned ext = 0; ext < 16; ++ext)
-					for (unsigned mr = 0; mr < 256; ++mr) {
-						const unsigned sib =
-							(mr & 7) == 4 &&
-							mr < 0xc0;
-						uint8_t bytes[11] = {
-							0x62,
-							(uint8_t)(ext << 4 | 1),
-							(uint8_t)(0xfc | pp),
-							(uint8_t)(ll << 5 | 8),
-							(uint8_t)(0x6f |
-								  store << 4),
-							(uint8_t)mr,
-							0x24
-						};
-						const uint32_t value =
-							displacements[(mr + ext) %
-								      8];
-						for (unsigned n = 0; n < 4; ++n)
-							bytes[6 + sib + n] =
-								(uint8_t)(value >>
-									  (8 *
-									   n));
-						if (!compare(handles, bytes,
-							     sizeof(bytes),
-							     mr + ext) ||
-						    !compare(
-							    handles, bytes,
-							    (mr + ext) %
-								    sizeof(bytes),
-							    ll))
+	const uint8_t prefix = (uint8_t)(0x7c | ((wpp & 4) << 5) | (wpp & 3));
+	for (unsigned mr = 0; mr < 256; ++mr) {
+		const unsigned sib = (mr & 7) == 4 && mr < 0xc0;
+		uint8_t bytes[11] = { 0x62,   (uint8_t)(ext << 4 | 1),
+				      prefix, (uint8_t)(ll << 5 | 8),
+				      opcode, (uint8_t)mr,
+				      0x24 };
+		const uint32_t value =
+			displacements[(mr + ext) % ARR_SIZE(displacements)];
+		for (unsigned n = 0; n < 4; ++n)
+			bytes[6 + sib + n] = (uint8_t)(value >> (8 * n));
+		if (!compare(handles, bytes, sizeof(bytes), mr + ext) ||
+		    !compare(handles, bytes, (mr + ext) % sizeof(bytes), ll))
+			return false;
+	}
+	return true;
+}
+
+static bool check_evex_memory_moves(csh handles[2])
+{
+	static const uint8_t opcodes[][2] = { { 0x6f, 0x7f },
+					      { 0x10, 0x11 },
+					      { 0x28, 0x29 } };
+	for (unsigned kind = 0; kind < ARR_SIZE(opcodes); ++kind)
+		for (unsigned wpp = 0; wpp < 8; ++wpp)
+			for (unsigned store = 0; store < 2; ++store)
+				for (unsigned ll = 0; ll < 4; ++ll)
+					for (unsigned ext = 0; ext < 16; ++ext)
+						if (!check_evex_memory_modrm(
+							    handles,
+							    opcodes[kind][store],
+							    wpp, ll, ext))
 							return false;
-					}
 	/* Sweep reserved fields, masks, W, map and both neighboring opcodes. */
 	uint8_t bytes[] = { 0x62, 0xf1, 0xfe, 0x48, 0x6f, 0x58, 0x80 };
-	for (unsigned field = 1; field <= 4; ++field) {
-		const uint8_t save = bytes[field];
-		for (unsigned value = 0; value < 256; ++value) {
-			bytes[field] = (uint8_t)value;
-			if (!compare(handles, bytes, sizeof(bytes), value))
-				return false;
+	for (unsigned kind = 0; kind < ARR_SIZE(opcodes); ++kind) {
+		bytes[2] = kind == 0 ? 0xfe : 0x7c;
+		bytes[4] = opcodes[kind][0];
+		for (unsigned field = 1; field <= 4; ++field) {
+			const uint8_t save = bytes[field];
+			for (unsigned value = 0; value < 256; ++value) {
+				bytes[field] = (uint8_t)value;
+				if (!compare(handles, bytes, sizeof(bytes),
+					     value))
+					return false;
+			}
+			bytes[field] = save;
 		}
-		bytes[field] = save;
 	}
 	return true;
 }

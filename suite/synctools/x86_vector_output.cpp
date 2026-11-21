@@ -1026,21 +1026,62 @@ void emit_evex_scan(Decoder &decoder, const std::map<unsigned, WidthRows> &ids)
 }
 
 // Derive the metadata and verify the complete operand record for the
-// unmasked EVEX.128/256/512.66/F3.0F.W1 packed load and store forms.
+// unmasked EVEX packed load and store forms with full-vector memory tuples.
 void emit_evex_memory(Decoder &decoder)
 {
+	constexpr uint8_t opcodes[][2] = { { 0x6f, 0x7f },
+					   { 0x10, 0x11 },
+					   { 0x28, 0x29 } };
+	// Each form requires the reserved vvvv field and its exact W and pp.
+	struct FormPrefix {
+		unsigned pair;
+		uint8_t prefix;
+	};
+	constexpr FormPrefix forms[] = {
+		{ 0, 0xfd }, { 0, 0xfe }, { 0, 0x7d }, { 0, 0x7e }, { 0, 0x7f },
+		{ 0, 0xff }, { 1, 0x7c }, { 1, 0xfd }, { 2, 0x7c }, { 2, 0xfd },
+	};
+	// Zero in either index denotes an opcode or prefix handled by the general printer.
+	std::array<unsigned, 256> opcode_index{};
+	std::array<std::array<unsigned, 8>, 4> prefix_index{};
+	for (unsigned pair = 0; pair < 3; ++pair)
+		for (unsigned store = 0; store < 2; ++store)
+			opcode_index[opcodes[pair][store]] =
+				2 * (pair + 1) + store;
+	for (unsigned i = 0; i < sizeof(forms) / sizeof(forms[0]); ++i) {
+		const auto &form = forms[i];
+		const auto key = ((form.prefix >> 5) & 4) | (form.prefix & 3);
+		prefix_index[form.pair + 1][key] = i + 1;
+	}
 	std::puts(
-		"struct EvexMemoryOutputRow {\n\tuint16_t id;\n\tchar mnemonic[16];\n\tuint8_t group_count, groups[4], access[2];\n};\nstatic const struct EvexMemoryOutputRow evex_memory_rows[2][2][3] X86_EVEX_MEMORY_DATA = {");
-	for (unsigned pp = 1; pp <= 2; ++pp) {
+		"static const uint8_t evex_memory_opcodes[256] X86_EVEX_MEMORY_DATA = {");
+	for (unsigned i = 0; i < opcode_index.size(); i += 16) {
+		std::printf("\t");
+		for (unsigned j = 0; j < 16; ++j)
+			std::printf("%s%u,", j ? " " : "", opcode_index[i + j]);
+		std::putchar('\n');
+	}
+	std::puts(
+		"};\nstatic const uint8_t evex_memory_prefixes[][8] X86_EVEX_MEMORY_DATA = {");
+	for (const auto &prefixes : prefix_index) {
+		std::printf("\t{");
+		for (auto plan : prefixes)
+			std::printf(" %u,", plan);
+		std::puts(" },");
+	}
+	std::puts("};");
+	std::puts(
+		"struct EvexMemoryOutputRow {\n\tuint16_t id;\n\tchar mnemonic[16];\n\tuint8_t group_count, groups[4], access[2];\n};\nstatic const struct EvexMemoryOutputRow evex_memory_rows[][2][3] X86_EVEX_MEMORY_DATA = {");
+	for (const auto &form : forms) {
 		std::puts("\t{");
 		for (unsigned store = 0; store < 2; ++store) {
 			std::puts("\t\t{");
 			for (unsigned ll = 0; ll < 3; ++ll) {
 				uint8_t bytes[] = { 0x62,
 						    0xf1,
-						    uint8_t(0xfc | pp),
+						    form.prefix,
 						    uint8_t(ll << 5 | 8),
-						    uint8_t(0x6f | store << 4),
+						    opcodes[form.pair][store],
 						    0x58,
 						    1 };
 				unsigned id =
@@ -1059,7 +1100,7 @@ void emit_evex_memory(Decoder &decoder)
 						"unexpected EVEX packed move metadata");
 				cs_x86 x{};
 				std::copy_n(bytes, 4, x.opcode);
-				x.rex = 0x48;
+				x.rex = uint8_t(0x40 | (form.prefix >> 7) << 3);
 				x.addr_size = 8;
 				x.modrm = bytes[5];
 				x.disp = 16 << ll;
