@@ -212,6 +212,7 @@ if(use_alias_trie)
     add_compile_definitions(CAPSTONE_USE_ALIAS_TRIE)
 endif()
 
+option(CAPSTONE_MIPS_FINAL_OUTPUT_TRIM "Remove leading whitespace once at the MIPS output boundary" OFF)
 option(CAPSTONE_MIPS_PRECHECK_PRINTED_ALIAS "Check the MIPS printer alias flag before calling the isolated mnemonic lookup" OFF)
 option(CAPSTONE_X86_REDUCE "x86 with reduce instruction sets to minimize library" OFF)
 option(CAPSTONE_X86_ATT_DISABLE "Disable x86 AT&T syntax" OFF)
@@ -398,6 +399,10 @@ endif()
 
 if(CAPSTONE_MIPS_SUPPORT)
     add_definitions(-DCAPSTONE_HAS_MIPS)
+    if(CAPSTONE_MIPS_FINAL_OUTPUT_TRIM)
+        set_property(SOURCE arch/Mips/MipsInstPrinter.c APPEND PROPERTY
+            COMPILE_DEFINITIONS CAPSTONE_MIPS_FINAL_OUTPUT_TRIM)
+    endif()
     if(CAPSTONE_MIPS_PRECHECK_PRINTED_ALIAS)
         set_property(SOURCE arch/Mips/MipsMapping.c APPEND PROPERTY
             COMPILE_DEFINITIONS CAPSTONE_MIPS_PRECHECK_PRINTED_ALIAS)

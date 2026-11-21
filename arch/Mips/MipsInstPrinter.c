@@ -151,9 +151,15 @@ static void patch_cs_printer(MCInst *MI, SStream *O)
 {
 	// replace '# 16 bit inst' to empty.
 	SStream_replc(O, '#', 0);
-	SStream_trimls(O);
 
+#ifndef CAPSTONE_MIPS_FINAL_OUTPUT_TRIM
+	SStream_trimls(O);
+#endif
 	if (MI->csh->syntax & CS_OPT_SYNTAX_NO_DOLLAR) {
+#ifdef CAPSTONE_MIPS_FINAL_OUTPUT_TRIM
+		/* The final writer trims ordinary output. Trim here before editing '$'. */
+		SStream_trimls(O);
+#endif
 		char *dollar = strchr(O->buffer, '$');
 		if (!dollar) {
 			return;
