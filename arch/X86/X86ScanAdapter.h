@@ -40,6 +40,11 @@ uint16_t X86_scanCallTarget(csh handle, const uint8_t *code, size_t size,
 bool X86_disasmIter(csh handle, const uint8_t **code, size_t *size,
 		    uint64_t *address, cs_insn *insn);
 
+/* Static-link text iterator for 32-bit x86. Other handle modes and option
+ * combinations follow X86_disasmIter and have the same observable results. */
+bool X86_disasmIter32(csh handle, const uint8_t **code, size_t *size,
+		      uint64_t *address, cs_insn *insn);
+
 /* Requires CAPSTONE_X86_SCAN_ADAPTER. Private static-link integration, not
  * an installed cs_* API. The callback
  * must use the handle's exact 32/64-bit profile and return (public_id << 8) |

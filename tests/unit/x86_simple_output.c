@@ -9,6 +9,9 @@
 
 /* An unrelated custom mnemonic selects the ordinary Intel decoder. Compare
  * both public records, including the parts an iterator leaves untouched. */
+static bool (*private_iter)(csh, const uint8_t **, size_t *, uint64_t *,
+			    cs_insn *) = X86_disasmIter;
+
 static bool compare(csh handles[2], const uint8_t *input, size_t length,
 		    unsigned seed)
 {
@@ -24,7 +27,7 @@ static bool compare(csh handles[2], const uint8_t *input, size_t length,
 		insn[side].is_alias = insn[side].usesAliasDetails = false;
 		insn[side].illegal = false;
 		insn[side].detail = &detail[side];
-		ok[side] = (side ? cs_disasm_iter : X86_disasmIter)(
+		ok[side] = (side ? cs_disasm_iter : private_iter)(
 			handles[side], &cursor[side], &left[side], &ip[side],
 			&insn[side]);
 		if (insn[side].detail != &detail[side])
@@ -702,6 +705,44 @@ static bool check_padding(csh handles[2])
 	return true;
 }
 
+static bool check_vex2_base_memory(csh handles[2])
+{
+	const uint32_t disps[] = { 0,	       1,	  9,	10,
+				   0x7f,       0x80,	  0xff, 0x12345678,
+				   0x80000000, 0xffffffff };
+	static const uint8_t ops[] = { 0x6f, 0x7f, 0xe5, 0xf5,
+				       0xfd, 0xfe, 0xef, 0xc6 };
+	for (unsigned flags = 0; flags < 256; ++flags) {
+		for (unsigned mr = 0; mr < 0xc0; ++mr) {
+			for (unsigned i = 0; i < sizeof(ops); ++i) {
+				const unsigned op = ops[i];
+				uint8_t bytes[] = { 0xc5,
+						    (uint8_t)flags,
+						    (uint8_t)op,
+						    (uint8_t)mr,
+						    0,
+						    0,
+						    0,
+						    0,
+						    0 };
+				unsigned seed = flags + mr + op;
+				uint32_t disp =
+					disps[seed % (sizeof(disps) /
+						      sizeof(disps[0]))];
+				for (unsigned j = 0; j < 4; ++j)
+					bytes[4 + j] =
+						(uint8_t)(disp >> (j * 8));
+				if (!compare(handles, bytes, sizeof(bytes),
+					     seed) ||
+				    !compare(handles, bytes,
+					     seed % sizeof(bytes), seed))
+					return false;
+			}
+		}
+	}
+	return true;
+}
+
 static bool check_vex_register_forms(csh handles[2])
 {
 	static const uint16_t forms[] = { 0x1ef, 0x1d4, 0x1fe, 0x200, 0x2dc,
@@ -829,6 +870,8 @@ static bool check_mode(cs_mode mode)
 		    !check_alu_memory(handles, mode) ||
 		    !check_alu_immediates(handles, mode) ||
 		    !check_legacy_vectors(handles, mode) ||
+		    (private_iter == X86_disasmIter32 &&
+		     !check_vex2_base_memory(handles)) ||
 		    !check_vex_register_forms(handles) ||
 		    (mode == CS_MODE_64 &&
 		     (!check_evex(handles) || !check_evex_extract(handles) ||
@@ -866,5 +909,9 @@ done:
 
 int main(void)
 {
+	private_iter = X86_disasmIter32;
+	if (!check_mode(CS_MODE_32))
+		return 1;
+	private_iter = X86_disasmIter;
 	return check_mode(CS_MODE_32) && check_mode(CS_MODE_64) ? 0 : 1;
 }

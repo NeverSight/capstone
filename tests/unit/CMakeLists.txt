@@ -203,6 +203,10 @@ foreach(TSRC ${UNIT_TEST_SOURCES})
     add_test(NAME "unit_${TBIN}" COMMAND ${TBIN})
 endforeach()
 
+if(TARGET x86_simple_output)
+    target_sources(x86_simple_output PRIVATE $<TARGET_OBJECTS:capstone_x86_iter32>)
+endif()
+
 if(CAPSTONE_X86_SUPPORT)
     set_tests_properties(unit_x86_x87_environment unit_x86_bound_access unit_x86_printer_prechecked PROPERTIES SKIP_RETURN_CODE 77)
     set_tests_properties(unit_x86_x87_environment_hardware PROPERTIES

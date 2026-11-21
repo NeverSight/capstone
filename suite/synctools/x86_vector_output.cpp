@@ -1157,6 +1157,226 @@ void emit_evex_memory(Decoder &decoder)
 	std::puts("};");
 }
 
+// Admit only ordinary 32-bit base-memory records reproduced in full by the
+// compact writer. Prefixes, SIB, absolute addresses and exceptional widths keep
+// their canonical path.
+std::string vex32_memory_record(Decoder &decoder, unsigned opcode, unsigned pp,
+				unsigned ll, unsigned dst, unsigned src,
+				unsigned base, unsigned mod, int32_t disp)
+{
+	const unsigned disp_size = mod == 2 ? 4 : mod;
+	uint8_t bytes[8] = { 0xc5,
+			     uint8_t(0x80 | ((~src & 15) << 3) | ll << 2 | pp),
+			     uint8_t(opcode),
+			     uint8_t(mod << 6 | dst << 3 | base) };
+	for (unsigned i = 0; i < disp_size; ++i)
+		bytes[4 + i] = uint8_t(uint32_t(disp) >> (8 * i));
+	unsigned id = decoder.decode(bytes, 4 + disp_size);
+	if (!id)
+		return {};
+	const auto &insn = *decoder.insn;
+	const auto &d = *insn.detail;
+	const auto &actual = d.x86;
+	if (insn.illegal || insn.is_alias || insn.usesAliasDetails ||
+	    std::strlen(insn.mnemonic) >= 16 || d.regs_read_count ||
+	    d.regs_write_count || d.groups_count > 4)
+		return {};
+	unsigned form;
+	if (actual.op_count == 3 && actual.operands[0].type == X86_OP_REG &&
+	    actual.operands[1].type == X86_OP_REG &&
+	    actual.operands[2].type == X86_OP_MEM)
+		form = 0;
+	else if (actual.op_count == 2 &&
+		 actual.operands[0].type == X86_OP_REG &&
+		 actual.operands[1].type == X86_OP_MEM)
+		form = 1;
+	else if (actual.op_count == 2 &&
+		 actual.operands[0].type == X86_OP_MEM &&
+		 actual.operands[1].type == X86_OP_REG)
+		form = 2;
+	else
+		return {};
+	if (form && src)
+		return {};
+	const x86_reg gprs[] = { X86_REG_EAX, X86_REG_ECX, X86_REG_EDX,
+				 X86_REG_EBX, X86_REG_ESP, X86_REG_EBP,
+				 X86_REG_ESI, X86_REG_EDI };
+	cs_detail expected{};
+	expected.groups_count = d.groups_count;
+	std::copy_n(d.groups, d.groups_count, expected.groups);
+	auto &x = expected.x86;
+	std::memcpy(x.opcode, bytes, 2);
+	x.addr_size = 4;
+	x.modrm = bytes[3];
+	x.encoding.modrm_offset = 3;
+	x.disp = disp;
+	if (disp_size) {
+		x.encoding.disp_offset = 4;
+		x.encoding.disp_size = uint8_t(disp_size);
+	}
+	x.op_count = actual.op_count;
+	const unsigned memory = form == 0 ? 2 : form == 1 ? 1 : 0;
+	Bytes4 access{}, groups{};
+	std::copy_n(d.groups, d.groups_count, groups.begin());
+	std::string text;
+	for (unsigned i = 0; i < x.op_count; ++i) {
+		if (i)
+			text += ", ";
+		auto &op = x.operands[i];
+		op.size = uint8_t(16u << ll);
+		op.access = actual.operands[i].access;
+		access[i] = unsigned(op.access);
+		if (i == memory) {
+			op.type = X86_OP_MEM;
+			op.mem.base = gprs[base];
+			op.mem.scale = 1;
+			op.mem.disp = disp;
+			text += ll ? "ymmword ptr [" : "xmmword ptr [";
+			text += cs_reg_name(decoder.handle, gprs[base]);
+			if (disp) {
+				const auto magnitude = uint32_t(
+					disp < 0 ? -int64_t(disp) : disp);
+				char digits[16];
+				std::snprintf(digits, sizeof(digits),
+					      magnitude <= 9 ? "%u" : "0x%x",
+					      magnitude);
+				text += disp < 0 ? " - " : " + ";
+				text += digits;
+			}
+			text += ']';
+		} else {
+			const unsigned number = form == 0 && i == 1 ? src : dst;
+			op.type = X86_OP_REG;
+			op.reg = x86_reg((ll ? X86_REG_YMM0 : X86_REG_XMM0) +
+					 number);
+			text += ll ? "ymm" : "xmm";
+			text += std::to_string(number);
+		}
+	}
+	if (text != insn.op_str ||
+	    std::memcmp(&expected, &d,
+			offsetof(cs_detail, x86) + sizeof(cs_x86)))
+		return {};
+	return "{ " + decoder.symbol(id) + ", \"" + insn.mnemonic + "\", " +
+	       std::to_string(d.groups_count) + ", " + fields(groups) + ", " +
+	       fields(access) + ", " + std::to_string(form) + " }";
+}
+
+void emit_vex32_memory()
+{
+	Decoder decoder(CS_MODE_32);
+	std::vector<std::string> rows(1, "{ 0 }");
+	unsigned plans[8][256] = {};
+	for (unsigned selector = 0; selector < 8; ++selector) {
+		const unsigned pp = selector & 3, ll = selector >> 2;
+		for (unsigned opcode = 0; opcode < 256; ++opcode) {
+			const auto row = vex32_memory_record(
+				decoder, opcode, pp, ll, 0, 0, 0, 0, 0);
+			if (row.empty())
+				continue;
+			const unsigned sources =
+				decoder.insn->detail->x86.op_count == 3 ? 8 : 1;
+			bool uniform = true;
+			for (unsigned mod = 0; mod < 3 && uniform; ++mod)
+				for (unsigned base = 0; base < 8 && uniform;
+				     ++base) {
+					if (base == 4 || (!mod && base == 5))
+						continue;
+					const std::vector<int32_t> disps =
+						!mod ?
+							std::vector<int32_t>{
+								0
+							} :
+						mod == 1 ?
+							std::vector<int32_t>{
+								0, 9, -1, -128,
+								127
+							} :
+							std::vector<int32_t>{
+								0,
+								9,
+								-1,
+								0x12345678,
+								INT32_MIN,
+								INT32_MAX
+							};
+					for (unsigned dst = 0;
+					     dst < 8 && uniform; ++dst)
+						for (unsigned src = 0;
+						     src < sources && uniform;
+						     ++src)
+							for (int32_t disp :
+							     disps)
+								if (vex32_memory_record(
+									    decoder,
+									    opcode,
+									    pp,
+									    ll,
+									    dst,
+									    src,
+									    base,
+									    mod,
+									    disp) !=
+								    row) {
+									uniform =
+										false;
+									break;
+								}
+				}
+			if (!uniform)
+				continue;
+			auto pos = std::find(rows.begin(), rows.end(), row);
+			if (pos == rows.end()) {
+				plans[selector][opcode] = unsigned(rows.size());
+				rows.push_back(row);
+			} else
+				plans[selector][opcode] =
+					unsigned(pos - rows.begin());
+		}
+	}
+	for (unsigned opcode : { 0x6fu, 0x7fu, 0xf5u, 0xfeu })
+		if (!plans[5][opcode])
+			throw std::runtime_error(
+				"missing canonical VEX32 memory plan");
+	std::puts(
+		"/* Generated by suite/synctools/x86_vector_output.cpp --vex32-memory. */");
+	std::puts(
+		"struct Vex32MemoryRow {\n\tuint16_t id;\n\tchar mnemonic[16];\n\tuint8_t group_count, groups[4], access[4], form;\n};\nstatic const struct Vex32MemoryRow vex32_memory_rows[] = {");
+	for (const auto &row : rows)
+		std::printf("\t%s,\n", row.c_str());
+	std::puts("};");
+	std::printf("static const %s vex32_memory_plans[8][256] = {\n",
+		    rows.size() <= 256 ? "uint8_t" : "uint16_t");
+	for (const auto &block : plans) {
+		std::puts("\t{");
+		for (unsigned i = 0; i < 256; i += 16) {
+			std::printf("\t\t");
+			for (unsigned j = 0; j < 16; ++j)
+				std::printf("%u,%s", block[i + j],
+					    j == 15 ? "" : " ");
+			std::puts("");
+		}
+		std::puts("\t},");
+	}
+	std::puts("};");
+	const x86_reg gprs[] = { X86_REG_EAX, X86_REG_ECX, X86_REG_EDX,
+				 X86_REG_EBX, X86_REG_ESP, X86_REG_EBP,
+				 X86_REG_ESI, X86_REG_EDI };
+	std::puts(
+		"static const struct X86SimpleRegister vex32_base_registers[] = {");
+	for (auto reg : gprs) {
+		const char *name = cs_reg_name(decoder.handle, reg);
+		if (!name || std::strlen(name) != 3)
+			throw std::runtime_error(
+				"unexpected canonical base register name");
+		std::printf("\t{ %u, 3, \"%s\" },\n", unsigned(reg), name);
+	}
+	std::puts("};");
+	std::fprintf(stderr, "%zu VEX32 memory rows; %llu full-record probes\n",
+		     rows.size() - 1,
+		     static_cast<unsigned long long>(decoder.probes));
+}
+
 void emit_output(Decoder &decoder, bool scan_only)
 {
 	std::vector<std::string> records;
@@ -1221,6 +1441,10 @@ void emit_output(Decoder &decoder, bool scan_only)
 
 int main(int argc, char **argv)
 {
+	if (argc == 2 && !std::strcmp(argv[1], "--vex32-memory")) {
+		emit_vex32_memory();
+		return 0;
+	}
 	if (argc == 2 && !std::strcmp(argv[1], "--evex-memory")) {
 		Decoder decoder;
 		std::puts(
@@ -1231,7 +1455,7 @@ int main(int argc, char **argv)
 	const bool scan_only = argc == 2 && !std::strcmp(argv[1], "--evex-scan");
 	if (argc > 1 && !scan_only)
 		throw std::runtime_error(
-			"usage: x86_vector_output [--evex-scan|--evex-memory]");
+			"usage: x86_vector_output [--evex-scan|--evex-memory|--vex32-memory]");
 	Decoder decoder;
 	std::puts("/* Generated by suite/synctools/x86_vector_output.cpp. */");
 	emit_output(decoder, scan_only);

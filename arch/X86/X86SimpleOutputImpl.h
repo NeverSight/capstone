@@ -1,0 +1,201 @@
+/* Capstone Disassembly Engine */
+/* SPDX-License-Identifier: BSD-3-Clause */
+
+#ifndef CS_X86_SIMPLE_OUTPUT_IMPL_H
+#define CS_X86_SIMPLE_OUTPUT_IMPL_H
+
+/* The register rows distinguish AH..BH from SPL..DIL when a REX prefix is
+ * present. Memory admission and bounds checks belong to the address writer. */
+#ifdef X86_EXTRA_OUTPUT32
+static bool tryOutput32(cs_struct *handle, const uint8_t *code, size_t size,
+			cs_insn *insn, uint16_t *insn_size)
+#else
+#ifdef CAPSTONE_X86_DEDICATED_OUTPUT
+CAPSTONE_INTERNAL
+#else
+static
+#endif
+bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+			 cs_insn *insn, uint16_t *insn_size)
+#endif
+{
+#ifdef X86_EXTRA_OUTPUT32
+	const bool wide = false;
+#else
+	const bool wide = handle->mode == CS_MODE_64;
+#endif
+	const bool has_rex = wide && (code[0] & 0xf0) == 0x40;
+	const uint8_t rex = has_rex ? code[0] : 0;
+	const bool escaped = code[0] == 0x0f;
+	const unsigned lead = has_rex || escaped;
+	if (size <= lead)
+		return false;
+	const uint8_t opcode = code[lead];
+	const unsigned prefix_class = escaped ? 3 :
+				      has_rex ? ((rex & 8) ? 2 : 1) :
+						0;
+	const unsigned plan = x86_simple_plans[wide][prefix_class][opcode];
+	if (!plan) {
+#ifdef X86_EXTRA_OUTPUT32
+		return X86_EXTRA_OUTPUT32(handle, code, size, insn, insn_size);
+#else
+		return false;
+#endif
+	}
+	const unsigned form = plan & 3;
+	uint8_t modrm = 0;
+	bool base_memory = false;
+	if (form == X86_SIMPLE_RM_REG || form == X86_SIMPLE_REG_RM) {
+		if (size < 2u + has_rex)
+			return false;
+		modrm = code[1 + has_rex];
+		if (modrm < 0xc0) {
+			/* The generated ALU, TEST and MOV register rows also
+             * describe their memory forms. XCHG and immediates
+             * require different memory records. */
+			const bool alu = opcode < 0x40;
+			const bool test_or_mov = (opcode & 0xfe) == 0x84 ||
+						 (opcode & 0xfc) == 0x88;
+			const bool push = opcode == 0xff &&
+					  (modrm & 0x38) == 0x30;
+			if (!alu && !test_or_mov && opcode != 0x8d && !push)
+				return false;
+			base_memory = true;
+		} else if (opcode == 0x8d || opcode == 0xff) {
+			return false;
+		}
+	}
+	if (X86_OUTPUT_UNSUPPORTED(handle, !wide && handle->mode != CS_MODE_32))
+		return false;
+
+	if (plan >= X86_PLAN_PUSH_IMMEDIATE) {
+		if (plan == X86_PLAN_VECTOR)
+			return X86_writeVectorOutput(code, size, insn,
+						     insn_size,
+						     x86_simple_registers[3],
+						     wide);
+		unsigned row;
+		const struct X86SimpleRegister *reg = NULL;
+		if (plan == X86_PLAN_PUSH_IMMEDIATE) {
+			const bool imm8 = opcode == 0x6a;
+			if (size < (imm8 ? 2u : 5u))
+				return false;
+			row = x86_push_rows[wide][imm8];
+		} else if (plan == X86_PLAN_MOV_REG_IMM32) {
+			if (size < 5u + has_rex)
+				return false;
+			row = x86_simple_plans[wide][prefix_class][0x8b] >> 2;
+			reg = &x86_simple_registers[2][((rex & 1) << 3) |
+						       (opcode & 7)];
+		} else {
+			if (size < (opcode == 0x81 ? 6u : 3u) + has_rex)
+				return false;
+			const unsigned group = (modrm >> 3) & 7;
+			row = plan == X86_PLAN_SHIFT_IMM8 ?
+				      x86_shift_rows[wide][prefix_class][group] :
+				      x86_simple_plans[wide][prefix_class]
+						      [(group << 3) | 1] >>
+					      2;
+			reg = &x86_simple_registers[(rex & 8) ? 3 : 2]
+						   [((rex & 1) << 3) |
+						    (modrm & 7)];
+		}
+		X86_writeImmediateOutput(code, insn, insn_size, rex,
+					 &x86_simple_outputs[row], reg);
+		return true;
+	}
+	const struct X86SimpleOutput *row = &x86_simple_outputs[plan >> 2];
+	if (base_memory)
+		return X86_writeMemoryOutput(code, size, insn, insn_size, row,
+					     x86_simple_registers);
+	const bool relative = form == X86_SIMPLE_RELATIVE;
+	if (relative && size < (size_t)row->imm_offset + row->imm_size)
+		return false;
+	uint64_t target = 0;
+	uint16_t first = row->ops[0].reg, second = row->ops[1].reg;
+	insn->id = row->id;
+	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
+	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
+	memset(insn->op_str, 0, sizeof(insn->op_str));
+	insn->bytes[0] = code[0];
+	if (form == X86_SIMPLE_FIXED) {
+		if (has_rex) {
+			// REX-prefixed fixed rows describe low and extended stack registers.
+			row += rex & 1;
+			first = row->ops[0].reg;
+			insn->bytes[1] = opcode;
+		}
+		memcpy(insn->op_str, row->operands, sizeof(row->operands));
+		*insn_size = insn->size = (uint16_t)(1 + has_rex);
+	} else if (relative) {
+		const uint8_t *bytes = code + row->imm_offset;
+		int64_t delta;
+		if (row->imm_size == 1) {
+			delta = (int8_t)bytes[0];
+		} else {
+			uint32_t raw = (uint32_t)bytes[0] |
+				       ((uint32_t)bytes[1] << 8) |
+				       ((uint32_t)bytes[2] << 16) |
+				       ((uint32_t)bytes[3] << 24);
+			delta = (int32_t)raw;
+		}
+		const uint16_t length = row->imm_offset + row->imm_size;
+		target = X86_relativeBranchTarget(handle->mode, insn->address,
+						  length, delta, row->imm_size);
+		if (target <= HEX_THRESHOLD) {
+			insn->op_str[0] = (char)('0' + target);
+		} else {
+			char digits[16];
+			char *end = digits + sizeof(digits);
+			char *p = end;
+			uint64_t value = target;
+			do {
+				*--p = "0123456789abcdef"[value & 15];
+				value >>= 4;
+			} while (value);
+			insn->op_str[0] = '0';
+			insn->op_str[1] = 'x';
+			memcpy(insn->op_str + 2, p, (size_t)(end - p));
+		}
+		memcpy(insn->bytes, code, length);
+		*insn_size = insn->size = length;
+	} else {
+		const unsigned width = (opcode & 1) ? ((rex & 8) ? 3 : 2) :
+						      has_rex;
+		const unsigned reg = ((rex & 4) << 1) | ((modrm >> 3) & 7);
+		const unsigned rm = ((rex & 1) << 3) | (modrm & 7);
+		const struct X86SimpleRegister *regs =
+			x86_simple_registers[width];
+		const struct X86SimpleRegister *a =
+			&regs[form == X86_SIMPLE_REG_RM ? reg : rm];
+		const struct X86SimpleRegister *b =
+			&regs[form == X86_SIMPLE_REG_RM ? rm : reg];
+		memcpy(insn->op_str, a->name, sizeof(a->name));
+		char *separator = insn->op_str + a->length;
+		separator[0] = ',';
+		separator[1] = ' ';
+		memcpy(separator + 2, b->name, sizeof(b->name));
+		first = a->reg;
+		second = b->reg;
+		insn->bytes[1] = code[1];
+		if (has_rex)
+			insn->bytes[2] = code[2];
+		*insn_size = insn->size = 2 + has_rex;
+	}
+	if (insn->detail) {
+		X86_writeSimpleDetail(insn->detail, row, opcode, rex, modrm,
+				      first, second);
+		if (relative) {
+			cs_x86 *x = &insn->detail->x86;
+			if (escaped) {
+				x->opcode[0] = 0x0f;
+				x->opcode[1] = opcode;
+			}
+			x->operands[0].type = X86_OP_IMM;
+			x->operands[0].imm = (int64_t)target;
+		}
+	}
+	return true;
+}
+
+#endif
