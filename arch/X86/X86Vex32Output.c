@@ -24,6 +24,11 @@
 #undef X86_MEMORY_IMMEDIATE
 #include "X86MemoryOutputImpl.h"
 
+#define X86_EXTEND32_MEMORY writeExtendMemory32
+#include "X86MemoryOutputImpl.h"
+#undef X86_EXTEND32_MEMORY
+#include "X86GenExtend32Output.inc"
+
 #include "X86GenVex32MemoryOutput.inc"
 
 /* Bare VEX2, ordinary 32-bit base and a generated full-width memory record. */
@@ -121,11 +126,50 @@ static bool writeVex32Memory(const uint8_t *code, size_t size, cs_insn *insn,
 	return true;
 }
 
+/* 0F B6/B7 and BE/BF read a byte or word and write a 32-bit register.
+ * The ordinary i386 address writer owns the memory addressing rules. */
+static bool writeExtend32(const uint8_t *code, size_t size, cs_insn *insn,
+			  uint16_t *insn_size)
+{
+	const uint8_t opcode = code[1], mr = code[2];
+	const struct X86SimpleOutput *row =
+		&x86_extend32[(opcode & 1) | ((opcode & 8) >> 2)];
+	if (mr < 0xc0)
+		return writeExtendMemory32(code, size, insn, insn_size, row,
+					   x86_simple_registers);
+	const struct X86SimpleRegister *dst =
+		&x86_simple_registers[2][(mr >> 3) & 7];
+	const struct X86SimpleRegister *src =
+		&(opcode & 1 ? x86_extend32_words :
+			       x86_simple_registers[0])[mr & 7];
+	*insn_size = insn->size = 3;
+	insn->id = row->id;
+	memcpy(insn->bytes, code, 3);
+	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
+	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
+	memset(insn->op_str, 0, sizeof(insn->op_str));
+	memcpy(insn->op_str, dst->name, sizeof(dst->name));
+	char *next = insn->op_str + dst->length;
+	memcpy(next, ", ", 2);
+	memcpy(next + 2, src->name, sizeof(src->name));
+	if (insn->detail) {
+		X86_writeSimpleDetail(insn->detail, row, 0x0f, 0, mr, dst->reg,
+				      src->reg);
+		insn->detail->x86.opcode[1] = opcode;
+	}
+	return true;
+}
+
 static bool writeExtraOutput32(cs_struct *handle, const uint8_t *code,
 			       size_t size, cs_insn *insn, uint16_t *insn_size)
 {
 	/* C4/C5 introduce VEX. The /0 forms of C6/C7 encode MOV r/m, immediate. */
-	if ((code[0] & 0xfc) != 0xc4 || X86_OUTPUT_UNSUPPORTED(handle, false))
+	if ((code[0] & 0xfc) != 0xc4)
+		return code[0] == 0x0f && size >= 3 &&
+		       (code[1] & 0xf6) == 0xb6 &&
+		       !X86_OUTPUT_UNSUPPORTED(handle, false) &&
+		       writeExtend32(code, size, insn, insn_size);
+	if (X86_OUTPUT_UNSUPPORTED(handle, false))
 		return false;
 	if (code[0] & 2) {
 		if (size < 2 || code[1] >= 0xc0 || (code[1] & 0x38))

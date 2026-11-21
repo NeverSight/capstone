@@ -908,6 +908,29 @@ static bool check_alu_memory(csh handles[2], cs_mode mode)
 	return true;
 }
 
+static bool check_extend32(csh handles[2])
+{
+	for (unsigned op = 0xb6; op <= 0xbf; ++op) {
+		if ((op & 0xf6) != 0xb6)
+			continue;
+		for (unsigned mr = 0; mr <= 0xff; ++mr) {
+			for (unsigned sib = 0; sib < 256;
+			     sib += (mr & 7) == 4 ? 1 : 256) {
+				const uint8_t b[] = { 0x0f,	   (uint8_t)op,
+						      (uint8_t)mr, (uint8_t)sib,
+						      0x80,	   0x12,
+						      0xf1,	   0xc7 };
+				unsigned seed = op + mr + sib;
+				if (!compare(handles, b, sizeof(b), seed) ||
+				    !compare(handles, b, seed % sizeof(b),
+					     seed))
+					return false;
+			}
+		}
+	}
+	return true;
+}
+
 static bool check_vex_packed_memory(csh handles[2])
 {
 	const uint8_t opcodes[] = { 0x10, 0x11, 0x28, 0x29, 0x51, 0x6f, 0x7f };
@@ -1142,7 +1165,8 @@ static bool check_mode(cs_mode mode)
 		    !check_padding(handles) ||
 		    !check_alu_memory(handles, mode) ||
 		    (mode == CS_MODE_32 && private_iter != X86_disasmIter &&
-		     !check_absolute_addresses32(handles)) ||
+		     (!check_absolute_addresses32(handles) ||
+		      !check_extend32(handles))) ||
 		    (private_iter != X86_disasmIter &&
 		     !check_indirect_memory(handles, mode)) ||
 		    !check_alu_immediates(handles, mode) ||
