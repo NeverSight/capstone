@@ -7,6 +7,8 @@
 #ifdef X86_MEMORY_IMMEDIATE
 #include "X86UnsignedImmediate.h"
 static bool X86_MEMORY_IMMEDIATE(
+#elif defined(X86_EXTEND64_MEMORY)
+static bool X86_EXTEND64_MEMORY(
 #elif defined(X86_EXTEND32_MEMORY)
 static bool X86_EXTEND32_MEMORY(
 #elif defined(X86_MEMORY32_OUTPUT)
@@ -20,13 +22,17 @@ bool X86_writeMemoryOutput(
 {
 #ifdef X86_MEMORY_IMMEDIATE
 	const bool wide = X86_IMMEDIATE_WIDE;
+#elif defined(X86_EXTEND64_MEMORY)
+	const bool wide = true;
 #elif defined(X86_MEMORY32_OUTPUT)
 	const bool wide = false;
 #else
 	const bool wide = row->address_size == 8;
 #endif
 	const uint8_t rex = wide && (code[0] & 0xf0) == 0x40 ? code[0] : 0;
-#ifdef X86_EXTEND32_MEMORY
+#ifdef X86_EXTEND64_MEMORY
+	const unsigned lead = (rex != 0) + (code[rex != 0] == 0x0f);
+#elif defined(X86_EXTEND32_MEMORY)
 	const unsigned lead = 1; /* The caller consumed the 0F escape. */
 #else
 	const unsigned lead = rex != 0;
@@ -67,7 +73,10 @@ bool X86_writeMemoryOutput(
 		}
 	}
 
-#ifdef X86_EXTEND32_MEMORY
+#ifdef X86_EXTEND64_MEMORY
+	const bool push = false, load = true;
+	const unsigned reg_width = rex & 8 ? 3 : 2;
+#elif defined(X86_EXTEND32_MEMORY)
 	const bool push = false, load = true;
 	const unsigned reg_width = 2; /* r32 destination */
 #else
@@ -102,9 +111,18 @@ bool X86_writeMemoryOutput(
 		memcpy(out, ", ", 2);
 		out += 2;
 	}
-#ifdef X86_EXTEND32_MEMORY
-	memcpy(out, row->ops[1].size == 1 ? "byte ptr [" : "word ptr [", 10);
-	out += 10;
+#if defined(X86_EXTEND32_MEMORY) || defined(X86_EXTEND64_MEMORY)
+#ifdef X86_EXTEND64_MEMORY
+	if (row->ops[1].size == 4) {
+		memcpy(out, "dword ptr [", 11);
+		out += 11;
+	} else
+#endif
+	{
+		memcpy(out, row->ops[1].size == 1 ? "byte ptr [" : "word ptr [",
+		       10);
+		out += 10;
+	}
 #else
 	if (lea) {
 		*out++ = '[';
@@ -170,7 +188,13 @@ bool X86_writeMemoryOutput(
 		X86_writeSimpleDetail(insn->detail, row, opcode, rex, modrm,
 				      load ? reg->reg : 0, load ? 0 : reg->reg);
 		cs_x86 *x = &insn->detail->x86;
-#ifdef X86_EXTEND32_MEMORY
+#ifdef X86_EXTEND64_MEMORY
+		if (opcode != 0x63) {
+			x->opcode[0] = 0x0f;
+			x->opcode[1] = opcode;
+		}
+		x->encoding.modrm_offset = (uint8_t)(lead + 1);
+#elif defined(X86_EXTEND32_MEMORY)
 		x->opcode[0] = 0x0f;
 		x->opcode[1] = opcode;
 #endif
