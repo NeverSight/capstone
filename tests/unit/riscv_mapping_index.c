@@ -5,9 +5,52 @@
 #include "../../utils.h"
 #include "../../arch/RISCV/RISCVMapping.h"
 
+#ifndef CAPSTONE_DIET
+static bool check_implicit_effects(cs_struct *handle, unsigned id,
+				   const insn_map *row)
+{
+	cs_detail actual;
+	memset(&actual, 0xa5, sizeof(actual));
+	cs_detail expected;
+	memcpy(&expected, &actual, sizeof(expected));
+	cs_insn insn = { 0 };
+	insn.id = UINT_MAX;
+	insn.detail = &actual;
+	if (row) {
+		memcpy(expected.regs_read, row->regs_use,
+		       sizeof(row->regs_use));
+		memcpy(expected.regs_write, row->regs_mod,
+		       sizeof(row->regs_mod));
+		memcpy(expected.groups, row->groups, sizeof(row->groups));
+		expected.regs_read_count =
+			(uint8_t)count_positive(row->regs_use);
+		expected.regs_write_count =
+			(uint8_t)count_positive(row->regs_mod);
+		expected.groups_count = (uint8_t)count_positive8(row->groups);
+		if (row->branch || row->indirect_branch)
+			expected.groups[expected.groups_count++] =
+				RISCV_GRP_JUMP;
+	}
+	const bool was_enabled = handle->detail_opt;
+	handle->detail_opt = true;
+	RISCV_get_insn_id(handle, &insn, id);
+	handle->detail_opt = was_enabled;
+	return insn.id == (row ? row->mapid : UINT_MAX) &&
+	       !memcmp(&actual, &expected, sizeof(actual));
+}
+#endif
+
 static bool check_id(cs_struct *handle, unsigned id)
 {
 	const insn_map *expected = lookup_insn_map(handle, id);
+#ifndef CAPSTONE_DIET
+	if (!check_implicit_effects(handle, id, expected)) {
+		fprintf(stderr,
+			"RISC-V implicit register or group mismatch for input ID %u\n",
+			id);
+		return false;
+	}
+#endif
 	cs_insn insn = { 0 };
 	insn.id = UINT_MAX;
 	RISCV_get_insn_id(handle, &insn, id);

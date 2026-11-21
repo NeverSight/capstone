@@ -364,6 +364,29 @@ void RISCV_compact_operands(MCInst *MI)
 	       (NUM_RISCV_OPS - write_pos) * sizeof(cs_riscv_op));
 }
 
+#if defined(CAPSTONE_RISCV_SHORT_IMPLICIT_LISTS) && !defined(CAPSTONE_DIET)
+/* Generated lists are contiguous and zero-padded. Current RISC-V rows
+ * have up to two implicit reads/writes and four groups. Longer lists
+ * retain the ordinary count. */
+static uint8_t implicit_reg_count(const uint16_t *regs)
+{
+	if (regs[2])
+		return (uint8_t)count_positive(regs);
+	return (uint8_t)((regs[0] != 0) + (regs[1] != 0));
+}
+
+static uint8_t implicit_group_count(const uint8_t *groups)
+{
+	if (groups[4])
+		return (uint8_t)count_positive8(groups);
+	return (uint8_t)((groups[0] != 0) + (groups[1] != 0) +
+			 (groups[2] != 0) + (groups[3] != 0));
+}
+#else
+#define implicit_reg_count count_positive
+#define implicit_group_count count_positive8
+#endif
+
 // given internal insn id, return public instruction info
 void RISCV_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
 {
@@ -379,17 +402,17 @@ void RISCV_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
 			memcpy(insn->detail->regs_read, insn_map->regs_use,
 			       sizeof(insn_map->regs_use));
 			insn->detail->regs_read_count =
-				(uint8_t)count_positive(insn_map->regs_use);
+				(uint8_t)implicit_reg_count(insn_map->regs_use);
 
 			memcpy(insn->detail->regs_write, insn_map->regs_mod,
 			       sizeof(insn_map->regs_mod));
 			insn->detail->regs_write_count =
-				(uint8_t)count_positive(insn_map->regs_mod);
+				(uint8_t)implicit_reg_count(insn_map->regs_mod);
 
 			memcpy(insn->detail->groups, insn_map->groups,
 			       sizeof(insn_map->groups));
 			insn->detail->groups_count =
-				(uint8_t)count_positive8(insn_map->groups);
+				(uint8_t)implicit_group_count(insn_map->groups);
 
 			if (insn_map->branch || insn_map->indirect_branch) {
 				// this insn also belongs to JUMP group. add JUMP group
