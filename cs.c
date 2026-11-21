@@ -68,6 +68,9 @@
 #include "arch/M68K/M68KModule.h"
 #include "arch/MOS65XX/MOS65XXModule.h"
 #include "arch/Mips/MipsModule.h"
+#ifdef CAPSTONE_HAS_MIPS
+#include "arch/Mips/MipsSingle.h"
+#endif
 #include "arch/PowerPC/PPCModule.h"
 #include "arch/RISCV/RISCVModule.h"
 #include "arch/SH/SHModule.h"
@@ -1737,6 +1740,32 @@ bool CAPSTONE_API cs_disasm_iter(csh ud, const uint8_t **code, size_t *size,
 				 uint64_t *address, cs_insn *insn)
 {
 	return cs_disasm_iter_core(ud, code, size, address, insn);
+}
+#endif
+
+#ifdef CAPSTONE_HAS_MIPS
+CAPSTONE_INTERNAL bool Mips_disasmOne(csh ud, const uint8_t *code, size_t size,
+				      uint64_t address, cs_insn *insn)
+{
+	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
+	if (!size || !handle)
+		return false;
+	// Skip-data callbacks and DIET text clearing retain the iterator policy.
+#ifndef CAPSTONE_DIET
+	if (handle->arch == CS_ARCH_MIPS && !handle->skipdata) {
+		cs_detail *detail = insn->detail;
+		uint16_t length;
+		if (!handle->detail_opt)
+			insn->detail = NULL;
+		insn->address = address;
+		handle->errnum = CS_ERR_OK;
+		bool decoded = cs_decode_full_insn(handle, code, size, insn,
+						   &length, false);
+		insn->detail = detail;
+		return decoded;
+	}
+#endif
+	return cs_disasm_iter(ud, &code, &size, &address, insn);
 }
 #endif
 
