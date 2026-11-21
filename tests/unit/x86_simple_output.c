@@ -812,6 +812,69 @@ static bool check_alu_immediates(csh handles[2], cs_mode mode)
 	return true;
 }
 
+static bool check_indirect_memory(csh handles[2], cs_mode mode)
+{
+	for (unsigned prefix = 0; prefix < (mode == CS_MODE_64 ? 17u : 1u);
+	     ++prefix) {
+		for (unsigned mr = 0; mr < 256; ++mr) {
+			const unsigned variants =
+				mr < 0xc0 && (mr & 7) == 4 ? 256u : 1u;
+			for (unsigned sib = 0; sib < variants; ++sib) {
+				uint8_t code[] = { (uint8_t)(0x3f + prefix),
+						   0xff,
+						   (uint8_t)mr,
+						   (uint8_t)sib,
+						   0xff,
+						   0xff,
+						   0xff,
+						   0x80 };
+				const uint8_t *start = code + !prefix;
+				const size_t length = sizeof(code) - !prefix;
+				for (size_t n = 1; n <= length; ++n)
+					if (!compare(handles, start, n,
+						     mr + sib + prefix))
+						return false;
+			}
+		}
+	}
+	return true;
+}
+
+static bool check_absolute_addresses32(csh handles[2])
+{
+	static const uint32_t addresses[] = {
+		0, 9, 10, 0x502dc4, 0x7fffffff, 0x80000000u, UINT32_MAX
+	};
+	static const uint8_t opcodes[] = { 0x00, 0x03, 0x38, 0x3b, 0x84, 0x89,
+					   0x8b, 0x8d, 0xc6, 0xc7, 0xff };
+	for (unsigned op = 0; op < sizeof(opcodes); ++op) {
+		for (unsigned group = 0; group < 8; ++group) {
+			for (unsigned i = 0;
+			     i < sizeof(addresses) / sizeof(addresses[0]);
+			     ++i) {
+				const uint32_t address = addresses[i];
+				const uint8_t code[] = {
+					opcodes[op],
+					(uint8_t)((group << 3) | 5),
+					(uint8_t)address,
+					(uint8_t)(address >> 8),
+					(uint8_t)(address >> 16),
+					(uint8_t)(address >> 24),
+					0xff,
+					0xfe,
+					0xfd,
+					0xfc
+				};
+				for (size_t len = 1; len <= sizeof(code); ++len)
+					if (!compare(handles, code, len,
+						     group + i + op))
+						return false;
+			}
+		}
+	}
+	return true;
+}
+
 static bool check_alu_memory(csh handles[2], cs_mode mode)
 {
 	const unsigned prefixes = mode == CS_MODE_64 ? 17 : 1;
@@ -839,6 +902,75 @@ static bool check_alu_memory(csh handles[2], cs_mode mode)
 					     (p + mr + n) % (sizeof(b) - !p),
 					     value))
 					return false;
+			}
+		}
+	}
+	return true;
+}
+
+static bool check_vex_packed_memory(csh handles[2])
+{
+	const uint8_t opcodes[] = { 0x10, 0x11, 0x28, 0x29, 0x51, 0x6f, 0x7f };
+	const uint8_t modrm[] = {
+		0x00, 0x04, 0x05, 0x44, 0x73, 0x84, 0xbc, 0xfd
+	};
+	const uint8_t sibs[] = { 0x24, 0x25, 0x64, 0xdc };
+	for (unsigned i = 0; i < sizeof(opcodes); ++i)
+		for (unsigned flags = 0; flags < 256; ++flags)
+			for (unsigned m = 0; m < sizeof(modrm); ++m)
+				for (unsigned s = 0;
+				     s <
+				     ((modrm[m] & 7) == 4 ? sizeof(sibs) : 1);
+				     ++s) {
+					uint8_t code[] = {
+						0xc5,	    (uint8_t)flags,
+						opcodes[i], modrm[m],
+						sibs[s],    0xff,
+						0xff,	    0xff,
+						0x80
+					};
+					for (unsigned length = 1;
+					     length <= sizeof(code); ++length)
+						if (!compare(handles, code,
+							     length,
+							     flags + s +
+								     length))
+							return false;
+				}
+	return true;
+}
+
+static bool check_sse_base_memory(csh handles[2])
+{
+	const uint8_t opcodes[] = { 0x10, 0x11, 0x12, 0x16,
+				    0x28, 0x29, 0x58, 0x59 };
+	const uint8_t sibs[] = { 0x24, 0x25, 0x64, 0xdc };
+	for (unsigned i = 0; i < sizeof(opcodes); ++i) {
+		for (unsigned prefix = 0; prefix <= 16; ++prefix) {
+			const unsigned skip = !prefix;
+			for (unsigned mr = 0; mr < 0xc0; ++mr) {
+				const bool sib = (mr & 7) == 4;
+				for (unsigned j = 0;
+				     j < (sib ? sizeof(sibs) : 1); ++j) {
+					uint8_t code[] = { (uint8_t)(0x3f +
+								     prefix),
+							   0x0f,
+							   opcodes[i],
+							   (uint8_t)mr,
+							   0xff,
+							   0xff,
+							   0xff,
+							   0x80,
+							   0x80 };
+					if (sib)
+						code[4] = sibs[j];
+					for (unsigned len = 1;
+					     len <= sizeof(code) - skip; ++len)
+						if (!compare(handles,
+							     code + skip, len,
+							     mr + j + len))
+							return false;
+				}
 			}
 		}
 	}
@@ -998,13 +1130,21 @@ static bool check_mode(cs_mode mode)
 		    !check_sib_base_mov(handles, mode) ||
 		    !check_indexed_memory(handles, mode) ||
 		    !check_push_memory(handles, mode) ||
-		    (mode == CS_MODE_64 && (!check_vex_rip_loads(handles) ||
-					    !check_sse_rip_memory(handles))) ||
+		    (mode == CS_MODE_64 &&
+		     (!check_vex_rip_loads(handles) ||
+		      !check_sse_rip_memory(handles) ||
+		      (private_iter == X86_disasmIterText &&
+		       (!check_sse_base_memory(handles) ||
+			!check_vex_packed_memory(handles))))) ||
 		    !check_rex_stack(handles) ||
 		    (mode == CS_MODE_64 && !check_broadcast(handles)) ||
 		    !check_evex_memory_moves(handles) ||
 		    !check_padding(handles) ||
 		    !check_alu_memory(handles, mode) ||
+		    (mode == CS_MODE_32 && private_iter != X86_disasmIter &&
+		     !check_absolute_addresses32(handles)) ||
+		    (mode == CS_MODE_32 && private_iter != X86_disasmIter &&
+		     !check_indirect_memory(handles, mode)) ||
 		    !check_alu_immediates(handles, mode) ||
 		    !check_legacy_vectors(handles, mode) ||
 		    (mode == CS_MODE_32 && private_iter != X86_disasmIter &&

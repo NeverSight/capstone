@@ -6,6 +6,9 @@
 
 /* The register rows distinguish AH..BH from SPL..DIL when a REX prefix is
  * present. Memory admission and bounds checks belong to the address writer. */
+#ifdef X86_MEMORY32_OUTPUT
+#include "X86GenIndirectMemory.inc"
+#endif
 #ifdef X86_FIXED_OUTPUT
 static bool X86_FIXED_OUTPUT(cs_struct *handle, const uint8_t *code,
 			     size_t size, cs_insn *insn, uint16_t *insn_size)
@@ -56,9 +59,16 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
 			const bool alu = opcode < 0x40;
 			const bool test_or_mov = (opcode & 0xfe) == 0x84 ||
 						 (opcode & 0xfc) == 0x88;
-			const bool push = opcode == 0xff &&
-					  (modrm & 0x38) == 0x30;
-			if (!alu && !test_or_mov && opcode != 0x8d && !push)
+#ifdef X86_MEMORY32_OUTPUT
+			const unsigned group = (modrm >> 3) & 7;
+			const bool single =
+				opcode == 0xff &&
+				(group == 2 || group == 4 || group == 6);
+#else
+			const bool single = opcode == 0xff &&
+					    (modrm & 0x38) == 0x30;
+#endif
+			if (!alu && !test_or_mov && opcode != 0x8d && !single)
 				return false;
 			base_memory = true;
 		} else if (opcode == 0x8d || opcode == 0xff) {
@@ -69,11 +79,17 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
 		return false;
 
 	if (plan >= X86_PLAN_PUSH_IMMEDIATE) {
-		if (plan == X86_PLAN_VECTOR)
+		if (plan == X86_PLAN_VECTOR) {
+#ifdef X86_FIXED_VEX2
+			if (code[0] == 0xc5)
+				return X86_FIXED_VEX2(code, size, insn,
+						      insn_size);
+#endif
 			return X86_writeVectorOutput(code, size, insn,
 						     insn_size,
 						     x86_simple_registers[3],
 						     wide);
+		}
 		unsigned row;
 		const struct X86SimpleRegister *reg = NULL;
 		if (plan == X86_PLAN_PUSH_IMMEDIATE) {
@@ -105,9 +121,17 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
 		return true;
 	}
 	const struct X86SimpleOutput *row = &x86_simple_outputs[plan >> 2];
-	if (base_memory)
+	if (base_memory) {
+#ifdef X86_MEMORY32_OUTPUT
+		if (opcode == 0xff && (modrm & 0x38) != 0x30)
+			row = &x86_indirect_memory[(modrm & 0x20) != 0];
+		return X86_MEMORY32_OUTPUT(code, size, insn, insn_size, row,
+					   x86_simple_registers);
+#else
 		return X86_writeMemoryOutput(code, size, insn, insn_size, row,
 					     x86_simple_registers);
+#endif
+	}
 	const bool relative = form == X86_SIMPLE_RELATIVE;
 	if (relative && size < (size_t)row->imm_offset + row->imm_size)
 		return false;

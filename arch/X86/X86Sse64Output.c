@@ -14,6 +14,7 @@
 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
 	!defined(_WIN32_WCE)
 #include "X86OutputOptions.h"
+#define X86_FIXED_VEX2 writeVex2Memory64
 #include "X86SimpleOutput.h"
 #include "X86GenSimpleOutput.inc"
 #include "X86VectorRegisterWriter.h"
@@ -26,56 +27,111 @@
 struct X86SseRegisterOutput {
 	struct X86SimpleOutput output;
 	bool reverse;
-	bool rip_memory;
+	bool base_memory;
 };
 #include "X86GenSse64RegisterOutput.inc"
+#include "X86GenVex64PackedMemory.inc"
 
-static bool writeSseRipOutput(const uint8_t *code, cs_insn *insn,
+static bool writePackedMemory(const uint8_t *code, cs_insn *insn,
 			      uint16_t *insn_size,
 			      const struct X86SseRegisterOutput *entry,
-			      uint8_t rex, unsigned offset)
+			      uint8_t rex, unsigned offset, size_t size,
+			      bool vex)
 {
 	const uint8_t mr = code[offset - 1], opcode = code[offset - 2];
 	const unsigned number = ((mr >> 3) & 7) | ((rex & 4) << 1);
-	const int32_t disp = X86_readDisp32(code + offset);
+	const unsigned mod = mr >> 6, rm = mr & 7;
+	const bool rip = !mod && rm == 5, sib = rm == 4;
+	const unsigned disp_size = mod == 2 || rip ? 4 : mod;
+	const unsigned disp_offset = offset + sib,
+		       length = disp_offset + disp_size;
+	if (size < length || (sib && ((rex & 2) || code[offset] != 0x24)))
+		return false;
+	const int32_t disp = disp_size == 4 ?
+				     X86_readDisp32(code + disp_offset) :
+			     disp_size == 1 ? (int8_t)code[disp_offset] :
+					      0;
+	const struct X86SimpleRegister *base =
+		&x86_simple_registers[3][((rex & 1) << 3) | rm];
 	const struct X86SimpleOutput *row = &entry->output;
-	insn->size = *insn_size = (uint16_t)(offset + 4);
+	insn->size = *insn_size = (uint16_t)length;
 	insn->id = row->id;
 	memcpy(insn->bytes, code, insn->size);
 	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
 	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
 	memset(insn->op_str, 0, sizeof(insn->op_str));
+	const unsigned ll = vex && (code[1] & 4);
 	char *out = insn->op_str;
 	if (!entry->reverse) {
-		out = writeVectorRegister(out, 0, number);
+		out = writeVectorRegister(out, ll, number);
 		memcpy(out, ", ", 2);
 		out += 2;
 	}
-	memcpy(out, "xmmword ptr [rip", 16);
-	out = X86_writeDisplacement(out + 16, disp);
+	memcpy(out, "xmmword ptr [", 13);
+	if (ll)
+		*out = 'y';
+	out += 13;
+	if (rip) {
+		memcpy(out, "rip", 3);
+		out += 3;
+	} else {
+		memcpy(out, base->name, base->length);
+		out += base->length;
+	}
+	out = X86_writeDisplacement(out, disp);
 	*out++ = ']';
 	if (entry->reverse) {
 		memcpy(out, ", ", 2);
-		writeVectorRegister(out + 2, 0, number);
+		writeVectorRegister(out + 2, ll, number);
 	}
 	if (insn->detail) {
-		const uint16_t reg = (uint16_t)(X86_REG_XMM0 + number);
+		const uint16_t reg =
+			(uint16_t)((ll ? X86_REG_YMM0 : X86_REG_XMM0) + number);
 		X86_writeSimpleDetail(insn->detail, row, 0x0f, rex, mr,
 				      entry->reverse ? 0 : reg,
 				      entry->reverse ? reg : 0);
 		cs_x86 *x = &insn->detail->x86;
-		x->opcode[1] = opcode;
+		if (vex) {
+			memcpy(x->opcode, code, 2);
+		} else {
+			x->opcode[1] = opcode;
+		}
 		x->encoding.modrm_offset = (uint8_t)(offset - 1);
-		x->encoding.disp_offset = (uint8_t)offset;
-		x->encoding.disp_size = 4;
+		if (disp_size) {
+			x->encoding.disp_offset = (uint8_t)disp_offset;
+			x->encoding.disp_size = (uint8_t)disp_size;
+		}
+		if (sib) {
+			x->sib = 0x24;
+			x->sib_base = (x86_reg)base->reg;
+			x->sib_scale = 1;
+		}
 		x->disp = disp;
 		cs_x86_op *op = &x->operands[entry->reverse ? 0 : 1];
 		op->type = X86_OP_MEM;
-		op->mem.base = X86_REG_RIP;
+		op->mem.base = rip ? X86_REG_RIP : (x86_reg)base->reg;
 		op->mem.scale = 1;
 		op->mem.disp = disp;
 	}
 	return true;
+}
+
+/* Only the bare VEX2 opcode plan enters here. Packed base-relative
+ * loads and stores share their address and detail construction with SSE. */
+static bool writeVex2Memory64(const uint8_t *code, size_t size, cs_insn *insn,
+			      uint16_t *insn_size)
+{
+	if (size >= 4 && (code[1] & 0x78) == 0x78 && code[3] < 0xc0) {
+		unsigned plan = vex64_packed_plans[code[1] & 7][code[2]];
+		const uint8_t rex =
+			(uint8_t)(0x40 | ((~(unsigned)code[1] >> 5) & 4));
+		if (plan && writePackedMemory(code, insn, insn_size,
+					      &vex64_packed_rows[plan], rex, 4,
+					      size, true))
+			return true;
+	}
+	return X86_writeVectorOutput(code, size, insn, insn_size,
+				     x86_simple_registers[3], true);
 }
 
 /* The scalar plans have already declined this instruction. A single opcode
@@ -103,8 +159,6 @@ static bool writeExtraOutput64(cs_struct *handle, const uint8_t *code,
 					      &x86_simple_outputs[row],
 					      x86_simple_registers);
 	}
-	if (code[length - 1] < 0xc0 && (code[length - 1] & 0xc7) != 5)
-		return false;
 	const uint8_t opcode = code[length - 2];
 	const unsigned index = opcode - X86_SSE_REGISTER_FIRST;
 	if (index >= sizeof(x86_sse_register_outputs) /
@@ -118,9 +172,9 @@ static bool writeExtraOutput64(cs_struct *handle, const uint8_t *code,
 
 	const uint8_t rex = has_rex ? code[0] : 0, mr = code[length - 1];
 	if (mr < 0xc0)
-		return entry->rip_memory && size >= length + 4 &&
-		       writeSseRipOutput(code, insn, insn_size, entry, rex,
-					 length);
+		return entry->base_memory &&
+		       writePackedMemory(code, insn, insn_size, entry, rex,
+					 length, size, false);
 	const unsigned reg = ((mr >> 3) & 7) | ((rex & 4) << 1);
 	const unsigned rm = (mr & 7) | ((rex & 1) << 3);
 	const unsigned first = entry->reverse ? rm : reg,

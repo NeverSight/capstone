@@ -1,13 +1,14 @@
 /* Capstone Disassembly Engine */
 /* SPDX-License-Identifier: BSD-3-Clause */
 
-#ifndef CS_X86_MEMORY_OUTPUT_IMPL_H
-#define CS_X86_MEMORY_OUTPUT_IMPL_H
+/* Instantiated for the ordinary address writer and the private mode-specific writers. */
 
 /* No-base SIB and encodings exposing EIZ/RIZ retain the general printer. */
 #ifdef X86_MEMORY_IMMEDIATE
 #include "X86UnsignedImmediate.h"
 static bool X86_MEMORY_IMMEDIATE(
+#elif defined(X86_MEMORY32_OUTPUT)
+static bool X86_MEMORY32_OUTPUT(
 #else
 bool X86_writeMemoryOutput(
 #endif
@@ -17,6 +18,8 @@ bool X86_writeMemoryOutput(
 {
 #ifdef X86_MEMORY_IMMEDIATE
 	const bool wide = X86_IMMEDIATE_WIDE;
+#elif defined(X86_MEMORY32_OUTPUT)
+	const bool wide = false;
 #else
 	const bool wide = row->address_size == 8;
 #endif
@@ -24,9 +27,9 @@ bool X86_writeMemoryOutput(
 	const unsigned lead = rex != 0;
 	const uint8_t opcode = code[lead], modrm = code[lead + 1];
 	const unsigned mod = modrm >> 6, rm = modrm & 7;
-	const bool sib = rm == 4, rip = !mod && rm == 5;
+	const bool sib = rm == 4, disp32_only = !mod && rm == 5;
 	const unsigned offset = lead + 2 + sib;
-	const unsigned disp_size = mod == 2 || rip ? 4 : mod;
+	const unsigned disp_size = mod == 2 || disp32_only ? 4 : mod;
 #ifdef X86_MEMORY_IMMEDIATE
 	const unsigned imm_size = (opcode & 1) ? 4 : 1;
 	const unsigned imm_offset = offset + disp_size;
@@ -34,7 +37,11 @@ bool X86_writeMemoryOutput(
 #else
 	const unsigned length = offset + disp_size;
 #endif
-	if (size < length || (rip && !wide))
+#ifdef X86_MEMORY32_OUTPUT
+	if (size < length)
+#else
+	if (size < length || (disp32_only && !wide))
+#endif
 		return false;
 
 	unsigned base_reg = rm;
@@ -95,9 +102,15 @@ bool X86_writeMemoryOutput(
 		       11);
 		out += 11;
 	}
-	if (rip) {
+	if (disp32_only) {
+#ifdef X86_MEMORY32_OUTPUT
+		/* The absolute address is unsigned in Intel text. The encoded
+         * displacement is signed in both public detail fields. */
+		out = writeUnsignedImmediate(out, (uint32_t)displacement);
+#else
 		memcpy(out, "rip", 3);
 		out += 3;
+#endif
 	} else {
 		memcpy(out, base->name, sizeof(base->name));
 		out += base->length;
@@ -112,7 +125,10 @@ bool X86_writeMemoryOutput(
 			*out++ = (char)('0' + (1u << scale_bits));
 		}
 	}
-	out = X86_writeDisplacement(out, displacement);
+#ifdef X86_MEMORY32_OUTPUT
+	if (!disp32_only)
+#endif
+		out = X86_writeDisplacement(out, displacement);
 	*out++ = ']';
 #ifdef X86_MEMORY_IMMEDIATE
 	const uint32_t encoded =
@@ -147,7 +163,12 @@ bool X86_writeMemoryOutput(
 #endif
 		cs_x86_op *mem = &x->operands[load ? 1 : 0];
 		mem->type = X86_OP_MEM;
-		mem->mem.base = rip ? X86_REG_RIP : (x86_reg)base->reg;
+#ifdef X86_MEMORY32_OUTPUT
+		mem->mem.base = disp32_only ? X86_REG_INVALID :
+					      (x86_reg)base->reg;
+#else
+		mem->mem.base = disp32_only ? X86_REG_RIP : (x86_reg)base->reg;
+#endif
 		mem->mem.scale = 1 << scale_bits;
 		if (index)
 			mem->mem.index = (x86_reg)index->reg;
@@ -165,5 +186,3 @@ bool X86_writeMemoryOutput(
 	}
 	return true;
 }
-
-#endif
