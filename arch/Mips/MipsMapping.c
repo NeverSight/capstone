@@ -463,6 +463,12 @@ void Mips_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
 	MAP_SET_ALIAS_ID(MI, O, insn_alias_mnem_map,
 			ARR_SIZE(insn_alias_mnem_map), alias_trie);
 #elif defined(CAPSTONE_ISOLATED_ALIAS_LOOKUP)
+#ifdef CAPSTONE_MIPS_PRECHECK_PRINTED_ALIAS
+	/* Mips_init_cs_detail cleared the ID before decode. Only the
+	 * alias printer can give this instruction a mnemonic to resolve. */
+	if (!MCInst_isAlias(MI))
+		return;
+#endif
 	map_set_mips_alias_id(MI, O, insn_alias_mnem_map,
 			      ARR_SIZE(insn_alias_mnem_map));
 #else
