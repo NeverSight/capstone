@@ -179,7 +179,7 @@ struct MCInst {
 	uint8_t x86Lock; // Set when the X86 LOCK prefix is present
 	bool isAliasInstr; // Flag if this MCInst is an alias.
 	bool fillDetailOps; // If set, detail->operands gets filled.
-	hppa_ext hppa_ext; ///< for HPPA operand. Contains info about modifiers and their effect on the instruction
+	struct hppa_ext hppa_ext; ///< for HPPA operand. Contains info about modifiers and their effect on the instruction
 	MCAsmInfo MAI; ///< The equivalent to MCAsmInfo in LLVM. It holds flags relevant for the asm style to print.
 };
 

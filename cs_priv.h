@@ -132,7 +132,7 @@ struct cs_struct {
 	// A mapping of LLVM instruction IDs to capstone instruction IDs, with
 	// some supplementary information, sorted in ascending order by LLVM
 	// instruction ID.
-	const insn_map *insn_map;
+	const struct insn_map *insn_map;
 	// The number of elements in the array pointed to by .insn_map
 	unsigned short insn_map_size;
 	bool no_text; // CS_OPT_TEXT is off: instructions are not printed
