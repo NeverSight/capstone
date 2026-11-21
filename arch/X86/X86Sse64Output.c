@@ -17,6 +17,11 @@
 #include "X86SimpleOutput.h"
 #include "X86GenSimpleOutput.inc"
 #include "X86VectorRegisterWriter.h"
+#define X86_MEMORY_IMMEDIATE writeMemoryImmediate64
+#define X86_IMMEDIATE_WIDE 1
+#include "X86MemoryOutputImpl.h"
+#undef X86_IMMEDIATE_WIDE
+#undef X86_MEMORY_IMMEDIATE
 
 struct X86SseRegisterOutput {
 	struct X86SimpleOutput output;
@@ -75,14 +80,30 @@ static bool writeSseRipOutput(const uint8_t *code, cs_insn *insn,
 
 /* The scalar plans have already declined this instruction. A single opcode
  * lookup supplies the mnemonic, operand order and all implicit effects. */
-static bool writeSse64RegisterOutput(cs_struct *handle, const uint8_t *code,
-				     size_t size, cs_insn *insn,
-				     uint16_t *insn_size)
+static bool writeExtraOutput64(cs_struct *handle, const uint8_t *code,
+			       size_t size, cs_insn *insn, uint16_t *insn_size)
 {
 	const bool has_rex = (code[0] & 0xf0) == 0x40;
 	const unsigned length = 3 + has_rex;
-	if (size < length || code[has_rex] != 0x0f ||
-	    (code[length - 1] < 0xc0 && (code[length - 1] & 0xc7) != 5))
+	if (size < length)
+		return false;
+	const uint8_t primary = code[has_rex];
+	if (primary != 0x0f) {
+		const uint8_t mr = code[has_rex + 1];
+		if ((primary & 0xfe) != 0xc6 || mr >= 0xc0 || (mr & 0x38) ||
+		    X86_OUTPUT_UNSUPPORTED(handle, false))
+			return false;
+		const unsigned prefix_class =
+			has_rex ? ((code[0] & 8) ? 2 : 1) : 0;
+		/* The MOV store row carries its operand width and access. */
+		const unsigned row = x86_simple_plans[1][prefix_class]
+						     [0x88 | (primary & 1)] >>
+				     2;
+		return writeMemoryImmediate64(code, size, insn, insn_size,
+					      &x86_simple_outputs[row],
+					      x86_simple_registers);
+	}
+	if (code[length - 1] < 0xc0 && (code[length - 1] & 0xc7) != 5)
 		return false;
 	const uint8_t opcode = code[length - 2];
 	const unsigned index = opcode - X86_SSE_REGISTER_FIRST;
@@ -125,7 +146,7 @@ static bool writeSse64RegisterOutput(cs_struct *handle, const uint8_t *code,
 
 #define X86_FIXED_OUTPUT tryOutput64
 #define X86_FIXED_WIDE true
-#define X86_OUTPUT_MISS writeSse64RegisterOutput
+#define X86_OUTPUT_MISS writeExtraOutput64
 #include "X86SimpleOutputImpl.h"
 #undef X86_OUTPUT_MISS
 #undef X86_FIXED_WIDE
@@ -135,8 +156,8 @@ static bool writeSse64RegisterOutput(cs_struct *handle, const uint8_t *code,
 #endif
 
 CAPSTONE_INTERNAL bool X86_disasmIterText(csh ud, const uint8_t **code,
-					size_t *size, uint64_t *address,
-					cs_insn *insn)
+					  size_t *size, uint64_t *address,
+					  cs_insn *insn)
 {
 #ifdef CS_DECODE_TRY_OUTPUT
 	cs_struct *handle = (cs_struct *)(uintptr_t)ud;

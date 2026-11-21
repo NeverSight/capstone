@@ -1008,8 +1008,9 @@ static bool check_mode(cs_mode mode)
 		    !check_alu_immediates(handles, mode) ||
 		    !check_legacy_vectors(handles, mode) ||
 		    (mode == CS_MODE_32 && private_iter != X86_disasmIter &&
-		     (!check_vex2_base_memory(handles) ||
-		      !check_mov_memory_immediates(handles, mode))) ||
+		     !check_vex2_base_memory(handles)) ||
+		    (private_iter != X86_disasmIter &&
+		     !check_mov_memory_immediates(handles, mode)) ||
 		    !check_vex_register_forms(handles) ||
 		    (mode == CS_MODE_64 &&
 		     (!check_evex(handles) || !check_evex_extract(handles) ||

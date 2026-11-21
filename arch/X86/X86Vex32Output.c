@@ -16,9 +16,11 @@
 #include "X86SimpleOutput.h"
 #include "X86GenSimpleOutput.inc"
 #include "X86VectorRegisterWriter.h"
-#define X86_MEMORY_IMMEDIATE32
+#define X86_MEMORY_IMMEDIATE writeMemoryImmediate32
+#define X86_IMMEDIATE_WIDE 0
 #include "X86MemoryOutputImpl.h"
-#undef X86_MEMORY_IMMEDIATE32
+#undef X86_IMMEDIATE_WIDE
+#undef X86_MEMORY_IMMEDIATE
 
 #include "X86GenVex32MemoryOutput.inc"
 
