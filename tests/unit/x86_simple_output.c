@@ -455,6 +455,14 @@ static bool check_legacy_vectors(csh handles[2], cs_mode mode)
 					++start;
 				}
 				const size_t size = sizeof(bytes) - !prefix;
+				/* Exercise unprefixed register, memory and truncated
+				 * encodings against the ordinary decoder. */
+				if (!compare(handles, start + 1, size - 1,
+					     mr) ||
+				    !compare(handles, start + 1,
+					     (mr + opcode) % (3 + !!prefix),
+					     0xa5))
+					return false;
 				if (!compare(handles, start, size,
 					     mr ^ opcode) ||
 				    !compare(handles, start,
@@ -837,6 +845,49 @@ static bool check_alu_memory(csh handles[2], cs_mode mode)
 	return true;
 }
 
+static bool check_sse_rip_memory(csh handles[2])
+{
+	const uint8_t opcodes[] = { 0x10, 0x11, 0x12, 0x16,
+				    0x28, 0x29, 0x58, 0x59 };
+	const uint32_t values[] = { 0,		 9,	      10,
+				    127,	 128,	      0xffffffffu,
+				    0xffffff80u, 0x80000000u, 0x7fffffffu };
+	for (unsigned prefix = 0; prefix <= 16; ++prefix) {
+		for (unsigned i = 0; i < sizeof(opcodes); ++i) {
+			for (unsigned field = 0; field < 8; ++field) {
+				uint8_t bytes[] = {
+					prefix ? (uint8_t)(0x3f + prefix) : 0,
+					0x0f,
+					opcodes[i],
+					(uint8_t)((field << 3) | 5),
+					0,
+					0,
+					0,
+					0
+				};
+				const unsigned skip = !prefix;
+				for (unsigned n = 0;
+				     n < sizeof(values) / sizeof(values[0]);
+				     ++n) {
+					for (unsigned k = 0; k < 4; ++k)
+						bytes[4 + k] =
+							(uint8_t)(values[n] >>
+								  (8 * k));
+					for (unsigned len =
+						     n ? sizeof(bytes) - skip :
+							 1;
+					     len <= sizeof(bytes) - skip; ++len)
+						if (!compare(handles,
+							     bytes + skip, len,
+							     n + field))
+							return false;
+				}
+			}
+		}
+	}
+	return true;
+}
+
 static bool check_mov_memory_immediates(csh handles[2], cs_mode mode)
 {
 	static const uint32_t values[] = { 0,	       1,	  9,
@@ -947,7 +998,8 @@ static bool check_mode(cs_mode mode)
 		    !check_sib_base_mov(handles, mode) ||
 		    !check_indexed_memory(handles, mode) ||
 		    !check_push_memory(handles, mode) ||
-		    (mode == CS_MODE_64 && !check_vex_rip_loads(handles)) ||
+		    (mode == CS_MODE_64 && (!check_vex_rip_loads(handles) ||
+					    !check_sse_rip_memory(handles))) ||
 		    !check_rex_stack(handles) ||
 		    (mode == CS_MODE_64 && !check_broadcast(handles)) ||
 		    !check_evex_memory_moves(handles) ||
@@ -955,9 +1007,10 @@ static bool check_mode(cs_mode mode)
 		    !check_alu_memory(handles, mode) ||
 		    !check_alu_immediates(handles, mode) ||
 		    !check_legacy_vectors(handles, mode) ||
-		    (private_iter == X86_disasmIter32 &&
-		     (!check_vex2_base_memory(handles) ||
-		      !check_mov_memory_immediates(handles, mode))) ||
+		    (mode == CS_MODE_32 && private_iter != X86_disasmIter &&
+		     !check_vex2_base_memory(handles)) ||
+		    (private_iter != X86_disasmIter &&
+		     !check_mov_memory_immediates(handles, mode)) ||
 		    !check_vex_register_forms(handles) ||
 		    (mode == CS_MODE_64 &&
 		     (!check_evex(handles) || !check_evex_extract(handles) ||
@@ -997,6 +1050,9 @@ int main(void)
 {
 	private_iter = X86_disasmIter32;
 	if (!check_mode(CS_MODE_32))
+		return 1;
+	private_iter = X86_disasmIterText;
+	if (!check_mode(CS_MODE_32) || !check_mode(CS_MODE_64))
 		return 1;
 	private_iter = X86_disasmIter;
 	return check_mode(CS_MODE_32) && check_mode(CS_MODE_64) ? 0 : 1;

@@ -45,6 +45,11 @@ bool X86_disasmIter(csh handle, const uint8_t **code, size_t *size,
 bool X86_disasmIter32(csh handle, const uint8_t **code, size_t *size,
 		      uint64_t *address, cs_insn *insn);
 
+/* Static text iterator for 32- and 64-bit x86. It uses the handle mode to
+ * select an output writer and preserves the cs_disasm_iter contract. */
+bool X86_disasmIterText(csh handle, const uint8_t **code, size_t *size,
+		      uint64_t *address, cs_insn *insn);
+
 /* Requires CAPSTONE_X86_SCAN_ADAPTER. Private static-link integration, not
  * an installed cs_* API. The callback
  * must use the handle's exact 32/64-bit profile and return (public_id << 8) |

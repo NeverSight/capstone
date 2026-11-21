@@ -5,9 +5,9 @@
 #define CS_X86_MEMORY_OUTPUT_IMPL_H
 
 /* No-base SIB and encodings exposing EIZ/RIZ retain the general printer. */
-#ifdef X86_MEMORY_IMMEDIATE32
+#ifdef X86_MEMORY_IMMEDIATE
 #include "X86UnsignedImmediate.h"
-static bool writeMemoryImmediate32(
+static bool X86_MEMORY_IMMEDIATE(
 #else
 bool X86_writeMemoryOutput(
 #endif
@@ -15,8 +15,8 @@ bool X86_writeMemoryOutput(
 	const struct X86SimpleOutput *row,
 	const struct X86SimpleRegister regs[4][16])
 {
-#ifdef X86_MEMORY_IMMEDIATE32
-	const bool wide = false;
+#ifdef X86_MEMORY_IMMEDIATE
+	const bool wide = X86_IMMEDIATE_WIDE;
 #else
 	const bool wide = row->address_size == 8;
 #endif
@@ -27,7 +27,7 @@ bool X86_writeMemoryOutput(
 	const bool sib = rm == 4, rip = !mod && rm == 5;
 	const unsigned offset = lead + 2 + sib;
 	const unsigned disp_size = mod == 2 || rip ? 4 : mod;
-#ifdef X86_MEMORY_IMMEDIATE32
+#ifdef X86_MEMORY_IMMEDIATE
 	const unsigned imm_size = (opcode & 1) ? 4 : 1;
 	const unsigned imm_offset = offset + disp_size;
 	const unsigned length = imm_offset + imm_size;
@@ -54,7 +54,7 @@ bool X86_writeMemoryOutput(
 		}
 	}
 
-#ifdef X86_MEMORY_IMMEDIATE32
+#ifdef X86_MEMORY_IMMEDIATE
 	const bool lea = false, load = false;
 #else
 	const bool push = opcode == 0xff, lea = opcode == 0x8d;
@@ -114,10 +114,18 @@ bool X86_writeMemoryOutput(
 	}
 	out = X86_writeDisplacement(out, displacement);
 	*out++ = ']';
-#ifdef X86_MEMORY_IMMEDIATE32
-	const uint32_t value =
+#ifdef X86_MEMORY_IMMEDIATE
+	const uint32_t encoded =
 		imm_size == 1 ? code[imm_offset] :
 				(uint32_t)X86_readDisp32(code + imm_offset);
+	/* MOV to a 64-bit memory operand sign-extends its encoded imm32. */
+#if X86_IMMEDIATE_WIDE
+	const uint64_t value = row->ops[0].size == 8 ?
+				       (uint64_t)(int64_t)(int32_t)encoded :
+				       encoded;
+#else
+	const uint32_t value = encoded;
+#endif
 	memcpy(out, ", ", 2);
 	writeUnsignedImmediate(out + 2, value);
 #else
@@ -130,7 +138,7 @@ bool X86_writeMemoryOutput(
 		X86_writeSimpleDetail(insn->detail, row, opcode, rex, modrm,
 				      load ? reg->reg : 0, load ? 0 : reg->reg);
 		cs_x86 *x = &insn->detail->x86;
-#ifdef X86_MEMORY_IMMEDIATE32
+#ifdef X86_MEMORY_IMMEDIATE
 		x->operands[1].type = X86_OP_IMM;
 		x->operands[1].imm = (int64_t)value;
 		x->operands[1].access = 0;

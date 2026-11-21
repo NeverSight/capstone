@@ -16,9 +16,11 @@
 #include "X86SimpleOutput.h"
 #include "X86GenSimpleOutput.inc"
 #include "X86VectorRegisterWriter.h"
-#define X86_MEMORY_IMMEDIATE32
+#define X86_MEMORY_IMMEDIATE writeMemoryImmediate32
+#define X86_IMMEDIATE_WIDE 0
 #include "X86MemoryOutputImpl.h"
-#undef X86_MEMORY_IMMEDIATE32
+#undef X86_IMMEDIATE_WIDE
+#undef X86_MEMORY_IMMEDIATE
 
 #include "X86GenVex32MemoryOutput.inc"
 
@@ -152,9 +154,13 @@ static bool writeExtraOutput32(cs_struct *handle, const uint8_t *code,
 	return true;
 }
 
-#define X86_EXTRA_OUTPUT32 writeExtraOutput32
+#define X86_FIXED_OUTPUT tryOutput32
+#define X86_FIXED_WIDE false
+#define X86_OUTPUT_MISS writeExtraOutput32
 #include "X86SimpleOutputImpl.h"
-#undef X86_EXTRA_OUTPUT32
+#undef X86_OUTPUT_MISS
+#undef X86_FIXED_WIDE
+#undef X86_FIXED_OUTPUT
 #define CS_DECODE_TRY_OUTPUT tryOutput32
 #include "../../cs_disasm_internal.h"
 #endif
