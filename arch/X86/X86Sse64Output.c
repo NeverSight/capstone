@@ -32,6 +32,38 @@ struct X86SseRegisterOutput {
 #include "X86GenSse64RegisterOutput.inc"
 #include "X86GenVex64PackedMemory.inc"
 
+#define X86_EXTEND64_MEMORY writeExtendMemory64
+#include "X86MemoryOutputImpl.h"
+#undef X86_EXTEND64_MEMORY
+#include "X86GenExtend64Output.inc"
+#include "X86ExtendRegisterOutput.h"
+
+static bool writeExtend64(const uint8_t *code, size_t size, cs_insn *insn,
+			  uint16_t *insn_size, unsigned length, uint8_t rex,
+			  uint8_t opcode)
+{
+	const bool escaped = opcode != 0x63;
+	const unsigned form = escaped ? ((rex & 8) >> 1) | ((opcode & 8) >> 2) |
+						(opcode & 1) :
+					8;
+	const struct X86SimpleOutput *row = &x86_extend64[form];
+	const uint8_t mr = code[length - 1];
+	if (mr < 0xc0)
+		return writeExtendMemory64(code, size, insn, insn_size, row,
+					   x86_simple_registers);
+	const struct X86SimpleRegister *dst =
+		&x86_simple_registers[(rex & 8) ? 3 : 2]
+				     [((rex & 4) << 1) | ((mr >> 3) & 7)];
+	const struct X86SimpleRegister *src =
+		!escaped     ? x86_simple_registers[2] :
+		(opcode & 1) ? x86_extend64_words :
+			       x86_simple_registers[rex != 0];
+	src += ((rex & 1) << 3) | (mr & 7);
+	writeExtendRegisters(code, length, insn, insn_size, row, dst, src, rex,
+			     opcode, mr, escaped);
+	return true;
+}
+
 #ifdef CAPSTONE_X86_NEAR_INDIRECT_OUTPUT
 #include "X86GenIndirect64Output.inc"
 
@@ -171,10 +203,20 @@ static bool writeExtraOutput64(cs_struct *handle, const uint8_t *code,
 			       size_t size, cs_insn *insn, uint16_t *insn_size)
 {
 	const bool has_rex = (code[0] & 0xf0) == 0x40;
-	const unsigned length = 3 + has_rex;
-	if (size < length)
+	if (size < 2u + has_rex)
 		return false;
 	const uint8_t primary = code[has_rex];
+	const unsigned length = 2 + has_rex + (primary == 0x0f);
+	if (size < length)
+		return false;
+	const uint8_t rex_byte = has_rex ? code[0] : 0;
+	if ((primary == 0x63 && (rex_byte & 8)) ||
+	    (primary == 0x0f && (code[length - 2] & 0xf6) == 0xb6)) {
+		if (X86_OUTPUT_UNSUPPORTED(handle, false))
+			return false;
+		return writeExtend64(code, size, insn, insn_size, length,
+				     rex_byte, code[length - 2]);
+	}
 	if (primary != 0x0f) {
 		const uint8_t mr = code[has_rex + 1];
 		if ((primary & 0xfe) != 0xc6 || mr >= 0xc0 || (mr & 0x38) ||

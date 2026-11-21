@@ -908,6 +908,35 @@ static bool check_alu_memory(csh handles[2], cs_mode mode)
 	return true;
 }
 
+static bool check_extend64(csh handles[2])
+{
+	static const uint8_t ops[] = { 0x63, 0xb6, 0xb7, 0xbe, 0xbf };
+	for (unsigned prefix = 0; prefix <= 16; ++prefix)
+		for (size_t op = 0; op < sizeof(ops); ++op)
+			for (unsigned mr = 0; mr < 256; ++mr) {
+				uint8_t bytes[10] = { 0 };
+				unsigned n = 0;
+				if (prefix)
+					bytes[n++] = (uint8_t)(0x3f + prefix);
+				if (ops[op] != 0x63)
+					bytes[n++] = 0x0f;
+				bytes[n++] = ops[op];
+				bytes[n++] = (uint8_t)mr;
+				bytes[n++] = (uint8_t)(mr & 8 ? 0x25 : 0xa3);
+				bytes[n++] = 0x80;
+				bytes[n++] = 0xfe;
+				bytes[n++] = 0xff;
+				bytes[n++] = 0xff;
+				const unsigned seed =
+					prefix + mr + (unsigned)op;
+				if (!compare(handles, bytes, n, seed) ||
+				    !compare(handles, bytes, seed % n + 1,
+					     seed))
+					return false;
+			}
+	return true;
+}
+
 static bool check_extend32(csh handles[2])
 {
 	for (unsigned op = 0xb6; op <= 0xbf; ++op) {
@@ -1167,6 +1196,8 @@ static bool check_mode(cs_mode mode)
 		    (mode == CS_MODE_32 && private_iter != X86_disasmIter &&
 		     (!check_absolute_addresses32(handles) ||
 		      !check_extend32(handles))) ||
+		    (mode == CS_MODE_64 && private_iter != X86_disasmIter &&
+		     !check_extend64(handles)) ||
 		    (private_iter != X86_disasmIter &&
 		     !check_indirect_memory(handles, mode)) ||
 		    !check_alu_immediates(handles, mode) ||

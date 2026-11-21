@@ -28,6 +28,7 @@
 #include "X86MemoryOutputImpl.h"
 #undef X86_EXTEND32_MEMORY
 #include "X86GenExtend32Output.inc"
+#include "X86ExtendRegisterOutput.h"
 
 #include "X86GenVex32MemoryOutput.inc"
 
@@ -142,21 +143,8 @@ static bool writeExtend32(const uint8_t *code, size_t size, cs_insn *insn,
 	const struct X86SimpleRegister *src =
 		&(opcode & 1 ? x86_extend32_words :
 			       x86_simple_registers[0])[mr & 7];
-	*insn_size = insn->size = 3;
-	insn->id = row->id;
-	memcpy(insn->bytes, code, 3);
-	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
-	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
-	memset(insn->op_str, 0, sizeof(insn->op_str));
-	memcpy(insn->op_str, dst->name, sizeof(dst->name));
-	char *next = insn->op_str + dst->length;
-	memcpy(next, ", ", 2);
-	memcpy(next + 2, src->name, sizeof(src->name));
-	if (insn->detail) {
-		X86_writeSimpleDetail(insn->detail, row, 0x0f, 0, mr, dst->reg,
-				      src->reg);
-		insn->detail->x86.opcode[1] = opcode;
-	}
+	writeExtendRegisters(code, 3, insn, insn_size, row, dst, src, 0, opcode,
+			     mr, true);
 	return true;
 }
 
