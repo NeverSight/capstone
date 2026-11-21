@@ -7,6 +7,8 @@
 #ifdef X86_MEMORY_IMMEDIATE
 #include "X86UnsignedImmediate.h"
 static bool X86_MEMORY_IMMEDIATE(
+#elif defined(X86_EXTEND32_MEMORY)
+static bool X86_EXTEND32_MEMORY(
 #elif defined(X86_MEMORY32_OUTPUT)
 static bool X86_MEMORY32_OUTPUT(
 #else
@@ -24,7 +26,11 @@ bool X86_writeMemoryOutput(
 	const bool wide = row->address_size == 8;
 #endif
 	const uint8_t rex = wide && (code[0] & 0xf0) == 0x40 ? code[0] : 0;
+#ifdef X86_EXTEND32_MEMORY
+	const unsigned lead = 1; /* The caller consumed the 0F escape. */
+#else
 	const unsigned lead = rex != 0;
+#endif
 	const uint8_t opcode = code[lead], modrm = code[lead + 1];
 	const unsigned mod = modrm >> 6, rm = modrm & 7;
 	const bool sib = rm == 4, disp32_only = !mod && rm == 5;
@@ -61,6 +67,10 @@ bool X86_writeMemoryOutput(
 		}
 	}
 
+#ifdef X86_EXTEND32_MEMORY
+	const bool push = false, load = true;
+	const unsigned reg_width = 2; /* r32 destination */
+#else
 #ifdef X86_MEMORY_IMMEDIATE
 	const bool lea = false, load = false;
 #else
@@ -68,6 +78,7 @@ bool X86_writeMemoryOutput(
 	const bool load = !push && (lea || (opcode & 2));
 #endif
 	const unsigned reg_width = (opcode & 1) ? ((rex & 8) ? 3 : 2) : lead;
+#endif
 	const struct X86SimpleRegister *reg =
 		&regs[reg_width][((rex & 4) << 1) | ((modrm >> 3) & 7)];
 	const struct X86SimpleRegister *base =
@@ -91,6 +102,10 @@ bool X86_writeMemoryOutput(
 		memcpy(out, ", ", 2);
 		out += 2;
 	}
+#ifdef X86_EXTEND32_MEMORY
+	memcpy(out, row->ops[1].size == 1 ? "byte ptr [" : "word ptr [", 10);
+	out += 10;
+#else
 	if (lea) {
 		*out++ = '[';
 	} else if (row->ops[0].size == 1) {
@@ -102,6 +117,7 @@ bool X86_writeMemoryOutput(
 		       11);
 		out += 11;
 	}
+#endif
 	if (disp32_only) {
 #ifdef X86_MEMORY32_OUTPUT
 		/* The absolute address is unsigned in Intel text. The encoded
@@ -154,6 +170,10 @@ bool X86_writeMemoryOutput(
 		X86_writeSimpleDetail(insn->detail, row, opcode, rex, modrm,
 				      load ? reg->reg : 0, load ? 0 : reg->reg);
 		cs_x86 *x = &insn->detail->x86;
+#ifdef X86_EXTEND32_MEMORY
+		x->opcode[0] = 0x0f;
+		x->opcode[1] = opcode;
+#endif
 #ifdef X86_MEMORY_IMMEDIATE
 		x->operands[1].type = X86_OP_IMM;
 		x->operands[1].imm = (int64_t)value;
