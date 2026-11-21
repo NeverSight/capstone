@@ -17210,6 +17210,8 @@ Decode:
 	return decodeToMCInst_2(S, DecodeIdx, insn, MI, Address, Decoder, &DecodeComplete);
 }
 
+#define RISCV_EXTENSION_MAJORS UINT32_C(0x405f0c04)
+
 static DecodeStatus directInstruction_2(const uint8_t *Table, MCInst *MI, uint16_t insn, uint64_t Address, const void *Decoder)
 
 {

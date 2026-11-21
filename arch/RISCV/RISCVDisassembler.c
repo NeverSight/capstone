@@ -634,6 +634,13 @@ DecodeStatus RISCV_getInstruction(MCInst *MI, uint16_t *Size,
 
 		Insn = readBytes32(MI, Bytes);
 
+		/* No extension table can reach Decode or TryDecode on a major
+		 * opcode outside this generated mask. Keep overlapping extensions
+		 * in the original order. */
+		const unsigned major = (Insn >> 2) & 31;
+		if (!(RISCV_EXTENSION_MAJORS & (UINT32_C(1) << major)))
+			goto base32;
+
 		TRY_TO_DECODE(4,
 			      RISCV_getFeatureBits(MI->csh->mode,
 						   RISCV_FeatureStdExtZdinx) &&
@@ -728,6 +735,7 @@ DecodeStatus RISCV_getInstruction(MCInst *MI, uint16_t *Size,
 		TRY_TO_DECODE_FEATURE(
 			4, RISCV_FeatureVendorXCVbi, DecoderTableXCVbi32,
 			"CORE-V Immediate Branching custom opcode table");
+	base32:
 		TRY_TO_DECODE(4, true, DecoderTable32, "RISCV32 table");
 
 		return MCDisassembler_Fail;

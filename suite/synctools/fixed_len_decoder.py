@@ -146,6 +146,53 @@ def successors(n):
     return [n.end] + ([] if n.target is None else [n.target])
 
 
+def observable_prefixes(nodes, bits=7):
+    """Conservatively admit any prefix that could reach an MCInst mutation."""
+    result = set()
+    for prefix in range(1 << bits):
+        pending = [(0, None)]
+        seen = set()
+        while pending:
+            position, field = pending.pop()
+            state = (position, field)
+            if state in seen:
+                continue
+            seen.add(state)
+            node = nodes[position]
+            if node.op in ('Decode', 'TryDecode'):
+                result.add(prefix)
+                break
+            if node.op == 'Fail':
+                continue
+            if node.op == 'ExtractField':
+                pending.append((node.end, node.args))
+                continue
+            if node.op in ('FilterValue', 'CheckField'):
+                if node.op == 'FilterValue':
+                    compared, expected = field, node.args[0]
+                else:
+                    compared, expected = node.args[:2], node.args[2]
+                if compared is None:
+                    match, mismatch = expected == 0, expected != 0
+                else:
+                    start, length = compared
+                    known = max(0, min(length, bits - start))
+                    mask = (1 << known) - 1
+                    match = expected < (1 << length) and (expected & mask) == ((prefix >> start) & mask)
+                    mismatch = not match or known < length
+                if match:
+                    pending.append((node.end, field))
+                if mismatch:
+                    pending.append((node.target, field))
+                continue
+            # Predicates are pure queries; either answer remains possible.
+            assert node.op in ('CheckPredicate', 'SoftFail'), node.op
+            pending.append((node.end, field))
+            if node.target is not None:
+                pending.append((node.target, field))
+    return result
+
+
 def primary_opcode_mask(nodes):
     """A top-level miss must reach Fail without modifying the instruction."""
     root = nodes[0]
@@ -282,6 +329,7 @@ def main():
             f"/* Source SHA256: {hashlib.sha256(text.encode('utf-8')).hexdigest()} */",
         ]
         counts = []
+        extension_majors = 0
         for name, body in tables:
             encoded_width = int(name[-2:])
             require(encoded_width in inputs, "Unsupported instruction width")
@@ -292,6 +340,9 @@ def main():
                 "Review changed decoder input width before regenerating",
             )
             nodes = parse(body)
+            if arch == "RISCV" and encoded_width == 32 and name != "DecoderTable32":
+                for opcode_prefix in observable_prefixes(nodes):
+                    extension_majors |= 1 << (opcode_prefix >> 2)
             if arch == "Mips" and name in (
                 "DecoderTableMips6432", "DecoderTableMipsFP6432", "DecoderTableMipsDSP32"
             ):
@@ -299,6 +350,10 @@ def main():
                 output.append(f"#define {name}_MAJOR_MASK UINT64_C(0x{mask:016x})")
             output.append(emit(name, nodes, width, w))
             counts.append((name, len(nodes)))
+        if arch == "RISCV":
+            output.append(
+                f"#define RISCV_EXTENSION_MAJORS UINT32_C(0x{extension_majors:08x})"
+            )
         for w, width in sorted(set(inputs.values())):
             selected = [n for n, _ in tables if inputs[int(n[-2:])] == (w, width)]
             if not selected:
