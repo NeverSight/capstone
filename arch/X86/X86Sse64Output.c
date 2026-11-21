@@ -32,6 +32,37 @@ struct X86SseRegisterOutput {
 #include "X86GenSse64RegisterOutput.inc"
 #include "X86GenVex64PackedMemory.inc"
 
+#ifdef CAPSTONE_X86_NEAR_INDIRECT_OUTPUT
+#include "X86GenIndirect64Output.inc"
+
+/* FF /2 and /4 have one explicit 64-bit target. The register and memory
+ * forms share their generated access, implicit register and group records. */
+static bool writeIndirect64(const uint8_t *code, size_t size, cs_insn *insn,
+			    uint16_t *insn_size, uint8_t rex, uint8_t modrm)
+{
+	const struct X86SimpleOutput *row =
+		&x86_indirect64[rex != 0][(modrm & 0x20) != 0];
+	if (modrm < 0xc0)
+		return X86_writeMemoryOutput(code, size, insn, insn_size, row,
+					     x86_simple_registers);
+	const struct X86SimpleRegister *reg =
+		&x86_simple_registers[3][((rex & 1) << 3) | (modrm & 7)];
+	*insn_size = insn->size = (uint16_t)(2 + (rex != 0));
+	insn->id = row->id;
+	memcpy(insn->bytes, code, insn->size);
+	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
+	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
+	memset(insn->op_str, 0, sizeof(insn->op_str));
+	memcpy(insn->op_str, reg->name, sizeof(reg->name));
+	if (insn->detail)
+		X86_writeSimpleDetail(insn->detail, row, 0xff, rex, modrm,
+				      reg->reg, 0);
+	return true;
+}
+
+#define X86_FIXED_INDIRECT writeIndirect64
+#endif
+
 static bool writePackedMemory(const uint8_t *code, cs_insn *insn,
 			      uint16_t *insn_size,
 			      const struct X86SseRegisterOutput *entry,

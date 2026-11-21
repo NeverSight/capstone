@@ -52,6 +52,15 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
 		if (size < 2u + has_rex)
 			return false;
 		modrm = code[1 + has_rex];
+#ifdef X86_FIXED_INDIRECT
+		if (opcode == 0xff &&
+		    ((modrm & 0x38) == 0x10 || (modrm & 0x38) == 0x20)) {
+			if (X86_OUTPUT_UNSUPPORTED(handle, false))
+				return false;
+			return X86_FIXED_INDIRECT(code, size, insn, insn_size,
+						  rex, modrm);
+		}
+#endif
 		if (modrm < 0xc0) {
 			/* The generated ALU, TEST and MOV register rows also
              * describe their memory forms. XCHG and immediates

@@ -1143,7 +1143,7 @@ static bool check_mode(cs_mode mode)
 		    !check_alu_memory(handles, mode) ||
 		    (mode == CS_MODE_32 && private_iter != X86_disasmIter &&
 		     !check_absolute_addresses32(handles)) ||
-		    (mode == CS_MODE_32 && private_iter != X86_disasmIter &&
+		    (private_iter != X86_disasmIter &&
 		     !check_indirect_memory(handles, mode)) ||
 		    !check_alu_immediates(handles, mode) ||
 		    !check_legacy_vectors(handles, mode) ||

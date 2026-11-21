@@ -216,6 +216,7 @@ option(CAPSTONE_MIPS_FINAL_OUTPUT_TRIM "Remove leading whitespace once at the MI
 option(CAPSTONE_MIPS_PRECHECK_PRINTED_ALIAS "Check the MIPS printer alias flag before calling the isolated mnemonic lookup" OFF)
 option(CAPSTONE_X86_REDUCE "x86 with reduce instruction sets to minimize library" OFF)
 option(CAPSTONE_X86_ATT_DISABLE "Disable x86 AT&T syntax" OFF)
+option(CAPSTONE_X86_NEAR_INDIRECT_OUTPUT "Enable near CALL/JMP output in the static x86-64 iterator" OFF)
 option(CAPSTONE_X86_SCAN_ADAPTER "Build the private x86 scan adapter hook" OFF)
 option(CAPSTONE_OSXKERNEL_SUPPORT "Support to embed Capstone into OS X Kernel extensions" OFF)
 
@@ -1050,6 +1051,9 @@ if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST
     set_target_properties(capstone_x86_iter32 PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
     add_library(capstone_x86_iter64 OBJECT arch/X86/X86Sse64Output.c)
     target_link_libraries(capstone_x86_iter64 PRIVATE capstone)
+    if(CAPSTONE_X86_NEAR_INDIRECT_OUTPUT)
+        target_compile_definitions(capstone_x86_iter64 PRIVATE CAPSTONE_X86_NEAR_INDIRECT_OUTPUT)
+    endif()
     set_target_properties(capstone_x86_iter64 PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
 endif()
 
