@@ -204,7 +204,7 @@ foreach(TSRC ${UNIT_TEST_SOURCES})
 endforeach()
 
 if(TARGET x86_simple_output)
-    target_sources(x86_simple_output PRIVATE $<TARGET_OBJECTS:capstone_x86_iter32>)
+    target_sources(x86_simple_output PRIVATE $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>)
 endif()
 
 if(CAPSTONE_X86_SUPPORT)

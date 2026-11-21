@@ -1033,12 +1033,15 @@ if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST
     add_library(capstone_x86_iter32 OBJECT arch/X86/X86Vex32Output.c)
     target_link_libraries(capstone_x86_iter32 PRIVATE capstone)
     set_target_properties(capstone_x86_iter32 PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
+    add_library(capstone_x86_iter64 OBJECT arch/X86/X86Sse64Output.c)
+    target_link_libraries(capstone_x86_iter64 PRIVATE capstone)
+    set_target_properties(capstone_x86_iter64 PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
 endif()
 
 if(CAPSTONE_BUILD_STATIC_LIBS)
     add_library(capstone_static STATIC $<TARGET_OBJECTS:capstone>)
     if(TARGET capstone_x86_iter32)
-        target_sources(capstone_static PRIVATE $<TARGET_OBJECTS:capstone_x86_iter32>)
+        target_sources(capstone_static PRIVATE $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>)
     endif()
     # Use normal capstone name. Otherwise we get libcapstone_static.a
     set_target_properties(capstone_static PROPERTIES OUTPUT_NAME "capstone")

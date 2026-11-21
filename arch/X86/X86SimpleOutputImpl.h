@@ -6,9 +6,9 @@
 
 /* The register rows distinguish AH..BH from SPL..DIL when a REX prefix is
  * present. Memory admission and bounds checks belong to the address writer. */
-#ifdef X86_EXTRA_OUTPUT32
-static bool tryOutput32(cs_struct *handle, const uint8_t *code, size_t size,
-			cs_insn *insn, uint16_t *insn_size)
+#ifdef X86_FIXED_OUTPUT
+static bool X86_FIXED_OUTPUT(cs_struct *handle, const uint8_t *code,
+			     size_t size, cs_insn *insn, uint16_t *insn_size)
 #else
 #ifdef CAPSTONE_X86_DEDICATED_OUTPUT
 CAPSTONE_INTERNAL
@@ -19,8 +19,8 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
 			 cs_insn *insn, uint16_t *insn_size)
 #endif
 {
-#ifdef X86_EXTRA_OUTPUT32
-	const bool wide = false;
+#ifdef X86_FIXED_OUTPUT
+	const bool wide = X86_FIXED_WIDE;
 #else
 	const bool wide = handle->mode == CS_MODE_64;
 #endif
@@ -36,8 +36,8 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
 						0;
 	const unsigned plan = x86_simple_plans[wide][prefix_class][opcode];
 	if (!plan) {
-#ifdef X86_EXTRA_OUTPUT32
-		return X86_EXTRA_OUTPUT32(handle, code, size, insn, insn_size);
+#ifdef X86_OUTPUT_MISS
+		return X86_OUTPUT_MISS(handle, code, size, insn, insn_size);
 #else
 		return false;
 #endif

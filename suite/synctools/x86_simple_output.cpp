@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
@@ -120,7 +121,7 @@ std::string initializer(const X86SimpleOutput &row)
 std::string describe(const cs_insn &insn, uint8_t opcode, uint8_t rex,
 		     uint8_t modrm, const X86SimpleRegister *first,
 		     const X86SimpleRegister *second, bool branch = false,
-		     bool lea = false)
+		     bool lea = false, bool escaped_pair = false)
 {
 	const auto &d = *insn.detail;
 	const auto &x = d.x86;
@@ -145,7 +146,7 @@ std::string describe(const cs_insn &insn, uint8_t opcode, uint8_t rex,
 	row.group_count = d.groups_count;
 	row.operand_count = x.op_count;
 	row.address_size = x.addr_size;
-	row.modrm_offset = x.encoding.modrm_offset;
+	row.modrm_offset = escaped_pair ? 2 : x.encoding.modrm_offset;
 	row.imm_offset = x.encoding.imm_offset;
 	row.imm_size = x.encoding.imm_size;
 	std::copy_n(d.regs_read, row.read_count, row.reads);
@@ -173,6 +174,11 @@ std::string describe(const cs_insn &insn, uint8_t opcode, uint8_t rex,
 			      first ? first->reg : row.ops[0].reg,
 			      second ? second->reg : row.ops[1].reg);
 
+	if (escaped_pair) {
+		rebuilt.x86.opcode[0] = 0x0f;
+		rebuilt.x86.opcode[1] = opcode;
+		rebuilt.x86.encoding.modrm_offset = uint8_t(2 + (rex != 0));
+	}
 	if (lea) {
 		if (x.op_count != 2 || x.operands[0].type != X86_OP_REG)
 			return {};
@@ -563,10 +569,167 @@ void emit_tables(const PlanTable &plans, const RegisterTable &regs,
 	}
 	std::cout << "};\n";
 }
+bool decode_sse(Decoder &decoder, const uint8_t *code, size_t size)
+{
+	const uint8_t *cursor = code;
+	size_t left = size;
+	uint64_t ip = UINT64_MAX - 1;
+	cs_insn &insn = *decoder.insn;
+	insn.is_alias = insn.usesAliasDetails = insn.illegal = false;
+	return cs_disasm_iter(decoder.handle, &cursor, &left, &ip, &insn) &&
+	       !left && cursor == code + size && !insn.is_alias &&
+	       !insn.usesAliasDetails && !insn.illegal;
+}
+
+// Use one record only when both operand order and every public detail field
+// are uniform over the complete ModR/M and REX register space.
+std::string describe_sse_pair(Decoder &decoder, const X86SimpleRegister *regs,
+			      unsigned opcode, unsigned rex, unsigned mr,
+			      bool reverse)
+{
+	uint8_t bytes[] = { uint8_t(rex), 0x0f, uint8_t(opcode), uint8_t(mr) };
+	if (!decode_sse(decoder, bytes + !rex, sizeof(bytes) - !rex))
+		return {};
+	const cs_insn &insn = *decoder.insn;
+	const unsigned reg = ((mr >> 3) & 7) | ((rex & 4) << 1);
+	const unsigned rm = (mr & 7) | ((rex & 1) << 3);
+	return describe(insn, uint8_t(opcode), uint8_t(rex), uint8_t(mr),
+			&regs[reverse ? rm : reg], &regs[reverse ? reg : rm],
+			false, false, true);
+}
+
+// A register row can describe a RIP-relative operand only if replacing its
+// ModR/M operand reproduces the canonical memory form, including its access.
+bool supports_rip_memory(Decoder &decoder, unsigned opcode, bool reverse)
+{
+	for (unsigned prefix = 0; prefix <= 16; ++prefix) {
+		const auto rex = uint8_t(prefix ? 0x3f + prefix : 0);
+		for (unsigned field = 0; field < 8; ++field) {
+			const auto mr = uint8_t((field << 3) | 5);
+			uint8_t encoding[] = { rex,
+					       0x0f,
+					       uint8_t(opcode),
+					       uint8_t(mr | 0xc0),
+					       0x99,
+					       0xba,
+					       0xdc,
+					       0xfe };
+			const uint8_t *code = encoding + !rex;
+			const unsigned length = 3 + (rex != 0);
+			if (!decode_sse(decoder, code, length))
+				return false;
+			auto &insn = *decoder.insn;
+			const auto id = insn.id;
+			const std::string mnemonic = insn.mnemonic;
+			cs_detail expected = *insn.detail;
+			auto &x = expected.x86;
+			auto &op = x.operands[reverse ? 0 : 1];
+			if (op.type != X86_OP_REG || op.size != 16)
+				return false;
+			const char *reg =
+				cs_reg_name(decoder.handle,
+					    x.operands[reverse ? 1 : 0].reg);
+			std::string memory = "xmmword ptr [rip - 0x1234567]";
+			std::string text =
+				reverse ? memory + ", " + reg :
+					  std::string(reg) + ", " + memory;
+			x.modrm = mr;
+			x.disp = -0x1234567;
+			x.encoding.disp_offset = uint8_t(length);
+			x.encoding.disp_size = 4;
+			op.type = X86_OP_MEM;
+			op.mem = {};
+			op.mem.base = X86_REG_RIP;
+			op.mem.scale = 1;
+			op.mem.disp = x.disp;
+			encoding[3] = mr;
+			if (!decode_sse(decoder, code, length + 4) ||
+			    insn.id != id || mnemonic != insn.mnemonic ||
+			    text != insn.op_str ||
+			    std::memcmp(&expected, insn.detail,
+					offsetof(cs_detail, x86) +
+						sizeof(cs_x86)))
+				return false;
+		}
+	}
+	return true;
+}
+
+void emit_sse64_registers(Decoder &decoder)
+{
+	X86SimpleRegister regs[16]{};
+	for (unsigned i = 0; i < 16; ++i) {
+		auto &reg = regs[i];
+		reg.reg = uint16_t(X86_REG_XMM0 + i);
+		const char *name = cs_reg_name(decoder.handle, reg.reg);
+		if (!name || std::strlen(name) >= sizeof(reg.name))
+			throw std::runtime_error("invalid XMM register name");
+		std::strcpy(reg.name, name);
+	}
+	std::vector<std::string> table(256);
+	unsigned first = 256, last = 0, count = 0;
+	for (unsigned opcode = 0; opcode < table.size(); ++opcode) {
+		bool reverse = false;
+		auto row = describe_sse_pair(decoder, regs, opcode, 0, 0xd9,
+					     false);
+		if (row.empty()) {
+			reverse = true;
+			row = describe_sse_pair(decoder, regs, opcode, 0, 0xd9,
+						true);
+		}
+		if (row.empty())
+			continue;
+		bool uniform = true;
+		for (unsigned prefix = 0; prefix <= 16 && uniform; ++prefix) {
+			unsigned rex = prefix ? 0x3f + prefix : 0;
+			for (unsigned mr = 0xc0; mr <= 0xff; ++mr)
+				if (describe_sse_pair(decoder, regs, opcode,
+						      rex, mr,
+						      reverse) != row) {
+					uniform = false;
+					break;
+				}
+		}
+		if (uniform) {
+			table[opcode] =
+				"{ " + row + (reverse ? ", true" : ", false") +
+				(supports_rip_memory(decoder, opcode, reverse) ?
+					 ", true }" :
+					 ", false }");
+			first = std::min(first, opcode);
+			last = opcode;
+			++count;
+		}
+	}
+	if (table[0x28].empty() || table[0x58].empty() || table[0x59].empty())
+		throw std::runtime_error("missing legacy SSE register forms");
+	std::cout
+		<< "/* Generated by x86_simple_output.cpp --sse64-registers. */\n"
+		<< "#define X86_SSE_REGISTER_FIRST " << first << "u\n"
+		<< "static const struct X86SseRegisterOutput x86_sse_register_outputs[] = {\n";
+	for (unsigned opcode = first; opcode <= last; ++opcode)
+		std::cout
+			<< "\t"
+			<< (table[opcode].empty() ? "{ { 0 }, false, false }" :
+						    table[opcode])
+			<< ",\n";
+	std::cout << "};\n";
+	std::cerr << count
+		  << " SSE opcodes verified over every REX and register pair\n";
+}
+
 } // namespace
 
-int main()
+int main(int argc, char **argv)
 {
+	if (argc == 2 && std::strcmp(argv[1], "--sse64-registers") == 0) {
+		Decoder decoder(CS_MODE_64);
+		emit_sse64_registers(decoder);
+		return 0;
+	}
+	if (argc != 1)
+		throw std::runtime_error(
+			"expected no arguments or --sse64-registers");
 	Decoder x86(CS_MODE_32), x64(CS_MODE_64);
 	RegisterTable regs{};
 	describe_registers(x64, regs);
