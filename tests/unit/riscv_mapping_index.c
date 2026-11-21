@@ -19,8 +19,48 @@ static bool check_id(cs_struct *handle, unsigned id)
 	return true;
 }
 
+#ifndef CAPSTONE_DIET
+static bool check_alias_names(void)
+{
+	static const name_map names[] = {
+#include "../../arch/RISCV/RISCVGenCSAliasMnemMap.inc"
+	};
+	cs_struct handle = { 0 };
+	cs_insn flat = { 0 };
+	MCInst mi = { 0 };
+	SStream out = { 0 };
+	handle.arch = CS_ARCH_RISCV;
+	mi.csh = &handle;
+	mi.flat_insn = &flat;
+	mi.isAliasInstr = true;
+	for (size_t i = 0; i < ARR_SIZE(names); ++i) {
+		char *start = out.buffer + 2;
+		out.buffer[0] = ' ';
+		out.buffer[1] = '\t';
+		const size_t len = strlen(names[i].name);
+		for (size_t j = 0; j <= len; ++j) {
+			for (unsigned c = 0; c <= UCHAR_MAX; ++c) {
+				memcpy(start, names[i].name, len + 1);
+				start[len + 1] = 0;
+				start[j] = (char)c;
+				map_set_alias_id(&mi, &out, names, ARR_SIZE(names));
+				const uint64_t expected = flat.alias_id;
+				RISCV_set_alias_id(&mi, &out);
+				if (flat.alias_id != expected)
+					return false;
+			}
+		}
+	}
+	return true;
+}
+#endif
+
 int main(void)
 {
+#ifndef CAPSTONE_DIET
+	if (!check_alias_names())
+		return 1;
+#endif
 	for (unsigned i = 0; i < RISCV_insn_count; ++i) {
 		if (RISCV_insns[i].id != i) {
 			fprintf(stderr,

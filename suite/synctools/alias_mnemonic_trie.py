@@ -34,7 +34,9 @@ def generate(directory):
             break
         names.append((match[2][1:-1].encode("ascii"), match[1]))
     else:
-        raise ValueError(f"Missing {arch} alias terminator")
+        # RISC-V passes the array length to the name lookup without an END row.
+        if arch != "RISCV":
+            raise ValueError(f"Missing {arch} alias terminator")
     # Slot zero is unused. A child is at parent.offset + its byte, and
     # child.parent distinguishes overlapping sparse transition rows.
     tree = {}
@@ -73,7 +75,7 @@ if __name__ == "__main__":
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[2] / "arch"
-    for arch in ("AArch64", "Mips", "PowerPC", "Sparc"):
+    for arch in ("AArch64", "Mips", "PowerPC", "RISCV", "Sparc"):
         directory = root / arch
         prefix = "PPC" if arch == "PowerPC" else arch
         target = directory / f"{prefix}GenAliasTrie.inc"

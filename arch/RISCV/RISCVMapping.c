@@ -8,6 +8,9 @@
 #include <string.h>
 
 #include "../../Mapping.h"
+#ifndef CAPSTONE_DIET
+#include "../../MappingAlias.h"
+#endif
 #include "../../cs_simple_types.h"
 #include "../../utils.h"
 
@@ -51,6 +54,10 @@ static const map_insn_ops insn_operands[] = {
 
 static const name_map insn_alias_mnem_map[] = {
 #include "RISCVGenCSAliasMnemMap.inc"
+};
+
+static const alias_trie_node riscv_alias_trie[] = {
+#include "RISCVGenAliasTrie.inc"
 };
 #endif
 
@@ -404,8 +411,8 @@ static const char *const insn_name_maps[] = {
 void RISCV_set_alias_id(MCInst *MI, SStream *O)
 {
 #ifndef CAPSTONE_DIET
-	map_set_alias_id(MI, O, insn_alias_mnem_map,
-			 ARR_SIZE(insn_alias_mnem_map));
+	map_set_alias_id_trie_impl(MI, O, riscv_alias_trie,
+				   ARR_SIZE(riscv_alias_trie));
 #endif
 }
 
