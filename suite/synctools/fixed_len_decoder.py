@@ -146,10 +146,11 @@ def successors(n):
     return [n.end] + ([] if n.target is None else [n.target])
 
 
-def observable_prefixes(nodes, bits=7):
-    """Conservatively admit any prefix that could reach an MCInst mutation."""
+def observable_field_values(nodes, offset, bits):
+    """Admit every value of the selected bits that could reach an MCInst mutation."""
     result = set()
-    for prefix in range(1 << bits):
+    selected = ((1 << bits) - 1) << offset
+    for value in range(1 << bits):
         pending = [(0, None)]
         seen = set()
         while pending:
@@ -160,7 +161,7 @@ def observable_prefixes(nodes, bits=7):
             seen.add(state)
             node = nodes[position]
             if node.op in ('Decode', 'TryDecode'):
-                result.add(prefix)
+                result.add(value)
                 break
             if node.op == 'Fail':
                 continue
@@ -176,10 +177,11 @@ def observable_prefixes(nodes, bits=7):
                     match, mismatch = expected == 0, expected != 0
                 else:
                     start, length = compared
-                    known = max(0, min(length, bits - start))
-                    mask = (1 << known) - 1
-                    match = expected < (1 << length) and (expected & mask) == ((prefix >> start) & mask)
-                    mismatch = not match or known < length
+                    field_mask = (1 << length) - 1
+                    known = (selected >> start) & field_mask
+                    observed = ((value << offset) >> start) & known
+                    match = expected <= field_mask and (expected & known) == observed
+                    mismatch = not match or known != field_mask
                 if match:
                     pending.append((node.end, field))
                 if mismatch:
@@ -330,6 +332,7 @@ def main():
         ]
         counts = []
         extension_majors = 0
+        ppc_extension_majors = 0
         for name, body in tables:
             encoded_width = int(name[-2:])
             require(encoded_width in inputs, "Unsupported instruction width")
@@ -341,8 +344,17 @@ def main():
             )
             nodes = parse(body)
             if arch == "RISCV" and encoded_width == 32 and name != "DecoderTable32":
-                for opcode_prefix in observable_prefixes(nodes):
+                for opcode_prefix in observable_field_values(nodes, 0, 7):
                     extension_majors |= 1 << (opcode_prefix >> 2)
+            if arch == "PowerPC" and name != "DecoderTable32":
+                if encoded_width == 64:
+                    # The first word in memory occupies bits 63:32, for either endianness.
+                    majors = observable_field_values(nodes, 58, 6)
+                    require(len(majors) == 1, "Review the prefixed PowerPC primary opcodes")
+                    output.append(f"#define PPC_PREFIX_MAJOR {next(iter(majors))}u")
+                else:
+                    for major in observable_field_values(nodes, 26, 6):
+                        ppc_extension_majors |= 1 << major
             if arch == "Mips" and name in (
                 "DecoderTableMips6432", "DecoderTableMipsFP6432", "DecoderTableMipsDSP32"
             ):
@@ -353,6 +365,10 @@ def main():
         if arch == "RISCV":
             output.append(
                 f"#define RISCV_EXTENSION_MAJORS UINT32_C(0x{extension_majors:08x})"
+            )
+        if arch == "PowerPC":
+            output.append(
+                f"#define PPC_EXTENSION_MAJORS UINT64_C(0x{ppc_extension_majors:016x})"
             )
         for w, width in sorted(set(inputs.values())):
             selected = [n for n, _ in tables if inputs[int(n[-2:])] == (w, width)]

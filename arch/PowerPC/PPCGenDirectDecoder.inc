@@ -11843,6 +11843,8 @@ Decode:
 	return decodeToMCInst_4(S, DecodeIdx, insn, MI, Address, Decoder, &DecodeComplete);
 }
 
+#define PPC_PREFIX_MAJOR 1u
+
 static DecodeStatus direct_DecoderTable64(MCInst *MI, uint64_t insn, uint64_t Address, const void *Decoder)
 {
 	uint64_t CurFieldValue = 0;
@@ -17792,6 +17794,8 @@ Decode:
 	MCInst_setOpcode(MI, Opc);
 	return decodeToMCInst_4(S, DecodeIdx, insn, MI, Address, Decoder, &DecodeComplete);
 }
+
+#define PPC_EXTENSION_MAJORS UINT64_C(0x3300000080000011)
 
 static DecodeStatus directInstruction_4(const uint8_t *Table, MCInst *MI, uint64_t insn, uint64_t Address, const void *Decoder)
 

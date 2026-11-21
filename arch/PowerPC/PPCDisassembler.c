@@ -398,6 +398,19 @@ DecodeStatus getInstruction(csh ud, const uint8_t *Bytes, size_t BytesLen,
 			    MCInst *MI, uint16_t *Size, uint64_t Address,
 			    void *Info)
 {
+#ifdef CAPSTONE_PPC_PRIMARY_DISPATCH
+	/* Only these primary opcodes can reach a prefixed or extension decoder. */
+	if (BytesLen >= 4) {
+		const uint32_t word = readBytes32(MI, Bytes);
+		const unsigned major = word >> 26;
+		if (major != PPC_PREFIX_MAJOR &&
+		    !(PPC_EXTENSION_MAJORS & (UINT64_C(1) << major))) {
+			*Size = 4;
+			return decodeInstruction_4(DecoderTable32, MI, word,
+						   Address, NULL);
+		}
+	}
+#endif
 	// If this is an 8-byte prefixed instruction, handle it here.
 	// Note: prefixed instructions aren't technically 8-byte entities - the
 	// prefix

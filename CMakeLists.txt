@@ -179,7 +179,7 @@ if(capstone_enabled_architectures STREQUAL "LOONGARCH")
 endif()
 
 if(capstone_enabled_architectures STREQUAL "PPC")
-    add_compile_definitions(CAPSTONE_PPC_INIT_CONSTRUCTED_OPERANDS)
+    add_compile_definitions(CAPSTONE_PPC_INIT_CONSTRUCTED_OPERANDS CAPSTONE_PPC_PRIMARY_DISPATCH)
 endif()
 
 if(capstone_enabled_architectures STREQUAL "RISCV")
