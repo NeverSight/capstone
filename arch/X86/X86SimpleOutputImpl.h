@@ -6,6 +6,33 @@
 
 /* The register rows distinguish AH..BH from SPL..DIL when a REX prefix is
  * present. Memory admission and bounds checks belong to the address writer. */
+#if defined(X86_FIXED_OUTPUT) && defined(__x86_64__) && defined(__SSE2__) && \
+	!defined(__KERNEL__)
+#include <emmintrin.h>
+#include "../../MathExtras.h"
+
+/* The target is above HEX_THRESHOLD. Expand all sixteen nibbles, then use
+ * the zero-filled tail to copy its significant digits directly to op_str. */
+static void writeRelativeHex(char *out, uint64_t value)
+{
+	const uint64_t big = __builtin_bswap64(value);
+	const __m128i bytes = _mm_loadl_epi64((const __m128i *)(const void *)&big);
+	const __m128i nibbles = _mm_and_si128(
+		_mm_unpacklo_epi8(_mm_srli_epi16(bytes, 4), bytes),
+		_mm_set1_epi8(15));
+	const __m128i letters = _mm_cmpgt_epi8(nibbles, _mm_set1_epi8(9));
+	const __m128i ascii = _mm_add_epi8(
+		_mm_add_epi8(nibbles, _mm_set1_epi8('0')),
+		_mm_and_si128(letters, _mm_set1_epi8('a' - '0' - 10)));
+	char digits[32];
+	_mm_storeu_si128((__m128i *)(void *)digits, ascii);
+	_mm_storeu_si128((__m128i *)(void *)(digits + 16), _mm_setzero_si128());
+	memcpy(out, "0x", 2);
+	memcpy(out + 2, digits + CountLeadingZeros_64(value) / 4, 16);
+}
+#define X86_FIXED_RELATIVE_HEX writeRelativeHex
+#endif
+
 #ifdef X86_MEMORY32_OUTPUT
 #include "X86GenIndirectMemory.inc"
 #endif
@@ -183,6 +210,9 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
 		if (target <= HEX_THRESHOLD) {
 			insn->op_str[0] = (char)('0' + target);
 		} else {
+#ifdef X86_FIXED_RELATIVE_HEX
+			X86_FIXED_RELATIVE_HEX(insn->op_str, target);
+#else
 			char digits[16];
 			char *end = digits + sizeof(digits);
 			char *p = end;
@@ -194,6 +224,7 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
 			insn->op_str[0] = '0';
 			insn->op_str[1] = 'x';
 			memcpy(insn->op_str + 2, p, (size_t)(end - p));
+#endif
 		}
 		memcpy(insn->bytes, code, length);
 		*insn_size = insn->size = length;

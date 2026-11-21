@@ -12,14 +12,14 @@
 static bool (*private_iter)(csh, const uint8_t **, size_t *, uint64_t *,
 			    cs_insn *) = X86_disasmIter;
 
-static bool compare(csh handles[2], const uint8_t *input, size_t length,
-		    unsigned seed)
+static bool compare_at(csh handles[2], const uint8_t *input, size_t length,
+		       unsigned seed, uint64_t address)
 {
 	cs_insn insn[2];
 	cs_detail detail[2];
 	const uint8_t *cursor[2] = { input, input };
 	size_t left[2] = { length, length };
-	uint64_t ip[2] = { UINT64_MAX - seed, UINT64_MAX - seed };
+	uint64_t ip[2] = { address, address };
 	bool ok[2];
 	for (unsigned side = 0; side < 2; ++side) {
 		memset(&insn[side], seed, sizeof(insn[side]));
@@ -46,6 +46,12 @@ static bool compare(csh handles[2], const uint8_t *input, size_t length,
 	return false;
 }
 
+static bool compare(csh handles[2], const uint8_t *input, size_t length,
+		    unsigned seed)
+{
+	return compare_at(handles, input, length, seed, UINT64_MAX - seed);
+}
+
 static bool check_branches(csh handles[2])
 {
 	const uint32_t bits[] = { 0,	1,    9,	  10,	     0x7f,
@@ -66,6 +72,19 @@ static bool check_branches(csh handles[2])
 			     ++length)
 				if (!compare(handles, bytes, length, i))
 					return false;
+		}
+	}
+	/* Exercise every possible leading nibble, including address wraparound. */
+	const uint8_t jump[] = { 0xeb, 0 };
+	for (unsigned shift = 0; shift < 64; shift += 4) {
+		for (uint64_t top = 1; top <= 15; ++top) {
+			uint64_t first = top << shift;
+			for (unsigned n = 0; n < 3; ++n) {
+				uint64_t target = first + n - 1;
+				if (!compare_at(handles, jump, sizeof(jump), n,
+						target - sizeof(jump)))
+					return false;
+			}
 		}
 	}
 	return true;
