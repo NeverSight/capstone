@@ -358,6 +358,31 @@ static bool check_evex_extract(csh handles[2])
 
 static bool check_evex(csh handles[2])
 {
+	/* Compare all EVEX embedded rounding modes, truncations, and register
+	 * extensions for packed arithmetic. Include masked and memory forms. */
+	for (unsigned n = 0; n < 4096; ++n) {
+		const uint8_t ops[] = { 0x58, 0x59, 0x5c, 0x5e,
+					0x98, 0xa8, 0xb8, 0xbc };
+		const unsigned family = n & 7;
+		const uint8_t bytes[] = {
+			0x62,
+			(uint8_t)((n & 0xf0) | (family < 4 ? 1 : 2)),
+			(uint8_t)(((n >> 3) & 0xf8) | 4 | ((n >> 10) & 3)),
+			(uint8_t)((((n >> 5) & 3) << 5) | 0x10 |
+				  ((n >> 4) & 8) | (n % 13 == 0 ? 1 : 0)),
+			ops[family],
+			(uint8_t)((n % 11 == 0 ? 0x40 : 0xc0) |
+				  ((n >> 1) & 63)),
+			0x80,
+			0,
+			0,
+			0
+		};
+		const size_t extent = n % 5 == 0 ? (n >> 8) % 7 : sizeof(bytes);
+		if (!compare(handles, bytes, extent, n))
+			return false;
+	}
+
 	static const uint16_t forms[] = { 0x1ef, 0x2dc, 0x2dd, 0x2de, 0x2df,
 					  0x344, 0x325, 0x1fe, 0x200 };
 	static const uint8_t tails[] = { 0,    4,    0x45, 0x85,

@@ -17,7 +17,7 @@
 #define X86_FIXED_VEX2 writeVex2Memory64
 #include "X86SimpleOutput.h"
 #include "X86GenSimpleOutput.inc"
-#include "X86VectorRegisterWriter.h"
+#include "X86VectorRegisterOutput.h"
 #define X86_MEMORY_IMMEDIATE writeMemoryImmediate64
 #define X86_IMMEDIATE_WIDE 1
 #include "X86MemoryOutputImpl.h"
@@ -229,6 +229,48 @@ static bool writeExtraOutput64(cs_struct *handle, const uint8_t *code,
 	return true;
 }
 
+#include "X86GenRoundedRegister64.inc"
+
+/* EVEX.b selects embedded rounding for these register-only packed operations.
+ * The caller has checked six bytes, register addressing and the EVEX.b bit. */
+static bool writeRoundedRegisters(const uint8_t *code, cs_insn *insn,
+				  uint16_t *insn_size)
+{
+	const unsigned map = code[1] & 15, flags = code[2];
+	if (map < 1 || map > 3 || !(flags & 4) || (code[3] & 0x87))
+		return false;
+	const unsigned w = flags >> 7, pp = flags & 3;
+	const unsigned plan = evex_rounded_plans[map - 1][code[4]];
+	const unsigned index = evex_rounded_prefixes[plan][w * 4 + pp];
+	if (!index)
+		return false;
+	const unsigned rc = code[3] >> 5, rxb = (~(unsigned)code[1] >> 5) & 7;
+	const unsigned regs[] = { ((code[5] >> 3) & 7) | ((rxb & 4) << 1) |
+					  (~(unsigned)code[1] & 16),
+				  ((~flags >> 3) & 15) |
+					  ((~(unsigned)code[3] & 8) << 1),
+				  (code[5] & 7) | ((rxb & 3) << 3) };
+	writeVectorRegisters(code, insn, insn_size, &evex_rounded_rows[index],
+			     4, 2, 0x40 | (w << 3) | rxb, 2, regs, 3);
+	static const char suffix[][11] = { ", {rn-sae}", ", {rd-sae}",
+					   ", {ru-sae}", ", {rz-sae}" };
+	/* Three ZMM names and two separators take 16 bytes plus a digit
+	 * for each two-digit register number. */
+	const unsigned end =
+		16 + (regs[0] >= 10) + (regs[1] >= 10) + (regs[2] >= 10);
+	memcpy(insn->op_str + end, suffix[rc], sizeof(suffix[rc]));
+	if (insn->detail) {
+		static const x86_avx_rm modes[] = { X86_AVX_RM_RN,
+						    X86_AVX_RM_RD,
+						    X86_AVX_RM_RU,
+						    X86_AVX_RM_RZ };
+		insn->detail->x86.avx_sae = true;
+		insn->detail->x86.avx_rm = modes[rc];
+	}
+	return true;
+}
+
+#define X86_FIXED_ROUNDED writeRoundedRegisters
 #define X86_FIXED_OUTPUT tryOutput64
 #define X86_FIXED_WIDE true
 #define X86_OUTPUT_MISS writeExtraOutput64

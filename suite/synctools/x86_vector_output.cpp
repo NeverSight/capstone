@@ -1377,6 +1377,159 @@ void emit_vex32_memory()
 		     static_cast<unsigned long long>(decoder.probes));
 }
 
+struct RoundedRow {
+	unsigned id = 0;
+	std::string mnemonic;
+	Bytes4 groups{}, access{};
+	unsigned group_count = 0;
+};
+
+bool observe_rounded(Decoder &decoder, unsigned map, unsigned opcode,
+		     unsigned pp, unsigned w, unsigned rc, unsigned dst,
+		     unsigned src, unsigned rm, RoundedRow &row)
+{
+	const uint8_t code[] = {
+		0x62,
+		uint8_t(map | ((dst & 8) ? 0 : 0x80) | ((rm & 16) ? 0 : 0x40) |
+			((rm & 8) ? 0 : 0x20) | (~dst & 16)),
+		uint8_t((w << 7) | ((~src & 15) << 3) | 4 | pp),
+		uint8_t((rc << 5) | 0x10 | ((src & 16) ? 0 : 8)),
+		uint8_t(opcode),
+		uint8_t(0xc0 | ((dst & 7) << 3) | (rm & 7))
+	};
+	const unsigned id = decoder.decode(code, sizeof(code));
+	if (!id)
+		return false;
+	const cs_insn &insn = *decoder.insn;
+	const cs_detail &detail = *insn.detail;
+	if (insn.illegal || insn.is_alias || insn.usesAliasDetails ||
+	    std::strlen(insn.mnemonic) >= 16 || detail.groups_count > 4)
+		return false;
+	if (!row.id) {
+		row.id = id;
+		row.mnemonic = insn.mnemonic;
+		row.group_count = detail.groups_count;
+		std::copy_n(detail.groups, row.group_count, row.groups.begin());
+		for (unsigned n = 0; n < 3; ++n)
+			row.access[n] = detail.x86.operands[n].access;
+	}
+	const char *const endings[] = { ", {rn-sae}", ", {rd-sae}",
+					", {ru-sae}", ", {rz-sae}" };
+	const x86_avx_rm modes[] = { X86_AVX_RM_RN, X86_AVX_RM_RD,
+				     X86_AVX_RM_RU, X86_AVX_RM_RZ };
+	const std::string text = "zmm" + std::to_string(dst) + ", zmm" +
+				 std::to_string(src) + ", zmm" +
+				 std::to_string(rm) + endings[rc];
+	if (row.id != id || row.mnemonic != insn.mnemonic ||
+	    text != insn.op_str)
+		return false;
+	cs_detail expected{};
+	expected.groups_count = uint8_t(row.group_count);
+	std::copy_n(row.groups.begin(), row.group_count, expected.groups);
+	cs_x86 &x = expected.x86;
+	std::memcpy(x.opcode, code, 4);
+	x.modrm = code[5];
+	x.rex = uint8_t(0x40 | (w << 3) | ((~unsigned(code[1]) >> 5) & 7));
+	x.addr_size = 8;
+	x.avx_sae = true;
+	x.avx_rm = modes[rc];
+	x.encoding.modrm_offset = 5;
+	x.op_count = 3;
+	const unsigned numbers[] = { dst, src, rm };
+	for (unsigned n = 0; n < 3; ++n) {
+		auto &op = x.operands[n];
+		op.type = X86_OP_REG;
+		op.size = 64;
+		op.reg = x86_reg(X86_REG_ZMM0 + numbers[n]);
+		op.access = cs_ac_type(row.access[n]);
+	}
+	return std::memcmp(&expected, &detail,
+			   offsetof(cs_detail, x86) + sizeof(cs_x86)) == 0;
+}
+
+void emit_rounded_vectors(Decoder &decoder)
+{
+	using PrefixRow = std::array<unsigned, 8>;
+	std::array<std::array<unsigned, 256>, 3> plans{};
+	std::vector<PrefixRow> prefixes(1);
+	std::vector<std::string> rows;
+	for (unsigned map = 1; map <= plans.size(); ++map) {
+		for (unsigned opcode = 0; opcode < 256; ++opcode) {
+			PrefixRow prefix{};
+			for (unsigned key = 0; key < prefix.size(); ++key) {
+				RoundedRow row;
+				auto same = [&](unsigned rc, unsigned dst,
+						unsigned src, unsigned rm) {
+					return observe_rounded(decoder, map,
+							       opcode, key & 3,
+							       key >> 2, rc,
+							       dst, src, rm,
+							       row);
+				};
+				if (!same(0, 3, 2, 1))
+					continue;
+				bool uniform = true;
+				for (unsigned rc = 0; rc < 4 && uniform; ++rc)
+					for (unsigned n = 0;
+					     n < 32768 && uniform; ++n)
+						uniform = same(rc, n >> 10,
+							       (n >> 5) & 31,
+							       n & 31);
+				if (!uniform)
+					continue;
+				const std::string value =
+					"{ " + decoder.symbol(row.id) + ", \"" +
+					row.mnemonic + "\", " +
+					std::to_string(row.group_count) + ", " +
+					fields(row.groups) + ", " +
+					fields(row.access) + ", 0 }";
+				const auto i = std::find(rows.begin(),
+							 rows.end(), value);
+				const unsigned idx =
+					unsigned(i - rows.begin()) + 1;
+				if (i == rows.end())
+					rows.push_back(value);
+				prefix[key] = idx;
+			}
+			const auto i = std::find(prefixes.begin(),
+						 prefixes.end(), prefix);
+			const unsigned idx = unsigned(i - prefixes.begin());
+			if (i == prefixes.end())
+				prefixes.push_back(prefix);
+			plans[map - 1][opcode] = idx;
+		}
+	}
+	if (!plans[0][0x58] || !plans[1][0xa8] || prefixes.size() > 256 ||
+	    rows.size() > UINT8_MAX)
+		throw std::runtime_error("invalid rounded EVEX register plans");
+	std::puts(
+		"static const struct VectorOutputRow evex_rounded_rows[] = {\n\t{ 0 },");
+	for (const auto &row : rows)
+		std::printf("\t%s,\n", row.c_str());
+	std::puts("};\nstatic const uint8_t evex_rounded_prefixes[][8] = {");
+	for (const auto &p : prefixes) {
+		std::printf("\t{");
+		for (const auto v : p)
+			std::printf(" %u,", v);
+		std::puts(" },");
+	}
+	std::puts("};\nstatic const uint8_t evex_rounded_plans[3][256] = {");
+	for (const auto &p : plans) {
+		std::puts("\t{");
+		for (unsigned n = 0; n < p.size(); n += 16) {
+			std::printf("\t\t");
+			for (unsigned k = 0; k < 16; ++k)
+				std::printf("%s%u,", k ? " " : "", p[n + k]);
+			std::putchar('\n');
+		}
+		std::puts("\t},");
+	}
+	std::puts("};");
+	std::fprintf(stderr,
+		     "%zu rounded EVEX register rows, %zu prefix plans\n",
+		     rows.size(), prefixes.size() - 1);
+}
+
 void emit_output(Decoder &decoder, bool scan_only)
 {
 	std::vector<std::string> records;
@@ -1413,8 +1566,7 @@ void emit_output(Decoder &decoder, bool scan_only)
 	if (plans.at(0x339)[0][1] == UINT8_MAX ||
 	    plans.at(0x33b)[1][2] == UINT8_MAX)
 		throw std::runtime_error("missing EVEX extract register forms");
-	std::puts(
-		"struct VectorOutputRow {\n\tuint16_t id;\n\tchar mnemonic[16];\n\tuint8_t group_count, groups[4], access[4], immediate;\n};\nstatic const struct VectorOutputRow evex_output_rows[] = {");
+	std::puts("static const struct VectorOutputRow evex_output_rows[] = {");
 	for (const auto &row : records)
 		std::printf("\t%s,\n", row.c_str());
 	std::puts(
@@ -1441,6 +1593,15 @@ void emit_output(Decoder &decoder, bool scan_only)
 
 int main(int argc, char **argv)
 {
+	if (argc == 2 && !std::strcmp(argv[1], "--rounded-registers64")) {
+		Decoder decoder;
+		std::puts(
+			"/* Generated by suite/synctools/x86_vector_output.cpp --rounded-registers64. */");
+		emit_rounded_vectors(decoder);
+		std::fprintf(stderr, "%llu ordinary decoder probes\n",
+			     static_cast<unsigned long long>(decoder.probes));
+		return 0;
+	}
 	if (argc == 2 && !std::strcmp(argv[1], "--vex32-memory")) {
 		emit_vex32_memory();
 		return 0;
@@ -1455,7 +1616,7 @@ int main(int argc, char **argv)
 	const bool scan_only = argc == 2 && !std::strcmp(argv[1], "--evex-scan");
 	if (argc > 1 && !scan_only)
 		throw std::runtime_error(
-			"usage: x86_vector_output [--evex-scan|--evex-memory|--vex32-memory]");
+			"usage: x86_vector_output [--evex-scan|--evex-memory|--vex32-memory|--rounded-registers64]");
 	Decoder decoder;
 	std::puts("/* Generated by suite/synctools/x86_vector_output.cpp. */");
 	emit_output(decoder, scan_only);

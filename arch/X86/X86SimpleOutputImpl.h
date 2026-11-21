@@ -94,6 +94,11 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
 				return X86_FIXED_VEX2(code, size, insn,
 						      insn_size);
 #endif
+#ifdef X86_FIXED_ROUNDED
+			if (code[0] == 0x62 && size >= 6 && code[5] >= 0xc0 &&
+			    (code[3] & 0x10))
+				return X86_FIXED_ROUNDED(code, insn, insn_size);
+#endif
 			return X86_writeVectorOutput(code, size, insn,
 						     insn_size,
 						     x86_simple_registers[3],

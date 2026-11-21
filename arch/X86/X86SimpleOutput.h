@@ -31,6 +31,12 @@ struct X86SimpleOutput {
 	struct X86SimpleOperand ops[2];
 };
 
+struct VectorOutputRow {
+	uint16_t id;
+	char mnemonic[16];
+	uint8_t group_count, groups[4], access[4], immediate;
+};
+
 struct X86SimpleRegister {
 	uint16_t reg;
 	uint8_t length;
