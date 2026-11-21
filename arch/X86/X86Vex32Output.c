@@ -16,6 +16,9 @@
 #include "X86SimpleOutput.h"
 #include "X86GenSimpleOutput.inc"
 #include "X86VectorRegisterWriter.h"
+#define X86_MEMORY_IMMEDIATE32
+#include "X86MemoryOutputImpl.h"
+#undef X86_MEMORY_IMMEDIATE32
 
 #include "X86GenVex32MemoryOutput.inc"
 
@@ -114,11 +117,21 @@ static bool writeVex32Memory(const uint8_t *code, size_t size, cs_insn *insn,
 	return true;
 }
 
-static bool writeVex32Output(cs_struct *handle, const uint8_t *code,
-			     size_t size, cs_insn *insn, uint16_t *insn_size)
+static bool writeExtraOutput32(cs_struct *handle, const uint8_t *code,
+			       size_t size, cs_insn *insn, uint16_t *insn_size)
 {
-	if ((code[0] & 0xfe) != 0xc4 || X86_OUTPUT_UNSUPPORTED(handle, false))
+	/* C4/C5 introduce VEX. The /0 forms of C6/C7 encode MOV r/m, immediate. */
+	if ((code[0] & 0xfc) != 0xc4 || X86_OUTPUT_UNSUPPORTED(handle, false))
 		return false;
+	if (code[0] & 2) {
+		if (size < 2 || code[1] >= 0xc0 || (code[1] & 0x38))
+			return false;
+		const unsigned opcode = 0x88 | (code[0] & 1);
+		const unsigned row = x86_simple_plans[0][0][opcode] >> 2;
+		return writeMemoryImmediate32(code, size, insn, insn_size,
+					      &x86_simple_outputs[row],
+					      x86_simple_registers);
+	}
 	const unsigned prefix = code[0] == 0xc5 ? 2 : 3;
 	/* LDS/LES, extended registers and W=1 retain the
      * canonical reader. The admitted rows use only XMM/YMM0..7. */
@@ -139,7 +152,7 @@ static bool writeVex32Output(cs_struct *handle, const uint8_t *code,
 	return true;
 }
 
-#define X86_EXTRA_OUTPUT32 writeVex32Output
+#define X86_EXTRA_OUTPUT32 writeExtraOutput32
 #include "X86SimpleOutputImpl.h"
 #undef X86_EXTRA_OUTPUT32
 #define CS_DECODE_TRY_OUTPUT tryOutput32

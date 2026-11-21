@@ -837,6 +837,91 @@ static bool check_alu_memory(csh handles[2], cs_mode mode)
 	return true;
 }
 
+static bool check_mov_memory_immediates(csh handles[2], cs_mode mode)
+{
+	static const uint32_t values[] = { 0,	       1,	  9,
+					   10,	       0x7f,	  0x80,
+					   0xff,       0x100,	  0x7fffffff,
+					   0x80000000, 0xffffffff };
+	uint8_t bytes[15];
+	for (unsigned prefix = 0; prefix < (mode == CS_MODE_64 ? 17u : 1u);
+	     ++prefix) {
+		unsigned lead = prefix != 0;
+		bytes[0] = (uint8_t)(0x3f + prefix);
+		for (unsigned opcode = 0xc6; opcode <= 0xc7; ++opcode) {
+			bytes[lead] = (uint8_t)opcode;
+			for (unsigned mr = 0; mr < 256; ++mr) {
+				bytes[lead + 1] = (uint8_t)mr;
+				bool sib = mr < 0xc0 && (mr & 7) == 4;
+				for (unsigned sb = 0; sb < (sib ? 256u : 1u);
+				     ++sb) {
+					unsigned offset = lead + 2;
+					if (sib)
+						bytes[offset++] = (uint8_t)sb;
+					unsigned mod = mr >> 6;
+					unsigned disp =
+						mod == 1 ? 1 :
+						mod == 2 ? 4 :
+						mod == 0 && ((mr & 7) == 5 ||
+							     (sib &&
+							      (sb & 7) == 5)) ?
+							   4 :
+							   0;
+					for (unsigned sample = 0;
+					     sample <
+					     sizeof(values) / sizeof(values[0]);
+					     ++sample) {
+						uint32_t displacement = values
+							[(sample + 4) %
+							 (sizeof(values) /
+							  sizeof(values[0]))];
+						for (unsigned i = 0; i < disp;
+						     ++i)
+							bytes[offset + i] =
+								(uint8_t)(displacement >>
+									  (i *
+									   8));
+						unsigned imm_offset =
+							offset + disp;
+						unsigned width =
+							opcode == 0xc6 ? 1 : 4;
+						for (unsigned i = 0; i < width;
+						     ++i)
+							bytes[imm_offset + i] =
+								(uint8_t)(values[sample] >>
+									  (i *
+									   8));
+						unsigned length =
+							imm_offset + width;
+						if (!compare(handles, bytes,
+							     length,
+							     sample ^ mr ^ sb))
+							return false;
+						if (!sample)
+							for (unsigned truncated =
+								     1;
+							     truncated < length;
+							     ++truncated)
+								if (!compare(
+									    handles,
+									    bytes,
+									    truncated,
+									    mr ^ sb))
+									return false;
+					}
+				}
+			}
+		}
+	}
+	/* Every byte value, independently of the addressing and boundary matrix. */
+	for (unsigned imm = 0; imm < 256; ++imm) {
+		const uint8_t simple[] = { 0xc6, 0x00, (uint8_t)imm };
+		if (!compare(handles, simple, sizeof(simple), imm))
+			return false;
+	}
+	return true;
+}
+
 static bool check_mode(cs_mode mode)
 {
 	csh handles[2] = { 0 };
@@ -871,7 +956,8 @@ static bool check_mode(cs_mode mode)
 		    !check_alu_immediates(handles, mode) ||
 		    !check_legacy_vectors(handles, mode) ||
 		    (private_iter == X86_disasmIter32 &&
-		     !check_vex2_base_memory(handles)) ||
+		     (!check_vex2_base_memory(handles) ||
+		      !check_mov_memory_immediates(handles, mode))) ||
 		    !check_vex_register_forms(handles) ||
 		    (mode == CS_MODE_64 &&
 		     (!check_evex(handles) || !check_evex_extract(handles) ||

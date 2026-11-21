@@ -10,22 +10,7 @@
 	!defined(_WIN32_WCE)
 #include "X86SimpleOutput.h"
 
-static void writeUnsignedImmediate(char *out, uint64_t value)
-{
-	if (value <= HEX_THRESHOLD) {
-		*out = (char)('0' + value);
-	} else {
-		static const char digits[] = "0123456789abcdef";
-		char temp[16], *end = temp + sizeof(temp), *start = end;
-		uint64_t n = value;
-		do {
-			*--start = digits[n & 15];
-			n >>= 4;
-		} while (n);
-		memcpy(out, "0x", 2);
-		memcpy(out + 2, start, end - start);
-	}
-}
+#include "X86UnsignedImmediate.h"
 
 static void writePushImmediate(cs_insn *insn, const uint8_t *code,
 			       const struct X86SimpleOutput *row, bool wide,
