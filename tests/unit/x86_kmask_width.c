@@ -15,12 +15,19 @@ static bool check(bool condition, const char *message)
 	return condition;
 }
 
+typedef struct mask_register {
+	x86_reg id;
+	const char *name;
+} mask_register;
+
+#define KREG(n) { X86_REG_K##n, "k" #n }
+
 typedef struct mask_width_case {
 	const uint8_t *code;
 	size_t code_size;
 	x86_insn instruction;
 	const char *mnemonic;
-	const char *registers[3];
+	mask_register registers[3];
 	uint8_t operand_count;
 	uint8_t operand_size;
 } mask_width_case;
@@ -29,6 +36,7 @@ static bool test_mask_width(csh handle, const mask_width_case *test_case)
 {
 	cs_insn *insn = NULL;
 	bool success = true;
+	const bool diet = cs_support(CS_SUPPORT_DIET);
 
 	size_t count = cs_disasm(handle, test_case->code, test_case->code_size,
 			 0x1000, 1, &insn);
@@ -38,8 +46,13 @@ static bool test_mask_width(csh handle, const mask_width_case *test_case)
 
 	success &= check(insn[0].id == test_case->instruction,
 			 "public instruction ID is correct");
-	success &= check(strcmp(insn[0].mnemonic, test_case->mnemonic) == 0,
-			 "mnemonic is correct");
+	if (diet)
+		success &= check(insn[0].mnemonic[0] == '\0',
+				 "DIET omits mnemonic text");
+	else
+		success &= check(strcmp(insn[0].mnemonic,
+					test_case->mnemonic) == 0,
+				 "mnemonic is correct");
 	success &= check(insn[0].detail != NULL, "detail is available");
 	if (insn[0].detail != NULL) {
 		const cs_x86 *x86 = &insn[0].detail->x86;
@@ -50,12 +63,26 @@ static bool test_mask_width(csh handle, const mask_width_case *test_case)
 				const cs_x86_op *operand = &x86->operands[i];
 				success &= check(operand->type == X86_OP_REG,
 						 "operand is a register");
-				success &= check(strcmp(cs_reg_name(handle, operand->reg),
-							test_case->registers[i]) == 0,
-						 "operand register is correct");
-				success &= check(operand->size ==
-							test_case->operand_size,
-						 "mask operand width follows suffix");
+				const mask_register *want =
+					&test_case->registers[i];
+				success &=
+					check(operand->reg == want->id,
+					      "operand register ID is correct");
+				const char *name =
+					cs_reg_name(handle, operand->reg);
+				if (diet)
+					success &= check(
+						name == NULL,
+						"DIET omits register names");
+				else
+					success &= check(
+						name && strcmp(name,
+							       want->name) == 0,
+						"operand register name is correct");
+				success &= check(
+					operand->size ==
+						test_case->operand_size,
+					"mask operand width follows suffix");
 			}
 		}
 	}
@@ -74,17 +101,17 @@ int main(void)
 	static const uint8_t ktestq[] = { 0xc4, 0xe1, 0xf8, 0x99, 0xd6 };
 	static const mask_width_case test_cases[] = {
 		{ kandb, sizeof(kandb), X86_INS_KANDB, "kandb",
-		  { "k2", "k5", "k6" }, 3, 1 },
+		  { KREG(2), KREG(5), KREG(6) }, 3, 1 },
 		{ kandw, sizeof(kandw), X86_INS_KANDW, "kandw",
-		  { "k2", "k5", "k6" }, 3, 2 },
+		  { KREG(2), KREG(5), KREG(6) }, 3, 2 },
 		{ kandd, sizeof(kandd), X86_INS_KANDD, "kandd",
-		  { "k5", "k5", "k4" }, 3, 4 },
+		  { KREG(5), KREG(5), KREG(4) }, 3, 4 },
 		{ kandq, sizeof(kandq), X86_INS_KANDQ, "kandq",
-		  { "k3", "k1", "k2" }, 3, 8 },
+		  { KREG(3), KREG(1), KREG(2) }, 3, 8 },
 		{ kmovq, sizeof(kmovq), X86_INS_KMOVQ, "kmovq",
-		  { "k2", "k5", NULL }, 2, 8 },
+		  { KREG(2), KREG(5) }, 2, 8 },
 		{ ktestq, sizeof(ktestq), X86_INS_KTESTQ, "ktestq",
-		  { "k2", "k6", NULL }, 2, 8 },
+		  { KREG(2), KREG(6) }, 2, 8 },
 	};
 	csh handle = 0;
 	bool success = true;
