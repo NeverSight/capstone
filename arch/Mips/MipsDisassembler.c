@@ -228,8 +228,9 @@ bool Mips_getFeatureBits(unsigned int mode, unsigned int feature)
 	}
 }
 
-#if defined(CAPSTONE_ARM_AARCH64_MIPS_X86) && defined(__linux__) && \
-	defined(__x86_64__) && defined(__GNUC__) && !defined(__clang__)
+#if (defined(CAPSTONE_MIPS_ONLY) && !defined(CAPSTONE_DIET)) || \
+	(defined(CAPSTONE_ARM_AARCH64_MIPS_X86) && defined(__linux__) && \
+	 defined(__x86_64__) && defined(__GNUC__) && !defined(__clang__))
 #define CAPSTONE_MIPS_PRIMARY_DISPATCH
 #endif
 

@@ -500,7 +500,11 @@ static void printFCCOperand(MCInst *MI, int opNum, SStream *O)
 static bool printAlias(const char *Str, const MCInst *MI, uint64_t Address,
 		       unsigned OpNo, SStream *OS, bool IsBranch)
 {
+#if defined(CAPSTONE_MIPS_ONLY) && !defined(CAPSTONE_DIET)
+	SStream_concat2(OS, "\t", Str);
+#else
 	SStream_concat(OS, "%s%s", "\t", Str);
+#endif
 	SStream_concat0(OS, "\t");
 	if (IsBranch)
 		printBranchOperand((MCInst *)MI, Address, OpNo, OS);
