@@ -178,6 +178,10 @@ if(capstone_enabled_architectures STREQUAL "LOONGARCH")
     add_compile_definitions(CAPSTONE_LOONGARCH_DEDICATED_MAPPING)
 endif()
 
+if(capstone_enabled_architectures STREQUAL "PPC")
+    add_compile_definitions(CAPSTONE_PPC_INIT_CONSTRUCTED_OPERANDS)
+endif()
+
 if(capstone_enabled_architectures STREQUAL "RISCV")
     add_compile_definitions(CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS)
 endif()

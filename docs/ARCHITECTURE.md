@@ -257,6 +257,10 @@ zero writes. `MCInst_Init` still clears the complete object for other callers.
 Public instruction/detail arrays retain their existing clearing and
 callback-visible state. These choices do not change decoding or legality checks.
 
+In a PowerPC-only build, the decoder initializes the first operand and the
+internal metadata. It constructs the remaining operands as it appends them.
+Printers and detail mapping read the constructed operand count.
+
 The private RISC-V printer temporary for uncompressed instructions uses the
 same metadata initializer without clearing unused operand slots. The generated
 uncompressor constructs every operand before the alias matcher, printer or

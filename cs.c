@@ -1085,6 +1085,9 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
 #ifdef CAPSTONE_ARM_INIT_CONSTRUCTED_OPERANDS
 		/* ARM constructs each operand before reading or inserting it. */
 		MCInst_InitStorage(&mci, CS_ARCH_ARM, false);
+#elif defined(CAPSTONE_PPC_INIT_CONSTRUCTED_OPERANDS)
+	/* The PowerPC decoder constructs each operand before reading it. */
+	MCInst_InitStorage(&mci, CS_ARCH_PPC, false);
 #elif defined(CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS)
 	/* The RISC-V decoder constructs each operand before reading it. */
 	MCInst_InitStorage(&mci, CS_ARCH_RISCV, false);
