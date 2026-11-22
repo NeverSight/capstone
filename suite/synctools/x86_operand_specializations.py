@@ -563,7 +563,7 @@ def scalar_terminal_form(operands, modrm):
     return True
 
 
-def legacy_terminal_model(suffix, *, public=False):
+def legacy_terminal_model(suffix, *, public=False, contexts_to_project=TERMINAL_ROWS):
 
     common = (X86 / "X86DisassemblerDecoderCommon.h").read_text()
     contexts, kinds, names = tables.parse_common(common)
@@ -644,8 +644,14 @@ def legacy_terminal_model(suffix, *, public=False):
         ],
         "Terminal attribute contexts changed",
     )
+    if contexts_to_project != TERMINAL_ROWS:
+        tables.require(
+            [context_values[i] for i in (5, 13, 3, 11)]
+            == ["IC_64BIT_XD", "IC_64BIT_REXW_XD", "IC_64BIT_XS", "IC_64BIT_REXW_XS"],
+            "Mandatory SSE attribute contexts changed",
+        )
     equivalent = equivalents16(suffix)
-    for _, attr_mask, mode16, has_op_size in TERMINAL_ROWS:
+    for _, attr_mask, mode16, has_op_size in contexts_to_project:
         context_name = context_values[attr_mask]
         row_maps = []
         for name, indices, source_rows in maps[:2]:
@@ -917,8 +923,18 @@ def terminal_immediate_bytes(tail, size, address_size):
 
 def emit_batch_primary(suffix):
     if suffix:
-        return "/* The private primary batch entries uses the full decoder. */"
-    groups, terminals, rows, _, _, _ = legacy_terminal_model(suffix, public=True)
+        return "/* The private batch entries use the full decoder. */"
+    # F2 and F3 select a mandatory SSE context on the 0F map. Keep
+    # their rows private to the batch classifier.
+    contexts = TERMINAL_ROWS + (
+        ("X86_BATCH_64_F2", 5, False, False),
+        ("X86_BATCH_64_REXW_F2", 13, False, False),
+        ("X86_BATCH_64_F3", 3, False, False),
+        ("X86_BATCH_64_REXW_F3", 11, False, False),
+    )
+    groups, terminals, rows, _, _, _ = legacy_terminal_model(
+        suffix, public=True, contexts_to_project=contexts
+    )
     mapping = public_instruction_ids(suffix)
     widths = {}
     modrm_call = "(!insn->consumedModRM && readModRMScan(insn))"
@@ -927,8 +943,7 @@ def emit_batch_primary(suffix):
         modrm = bool(reads and reads[0] == modrm_call)
         tail = reads[1:] if modrm else reads
         tables.require(modrm_call not in tail, "Expected leading ModR/M")
-        widths[handler] = (modrm, terminal_immediate_bytes(tail, 4, 4),
-                           terminal_immediate_bytes(tail, 4, 8))
+        widths[handler] = modrm, tail
 
     # Leave every prefix or escape with the existing classifier. REX bytes
     # encode INC/DEC in i386 mode and use ordinary primary descriptors.
@@ -941,12 +956,23 @@ def emit_batch_primary(suffix):
     indexed = []
     group_bit = 1 << 31
 
-    def primary(context):
+    def opcode_plans(context, secondary):
         legacy = context == "X86_TERMINAL_32"
         direct = []
-        index = next(i for i, row in enumerate(TERMINAL_ROWS) if row[0] == context)
-        for opcode, (first, kind) in enumerate(rows[index][0]):
-            if (flags[opcode] and not (legacy and flags[opcode] == rex)) or not first:
+        index = next(i for i, row in enumerate(contexts) if row[0] == context)
+        has_opsize = contexts[index][3]
+        immediate_size = 2 if has_opsize and "REXW" not in context else 4
+        extents = {handler: (reads_modrm, terminal_immediate_bytes(tail, immediate_size, 4 if legacy else 8))
+                   for handler, (reads_modrm, tail) in widths.items()}
+        for opcode, (first, kind) in enumerate(rows[index][int(secondary)]):
+            if secondary:
+                # getIDForMode owns size-prefixed branch and state-save repairs.
+                # Other escape maps and feature extensions use the full decoder.
+                excluded = opcode in (0x00, 0x01, 0x0F, 0x38, 0x3A, 0xC7) or (
+                    has_opsize and (opcode == 0xAE or 0x80 <= opcode <= 0x8F))
+            else:
+                excluded = flags[opcode] and not (legacy and flags[opcode] == rex)
+            if excluded or not first:
                 direct.append(0)
                 continue
             values = []
@@ -955,8 +981,7 @@ def emit_batch_primary(suffix):
                 if not uid:
                     values.append(0)
                     continue
-                reads_modrm, legacy_tail, native_tail = widths[handler]
-                tail = legacy_tail if legacy else native_tail
+                reads_modrm, tail = extents[handler]
                 reads_modrm |= kind != "MODRM_ONEENTRY"
                 fixed = 1 + int(reads_modrm) + tail
                 tables.require(fixed <= 15 and mapping[uid] < (group_bit >> 8), "Primary plan overflow")
@@ -983,10 +1008,20 @@ def emit_batch_primary(suffix):
         return direct
 
     lines = ["#define X86_BATCH_REG_GROUP UINT32_C(0x80000000)"]
-    for name, context in (("x86Batch32Primary", "X86_TERMINAL_32"),
-                          ("x86Batch64Primary", "X86_TERMINAL_64"),
-                          ("x86Batch64RexWPrimary", "X86_TERMINAL_64_REXW")):
-        direct = primary(context)
+    for name, context, secondary in (
+        ("x86Batch32Primary", "X86_TERMINAL_32", False),
+        ("x86Batch64Primary", "X86_TERMINAL_64", False),
+        ("x86Batch64RexWPrimary", "X86_TERMINAL_64_REXW", False),
+        ("x86Batch64Secondary", "X86_TERMINAL_64", True),
+        ("x86Batch64RexWSecondary", "X86_TERMINAL_64_REXW", True),
+        ("x86Batch64OpSizeSecondary", "X86_TERMINAL_64_OPSIZE", True),
+        ("x86Batch64RexWOpSizeSecondary", "X86_TERMINAL_64_REXW_OPSIZE", True),
+        ("x86Batch64F2Secondary", "X86_BATCH_64_F2", True),
+        ("x86Batch64RexWF2Secondary", "X86_BATCH_64_REXW_F2", True),
+        ("x86Batch64F3Secondary", "X86_BATCH_64_F3", True),
+        ("x86Batch64RexWF3Secondary", "X86_BATCH_64_REXW_F3", True),
+    ):
+        direct = opcode_plans(context, secondary)
         lines.append(f"static const uint32_t {name}[256] = {{")
         for start in range(0, 256, 8):
             lines.append("\t" + ", ".join(f"0x{v:08x}u" for v in direct[start:start+8]) + ",")
@@ -1244,6 +1279,90 @@ def vex_scan_form(operands, register_form):
     return True
 
 
+def public_vex_plan(ids, kind, offset, modrm, metadata, tails):
+    uid = tables.source_id(ids, kind, offset, modrm)
+    if not uid or uid >= len(metadata) or not metadata[uid]:
+        return 0
+    word = metadata[uid]
+    public_id, flags = word >> 8, word & 255
+    if not public_id or (flags >> 4) not in tails:
+        return 0
+    has_modrm = kind != "MODRM_ONEENTRY" or bool(flags & 4)
+    form = 2 if modrm >= 0xc0 else 1
+    if has_modrm and not flags & form:
+        return 0
+    tables.require(public_id < 2048, "VEX public ID overlaps the plan tags")
+    return ((public_id << 3) | (int(has_modrm) << 2)
+            | (int(not flags & 8) << 1) | tails[flags >> 4])
+
+
+def emit_vex3_plans(ids, maps, contexts, context_values, attrs, pp, metadata, tails):
+    """Index uniform long-mode VEX operands by opcode, W, L and pp."""
+    opcode_rows = []
+    rows = [(0,) * 16]
+    row_index = {rows[0]: 0}
+    pairs, cache = [], {}
+
+    def cell(kind, offset):
+        key = kind, offset
+        if key in cache:
+            return cache[key]
+        outcomes = [public_vex_plan(ids, kind, offset, mr, metadata, tails)
+                    for mr in range(256)]
+        # Register and memory operands may select different public IDs or
+        # legality. Non-uniform ModR/M.reg and ModR/M.r/m groups fall back.
+        pair = tuple(values[0] if all(n == values[0] for n in values) else 0
+                     for values in (outcomes[:192], outcomes[192:]))
+        if pair[0] == pair[1]:
+            word = pair[0]
+        else:
+            if pair not in pairs:
+                pairs.append(pair)
+            word = 0x8000 | pairs.index(pair)
+        cache[key] = word
+        return word
+
+    for number, (_, indices, entries) in enumerate(maps[1:4], start=1):
+        by_selector = []
+        for selector in range(16):
+            flags = attrs["ATTR_64BIT"] | attrs["ATTR_VEX"] | pp[selector & 3]
+            if selector & 4:
+                flags |= attrs["ATTR_VEXL"]
+            if selector & 8:
+                flags |= attrs["ATTR_REXW"]
+            index = indices[contexts.index(context_values[flags])]
+            by_selector.append(entries[index - 1] if index else None)
+        opcodes = []
+        for opcode in range(256):
+            # The canonical scan defers these IDs to generic decoding.
+            repaired = ((number == 1 and (opcode == 0xae or 0x82 <= opcode <= 0x8f))
+                        or (number == 2 and opcode == 0xf8))
+            row = tuple(cell(*entry[opcode]) if entry and not repaired
+                        and (number != 1 or selector & 8) else 0
+                        for selector, entry in enumerate(by_selector))
+            if row not in row_index:
+                row_index[row] = len(rows)
+                rows.append(row)
+            opcodes.append(row_index[row])
+        opcode_rows.append(opcodes)
+    width = "uint8_t" if len(rows) <= 256 else "uint16_t"
+    tables.require(len(rows) <= 65536 and len(pairs) < 32768, "VEX3 plan index overflow")
+    lines = ["#ifdef X86_DEFINE_VEX3_PUBLIC_PLANS",
+             f"static const {width} x86Vex3OpcodeRows[3][256] = {{"]
+    for row in opcode_rows:
+        lines.append("\t{")
+        for i in range(0, 256, 16):
+            lines.append("\t\t" + ", ".join(map(str, row[i:i+16])) + ",")
+        lines.append("\t},")
+    lines += ["};", f"static const uint16_t x86Vex3PublicRows[{len(rows)}][16] = {{"]
+    for row in rows:
+        lines.append("\t{ " + ", ".join(map(str, row)) + " },")
+    lines += ["};", f"static const uint16_t x86Vex3FormPlans[{len(pairs)}][2] = {{"]
+    for row in pairs:
+        lines.append("\t{ " + ", ".join(map(str, row)) + " },")
+    return lines + ["};", "#endif", ""]
+
+
 def emit_vex2_plans(suffix, source, contexts, names, context_values, attrs, pp,
                     metadata, patterns):
     """Collapse identical ModR/M outcomes into one public ID and operand extent."""
@@ -1267,20 +1386,7 @@ def emit_vex2_plans(suffix, source, contexts, names, context_values, attrs, pp,
         plans = []
         for opcode, (kind, offset) in enumerate(row):
             def plan(modrm):
-                uid = tables.source_id(ids, kind, offset, modrm)
-                if not uid or uid >= len(metadata) or not metadata[uid]:
-                    return 0
-                word = metadata[uid]
-                public_id, flags = word >> 8, word & 255
-                if not public_id or (flags >> 4) not in tails:
-                    return 0
-                has_modrm = kind != "MODRM_ONEENTRY" or bool(flags & 4)
-                form = 2 if modrm >= 0xc0 else 1
-                if has_modrm and not flags & form:
-                    return 0
-                tables.require(public_id < 2048, "VEX2 public ID overlaps the plan tags")
-                return ((public_id << 3) | (int(has_modrm) << 2)
-                        | (int(not flags & 8) << 1) | tails[flags >> 4])
+                return public_vex_plan(ids, kind, offset, modrm, metadata, tails)
 
             # These opcodes retain the general ID and size repairs of tryVexTerminalScan.
             if opcode == 0xae or 0x82 <= opcode <= 0x8f:
@@ -1364,7 +1470,10 @@ def emit_vex2_plans(suffix, source, contexts, names, context_values, attrs, pp,
         for group in groups:
             lines.append("\t{ " + ", ".join(map(str, group)) + " },")
         lines += ["};"]
-    return lines + ["#endif", ""]
+    lines += ["#endif", ""]
+    if not suffix:
+        lines += emit_vex3_plans(ids, maps, contexts, context_values, attrs, pp, metadata, tails)
+    return lines
 
 
 def emit_vex_scan_rows(suffix, metadata, patterns, public_plans=False):
