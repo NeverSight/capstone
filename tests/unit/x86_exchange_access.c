@@ -59,22 +59,29 @@ static int check(csh h, const exchange_case *test)
 		cs_free(in, test->iterator ? 1 : 0);
 		return 1;
 	}
+	cs_regs reads, writes;
+	uint8_t nr = 0, nw = 0;
+	int bad = in->id != id || in->size != n;
+	if (test->iterator)
+		bad |= remaining != 0 || cursor != code + n ||
+		       address != 0x1000 + n;
+	const cs_err access = cs_regs_access(h, in, reads, &nr, writes, &nw);
+	if (cs_support(CS_SUPPORT_DIET)) {
+		bad |= access != CS_ERR_DIET;
+		cs_free(in, 1);
+		return bad != 0;
+	}
 	const cs_detail *d = in->detail;
 	const cs_x86 *x = &d->x86;
 	const cs_x86_op *dest = &x->operands[test->att && !pair ? 1 : 0];
-	cs_regs reads, writes;
-	uint8_t nr = 0, nw = 0;
-	int bad = in->id != id || in->size != n ||
-		  x->op_count != (pair ? 1 : 2) || dest->size != width ||
-		  dest->access != CS_AC_READ_WRITE || d->groups_count ||
-		  x->eflags !=
-			  (pair ? X86_EFLAGS_MODIFY_ZF :
-				  (X86_EFLAGS_MODIFY_OF | X86_EFLAGS_MODIFY_SF |
-				   X86_EFLAGS_MODIFY_ZF | X86_EFLAGS_MODIFY_AF |
-				   X86_EFLAGS_MODIFY_PF |
-				   X86_EFLAGS_MODIFY_CF)) ||
-		  cs_regs_access(h, in, reads, &nr, writes, &nw) != CS_ERR_OK ||
-		  !contains(writes, nw, X86_REG_EFLAGS);
+	bad |= x->op_count != (pair ? 1 : 2) || dest->size != width ||
+	       dest->access != CS_AC_READ_WRITE || d->groups_count ||
+	       x->eflags !=
+		       (pair ? X86_EFLAGS_MODIFY_ZF :
+			       (X86_EFLAGS_MODIFY_OF | X86_EFLAGS_MODIFY_SF |
+				X86_EFLAGS_MODIFY_ZF | X86_EFLAGS_MODIFY_AF |
+				X86_EFLAGS_MODIFY_PF | X86_EFLAGS_MODIFY_CF)) ||
+	       access != CS_ERR_OK || !contains(writes, nw, X86_REG_EFLAGS);
 	if (test->memory) {
 		const x86_reg base = test->long_mode ? X86_REG_RDI :
 						       X86_REG_EDI;
@@ -112,9 +119,6 @@ static int check(csh h, const exchange_case *test)
 					 accumulators[test->width]) ||
 			       !contains(writes, nw, accumulators[test->width]);
 	}
-	if (test->iterator)
-		bad |= remaining != 0 || cursor != code + n ||
-		       address != 0x1000 + n;
 	if (bad)
 		fprintf(stderr,
 			"exchange effects: %s %s memory=%u reads=%u writes=%u implicit=%u/%u\n",
@@ -134,11 +138,23 @@ int main(void)
 		if (cs_open(CS_ARCH_X86, mode ? CS_MODE_64 : CS_MODE_32, &h) !=
 		    CS_ERR_OK)
 			return 1;
-		cs_option(h, CS_OPT_DETAIL, CS_OPT_ON);
+		if (cs_option(h, CS_OPT_DETAIL, CS_OPT_ON) != CS_ERR_OK) {
+			cs_close(&h);
+			return 1;
+		}
 		for (test.att = 0; test.att < 2; ++test.att) {
-			cs_option(h, CS_OPT_SYNTAX,
-				  test.att ? CS_OPT_SYNTAX_ATT :
-					     CS_OPT_SYNTAX_INTEL);
+			cs_err syntax = cs_option(h, CS_OPT_SYNTAX,
+						  test.att ?
+							  CS_OPT_SYNTAX_ATT :
+							  CS_OPT_SYNTAX_INTEL);
+			if (test.att && (syntax == CS_ERR_X86_ATT ||
+					 (syntax == CS_ERR_DIET &&
+					  cs_support(CS_SUPPORT_DIET))))
+				continue;
+			if (syntax != CS_ERR_OK) {
+				cs_close(&h);
+				return 1;
+			}
 			for (test.kind = 0; test.kind < 3; ++test.kind)
 				for (test.width = test.kind == 2 ? 3 : 0;
 				     test.width <
