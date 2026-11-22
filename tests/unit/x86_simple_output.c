@@ -930,6 +930,75 @@ static bool check_absolute_addresses32(csh handles[2])
 	return true;
 }
 
+/* Segment, ModR/M, SIB and truncation are compared against the ordinary
+ * decoder, including the complete public detail and reused output record. */
+static bool check_vex32_register_moves(csh handles[2])
+{
+	for (unsigned flags = 0; flags < 256; ++flags)
+		for (unsigned mr = 0xc0; mr <= 0xff; ++mr)
+			for (unsigned op = 0x6f; op <= 0x7f; op += 0x10) {
+				const uint8_t bytes[] = { 0xc5, (uint8_t)flags,
+							  (uint8_t)op,
+							  (uint8_t)mr };
+				for (size_t n = 1; n <= sizeof(bytes); ++n)
+					if (!compare(handles, bytes, n,
+						     mr + flags))
+						return false;
+			}
+	return true;
+}
+
+static bool check_segment_lea32(csh handles[2])
+{
+	const uint8_t prefixes[] = { 0x26, 0x2e, 0x36, 0x3e, 0x64, 0x65 };
+	for (unsigned p = 0; p < sizeof(prefixes); ++p)
+		for (unsigned mr = 0; mr < 256; ++mr)
+			for (unsigned sib = 0; sib < ((mr & 7) == 4 ? 256u : 1u); ++sib) {
+				uint8_t code[] = { prefixes[p], 0x8d, mr, sib,
+						   0x80, 0xff, 0xff, 0xff };
+				if (!compare(handles, code, sizeof(code), mr ^ sib))
+					return false;
+				if ((mr & 0x38) == 0)
+					for (size_t len = 1; len < sizeof(code); ++len)
+						if (!compare(handles, code, len, mr ^ sib))
+							return false;
+			}
+	return true;
+}
+
+static bool check_memory_compares(csh handles[2], cs_mode mode)
+{
+	const uint8_t values[] = { 0, 9, 10, 0x7f, 0x80, 0xff };
+	const uint8_t sibs[] = { 0x24, 0x08, 0x4d, 0xa5, 0xfc, 0xff };
+	for (unsigned prefix = 0; prefix < (mode == CS_MODE_64 ? 17u : 1u);
+	     ++prefix) {
+		for (unsigned opcode = 0x80; opcode <= 0x83; ++opcode) {
+			for (unsigned mr = 0x30; mr <= 0xff; ++mr) {
+				if ((mr & 0x30) != 0x30)
+					continue;
+				for (unsigned n = 0; n < sizeof(values); ++n) {
+					uint8_t code[12];
+					memset(code, values[n], sizeof(code));
+					code[0] = (uint8_t)(0x3f + prefix);
+					code[1] = (uint8_t)opcode;
+					code[2] = (uint8_t)mr;
+					if ((mr & 7) == 4)
+						code[3] = sibs[n];
+					const uint8_t *start = code + !prefix;
+					for (size_t length = 1;
+					     length <= sizeof(code) - !prefix;
+					     ++length)
+						if (!compare(handles, start,
+							     length,
+							     prefix + mr + n))
+							return false;
+				}
+			}
+		}
+	}
+	return true;
+}
+
 static bool check_alu_memory(csh handles[2], cs_mode mode)
 {
 	const unsigned prefixes = mode == CS_MODE_64 ? 17 : 1;
@@ -1281,6 +1350,10 @@ static bool check_mode(cs_mode mode)
 		    (mode == CS_MODE_64 && !check_broadcast(handles)) ||
 		    !check_evex_memory_moves(handles) ||
 		    !check_padding(handles) ||
+		    (mode == CS_MODE_32 &&
+		     (!check_segment_lea32(handles) ||
+		      !check_vex32_register_moves(handles) ||
+		      !check_memory_compares(handles, mode))) ||
 		    !check_alu_memory(handles, mode) ||
 		    (mode == CS_MODE_32 && private_iter != X86_disasmIter &&
 		     (!check_absolute_addresses32(handles) ||

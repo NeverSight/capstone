@@ -163,7 +163,11 @@ CS_DECODE_INLINE bool decode_insn(cs_struct *handle, const uint8_t *code,
 	if (CS_DECODE_TRY_OUTPUT(handle, code, size, insn, insn_size))
 		return true;
 #endif
+#ifdef CS_DECODE_OUTPUT_MISS
+	return CS_DECODE_OUTPUT_MISS(handle, code, size, insn, insn_size, batch);
+#else
 	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
+#endif
 }
 #undef CS_DECODE_SCAN
 

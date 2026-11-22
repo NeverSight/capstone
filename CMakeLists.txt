@@ -1049,12 +1049,15 @@ if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST
     add_library(capstone_x86_iter32 OBJECT arch/X86/X86Vex32Output.c)
     target_link_libraries(capstone_x86_iter32 PRIVATE capstone)
     set_target_properties(capstone_x86_iter32 PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
-    add_library(capstone_x86_iter64 OBJECT arch/X86/X86Sse64Output.c arch/X86/X86BatchScan.c)
+    add_library(capstone_x86_iter64 OBJECT arch/X86/X86Sse64Output.c)
     target_link_libraries(capstone_x86_iter64 PRIVATE capstone)
     if(CAPSTONE_X86_NEAR_INDIRECT_OUTPUT)
         target_compile_definitions(capstone_x86_iter64 PRIVATE CAPSTONE_X86_NEAR_INDIRECT_OUTPUT)
     endif()
     set_target_properties(capstone_x86_iter64 PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
+    add_library(capstone_x86_native OBJECT arch/X86/X86MemoryFallback32.c arch/X86/X86BatchScan.c)
+    target_link_libraries(capstone_x86_native PRIVATE capstone)
+    set_target_properties(capstone_x86_native PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
 endif()
 
 if(CAPSTONE_BUILD_STATIC_LIBS)
@@ -1062,18 +1065,16 @@ if(CAPSTONE_BUILD_STATIC_LIBS)
     if(TARGET capstone_x86_iter32)
         if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_C_COMPILER_ID STREQUAL "Clang"
            AND (CAPSTONE_AARCH64_SUPPORT OR CAPSTONE_MIPS_SUPPORT))
-            # The alias parser is referenced by backend objects, so an archive
-            # linker may extract it after directly referenced private iterators.
-            # Keep that parser before the optional batch tables in either case.
+            # Backends reference the alias parser indirectly. Keep its hot code
+            # ahead of the optional native readers even when all are linked.
             set(capstone_static_objects
                 "$<FILTER:$<TARGET_OBJECTS:capstone>,EXCLUDE,/AliasMapping[.]c[.]o$>"
-                $<TARGET_OBJECTS:capstone_x86_iter32>
-                "$<FILTER:$<TARGET_OBJECTS:capstone_x86_iter64>,EXCLUDE,/X86BatchScan[.]c[.]o$>"
-                "$<FILTER:$<TARGET_OBJECTS:capstone>,INCLUDE,/AliasMapping[.]c[.]o$>"
-                "$<FILTER:$<TARGET_OBJECTS:capstone_x86_iter64>,INCLUDE,/X86BatchScan[.]c[.]o$>")
+                $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>
+                "$<FILTER:$<TARGET_OBJECTS:capstone>,INCLUDE,/AliasMapping[.]c[.]o$>")
         else()
             list(APPEND capstone_static_objects $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>)
         endif()
+        list(APPEND capstone_static_objects $<TARGET_OBJECTS:capstone_x86_native>)
     endif()
     add_library(capstone_static STATIC ${capstone_static_objects})
     # Use normal capstone name. Otherwise we get libcapstone_static.a

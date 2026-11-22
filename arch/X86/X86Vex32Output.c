@@ -196,7 +196,9 @@ static bool writeExtraOutput32(cs_struct *handle, const uint8_t *code,
 #undef X86_FIXED_WIDE
 #undef X86_FIXED_OUTPUT
 #define CS_DECODE_TRY_OUTPUT tryOutput32
+#define CS_DECODE_OUTPUT_MISS X86_decodeOutputMiss32
 #include "../../cs_disasm_internal.h"
+#undef CS_DECODE_OUTPUT_MISS
 #endif
 
 CAPSTONE_INTERNAL bool X86_disasmIter32(csh ud, const uint8_t **code,

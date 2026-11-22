@@ -7,6 +7,8 @@
 #ifdef X86_MEMORY_IMMEDIATE
 #include "X86UnsignedImmediate.h"
 static bool X86_MEMORY_IMMEDIATE(
+#elif defined(X86_SEGMENT_LEA32)
+static bool X86_SEGMENT_LEA32(
 #elif defined(X86_EXTEND64_MEMORY)
 static bool X86_EXTEND64_MEMORY(
 #elif defined(X86_EXTEND32_MEMORY)
@@ -32,8 +34,8 @@ bool X86_writeMemoryOutput(
 	const uint8_t rex = wide && (code[0] & 0xf0) == 0x40 ? code[0] : 0;
 #ifdef X86_EXTEND64_MEMORY
 	const unsigned lead = (rex != 0) + (code[rex != 0] == 0x0f);
-#elif defined(X86_EXTEND32_MEMORY)
-	const unsigned lead = 1; /* The caller consumed the 0F escape. */
+#elif defined(X86_EXTEND32_MEMORY) || defined(X86_SEGMENT_LEA32)
+	const unsigned lead = 1; /* The caller consumed one prefix or escape. */
 #else
 	const unsigned lead = rex != 0;
 #endif
@@ -43,7 +45,11 @@ bool X86_writeMemoryOutput(
 	const unsigned offset = lead + 2 + sib;
 	const unsigned disp_size = mod == 2 || disp32_only ? 4 : mod;
 #ifdef X86_MEMORY_IMMEDIATE
+#ifdef X86_COMPARE_IMMEDIATE
+	const unsigned imm_size = opcode == 0x81 ? 4 : 1;
+#else
 	const unsigned imm_size = (opcode & 1) ? 4 : 1;
+#endif
 	const unsigned imm_offset = offset + disp_size;
 	const unsigned length = imm_offset + imm_size;
 #else
@@ -64,8 +70,14 @@ bool X86_writeMemoryOutput(
 		const unsigned index_reg = ((rex & 2) << 2) |
 					   ((encoding >> 3) & 7);
 		base_reg = encoding & 7;
+#ifdef X86_SEGMENT_LEA32
+		/* A scale-one SIB without an index names only its base. */
+		if ((!mod && base_reg == 5) ||
+		    (index_reg == 4 && (encoding >> 6) != 0))
+#else
 		if ((!mod && base_reg == 5) ||
 		    (index_reg == 4 && encoding != 0x24))
+#endif
 			return false;
 		if (index_reg != 4) {
 			index = &regs[wide ? 3 : 2][index_reg];
@@ -80,7 +92,9 @@ bool X86_writeMemoryOutput(
 	const bool push = false, load = true;
 	const unsigned reg_width = 2; /* r32 destination */
 #else
-#ifdef X86_MEMORY_IMMEDIATE
+#ifdef X86_SEGMENT_LEA32
+	const bool lea = true, load = true, push = false;
+#elif defined(X86_MEMORY_IMMEDIATE)
 	const bool lea = false, load = false;
 #else
 	const bool push = opcode == 0xff, lea = opcode == 0x8d;
@@ -124,6 +138,18 @@ bool X86_writeMemoryOutput(
 		out += 10;
 	}
 #else
+#ifdef X86_SEGMENT_LEA32
+	static const struct X86SimpleRegister segments[] = {
+		{ X86_REG_ES, 2, "es" }, { X86_REG_CS, 2, "cs" },
+		{ X86_REG_SS, 2, "ss" }, { X86_REG_DS, 2, "ds" },
+		{ X86_REG_FS, 2, "fs" }, { X86_REG_GS, 2, "gs" },
+	};
+	const unsigned segment = code[0] >= 0x64 ? 4 + (code[0] & 1) :
+						   (code[0] >> 3) & 3;
+	memcpy(out, segments[segment].name, 2);
+	out[2] = ':';
+	out += 3;
+#endif
 	if (lea) {
 		*out++ = '[';
 	} else if (row->ops[0].size == 1) {
@@ -168,6 +194,19 @@ bool X86_writeMemoryOutput(
 	const uint32_t encoded =
 		imm_size == 1 ? code[imm_offset] :
 				(uint32_t)X86_readDisp32(code + imm_offset);
+#ifdef X86_COMPARE_IMMEDIATE
+	/* 83 /7 sign-extends imm8. REX.W 81 /7 sign-extends imm32. */
+	int64_t value = encoded;
+	if (opcode == 0x83)
+		value = (int8_t)encoded;
+	else if (imm_size == 4 && row->ops[0].size == 8)
+		value = (int32_t)encoded;
+	memcpy(out, ", ", 2);
+	out += 2;
+	if (value < 0)
+		*out++ = '-';
+	writeUnsignedImmediate(out, (uint64_t)(value < 0 ? -value : value));
+#else
 	/* MOV to a 64-bit memory operand sign-extends its encoded imm32. */
 #if X86_IMMEDIATE_WIDE
 	const uint64_t value = row->ops[0].size == 8 ?
@@ -178,6 +217,7 @@ bool X86_writeMemoryOutput(
 #endif
 	memcpy(out, ", ", 2);
 	writeUnsignedImmediate(out + 2, value);
+#endif
 #else
 	if (!load && !push) {
 		memcpy(out, ", ", 2);
@@ -194,6 +234,10 @@ bool X86_writeMemoryOutput(
 			x->opcode[1] = opcode;
 		}
 		x->encoding.modrm_offset = (uint8_t)(lead + 1);
+#elif defined(X86_SEGMENT_LEA32)
+		x->prefix[1] = code[0];
+		x->encoding.modrm_offset = 2;
+		x->operands[1].mem.segment = (x86_reg)segments[segment].reg;
 #elif defined(X86_EXTEND32_MEMORY)
 		x->opcode[0] = 0x0f;
 		x->opcode[1] = opcode;

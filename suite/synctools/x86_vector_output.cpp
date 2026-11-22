@@ -664,26 +664,13 @@ void emit_vex_rip_loads(Decoder &decoder)
 	std::puts("};");
 }
 
-// Match ordinary NDS register operands against the complete canonical record.
-// Opcodes with aliases, exceptional register sizes or immediate-dependent text
-// keep using the general decoder.
-std::string vex_register_row(Decoder &decoder, unsigned map, unsigned opcode,
-			     unsigned w, unsigned ll, unsigned rxb,
-			     unsigned dst, unsigned src, unsigned rm,
-			     bool short_prefix, bool immediate, unsigned value,
-			     bool group_shift = false, bool mode32 = false)
+std::string checked_vex_registers(Decoder &decoder, const uint8_t *bytes,
+				  unsigned prefix, bool mode32,
+				  unsigned rex_bits, unsigned ll,
+				  const unsigned *numbers, unsigned reg_count,
+				  bool immediate)
 {
-	const unsigned prefix = short_prefix ? 2 : 3;
-	const unsigned length = prefix + 2 + immediate;
-	uint8_t bytes[6] = {};
-	bytes[0] = short_prefix ? 0xc5 : 0xc4;
-	bytes[1] = uint8_t((~rxb & 7) << 5 | map);
-	bytes[prefix - 1] = uint8_t((short_prefix ? (~rxb & 4) << 5 : w << 7) |
-				    (~src & 15) << 3 | ll << 2 | 1);
-	bytes[prefix] = uint8_t(opcode);
-	bytes[prefix + 1] = uint8_t(0xc0 | dst << 3 | rm);
-	bytes[prefix + 2] = uint8_t(value);
-	unsigned id = decoder.decode(bytes, length);
+	unsigned id = decoder.decode(bytes, prefix + 2 + immediate);
 	if (!id)
 		return {};
 	const cs_insn &insn = *decoder.insn;
@@ -692,16 +679,12 @@ std::string vex_register_row(Decoder &decoder, unsigned map, unsigned opcode,
 	if (insn.illegal || insn.is_alias || insn.usesAliasDetails ||
 	    std::strlen(insn.mnemonic) >= 16 || detail.regs_read_count ||
 	    detail.regs_write_count || detail.groups_count > 4 ||
-	    x.op_count != (group_shift ? 2u : 3u) + immediate)
+	    x.op_count != reg_count + immediate)
 		return {};
-	const unsigned reg_count = group_shift ? 2 : 3;
-	const unsigned numbers[] = { group_shift ? src : dst | ((rxb & 4) << 1),
-				     group_shift ? rm | ((rxb & 1) << 3) : src,
-				     rm | ((rxb & 1) << 3) };
 	cs_x86 expected{};
 	std::memcpy(expected.opcode, bytes, prefix);
 	expected.addr_size = mode32 ? 4 : 8;
-	expected.rex = mode32 ? 0 : uint8_t(0x40 | w << 3 | rxb);
+	expected.rex = mode32 ? 0 : uint8_t(0x40 | rex_bits);
 	expected.modrm = bytes[prefix + 1];
 	expected.encoding.modrm_offset = uint8_t(prefix + 1);
 	expected.op_count = uint8_t(reg_count + immediate);
@@ -722,6 +705,7 @@ std::string vex_register_row(Decoder &decoder, unsigned map, unsigned opcode,
 		text += std::to_string(numbers[i]);
 	}
 	if (immediate) {
+		const unsigned value = bytes[prefix + 2];
 		auto &op = expected.operands[reg_count];
 		op.type = X86_OP_IMM;
 		op.imm = value;
@@ -741,6 +725,33 @@ std::string vex_register_row(Decoder &decoder, unsigned map, unsigned opcode,
 	return "{ " + decoder.symbol(id) + ", \"" + insn.mnemonic + "\", " +
 	       std::to_string(detail.groups_count) + ", " + fields(groups) +
 	       ", " + fields(access) + ", " + std::to_string(immediate) + " }";
+}
+
+// Match ordinary NDS register operands against the complete canonical record.
+// Opcodes with aliases, exceptional register sizes or immediate-dependent text
+// keep using the general decoder.
+std::string vex_register_row(Decoder &decoder, unsigned map, unsigned opcode,
+			     unsigned w, unsigned ll, unsigned rxb,
+			     unsigned dst, unsigned src, unsigned rm,
+			     bool short_prefix, bool immediate, unsigned value,
+			     bool group_shift = false, bool mode32 = false)
+{
+	const unsigned prefix = short_prefix ? 2 : 3;
+	uint8_t bytes[6] = {};
+	bytes[0] = short_prefix ? 0xc5 : 0xc4;
+	bytes[1] = uint8_t((~rxb & 7) << 5 | map);
+	bytes[prefix - 1] = uint8_t((short_prefix ? (~rxb & 4) << 5 : w << 7) |
+				    (~src & 15) << 3 | ll << 2 | 1);
+	bytes[prefix] = uint8_t(opcode);
+	bytes[prefix + 1] = uint8_t(0xc0 | dst << 3 | rm);
+	bytes[prefix + 2] = uint8_t(value);
+	const unsigned reg_count = group_shift ? 2 : 3;
+	const unsigned numbers[] = { group_shift ? src : dst | ((rxb & 4) << 1),
+				     group_shift ? rm | ((rxb & 1) << 3) : src,
+				     rm | ((rxb & 1) << 3) };
+	return checked_vex_registers(decoder, bytes, prefix, mode32,
+				     (w << 3) | rxb, ll, numbers, reg_count,
+				     immediate);
 }
 
 // VEX groups 12-14 encode the operation in ModR/M.reg, the destination
@@ -1262,6 +1273,44 @@ std::string vex32_memory_record(Decoder &decoder, unsigned opcode, unsigned pp,
 	       fields(access) + ", " + std::to_string(form) + " }";
 }
 
+// Both VEX2 opcode directions share a public row for register-to-register moves.
+void emit_vex32_moves(Decoder &decoder)
+{
+	std::puts("static const struct VectorOutputRow vex32_move_rows[2] = {");
+	for (unsigned pp : { 1u, 2u }) {
+		std::string row;
+		for (unsigned ll : { 0u, 1u }) {
+			for (unsigned opcode : { 0x6fu, 0x7fu }) {
+				for (unsigned mr = 0xc0; mr <= 0xff; ++mr) {
+					const unsigned reg = (mr >> 3) & 7,
+						       rm = mr & 7;
+					const uint8_t bytes[] = {
+						0xc5,
+						uint8_t(0xf8 | ll << 2 | pp),
+						uint8_t(opcode), uint8_t(mr)
+					};
+					const unsigned operands[] = {
+						opcode == 0x6f ? reg : rm,
+						opcode == 0x6f ? rm : reg
+					};
+					const auto value =
+						checked_vex_registers(
+							decoder, bytes, 2, true,
+							0, ll, operands, 2,
+							false);
+					if (value.empty() ||
+					    (!row.empty() && row != value))
+						throw std::runtime_error(
+							"inconsistent i386 VEX2 register move");
+					row = value;
+				}
+			}
+		}
+		std::printf("\t%s,\n", row.c_str());
+	}
+	std::puts("};");
+}
+
 void emit_vex32_memory()
 {
 	Decoder decoder(CS_MODE_32);
@@ -1340,6 +1389,9 @@ void emit_vex32_memory()
 				"missing canonical VEX32 memory plan");
 	std::puts(
 		"/* Generated by suite/synctools/x86_vector_output.cpp --vex32-memory. */");
+	std::puts("#ifdef X86_VEX32_REGISTER_MOVES");
+	emit_vex32_moves(decoder);
+	std::puts("#else");
 	std::puts(
 		"struct Vex32MemoryRow {\n\tuint16_t id;\n\tchar mnemonic[16];\n\tuint8_t group_count, groups[4], access[4], form;\n};\nstatic const struct Vex32MemoryRow vex32_memory_rows[] = {");
 	for (const auto &row : rows)
@@ -1375,6 +1427,7 @@ void emit_vex32_memory()
 	std::fprintf(stderr, "%zu VEX32 memory rows; %llu full-record probes\n",
 		     rows.size() - 1,
 		     static_cast<unsigned long long>(decoder.probes));
+	std::puts("#endif");
 }
 
 struct RoundedRow {

@@ -278,7 +278,7 @@ endif
 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86VectorOutput.o
 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86EvexScan.o
 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86EvexMemoryOutput.o
-	LIBOBJ_X86_STATIC_OUTPUT = $(OBJDIR)/arch/X86/X86Vex32Output.o $(OBJDIR)/arch/X86/X86Sse64Output.o $(OBJDIR)/arch/X86/X86BatchScan.o
+	LIBOBJ_X86_STATIC_OUTPUT = $(OBJDIR)/arch/X86/X86Vex32Output.o $(OBJDIR)/arch/X86/X86Sse64Output.o $(OBJDIR)/arch/X86/X86MemoryFallback32.o $(OBJDIR)/arch/X86/X86BatchScan.o
 	LIBOBJ_X86_NUMBERS += $(OBJDIR)/arch/X86/X86IntelInstPrinterNumbers.o
 endif
 
