@@ -545,6 +545,33 @@ static bool check_plain_evex_registers(csh handles[2])
 				}
 	return true;
 }
+static bool check_legacy_register_immediates(csh handles[2])
+{
+	static const uint8_t values[] = { 0, 9, 10, 15, 16, 127, 128, 255 };
+	for (unsigned p = 0; p <= 16; ++p)
+		for (unsigned opcode = 0x70; opcode <= 0x73; ++opcode)
+			for (unsigned mr = 0xc0; mr <= 0xff; ++mr)
+				for (unsigned k = 0; k < sizeof(values); ++k) {
+					uint8_t bytes[] = { 0x66,
+							    (uint8_t)(0x3f + p),
+							    0x0f,
+							    (uint8_t)opcode,
+							    (uint8_t)mr,
+							    values[k] };
+					if (!p)
+						bytes[1] = 0x66;
+					const uint8_t *start = bytes + !p;
+					const size_t length =
+						sizeof(bytes) - !p;
+					if (!compare(handles, start, length,
+						     mr ^ values[k]) ||
+					    !compare(handles, start, length - 1,
+						     values[k]))
+						return false;
+				}
+	return true;
+}
+
 static bool check_legacy_vectors(csh handles[2], cs_mode mode)
 {
 	for (unsigned prefix = 0; prefix <= (mode == CS_MODE_64 ? 16u : 0u);
@@ -1054,15 +1081,17 @@ static bool check_segment_lea32(csh handles[2])
 	return true;
 }
 
-static bool check_memory_compares(csh handles[2], cs_mode mode)
+static bool check_memory_flag_immediates(csh handles[2], cs_mode mode)
 {
 	const uint8_t values[] = { 0, 9, 10, 0x7f, 0x80, 0xff };
 	const uint8_t sibs[] = { 0x24, 0x08, 0x4d, 0xa5, 0xfc, 0xff };
+	const uint8_t opcodes[] = { 0x80, 0x81, 0x82, 0x83, 0xf6, 0xf7 };
 	for (unsigned prefix = 0; prefix < (mode == CS_MODE_64 ? 17u : 1u);
 	     ++prefix) {
-		for (unsigned opcode = 0x80; opcode <= 0x83; ++opcode) {
-			for (unsigned mr = 0x30; mr <= 0xff; ++mr) {
-				if ((mr & 0x30) != 0x30)
+		for (unsigned index = 0; index < sizeof(opcodes); ++index) {
+			const unsigned opcode = opcodes[index];
+			for (unsigned mr = 0; mr <= 0xff; ++mr) {
+				if ((mr & 0x30) != (opcode >= 0xf6 ? 0 : 0x30))
 					continue;
 				for (unsigned n = 0; n < sizeof(values); ++n) {
 					uint8_t code[12];
@@ -1541,6 +1570,7 @@ static bool check_mode(cs_mode mode)
 			!check_evex_immediate_shifts(handles) ||
 			!check_vex_clear(handles) ||
 			!check_sse_base_memory(handles) ||
+			!check_legacy_register_immediates(handles) ||
 			!check_legacy_memory(handles, 0x66) ||
 			!check_legacy_memory(handles, 0xf2) ||
 			!check_legacy_memory(handles, 0xf3) ||
@@ -1552,7 +1582,7 @@ static bool check_mode(cs_mode mode)
 		    (mode == CS_MODE_32 &&
 		     (!check_segment_lea32(handles) ||
 		      !check_vex32_register_moves(handles) ||
-		      !check_memory_compares(handles, mode))) ||
+		      !check_memory_flag_immediates(handles, mode))) ||
 		    !check_alu_memory(handles, mode) ||
 		    !check_vex_register_immediates(handles, mode) ||
 		    (mode == CS_MODE_32 && private_iter != X86_disasmIter &&

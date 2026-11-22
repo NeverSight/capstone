@@ -95,7 +95,7 @@ X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
 		}
 		break;
 	}
-	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
+	return X86_decodeRegisterFallback32(handle, code, size, insn, insn_size, batch);
 }
 #endif
 #endif

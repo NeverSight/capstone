@@ -32,6 +32,35 @@
 #undef X86_LEGACY_PACKED_MEMORY
 #include "X86GenLegacyPackedMemory.inc"
 
+#include "X86GenLegacyRegisterImmediates.inc"
+
+/* The caller checked a complete 66 [REX] 0F 70..73 /r ib register form. */
+static bool writeLegacyRegisterImmediate(const uint8_t *code, cs_insn *insn,
+					 uint16_t *insn_size, unsigned offset,
+					 uint8_t rex)
+{
+	const unsigned opcode = code[offset - 2], mr = code[offset - 1];
+	const unsigned field = (mr >> 3) & 7;
+	const unsigned plan = legacy_immediate_plans[opcode - 0x70][field];
+	if (!plan)
+		return false;
+	const unsigned rm = (mr & 7) | ((rex & 1) << 3);
+	const bool shuffle = opcode == 0x70;
+	const unsigned regs[] = { shuffle ? field | ((rex & 4) << 1) : rm, rm };
+	writeVectorRegisters(code, insn, insn_size,
+			     &legacy_immediate_rows[plan - 1], offset - 2, 0,
+			     rex, 0, regs, shuffle ? 2 : 1);
+	if (insn->detail) {
+		/* Legacy prefix and escaped opcode have separate public fields. */
+		cs_x86 *x = &insn->detail->x86;
+		x->prefix[2] = 0x66;
+		x->opcode[0] = 0x0f;
+		x->opcode[1] = (uint8_t)opcode;
+		x->opcode[2] = 0;
+	}
+	return true;
+}
+
 /* The fixed-width AMD64 iterator has already tried its common records. */
 CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
 X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
@@ -69,21 +98,29 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
 		return true;
 	if (code[0] == 0xc4 &&
 	    X86_writeVexRegisterImmediate(handle, code, size, insn, insn_size,
-					   x86_simple_registers, true))
+					  x86_simple_registers, true))
 		return true;
 	if (size >= 4 && (code[0] == 0x66 || (code[0] & 0xfe) == 0xf2)) {
 		const uint8_t rex = (code[1] & 0xf0) == 0x40 ? code[1] : 0;
 		const unsigned offset = 4 + (rex != 0);
-		if (size >= offset && code[offset - 3] == 0x0f &&
-		    code[offset - 1] < 0xc0) {
-			const unsigned bank =
-				code[0] == 0x66 ? 0 : 1 + (code[0] & 1);
-			const unsigned row =
-				legacy_packed_plans[bank][code[offset - 2]];
-			if (row && !X86_OUTPUT_UNSUPPORTED(handle, false) &&
-			    writePackedMemory(code, insn, insn_size,
-					      &legacy_packed_rows[row], rex,
-					      offset, size, false))
+		if (size >= offset && code[offset - 3] == 0x0f) {
+			const unsigned opcode = code[offset - 2];
+			if (code[offset - 1] < 0xc0) {
+				const unsigned bank =
+					code[0] == 0x66 ? 0 : 1 + (code[0] & 1);
+				const unsigned row =
+					legacy_packed_plans[bank][opcode];
+				if (row &&
+				    !X86_OUTPUT_UNSUPPORTED(handle, false) &&
+				    writePackedMemory(code, insn, insn_size,
+						      &legacy_packed_rows[row],
+						      rex, offset, size, false))
+					return true;
+			} else if (code[0] == 0x66 && opcode >= 0x70 &&
+				   opcode <= 0x73 && size > offset &&
+				   !X86_OUTPUT_UNSUPPORTED(handle, false) &&
+				   writeLegacyRegisterImmediate(
+					   code, insn, insn_size, offset, rex))
 				return true;
 		}
 	}

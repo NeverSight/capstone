@@ -16,6 +16,12 @@ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
 X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
 			cs_insn *insn, uint16_t *insn_size, bool batch);
 
+/* Called after the static i386 memory writer declines the encoding. */
+CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+X86_decodeRegisterFallback32(cs_struct *handle, const uint8_t *code,
+			     size_t size, cs_insn *insn, uint16_t *insn_size,
+			     bool batch);
+
 /* Called by the static AMD64 iterator with at least one input byte. */
 CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
 X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,

@@ -238,6 +238,7 @@
 		A4A3B7006E0700D09BB99F2E /* X86VectorFallback64.c in Sources */ = {isa = PBXBuildFile; fileRef = 70E31C77770C0D60800C36FE /* X86VectorFallback64.c */; };
 		5816C41E14374534B361EF32 /* X86VexRegisterImmediate.c in Sources */ = {isa = PBXBuildFile; fileRef = 029632200F114D2F98A08CA9 /* X86VexRegisterImmediate.c */; };
 		A9B7FA0C9D8900A243394458 /* X86PlainEvexOutput.c in Sources */ = {isa = PBXBuildFile; fileRef = 98D1A958BA441848EAB1CA5B /* X86PlainEvexOutput.c */; };
+		70ABBD7F903AC493B372F180 /* X86RegisterFallback32.c in Sources */ = {isa = PBXBuildFile; fileRef = 5F8735EB17DC98F7973339F7 /* X86RegisterFallback32.c */; };
 		3A53497911EC12DEB29E66FC /* X86MemoryFallback32.c in Sources */ = {isa = PBXBuildFile; fileRef = BFEEA2C504515B50A3D06B29 /* X86MemoryFallback32.c */; };
 		F74BC2F8F26F7C2681921DB9 /* X86ImmediateOutput.c in Sources */ = {isa = PBXBuildFile; fileRef = 526314BBC39C6A88358C1D66 /* X86ImmediateOutput.c */; };
 		DFEE6EAA73DBA4D92B9766AB /* X86MemoryOutput.c in Sources */ = {isa = PBXBuildFile; fileRef = A6FC550DD32C687728F80D7F /* X86MemoryOutput.c */; };
@@ -534,6 +535,7 @@
 		70E31C77770C0D60800C36FE /* X86VectorFallback64.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86VectorFallback64.c; sourceTree = "<group>"; };
 		029632200F114D2F98A08CA9 /* X86VexRegisterImmediate.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86VexRegisterImmediate.c; sourceTree = "<group>"; };
 		98D1A958BA441848EAB1CA5B /* X86PlainEvexOutput.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86PlainEvexOutput.c; sourceTree = "<group>"; };
+		5F8735EB17DC98F7973339F7 /* X86RegisterFallback32.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86RegisterFallback32.c; sourceTree = "<group>"; };
 		BFEEA2C504515B50A3D06B29 /* X86MemoryFallback32.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86MemoryFallback32.c; sourceTree = "<group>"; };
 		526314BBC39C6A88358C1D66 /* X86ImmediateOutput.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86ImmediateOutput.c; sourceTree = "<group>"; };
 		A6FC550DD32C687728F80D7F /* X86MemoryOutput.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86MemoryOutput.c; sourceTree = "<group>"; };
@@ -1022,6 +1024,7 @@
 				70E31C77770C0D60800C36FE /* X86VectorFallback64.c */,
 				029632200F114D2F98A08CA9 /* X86VexRegisterImmediate.c */,
 				98D1A958BA441848EAB1CA5B /* X86PlainEvexOutput.c */,
+				5F8735EB17DC98F7973339F7 /* X86RegisterFallback32.c */,
 				BFEEA2C504515B50A3D06B29 /* X86MemoryFallback32.c */,
 				526314BBC39C6A88358C1D66 /* X86ImmediateOutput.c */,
 				A6FC550DD32C687728F80D7F /* X86MemoryOutput.c */,
@@ -1794,6 +1797,7 @@
 				A4A3B7006E0700D09BB99F2E /* X86VectorFallback64.c in Sources */,
 				5816C41E14374534B361EF32 /* X86VexRegisterImmediate.c in Sources */,
 				A9B7FA0C9D8900A243394458 /* X86PlainEvexOutput.c in Sources */,
+				70ABBD7F903AC493B372F180 /* X86RegisterFallback32.c in Sources */,
 				3A53497911EC12DEB29E66FC /* X86MemoryFallback32.c in Sources */,
 				F74BC2F8F26F7C2681921DB9 /* X86ImmediateOutput.c in Sources */,
 				DFEE6EAA73DBA4D92B9766AB /* X86MemoryOutput.c in Sources */,
