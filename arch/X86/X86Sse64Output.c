@@ -14,7 +14,9 @@
 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
 	!defined(_WIN32_WCE)
 #include "X86OutputOptions.h"
-#define X86_FIXED_VEX2 writeVex2Memory64
+#define GET_INSTRINFO_ENUM
+#include "X86GenInstrInfo.inc"
+#define X86_FIXED_VEX2 writeVex2Output64
 #include "X86SimpleOutput.h"
 #include "X86GenSimpleOutput.inc"
 #include "X86VectorRegisterOutput.h"
@@ -181,9 +183,35 @@ static bool writePackedMemory(const uint8_t *code, cs_insn *insn,
 
 /* Only the bare VEX2 opcode plan enters here. Packed base-relative
  * loads and stores share their address and detail construction with SSE. */
-static bool writeVex2Memory64(const uint8_t *code, size_t size, cs_insn *insn,
-			      uint16_t *insn_size)
+static bool writeVex2Output64(cs_struct *handle, const uint8_t *code,
+			      size_t size, cs_insn *insn, uint16_t *insn_size)
 {
+	/* The bare vector clear instructions have no ModR/M or operands. */
+	if (size >= 3 && code[2] == 0x77 && (code[1] & 0xfb) == 0xf8) {
+		const bool all = (code[1] & 4) != 0;
+		insn->size = *insn_size = 3;
+		memcpy(insn->bytes, code, 3);
+		memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
+		if (all)
+			memcpy(insn->mnemonic, "vzeroall", sizeof("vzeroall"));
+		else
+			memcpy(insn->mnemonic, "vzeroupper",
+			       sizeof("vzeroupper"));
+		memset(insn->op_str, 0, sizeof(insn->op_str));
+		if (insn->detail) {
+			cs_detail *detail = insn->detail;
+			memset(detail, 0,
+			       offsetof(cs_detail, x86) + sizeof(cs_x86));
+			detail->x86.addr_size = 8;
+			detail->x86.rex = 0x40;
+			memcpy(detail->x86.opcode, code, 2);
+			X86_get_insn_id(handle, insn,
+					all ? X86_VZEROALL : X86_VZEROUPPER);
+		} else {
+			insn->id = all ? X86_INS_VZEROALL : X86_INS_VZEROUPPER;
+		}
+		return true;
+	}
 	if (size >= 4 && (code[1] & 0x78) == 0x78 && code[3] < 0xc0) {
 		unsigned plan = vex64_packed_plans[code[1] & 7][code[2]];
 		const uint8_t rex =

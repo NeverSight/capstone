@@ -118,7 +118,7 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
 		if (plan == X86_PLAN_VECTOR) {
 #ifdef X86_FIXED_VEX2
 			if (code[0] == 0xc5)
-				return X86_FIXED_VEX2(code, size, insn,
+				return X86_FIXED_VEX2(handle, code, size, insn,
 						      insn_size);
 #endif
 #ifdef X86_FIXED_ROUNDED

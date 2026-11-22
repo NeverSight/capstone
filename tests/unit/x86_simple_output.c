@@ -570,6 +570,17 @@ static bool check_push_memory(csh handles[2], cs_mode mode)
 	return true;
 }
 
+static bool check_vex_clear(csh handles[2])
+{
+	for (unsigned flags = 0; flags < 256; ++flags) {
+		uint8_t bytes[] = { 0xc5, (uint8_t)flags, 0x77, 0xc0 };
+		for (size_t length = 1; length <= sizeof(bytes); ++length)
+			if (!compare(handles, bytes, length, flags))
+				return false;
+	}
+	return true;
+}
+
 static bool check_vex_rip_loads(csh handles[2])
 {
 	const uint32_t edges[] = {
@@ -1230,7 +1241,8 @@ static bool check_mode(cs_mode mode)
 		     (!check_vex_rip_loads(handles) ||
 		      !check_sse_rip_memory(handles) ||
 		      (private_iter == X86_disasmIterText &&
-		       (!check_sse_base_memory(handles) ||
+		       (!check_vex_clear(handles) ||
+			!check_sse_base_memory(handles) ||
 			!check_vex_packed_memory(handles))))) ||
 		    !check_rex_stack(handles) ||
 		    (mode == CS_MODE_64 && !check_broadcast(handles)) ||
