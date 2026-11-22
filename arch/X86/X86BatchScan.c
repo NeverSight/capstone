@@ -207,9 +207,9 @@ static uint32_t readFirst64(const uint8_t *code, size_t size)
 			plan ? readPrimary(code + 1, size - 1, plan) : 0;
 		return word ? word + 1 : 0;
 	}
-	const unsigned plan = x86Batch64Primary[byte];
-	if (plan)
-		return readPrimary(code, size, plan);
+	const unsigned primary = x86Batch64Primary[byte];
+	if (primary)
+		return readPrimary(code, size, primary);
 	if (byte == 0x0f)
 		return readSecondary64(code, size, 1, false, false);
 	if (byte == 0x66 && size >= 3) {
