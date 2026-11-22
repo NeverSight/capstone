@@ -53,9 +53,9 @@
 
 #define DEBUG_TYPE "riscv-disassembler"
 
+#ifndef RISCV_USE_STACK_OPERAND_POSITIONS
 void addSPOperands(MCInst *MI);
-;
-// end anonymous namespace
+#endif
 
 static DecodeStatus DecodeGPRRegisterClass(MCInst *Inst, uint32_t RegNo,
 					   uint64_t Address,
@@ -575,6 +575,29 @@ static DecodeStatus decodeZcmpSpimm(MCInst *Inst, unsigned Imm,
 	return MCDisassembler_Success;
 }
 
+#ifdef RISCV_USE_STACK_OPERAND_POSITIONS
+/* Positions refer to the final operand list. Inserting from lowest to highest
+ * keeps subsequent positions valid when an instruction implies SP twice. */
+static void insertSPOperands(MCInst *MI, unsigned positions)
+{
+	MCOperand sp;
+	sp.MachineOperandType = kRegister;
+	sp.Kind = kRegister;
+	sp.RegVal = RISCV_X2;
+	do {
+		MCInst_insert0(MI, CountTrailingZeros_32(positions), &sp);
+		positions &= positions - 1;
+	} while (positions);
+}
+
+static inline void addSPOperands(MCInst *MI)
+{
+	unsigned positions =
+		RISCV_getStackOperandPositions(MCInst_getOpcode(MI));
+	if (positions)
+		insertSPOperands(MI, positions);
+}
+#else
 // Add implied SP operand for C.*SP compressed instructions. The SP operand
 // isn't explicitly encoded in the instruction.
 void addSPOperands(MCInst *MI)
@@ -590,6 +613,7 @@ void addSPOperands(MCInst *MI)
 		if (MCID->OpInfo[i].RegClass == RISCV_SPRegClassID)
 			MCInst_insert0(MI, i, &SPReg);
 }
+#endif
 
 DecodeStatus RISCV_getInstruction(MCInst *MI, uint16_t *Size,
 				  const uint8_t *Bytes, size_t BytesLen,

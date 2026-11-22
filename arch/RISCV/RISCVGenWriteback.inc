@@ -415,3 +415,16 @@ static const uint8_t RISCVWritebackFlags[] = {
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	0, 0,
 };
+
+#ifdef RISCV_USE_STACK_OPERAND_POSITIONS
+static const uint8_t RISCVStackOperandPositions[] = {
+	3, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 2, 0, 2, 0, 2, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0,
+	0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+};
+static inline unsigned RISCV_getStackOperandPositions(unsigned opcode)
+{
+	unsigned index = opcode - 11749U;
+	return index < sizeof(RISCVStackOperandPositions) ?
+		       RISCVStackOperandPositions[index] : 0;
+}
+#endif

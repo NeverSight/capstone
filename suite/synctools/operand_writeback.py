@@ -60,12 +60,18 @@ def generated_flags(arch, source):
         f"{arch} opcode coverage changed",
     )
     flags = [0] * count
+    stack_positions = {}
     for length, offset, uid, _ in descriptors:
         length, offset, uid = int(length), int(offset), int(uid)
         require(
             offset + length <= len(operands), f"{arch} operand extent exceeds table"
         )
-        for _, _, _, constraints in operands[offset : offset + length]:
+        for index, (reg_class, _, _, constraints) in enumerate(
+            operands[offset : offset + length]
+        ):
+            if arch == "RISCV" and reg_class == "RISCV_SPRegClassID":
+                require(index < 8, "RISC-V implied SP position exceeds one byte")
+                stack_positions[uid] = stack_positions.get(uid, 0) | (1 << index)
             if re.fullmatch(r"CONSTRAINT_MCOI_TIED_TO\(\d+\)", constraints):
                 flags[uid] = 1
             else:
@@ -84,6 +90,27 @@ def generated_flags(arch, source):
     for index in range(0, count, 32):
         lines.append("\t" + ", ".join(map(str, flags[index : index + 32])) + ",")
     lines += ["};", ""]
+    if arch == "RISCV":
+        require(stack_positions, "No implied RISC-V SP operands found")
+        first, last = min(stack_positions), max(stack_positions)
+        positions = [stack_positions.get(opcode, 0) for opcode in range(first, last + 1)]
+        lines += [
+            "#ifdef RISCV_USE_STACK_OPERAND_POSITIONS",
+            "static const uint8_t RISCVStackOperandPositions[] = {",
+        ]
+        for index in range(0, len(positions), 32):
+            lines.append("\t" + ", ".join(map(str, positions[index : index + 32])) + ",")
+        lines += [
+            "};",
+            "static inline unsigned RISCV_getStackOperandPositions(unsigned opcode)",
+            "{",
+            f"\tunsigned index = opcode - {first}U;",
+            "\treturn index < sizeof(RISCVStackOperandPositions) ?",
+            "\t\t       RISCVStackOperandPositions[index] : 0;",
+            "}",
+            "#endif",
+            "",
+        ]
     return "\n".join(lines)
 
 
