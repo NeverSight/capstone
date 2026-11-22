@@ -64,6 +64,9 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
 				   x86_simple_registers[3]))
 		return true;
 #endif
+	if (size >= 6 && code[0] == 0x62 && code[5] >= 0xc0 &&
+	    X86_writePlainEvexRegisters(handle, code, insn, insn_size))
+		return true;
 	if (code[0] == 0xc4 &&
 	    X86_writeVexRegisterImmediate(handle, code, size, insn, insn_size,
 					   x86_simple_registers, true))

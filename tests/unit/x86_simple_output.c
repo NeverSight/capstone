@@ -516,6 +516,35 @@ static bool check_vex_indexed(csh handles[2])
 	return true;
 }
 
+static bool check_plain_evex_registers(csh handles[2])
+{
+	static const uint8_t flags[] = { 0,    8,    0x28, 0x48,
+					 0x68, 0x18, 0x49, 0xc9 };
+	for (unsigned map = 1; map <= 3; ++map)
+		for (unsigned op = 0; op <= 255; ++op)
+			for (unsigned wpp = 0; wpp < 8; ++wpp)
+				for (unsigned k = 0; k < sizeof(flags); ++k) {
+					const uint8_t p1 =
+						(uint8_t)((wpp / 4 << 7) |
+							  (wpp % 4) | 4 |
+							  ((k & 1) ? 0x78 :
+								     0x28));
+					uint8_t b[] = {
+						0x62,
+						(uint8_t)(((k * 5 + op) << 4) | map),
+						p1,
+						flags[k],
+						(uint8_t)op,
+						(uint8_t)(0xc0 | ((op * 7 + k) & 63))
+					};
+					if (!compare(handles, b, sizeof(b),
+						     op ^ k) ||
+					    !compare(handles, b, sizeof(b) - 1,
+						     k))
+						return false;
+				}
+	return true;
+}
 static bool check_legacy_vectors(csh handles[2], cs_mode mode)
 {
 	for (unsigned prefix = 0; prefix <= (mode == CS_MODE_64 ? 16u : 0u);
@@ -1508,7 +1537,8 @@ static bool check_mode(cs_mode mode)
 		     (!check_vex_rip_loads(handles) ||
 		      !check_sse_rip_memory(handles) ||
 		      (private_iter == X86_disasmIterText &&
-		       (!check_evex_immediate_shifts(handles) ||
+		       (!check_plain_evex_registers(handles) ||
+			!check_evex_immediate_shifts(handles) ||
 			!check_vex_clear(handles) ||
 			!check_sse_base_memory(handles) ||
 			!check_legacy_memory(handles, 0x66) ||

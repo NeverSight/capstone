@@ -81,6 +81,11 @@ X86_writeVexRegisterImmediate(cs_struct *handle, const uint8_t *code,
 			      const struct X86SimpleRegister regs[4][16],
 			      bool wide);
 
+/* Six bytes, bare EVEX, register ModR/M and 64-bit mode were checked by the iterator. */
+CAPSTONE_INTERNAL bool X86_writePlainEvexRegisters(cs_struct *handle,
+						   const uint8_t *code,
+						   cs_insn *insn,
+						   uint16_t *insn_size);
 /* Externalizing the broadcast reader preserves Clang's surrounding code.
  * Other compilers retain the established static reader. */
 #if defined(__clang__)

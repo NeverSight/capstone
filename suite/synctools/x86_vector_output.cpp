@@ -1662,23 +1662,32 @@ void emit_vex32_memory()
 	std::puts("#endif");
 }
 
-struct RoundedRow {
+enum class EvexRegisterOrder { Three, Pair, ReversePair, Rounded };
+
+struct EvexRegisterRecord {
 	unsigned id = 0;
 	std::string mnemonic;
 	Bytes4 groups{}, access{};
 	unsigned group_count = 0;
 };
 
-bool observe_rounded(Decoder &decoder, unsigned map, unsigned opcode,
-		     unsigned pp, unsigned w, unsigned rc, unsigned dst,
-		     unsigned src, unsigned rm, RoundedRow &row)
+bool observe_evex_registers(Decoder &decoder, unsigned map, unsigned opcode,
+			    unsigned pp, unsigned w, unsigned rc, unsigned dst,
+			    unsigned src, unsigned rm, EvexRegisterOrder order,
+			    EvexRegisterRecord &row)
 {
+	const bool rounded = order == EvexRegisterOrder::Rounded;
+	const bool pair = order == EvexRegisterOrder::Pair ||
+			  order == EvexRegisterOrder::ReversePair;
+	const unsigned count = pair ? 2 : 3;
+	const unsigned ll = rounded ? 2 : rc;
 	const uint8_t code[] = {
 		0x62,
 		uint8_t(map | ((dst & 8) ? 0 : 0x80) | ((rm & 16) ? 0 : 0x40) |
 			((rm & 8) ? 0 : 0x20) | (~dst & 16)),
 		uint8_t((w << 7) | ((~src & 15) << 3) | 4 | pp),
-		uint8_t((rc << 5) | 0x10 | ((src & 16) ? 0 : 8)),
+		uint8_t((rc << 5) | (rounded ? 0x10 : 0) |
+			((src & 16) ? 0 : 8)),
 		uint8_t(opcode),
 		uint8_t(0xc0 | ((dst & 7) << 3) | (rm & 7))
 	};
@@ -1695,18 +1704,28 @@ bool observe_rounded(Decoder &decoder, unsigned map, unsigned opcode,
 		row.mnemonic = insn.mnemonic;
 		row.group_count = detail.groups_count;
 		std::copy_n(detail.groups, row.group_count, row.groups.begin());
-		for (unsigned n = 0; n < 3; ++n)
+		for (unsigned n = 0; n < count; ++n)
 			row.access[n] = detail.x86.operands[n].access;
 	}
 	const char *const endings[] = { ", {rn-sae}", ", {rd-sae}",
 					", {ru-sae}", ", {rz-sae}" };
 	const x86_avx_rm modes[] = { X86_AVX_RM_RN, X86_AVX_RM_RD,
 				     X86_AVX_RM_RU, X86_AVX_RM_RZ };
-	const std::string text = "zmm" + std::to_string(dst) + ", zmm" +
-				 std::to_string(src) + ", zmm" +
-				 std::to_string(rm) + endings[rc];
+	const bool reverse = order == EvexRegisterOrder::ReversePair;
+	const unsigned numbers[] = { reverse ? rm : dst,
+				     pair ? (reverse ? dst : rm) : src, rm };
+	const char *const names[] = { "xmm", "ymm", "zmm" };
+	const char *name = names[ll];
+	char text[64];
+	if (pair)
+		std::snprintf(text, sizeof(text), "%s%u, %s%u", name,
+			      numbers[0], name, numbers[1]);
+	else
+		std::snprintf(text, sizeof(text), "%s%u, %s%u, %s%u%s", name,
+			      dst, name, src, name, rm,
+			      rounded ? endings[rc] : "");
 	if (row.id != id || row.mnemonic != insn.mnemonic ||
-	    text != insn.op_str)
+	    std::strcmp(text, insn.op_str))
 		return false;
 	cs_detail expected{};
 	expected.groups_count = uint8_t(row.group_count);
@@ -1716,20 +1735,140 @@ bool observe_rounded(Decoder &decoder, unsigned map, unsigned opcode,
 	x.modrm = code[5];
 	x.rex = uint8_t(0x40 | (w << 3) | ((~unsigned(code[1]) >> 5) & 7));
 	x.addr_size = 8;
-	x.avx_sae = true;
-	x.avx_rm = modes[rc];
+	if (rounded) {
+		x.avx_sae = true;
+		x.avx_rm = modes[rc];
+	}
 	x.encoding.modrm_offset = 5;
-	x.op_count = 3;
-	const unsigned numbers[] = { dst, src, rm };
-	for (unsigned n = 0; n < 3; ++n) {
+	x.op_count = uint8_t(count);
+	const x86_reg bases[] = { X86_REG_XMM0, X86_REG_YMM0, X86_REG_ZMM0 };
+	for (unsigned n = 0; n < count; ++n) {
 		auto &op = x.operands[n];
 		op.type = X86_OP_REG;
-		op.size = 64;
-		op.reg = x86_reg(X86_REG_ZMM0 + numbers[n]);
+		op.size = uint8_t(16u << ll);
+		op.reg = x86_reg(bases[ll] + numbers[n]);
 		op.access = cs_ac_type(row.access[n]);
 	}
 	return std::memcmp(&expected, &detail,
 			   offsetof(cs_detail, x86) + sizeof(cs_x86)) == 0;
+}
+
+void emit_plain_evex_registers(Decoder &decoder)
+{
+	using Prefix = std::array<unsigned, 24>;
+	std::array<std::array<unsigned, 256>, 3> plans{};
+	std::vector<Prefix> prefixes(1);
+	std::vector<std::string> rows;
+	for (unsigned map = 1; map <= plans.size(); ++map) {
+		for (unsigned opcode = 0; opcode < 256; ++opcode) {
+			Prefix prefix{};
+			for (unsigned key = 0; key < prefix.size(); ++key) {
+				const unsigned w = key / 12, pp = key / 3 % 4,
+					       ll = key % 3;
+				for (auto order :
+				     { EvexRegisterOrder::Three,
+				       EvexRegisterOrder::Pair,
+				       EvexRegisterOrder::ReversePair }) {
+					EvexRegisterRecord row;
+					auto same = [&](unsigned dst,
+							unsigned src,
+							unsigned rm) {
+						return observe_evex_registers(
+							decoder, map, opcode,
+							pp, w, ll, dst, src, rm,
+							order, row);
+					};
+					const bool three =
+						order ==
+						EvexRegisterOrder::Three;
+					if (!same(3, three ? 2 : 0, 1))
+						continue;
+					// For a register pair vvvv and V' are reserved. All other
+					// allowed EVEX bits enumerate the architectural registers.
+					bool uniform = true;
+					for (unsigned dst = 0;
+					     dst < 32 && uniform; ++dst)
+						for (unsigned src = 0;
+						     src < (three ? 32u : 1u) &&
+						     uniform;
+						     ++src)
+							for (unsigned rm = 0;
+							     rm < 32 && uniform;
+							     ++rm)
+								uniform = same(
+									dst,
+									src,
+									rm);
+					if (!uniform)
+						continue;
+					const char *tag =
+						three ? "EVEX_REGISTERS_THREE" :
+						order == EvexRegisterOrder::Pair ?
+							"EVEX_REGISTERS_PAIR" :
+							"EVEX_REGISTERS_REVERSED";
+					const std::string value =
+						"{ { " +
+						decoder.symbol(row.id) +
+						", \"" + row.mnemonic + "\", " +
+						std::to_string(
+							row.group_count) +
+						", " + fields(row.groups) +
+						", " + fields(row.access) +
+						", 0 }, " + tag + " }";
+					const auto i = std::find(rows.begin(),
+								 rows.end(),
+								 value);
+					prefix[key] =
+						unsigned(i - rows.begin()) + 1;
+					if (i == rows.end())
+						rows.push_back(value);
+					break;
+				}
+			}
+			const auto i = std::find(prefixes.begin(),
+						 prefixes.end(), prefix);
+			plans[map - 1][opcode] = unsigned(i - prefixes.begin());
+			if (i == prefixes.end())
+				prefixes.push_back(prefix);
+		}
+	}
+	if (rows.empty() || rows.size() > UINT16_MAX ||
+	    prefixes.size() > UINT16_MAX || !plans[0][0x28] ||
+	    !plans[0][0x58] || !plans[1][0xa8])
+		throw std::runtime_error(
+			"missing ordinary EVEX register plans");
+	std::puts(
+		"/* Generated by suite/synctools/x86_vector_output.cpp --plain-evex-registers. */");
+	std::puts(
+		"static const struct EvexRegisterOutput plain_evex_rows[] = {");
+	for (const auto &v : rows)
+		std::printf("\t%s,\n", v.c_str());
+	std::printf("};\nstatic const %s plain_evex_opcodes[3][256] = {\n",
+		    prefixes.size() <= 256 ? "uint8_t" : "uint16_t");
+	for (const auto &map : plans) {
+		std::puts("\t{");
+		for (unsigned i = 0; i < map.size(); i += 16) {
+			std::printf("\t\t");
+			for (unsigned j = 0; j < 16; ++j)
+				std::printf("%u,%s", map[i + j],
+					    j == 15 ? "" : " ");
+			std::puts("");
+		}
+		std::puts("\t},");
+	}
+	std::puts("};\nstatic const uint16_t plain_evex_prefixes[][24] = {");
+	for (const auto &prefix : prefixes) {
+		std::printf("\t{");
+		for (auto k : prefix)
+			std::printf(" %u,", k);
+		std::puts(" },");
+	}
+	std::puts("};");
+	std::fprintf(
+		stderr,
+		"%zu EVEX rows and %zu prefix plans from %llu canonical observations\n",
+		rows.size(), prefixes.size() - 1,
+		static_cast<unsigned long long>(decoder.probes));
 }
 
 void emit_rounded_vectors(Decoder &decoder)
@@ -1743,14 +1882,14 @@ void emit_rounded_vectors(Decoder &decoder)
 		for (unsigned opcode = 0; opcode < 256; ++opcode) {
 			PrefixRow prefix{};
 			for (unsigned key = 0; key < prefix.size(); ++key) {
-				RoundedRow row;
+				EvexRegisterRecord row;
 				auto same = [&](unsigned rc, unsigned dst,
 						unsigned src, unsigned rm) {
-					return observe_rounded(decoder, map,
+					return observe_evex_registers(decoder, map,
 							       opcode, key & 3,
 							       key >> 2, rc,
 							       dst, src, rm,
-							       row);
+							       EvexRegisterOrder::Rounded, row);
 				};
 				if (!same(0, 3, 2, 1))
 					continue;
@@ -1939,6 +2078,11 @@ void emit_output(Decoder &decoder, bool scan_only)
 
 int main(int argc, char **argv)
 {
+	if (argc == 2 && !std::strcmp(argv[1], "--plain-evex-registers")) {
+		Decoder decoder;
+		emit_plain_evex_registers(decoder);
+		return 0;
+	}
 	if (argc == 2 && !std::strcmp(argv[1], "--evex-shifts")) {
 		Decoder decoder;
 		std::puts("/* Generated by suite/synctools/x86_vector_output.cpp --evex-shifts. */");
@@ -1975,7 +2119,7 @@ int main(int argc, char **argv)
 	const bool scan_only = argc == 2 && !std::strcmp(argv[1], "--evex-scan");
 	if (argc > 1 && !scan_only)
 		throw std::runtime_error(
-			"usage: x86_vector_output [--evex-scan|--evex-memory|--vex-register-immediates|--vex32-memory|--rounded-registers64|--evex-shifts]");
+			"usage: x86_vector_output [--evex-scan|--evex-memory|--vex-register-immediates|--vex32-memory|--rounded-registers64|--evex-shifts|--plain-evex-registers]");
 	Decoder decoder;
 	std::puts("/* Generated by suite/synctools/x86_vector_output.cpp. */");
 	emit_output(decoder, scan_only);
