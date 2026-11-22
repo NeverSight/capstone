@@ -1,5 +1,5 @@
-#ifndef CS_MIPS_LINKAGE_H
-#define CS_MIPS_LINKAGE_H
+#ifndef CS_RISCV_LINKAGE_H
+#define CS_RISCV_LINKAGE_H
 
 #include "../../MCDisassembler.h"
 #include "../../MCInst.h"
@@ -14,4 +14,4 @@ const char *RISCV_LLVM_getRegisterName(unsigned RegNo, unsigned AltIdx);
 void RISCV_LLVM_printInstruction(MCInst *MI, SStream *O,
 				 void * /* MCRegisterInfo* */ info);
 
-#endif // CS_MIPS_LINKAGE_H
+#endif // CS_RISCV_LINKAGE_H

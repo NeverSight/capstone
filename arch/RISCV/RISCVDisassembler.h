@@ -8,11 +8,13 @@
 #include "../../include/capstone/capstone.h"
 #include "../../MCRegisterInfo.h"
 #include "../../MCInst.h"
+#include "../../MCDisassembler.h"
+#include "../../SStream.h"
 
 void RISCV_init(MCRegisterInfo *MRI);
 
-bool RISCV_getInstruction(csh ud, const uint8_t *code, size_t code_len,
-			  MCInst *instr, uint16_t *size, uint64_t address,
-			  void *info);
+DecodeStatus RISCV_getInstruction(MCInst *MI, uint16_t *Size,
+				  const uint8_t *Bytes, size_t BytesLen,
+				  uint64_t Address, SStream *CS);
 
 #endif

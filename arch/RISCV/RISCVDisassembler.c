@@ -36,6 +36,7 @@
 #include "../../MCFixedLenDisassembler.h"
 #include "../../cs_priv.h"
 #include "../../utils.h"
+#include "RISCVDisassembler.h"
 #include "RISCVDisassemblerExtension.h"
 #include "RISCVBaseInfo.h"
 #include "RISCVMapping.h"
@@ -52,9 +53,6 @@
 
 #define DEBUG_TYPE "riscv-disassembler"
 
-DecodeStatus RISCV_getInstruction(MCInst *Instr, uint16_t *Size,
-				  const uint8_t *Bytes, size_t BytesLen,
-				  uint64_t Address, SStream *CStream);
 void addSPOperands(MCInst *MI);
 ;
 // end anonymous namespace
