@@ -28,7 +28,8 @@ struct EvexRegisterOutput {
 
 /* The caller identified six bytes with an EVEX prefix and register ModR/M. */
 bool X86_writePlainEvexRegisters(cs_struct *handle, const uint8_t *code,
-				 cs_insn *insn, uint16_t *insn_size)
+				 size_t size, cs_insn *insn,
+				 uint16_t *insn_size)
 {
 	const unsigned map = code[1] & 15, flags = code[2], p2 = code[3];
 	const unsigned ll = p2 >> 5;
@@ -43,7 +44,8 @@ bool X86_writePlainEvexRegisters(cs_struct *handle, const uint8_t *code,
 	const struct EvexRegisterOutput *record = &plain_evex_rows[row - 1];
 	const bool pair = record->order != EVEX_REGISTERS_THREE;
 	const unsigned src = ((~flags >> 3) & 15) | ((~p2 & 8) << 1);
-	if ((pair && src != 0) || X86_OUTPUT_UNSUPPORTED(handle, false))
+	if ((record->instruction.immediate && size < 7) || (pair && src != 0) ||
+	    X86_OUTPUT_UNSUPPORTED(handle, false))
 		return false;
 	const unsigned rxb = (~(unsigned)code[1] >> 5) & 7;
 	const unsigned reg = ((code[5] >> 3) & 7) | ((rxb & 4) << 1) |

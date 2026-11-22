@@ -84,7 +84,7 @@ X86_writeVexRegisterImmediate(cs_struct *handle, const uint8_t *code,
 /* Six bytes, bare EVEX, register ModR/M and 64-bit mode were checked by the iterator. */
 CAPSTONE_INTERNAL bool X86_writePlainEvexRegisters(cs_struct *handle,
 						   const uint8_t *code,
-						   cs_insn *insn,
+						   size_t size, cs_insn *insn,
 						   uint16_t *insn_size);
 /* The iterator checked the ten-byte RIP-relative encoding and 64-bit mode. */
 CAPSTONE_INTERNAL bool X86_writeEvexRipMemory(cs_struct *handle,

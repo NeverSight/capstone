@@ -531,6 +531,14 @@ static bool check_plain_evex_registers(csh handles[2])
 				return false;
 	}
 
+	// Unmasked EVEX.0F3A shuffles take a seventh control byte.
+	uint8_t shuffle[] = { 0x62, 0xf3, 0xdd, 0x48, 0x43, 0xdc, 0 };
+	for (unsigned value = 0; value < 256; ++value) {
+		shuffle[6] = (uint8_t)value;
+		if (!compare(handles, shuffle, sizeof(shuffle), value) ||
+		    !compare(handles, shuffle, sizeof(shuffle) - 1, value))
+			return false;
+	}
 	static const uint8_t flags[] = { 0,    8,    0x28, 0x48,
 					 0x68, 0x18, 0x49, 0xc9 };
 	for (unsigned map = 1; map <= 3; ++map)

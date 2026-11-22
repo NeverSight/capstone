@@ -119,7 +119,7 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
 		return true;
 #endif
 	if (size >= 6 && code[0] == 0x62 && code[5] >= 0xc0 &&
-	    X86_writePlainEvexRegisters(handle, code, insn, insn_size))
+	    X86_writePlainEvexRegisters(handle, code, size, insn, insn_size))
 		return true;
 	if (size >= 10 && code[0] == 0x62 && (code[5] & 0xc7) == 5 &&
 	    X86_writeEvexRipMemory(handle, code, insn, insn_size))

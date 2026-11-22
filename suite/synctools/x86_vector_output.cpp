@@ -1767,7 +1767,7 @@ struct EvexRegisterRecord {
 bool observe_evex_registers(Decoder &decoder, unsigned map, unsigned opcode,
 			    unsigned pp, unsigned w, unsigned rc, unsigned dst,
 			    unsigned src, unsigned rm, EvexRegisterOrder order,
-			    EvexRegisterRecord &row)
+			    EvexRegisterRecord &row, int immediate = -1)
 {
 	const bool rounded = order == EvexRegisterOrder::Rounded;
 	const bool pair = order == EvexRegisterOrder::Pair ||
@@ -1782,9 +1782,10 @@ bool observe_evex_registers(Decoder &decoder, unsigned map, unsigned opcode,
 		uint8_t((rc << 5) | (rounded ? 0x10 : 0) |
 			((src & 16) ? 0 : 8)),
 		uint8_t(opcode),
-		uint8_t(0xc0 | ((dst & 7) << 3) | (rm & 7))
+		uint8_t(0xc0 | ((dst & 7) << 3) | (rm & 7)),
+		uint8_t(immediate)
 	};
-	const unsigned id = decoder.decode(code, sizeof(code));
+	const unsigned id = decoder.decode(code, 6 + (immediate >= 0));
 	if (!id)
 		return false;
 	const cs_insn &insn = *decoder.insn;
@@ -1797,7 +1798,7 @@ bool observe_evex_registers(Decoder &decoder, unsigned map, unsigned opcode,
 		row.mnemonic = insn.mnemonic;
 		row.group_count = detail.groups_count;
 		std::copy_n(detail.groups, row.group_count, row.groups.begin());
-		for (unsigned n = 0; n < count; ++n)
+		for (unsigned n = 0; n < count + (immediate >= 0); ++n)
 			row.access[n] = detail.x86.operands[n].access;
 	}
 	const char *const endings[] = { ", {rn-sae}", ", {rd-sae}",
@@ -1817,6 +1818,12 @@ bool observe_evex_registers(Decoder &decoder, unsigned map, unsigned opcode,
 		std::snprintf(text, sizeof(text), "%s%u, %s%u, %s%u%s", name,
 			      dst, name, src, name, rm,
 			      rounded ? endings[rc] : "");
+	if (immediate >= 0) {
+		const size_t pos = std::strlen(text);
+		std::snprintf(text + pos, sizeof(text) - pos,
+			      immediate <= 9 ? ", %u" : ", 0x%x",
+			      unsigned(immediate));
+	}
 	if (row.id != id || row.mnemonic != insn.mnemonic ||
 	    std::strcmp(text, insn.op_str))
 		return false;
@@ -1833,7 +1840,16 @@ bool observe_evex_registers(Decoder &decoder, unsigned map, unsigned opcode,
 		x.avx_rm = modes[rc];
 	}
 	x.encoding.modrm_offset = 5;
-	x.op_count = uint8_t(count);
+	x.op_count = uint8_t(count + (immediate >= 0));
+	if (immediate >= 0) {
+		x.encoding.imm_offset = 6;
+		x.encoding.imm_size = 1;
+		auto &op = x.operands[count];
+		op.type = X86_OP_IMM;
+		op.imm = immediate;
+		op.size = 1;
+		op.access = cs_ac_type(row.access[count]);
+	}
 	const x86_reg bases[] = { X86_REG_XMM0, X86_REG_YMM0, X86_REG_ZMM0 };
 	for (unsigned n = 0; n < count; ++n) {
 		auto &op = x.operands[n];
@@ -1863,22 +1879,49 @@ void emit_plain_evex_registers(Decoder &decoder)
 				       EvexRegisterOrder::Pair,
 				       EvexRegisterOrder::ReversePair }) {
 					EvexRegisterRecord row;
-					auto same = [&](unsigned dst,
-							unsigned src,
-							unsigned rm) {
-						return observe_evex_registers(
-							decoder, map, opcode,
-							pp, w, ll, dst, src, rm,
-							order, row);
-					};
 					const bool three =
 						order ==
 						EvexRegisterOrder::Three;
-					if (!same(3, three ? 2 : 0, 1))
-						continue;
+					auto observe = [&](unsigned dst,
+							   unsigned src,
+							   unsigned rm,
+							   int value) {
+						return observe_evex_registers(
+							decoder, map, opcode,
+							pp, w, ll, dst, src, rm,
+							order, row, value);
+					};
+					bool immediate = false;
+					if (!observe(3, three ? 2 : 0, 1, -1)) {
+						if (map != 3)
+							continue;
+						row = {};
+						if (!observe(3, three ? 2 : 0,
+							     1, 0x5a))
+							continue;
+						immediate = true;
+					}
 					// For a register pair vvvv and V' are reserved. All other
 					// allowed EVEX bits enumerate the architectural registers.
 					bool uniform = true;
+					// An imm8 can change the printed mnemonic or public ID.
+					// Check every value before accepting this operand form.
+					if (immediate) {
+						for (int value = 0;
+						     value <= 255 && uniform;
+						     ++value)
+							uniform =
+								observe(3,
+									three ? 2 :
+										0,
+									1,
+									value) &&
+								observe(28,
+									three ? 31 :
+										0,
+									17,
+									value);
+					}
 					for (unsigned dst = 0;
 					     dst < 32 && uniform; ++dst)
 						for (unsigned src = 0;
@@ -1887,11 +1930,19 @@ void emit_plain_evex_registers(Decoder &decoder)
 						     ++src)
 							for (unsigned rm = 0;
 							     rm < 32 && uniform;
-							     ++rm)
-								uniform = same(
+							     ++rm) {
+								const int value =
+									immediate ?
+										int((dst * 37 +
+										     src * 11 +
+										     rm) &
+										    255) :
+										-1;
+								uniform = observe(
 									dst,
-									src,
-									rm);
+									src, rm,
+									value);
+							}
 					if (!uniform)
 						continue;
 					const char *tag =
@@ -1907,7 +1958,9 @@ void emit_plain_evex_registers(Decoder &decoder)
 							row.group_count) +
 						", " + fields(row.groups) +
 						", " + fields(row.access) +
-						", 0 }, " + tag + " }";
+						", " +
+						std::to_string(immediate) +
+						" }, " + tag + " }";
 					const auto i = std::find(rows.begin(),
 								 rows.end(),
 								 value);
