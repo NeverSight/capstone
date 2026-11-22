@@ -1095,7 +1095,7 @@ void emit_evex_memory(Decoder &decoder)
 		prefix_index[form.pair + 1][key] = i + 1;
 	}
 	std::puts(
-		"static const uint8_t evex_memory_opcodes[256] X86_EVEX_MEMORY_DATA = {");
+		"const uint8_t x86_evex_memory_opcodes[256] X86_EVEX_MEMORY_DATA = {");
 	for (unsigned i = 0; i < opcode_index.size(); i += 16) {
 		std::printf("\t");
 		for (unsigned j = 0; j < 16; ++j)
@@ -1103,7 +1103,7 @@ void emit_evex_memory(Decoder &decoder)
 		std::putchar('\n');
 	}
 	std::puts(
-		"};\nstatic const uint8_t evex_memory_prefixes[][8] X86_EVEX_MEMORY_DATA = {");
+		"};\nconst uint8_t x86_evex_memory_prefixes[][8] X86_EVEX_MEMORY_DATA = {");
 	for (const auto &prefixes : prefix_index) {
 		std::printf("\t{");
 		for (auto plan : prefixes)
@@ -1112,7 +1112,7 @@ void emit_evex_memory(Decoder &decoder)
 	}
 	std::puts("};");
 	std::puts(
-		"struct EvexMemoryOutputRow {\n\tuint16_t id;\n\tchar mnemonic[16];\n\tuint8_t group_count, groups[4], access[2];\n};\nstatic const struct EvexMemoryOutputRow evex_memory_rows[][2][3] X86_EVEX_MEMORY_DATA = {");
+		"const struct EvexMemoryOutputRow x86_evex_memory_rows[][2][3] X86_EVEX_MEMORY_DATA = {");
 	for (const auto &form : forms) {
 		std::puts("\t{");
 		for (unsigned store = 0; store < 2; ++store) {

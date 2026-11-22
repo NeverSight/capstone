@@ -116,6 +116,22 @@ static inline char *X86_writeDisp8(char *out, int displacement)
 	return out;
 }
 
+/* The caller owns index admission, including the public EIZ/RIZ spelling. */
+static inline char *X86_writeScaledIndex(char *out,
+					 const struct X86SimpleRegister *index,
+					 unsigned scale_bits)
+{
+	memcpy(out, " + ", 3);
+	out += 3;
+	memcpy(out, index->name, sizeof(index->name));
+	out += index->length;
+	if (scale_bits) {
+		*out++ = '*';
+		*out++ = (char)('0' + (1u << scale_bits));
+	}
+	return out;
+}
+
 static inline int32_t X86_readDisp32(const uint8_t *p)
 {
 	return (int32_t)((uint32_t)p[0] | (uint32_t)p[1] << 8 |

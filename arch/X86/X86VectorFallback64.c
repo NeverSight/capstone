@@ -18,6 +18,13 @@
 #include "X86VectorRegisterOutput.h"
 #include "X86GenEvexShiftOutput.inc"
 #include "../../cs_disasm_internal.h"
+#ifdef CAPSTONE_X86_EVEX_MEMORY_OUTPUT
+#define X86_EVEX_INDEXED_SIB
+#define X86_EVEX_MEMORY_DATA
+#include "X86EvexMemoryRecord.h"
+#undef X86_EVEX_INDEXED_SIB
+#undef X86_EVEX_MEMORY_DATA
+#endif
 
 #include "X86GenSimpleOutput.inc"
 #define X86_LEGACY_PACKED_MEMORY
@@ -50,6 +57,13 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
 					    &evex_shift_rows[plan - 1], 4, ll,
 					    0x40 | (w << 3) | rxb, ll, regs, 2);
 	}
+#ifdef CAPSTONE_X86_EVEX_MEMORY_OUTPUT
+	if (size >= 7 && code[0] == 0x62 && code[5] < 0xc0 &&
+	    (code[5] & 7) == 4 && !X86_OUTPUT_UNSUPPORTED(handle, false) &&
+	    writeIndexedEvexMemory(code, size, insn, insn_size,
+				   x86_simple_registers[3]))
+		return true;
+#endif
 	if (size >= 4 && (code[0] == 0x66 || (code[0] & 0xfe) == 0xf2)) {
 		const uint8_t rex = (code[1] & 0xf0) == 0x40 ? code[1] : 0;
 		const unsigned offset = 4 + (rex != 0);

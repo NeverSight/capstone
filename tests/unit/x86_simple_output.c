@@ -377,6 +377,43 @@ static bool check_evex_extract(csh handles[2])
 
 static bool check_evex(csh handles[2])
 {
+	/* Every SIB, every extension bit and each displacement form. Vary
+     * the vector length, full-vector tuple and direction independently. */
+	for (unsigned sib = 0; sib < 256; ++sib)
+		for (unsigned ext = 0; ext < 16; ++ext)
+			for (unsigned mod = 0; mod < 3; ++mod)
+				for (unsigned load = 0; load < 2; ++load) {
+					uint8_t code[] = {
+						0x62,
+						(uint8_t)(ext << 4 | 1),
+						(uint8_t)(0x7c |
+							  (1 + (ext + sib) % 3) |
+							  ((sib & 1) << 7)),
+						(uint8_t)(8 | ((sib + ext) % 3)
+								      << 5),
+						(uint8_t)(load ? 0x6f : 0x7f),
+						(uint8_t)(mod << 6 |
+							  ((sib + ext) & 7)
+								  << 3 |
+							  4),
+						(uint8_t)sib,
+						0x80,
+						0xff,
+						0,
+						0x80
+					};
+					const unsigned length =
+						7 +
+						(mod == 2 || (!mod &&
+							      (sib & 7) == 5) ?
+							 4 :
+							 mod);
+					if (!compare(handles, code, length,
+						     sib) ||
+					    !compare(handles, code, length - 1,
+						     ext))
+						return false;
+				}
 	/* Compare all EVEX embedded rounding modes, truncations, and register
 	 * extensions for packed arithmetic. Include masked and memory forms. */
 	for (unsigned n = 0; n < 4096; ++n) {

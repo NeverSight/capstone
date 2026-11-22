@@ -175,16 +175,8 @@ bool X86_writeMemoryOutput(
 		memcpy(out, base->name, sizeof(base->name));
 		out += base->length;
 	}
-	if (index) {
-		memcpy(out, " + ", 3);
-		out += 3;
-		memcpy(out, index->name, sizeof(index->name));
-		out += index->length;
-		if (scale_bits) {
-			*out++ = '*';
-			*out++ = (char)('0' + (1u << scale_bits));
-		}
-	}
+	if (index)
+		out = X86_writeScaledIndex(out, index, scale_bits);
 #ifdef X86_MEMORY32_OUTPUT
 	if (!disp32_only)
 #endif
