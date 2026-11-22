@@ -1041,21 +1041,17 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
 /* Keep the full decoder's stack frame off generated-output hits, while
  * retaining the public iterator's scan code and private calling convention. */
 #if defined(CAPSTONE_X86_DEDICATED_OUTPUT) && defined(__clang__) && defined(__x86_64__)
-static __attribute__((noinline)) CS_PRESERVE_MOST bool
-decode_full_insn_body(cs_struct *handle, const uint8_t *code, size_t size,
-		    cs_insn *insn, uint16_t *insn_size, bool batch);
-
 CS_PRESERVE_MOST bool
 cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
 		    cs_insn *insn, uint16_t *insn_size, bool batch)
 {
 	if (size && X86_trySimpleOutput(handle, code, size, insn, insn_size))
 		return true;
-	return decode_full_insn_body(handle, code, size, insn, insn_size, batch);
+	return cs_decode_full_insn_body(handle, code, size, insn, insn_size, batch);
 }
 
-static __attribute__((noinline)) CS_PRESERVE_MOST bool
-decode_full_insn_body(cs_struct *handle, const uint8_t *code, size_t size,
+__attribute__((noinline)) CS_PRESERVE_MOST bool
+cs_decode_full_insn_body(cs_struct *handle, const uint8_t *code, size_t size,
 		    cs_insn *insn, uint16_t *insn_size, bool batch)
 {
 #else

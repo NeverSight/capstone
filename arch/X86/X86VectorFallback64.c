@@ -67,6 +67,16 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
 		}
 	}
 fallback:
+#if defined(CAPSTONE_X86_DEDICATED_OUTPUT) && defined(__clang__) && \
+	defined(__x86_64__)
+	/* The fixed AMD64 decoder has just tried the shared output plans.
+	 * Its VEX2 helper also tries the shared writer on a miss. Only its
+	 * EVEX register-rounding override can decline before that writer. */
+	if (!(size >= 6 && code[0] == 0x62 && code[5] >= 0xc0 &&
+	      (code[3] & 0x10)))
+		return cs_decode_full_insn_body(handle, code, size, insn,
+						insn_size, batch);
+#endif
 	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
 }
 #endif

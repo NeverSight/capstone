@@ -21,6 +21,12 @@
 CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
 cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
 		    cs_insn *insn, uint16_t *insn_size, bool batch);
+#if defined(CAPSTONE_X86_DEDICATED_OUTPUT) && defined(__clang__) && \
+	defined(__x86_64__)
+CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+cs_decode_full_insn_body(cs_struct *handle, const uint8_t *code, size_t size,
+			 cs_insn *insn, uint16_t *insn_size, bool batch);
+#endif
 CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
 cs_disasm_iter_skipdata(struct cs_struct *handle, const uint8_t **code,
 			size_t *size, uint64_t *address, cs_insn *insn);
