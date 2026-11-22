@@ -12,6 +12,9 @@ typedef enum {
 #include "MipsGenCSOpGroup.inc"
 } mips_op_group;
 
+bool Mips_disasm16NoText(cs_struct *handle, const uint8_t *code, size_t length,
+			 cs_insn *insn);
+
 void Mips_init_mri(MCRegisterInfo *MRI);
 
 // return name of register in friendly string

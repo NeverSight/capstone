@@ -65,6 +65,23 @@ static bool profile(cs_mode mode, bool big)
 			     compare(handle, bytes, v & 3, pc, iter, one);
 		}
 	}
+	/* Vary every suffix behind an EXTEND prefix; the prefix can select
+	 * registers, immediates, reserved forms and instruction groups. */
+	if (ok && (mode & CS_MODE_MIPS16)) {
+		cs_option(handle, CS_OPT_DETAIL, CS_OPT_ON);
+		cs_option(handle, CS_OPT_TEXT, CS_OPT_OFF);
+		cs_option(handle, CS_OPT_SKIPDATA, CS_OPT_OFF);
+		for (unsigned v = 0; ok && v < 65536; ++v) {
+			const uint16_t prefix = 0xf000 | (v & 0x7ff);
+			uint8_t bytes[4];
+			bytes[big ? 0 : 1] = (uint8_t)(prefix >> 8);
+			bytes[big ? 1 : 0] = (uint8_t)prefix;
+			bytes[big ? 2 : 3] = (uint8_t)(v >> 8);
+			bytes[big ? 3 : 2] = (uint8_t)v;
+			ok = compare(handle, bytes, sizeof(bytes),
+				     UINT64_C(0xfffffffc) - 2 * v, iter, one);
+		}
+	}
 	cs_free(iter, iter ? 1 : 0);
 	cs_free(one, one ? 1 : 0);
 	cs_close(&handle);
@@ -78,6 +95,7 @@ int main(void)
 				  CS_MODE_MIPS32R6,
 				  CS_MODE_MIPS64R6,
 				  CS_MODE_MIPS16,
+				  CS_MODE_MIPS32R2 | CS_MODE_MIPS16,
 				  CS_MODE_MIPS32R2 | CS_MODE_MICRO,
 				  CS_MODE_MIPS64R2 | CS_MODE_MICRO };
 	for (unsigned i = 0; i < sizeof(modes) / sizeof(*modes); ++i)

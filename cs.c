@@ -70,6 +70,7 @@
 #include "arch/Mips/MipsModule.h"
 #ifdef CAPSTONE_HAS_MIPS
 #include "arch/Mips/MipsSingle.h"
+#include "arch/Mips/MipsMapping.h"
 #endif
 #include "arch/PowerPC/PPCModule.h"
 #include "arch/RISCV/RISCVModule.h"
@@ -1759,8 +1760,13 @@ CAPSTONE_INTERNAL bool Mips_disasmOne(csh ud, const uint8_t *code, size_t size,
 			insn->detail = NULL;
 		insn->address = address;
 		handle->errnum = CS_ERR_OK;
-		bool decoded = cs_decode_full_insn(handle, code, size, insn,
-						   &length, false);
+		const cs_mode mode = handle->mode &
+				     ~(CS_MODE_BIG_ENDIAN | CS_MODE_MIPS32R2);
+		bool decoded =
+			handle->no_text && mode == CS_MODE_MIPS16 ?
+				Mips_disasm16NoText(handle, code, size, insn) :
+				cs_decode_full_insn(handle, code, size, insn,
+						    &length, false);
 		insn->detail = detail;
 		return decoded;
 	}
