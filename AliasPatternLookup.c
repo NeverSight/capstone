@@ -3,7 +3,11 @@
 
 #include "AliasPatternLookup.h"
 
-#ifndef CAPSTONE_DIET
+#if !defined(CAPSTONE_DIET) && \
+	(defined(CAPSTONE_HAS_AARCH64) || defined(CAPSTONE_HAS_ARM) || \
+	 defined(CAPSTONE_HAS_MIPS) || defined(CAPSTONE_HAS_POWERPC) || \
+	 defined(CAPSTONE_HAS_RISCV) || defined(CAPSTONE_HAS_SPARC) || \
+	 defined(CAPSTONE_HAS_LOONGARCH))
 #include "MathExtras.h"
 #include "utils.h"
 
