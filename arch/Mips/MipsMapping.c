@@ -297,6 +297,16 @@ void Mips_set_instr_map_data(MCInst *MI)
 #endif
 }
 
+static bool finishInstruction(MCInst *instr, DecodeStatus result)
+{
+	if (result == MCDisassembler_Fail)
+		return false;
+	Mips_set_instr_map_data(instr);
+	if (result == MCDisassembler_SoftFail)
+		MCInst_setSoftFail(instr);
+	return true;
+}
+
 bool Mips_getInstruction(csh handle, const uint8_t *code, size_t code_len,
 			 MCInst *instr, uint16_t *size, uint64_t address,
 			 void *info)
@@ -359,13 +369,38 @@ bool Mips_getInstruction(csh handle, const uint8_t *code, size_t code_len,
 	DecodeStatus Result = Mips_LLVM_getInstruction(instr, &size64, code,
 						       code_len, address, info);
 	*size = size64;
-	if (Result != MCDisassembler_Fail) {
-		Mips_set_instr_map_data(instr);
-	}
-	if (Result == MCDisassembler_SoftFail) {
-		MCInst_setSoftFail(instr);
-	}
-	return Result != MCDisassembler_Fail;
+	return finishInstruction(instr, Result);
+}
+
+/* The fixed-address caller has selected MIPS16 and suppressed assembly text.
+ * Keep its generated decoder, aliases, implicit effects and SAVE/RESTORE
+ * operands identical to the public iterator. */
+bool Mips_disasm16NoText(cs_struct *handle, const uint8_t *code, size_t length,
+			 cs_insn *insn)
+{
+	MCInst instr;
+	uint64_t size = 0;
+	MCInst_InitStorage(&instr, CS_ARCH_MIPS, false);
+	instr.csh = handle;
+	instr.address = insn->address;
+	instr.flat_insn = insn;
+	instr.MRI = (MCRegisterInfo *)handle->getinsn_info;
+	Mips_init_cs_detail(&instr);
+	map_set_fill_detail_ops(&instr, true);
+	DecodeStatus result = Mips_decode16Instruction(
+		&instr, &size, code, length, insn->address,
+		(handle->mode & CS_MODE_BIG_ENDIAN) != 0);
+	if (!finishInstruction(&instr, result))
+		return false;
+	insn->size = (uint16_t)size;
+	if (size == 4)
+		memcpy(insn->bytes, code, 4);
+	else
+		memcpy(insn->bytes, code, 2);
+	insn->mnemonic[0] = insn->op_str[0] = 0;
+	if (MCInst_getOpcodePub(&instr))
+		insn->id = MCInst_getOpcodePub(&instr);
+	return true;
 }
 
 static void Mips_set_detail_op_reg(MCInst *MI, unsigned OpNum, mips_reg Reg,

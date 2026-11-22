@@ -4,6 +4,8 @@
 #ifndef CS_MIPS16_DISASSEMBLER_EXTENSION_H
 #define CS_MIPS16_DISASSEMBLER_EXTENSION_H
 
+#include "MipsLinkage.h"
+
 /* Physical MIPS16 forms missing from the imported compiler descriptions.
  * MD00076 revision 2.63 and MD01172 revision 1.00 own these encodings. Keep
  * outside translated/generated files; see docs/ARCHITECTURE.md. */
@@ -17,10 +19,9 @@ static void mips16GPR(MCInst *MI, unsigned reg)
 	MCOperand_CreateReg0(MI, getReg(MI, Mips_GPR32RegClassID, reg));
 }
 
-static DecodeStatus decodeMips16Instruction(MCInst *MI, uint64_t *Size,
-					    const uint8_t *Bytes,
-					    size_t BytesLen, uint64_t Address,
-					    bool IsBigEndian)
+DecodeStatus Mips_decode16Instruction(MCInst *MI, uint64_t *Size,
+				      const uint8_t *Bytes, size_t BytesLen,
+				      uint64_t Address, bool IsBigEndian)
 {
 	uint64_t insn;
 	if (readInstruction16(Bytes, BytesLen, Address, Size, &insn,

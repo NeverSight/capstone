@@ -1633,8 +1633,8 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
 	}
 
 	if (IsMips16)
-		return decodeMips16Instruction(Instr, Size, Bytes, BytesLen,
-					       Address, IsBigEndian);
+		return Mips_decode16Instruction(Instr, Size, Bytes, BytesLen,
+						Address, IsBigEndian);
 
 	// Attempt to read the instruction so that we can attempt to decode it. If
 	// the buffer is not 4 bytes long, let the higher level logic figure out
