@@ -65,6 +65,7 @@
 		0C6F07220265CCFEC8B56C6D /* MCInstPrinter.c in Sources */ = {isa = PBXBuildFile; fileRef = A147681900A859B6FF33B1C5 /* MCInstPrinter.c */; };
 		E06B2929F95A196300477770 /* Mapping.c in Sources */ = {isa = PBXBuildFile; fileRef = 0757CC8E95E32C807B529D06 /* Mapping.c */; };
 		C9DC7E63CA75A68259E4017B /* AliasMapping.c in Sources */ = {isa = PBXBuildFile; fileRef = 9BDA55CDC1F7E174768F868D /* AliasMapping.c */; };
+		25A957FA86C6880D9D148DF7 /* AliasPatternLookup.c in Sources */ = {isa = PBXBuildFile; fileRef = 4290B43E4BDED7AA01112F14 /* AliasPatternLookup.c */; };
 		DC474F9019DE6FCD00BCA449 /* MCRegisterInfo.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE24A019DDCDEE00EF8EA9 /* MCRegisterInfo.c */; };
 		DC474F9119DE6FCD00BCA449 /* SStream.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE24A119DDCDEE00EF8EA9 /* SStream.c */; };
 		DC474F9219DE6FCD00BCA449 /* utils.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE24A219DDCDEE00EF8EA9 /* utils.c */; };
@@ -74,6 +75,7 @@
 		03A4059C2E7F14C13B3E0635 /* MCInstPrinter.c in Sources */ = {isa = PBXBuildFile; fileRef = A147681900A859B6FF33B1C5 /* MCInstPrinter.c */; };
 		FE24CD259F3F09130FF97530 /* Mapping.c in Sources */ = {isa = PBXBuildFile; fileRef = 0757CC8E95E32C807B529D06 /* Mapping.c */; };
 		02F390F5981CFD7244A2E5B1 /* AliasMapping.c in Sources */ = {isa = PBXBuildFile; fileRef = 9BDA55CDC1F7E174768F868D /* AliasMapping.c */; };
+		4943BF7544A4FC4167B58D57 /* AliasPatternLookup.c in Sources */ = {isa = PBXBuildFile; fileRef = 4290B43E4BDED7AA01112F14 /* AliasPatternLookup.c */; };
 		DC474F9619DE6FCD00BCA449 /* MCRegisterInfo.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE24A019DDCDEE00EF8EA9 /* MCRegisterInfo.c */; };
 		DC474F9719DE6FCD00BCA449 /* SStream.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE24A119DDCDEE00EF8EA9 /* SStream.c */; };
 		DC474F9819DE6FCD00BCA449 /* utils.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE24A219DDCDEE00EF8EA9 /* utils.c */; };
@@ -259,6 +261,7 @@
 		08825505947F9FF38595CAA2 /* MCInstPrinter.c in Sources */ = {isa = PBXBuildFile; fileRef = A147681900A859B6FF33B1C5 /* MCInstPrinter.c */; };
 		99F6EE7BCF49E62584A33533 /* Mapping.c in Sources */ = {isa = PBXBuildFile; fileRef = 0757CC8E95E32C807B529D06 /* Mapping.c */; };
 		31C3FEE2D3F44FFB70B747C4 /* AliasMapping.c in Sources */ = {isa = PBXBuildFile; fileRef = 9BDA55CDC1F7E174768F868D /* AliasMapping.c */; };
+		4D57DBEAAA2B68D04546A8CD /* AliasPatternLookup.c in Sources */ = {isa = PBXBuildFile; fileRef = 4290B43E4BDED7AA01112F14 /* AliasPatternLookup.c */; };
 		DCFE24A919DDCDEE00EF8EA9 /* MCRegisterInfo.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE24A019DDCDEE00EF8EA9 /* MCRegisterInfo.c */; };
 		DCFE24AB19DDCDEE00EF8EA9 /* SStream.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE24A119DDCDEE00EF8EA9 /* SStream.c */; };
 		DCFE24AD19DDCDEE00EF8EA9 /* utils.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE24A219DDCDEE00EF8EA9 /* utils.c */; };
@@ -575,6 +578,7 @@
 		A147681900A859B6FF33B1C5 /* MCInstPrinter.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = MCInstPrinter.c; path = ../MCInstPrinter.c; sourceTree = "<group>"; };
 		0757CC8E95E32C807B529D06 /* Mapping.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = Mapping.c; path = ../Mapping.c; sourceTree = "<group>"; };
 		9BDA55CDC1F7E174768F868D /* AliasMapping.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = AliasMapping.c; path = ../AliasMapping.c; sourceTree = "<group>"; };
+		4290B43E4BDED7AA01112F14 /* AliasPatternLookup.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = AliasPatternLookup.c; path = ../AliasPatternLookup.c; sourceTree = "<group>"; };
 		DCFE24A019DDCDEE00EF8EA9 /* MCRegisterInfo.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = MCRegisterInfo.c; path = ../MCRegisterInfo.c; sourceTree = "<group>"; };
 		DCFE24A119DDCDEE00EF8EA9 /* SStream.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = SStream.c; path = ../SStream.c; sourceTree = "<group>"; };
 		DCFE24A219DDCDEE00EF8EA9 /* utils.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = utils.c; path = ../utils.c; sourceTree = "<group>"; };
@@ -820,6 +824,7 @@
 				A147681900A859B6FF33B1C5 /* MCInstPrinter.c */,
 				0757CC8E95E32C807B529D06 /* Mapping.c */,
 				9BDA55CDC1F7E174768F868D /* AliasMapping.c */,
+				4290B43E4BDED7AA01112F14 /* AliasPatternLookup.c */,
 				DCFE24B719DDCE1E00EF8EA9 /* MCInstrDesc.h */,
 				DCFE24A019DDCDEE00EF8EA9 /* MCRegisterInfo.c */,
 				DCFE24B819DDCE1E00EF8EA9 /* MCRegisterInfo.h */,
@@ -1690,6 +1695,7 @@
 				03A4059C2E7F14C13B3E0635 /* MCInstPrinter.c in Sources */,
 				FE24CD259F3F09130FF97530 /* Mapping.c in Sources */,
 				02F390F5981CFD7244A2E5B1 /* AliasMapping.c in Sources */,
+				4943BF7544A4FC4167B58D57 /* AliasPatternLookup.c in Sources */,
 				DC474FD519DE6FDA00BCA449 /* SystemZMCTargetDesc.c in Sources */,
 				DC474F9719DE6FCD00BCA449 /* SStream.c in Sources */,
 				DC474FCE19DE6FDA00BCA449 /* SparcDisassembler.c in Sources */,
@@ -1776,6 +1782,7 @@
 				08825505947F9FF38595CAA2 /* MCInstPrinter.c in Sources */,
 				99F6EE7BCF49E62584A33533 /* Mapping.c in Sources */,
 				31C3FEE2D3F44FFB70B747C4 /* AliasMapping.c in Sources */,
+				4D57DBEAAA2B68D04546A8CD /* AliasPatternLookup.c in Sources */,
 				DCFE246719DDCDA000EF8EA9 /* MipsDisassembler.c in Sources */,
 				DCFE245819DDCD9200EF8EA9 /* AArch64Mapping.c in Sources */,
 				DCFE247919DDCDAD00EF8EA9 /* SparcMapping.c in Sources */,
@@ -1851,6 +1858,7 @@
 				0C6F07220265CCFEC8B56C6D /* MCInstPrinter.c in Sources */,
 				E06B2929F95A196300477770 /* Mapping.c in Sources */,
 				C9DC7E63CA75A68259E4017B /* AliasMapping.c in Sources */,
+				25A957FA86C6880D9D148DF7 /* AliasPatternLookup.c in Sources */,
 				DC474FB119DE6FDA00BCA449 /* SystemZMCTargetDesc.c in Sources */,
 				DC474F9119DE6FCD00BCA449 /* SStream.c in Sources */,
 				DC474FAA19DE6FDA00BCA449 /* SparcDisassembler.c in Sources */,

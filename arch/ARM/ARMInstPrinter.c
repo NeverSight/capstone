@@ -1695,7 +1695,12 @@ static inline void printMveSaturateOp(MCInst *MI, unsigned OpNum, SStream *O)
 }
 
 #define PRINT_ALIAS_INSTR
+#ifndef CAPSTONE_DIET
+#include "../../AliasPatternLookup.h"
+#define matchAliasPatterns matchARMAliasPatterns
+#endif
 #include "ARMGenAsmWriter.inc"
+#undef matchAliasPatterns
 
 static void printInst(MCInst *MI, SStream *O, void *info)
 {

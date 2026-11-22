@@ -76,7 +76,12 @@ DECLARE_printComplexRotationOp(90, 0);
 
 #define GET_INSTRUCTION_NAME
 #define PRINT_ALIAS_INSTR
+#ifndef CAPSTONE_DIET
+#include "../../AliasPatternLookup.h"
+#define matchAliasPatterns matchAArch64AliasPatterns
+#endif
 #include "AArch64GenAsmWriter.inc"
+#undef matchAliasPatterns
 
 void printRegName(SStream *OS, unsigned Reg)
 {

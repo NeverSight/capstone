@@ -48,7 +48,12 @@
 
 // Include the auto-generated portion of the assembly writer.
 #define PRINT_ALIAS_INSTR
+#ifndef CAPSTONE_DIET
+#include "../../AliasPatternLookup.h"
+#define matchAliasPatterns matchLoongArchAliasPatterns
+#endif
 #include "LoongArchGenAsmWriter.inc"
+#undef matchAliasPatterns
 
 static void printInst(MCInst *MI, uint64_t Address, const char *Annot,
 		      SStream *O)

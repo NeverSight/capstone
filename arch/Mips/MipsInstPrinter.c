@@ -47,7 +47,12 @@
 #define DEBUG_TYPE "asm-printer"
 
 #define PRINT_ALIAS_INSTR
+#ifndef CAPSTONE_DIET
+#include "../../AliasPatternLookup.h"
+#define matchAliasPatterns matchMipsAliasPatterns
+#endif
 #include "MipsGenAsmWriter.inc"
+#undef matchAliasPatterns
 
 static bool isReg(const MCInst *MI, unsigned OpNo, unsigned R)
 {

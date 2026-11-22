@@ -273,6 +273,7 @@ set(SOURCES_ENGINE
     cs.c
     Mapping.c
     AliasMapping.c
+    AliasPatternLookup.c
     MCInst.c
     MCInstrDesc.c
     MCInstPrinter.c
@@ -1062,19 +1063,23 @@ endif()
 
 if(CAPSTONE_BUILD_STATIC_LIBS)
     set(capstone_static_objects $<TARGET_OBJECTS:capstone>)
+    set(capstone_alias_patterns_tail)
     if(TARGET capstone_x86_iter32)
         if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_C_COMPILER_ID STREQUAL "Clang"
            AND (CAPSTONE_AARCH64_SUPPORT OR CAPSTONE_MIPS_SUPPORT))
             # Backends reference the alias parser indirectly. Keep its hot code
             # ahead of the optional native readers even when all are linked.
+            # Keep the opcode rows after the native scanner when both are linked.
+            set(capstone_alias_patterns_tail
+                "$<FILTER:$<TARGET_OBJECTS:capstone>,INCLUDE,/AliasPatternLookup[.]c[.]o$>")
             set(capstone_static_objects
-                "$<FILTER:$<TARGET_OBJECTS:capstone>,EXCLUDE,/AliasMapping[.]c[.]o$>"
+                "$<FILTER:$<TARGET_OBJECTS:capstone>,EXCLUDE,/(AliasMapping|AliasPatternLookup)[.]c[.]o$>"
                 $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>
                 "$<FILTER:$<TARGET_OBJECTS:capstone>,INCLUDE,/AliasMapping[.]c[.]o$>")
         else()
             list(APPEND capstone_static_objects $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>)
         endif()
-        list(APPEND capstone_static_objects $<TARGET_OBJECTS:capstone_x86_native>)
+        list(APPEND capstone_static_objects $<TARGET_OBJECTS:capstone_x86_native> ${capstone_alias_patterns_tail})
     endif()
     add_library(capstone_static STATIC ${capstone_static_objects})
     # Use normal capstone name. Otherwise we get libcapstone_static.a

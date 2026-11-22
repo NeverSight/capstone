@@ -61,7 +61,12 @@ static inline void printRegName(SStream *O, MCRegister Reg);
 static inline void printOperand(MCInst *MI, unsigned OpNo, SStream *O);
 // Include the auto-generated portion of the assembly writer.
 #define PRINT_ALIAS_INSTR
+#ifndef CAPSTONE_DIET
+#include "../../AliasPatternLookup.h"
+#define matchAliasPatterns matchRISCVAliasPatterns
+#endif
 #include "RISCVGenAsmWriter.inc"
+#undef matchAliasPatterns
 
 // Print architectural register names rather than the ABI names (such as x2
 // instead of sp).

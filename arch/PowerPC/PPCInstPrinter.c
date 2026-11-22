@@ -571,7 +571,12 @@ static inline void printTLSCall(MCInst *MI, unsigned OpNo, SStream *O)
 }
 
 #define PRINT_ALIAS_INSTR
+#ifndef CAPSTONE_DIET
+#include "../../AliasPatternLookup.h"
+#define matchAliasPatterns matchPPCAliasPatterns
+#endif
 #include "PPCGenAsmWriter.inc"
+#undef matchAliasPatterns
 
 static void printInst(MCInst *MI, uint64_t Address, const char *Annot,
 		      SStream *O)

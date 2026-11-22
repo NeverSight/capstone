@@ -51,7 +51,12 @@ static void printOperand(MCInst *MI, int opNum, SStream *O);
 
 #define GET_INSTRUCTION_NAME
 #define PRINT_ALIAS_INSTR
+#ifndef CAPSTONE_DIET
+#include "../../AliasPatternLookup.h"
+#define matchAliasPatterns matchSparcAliasPatterns
+#endif
 #include "SparcGenAsmWriter.inc"
+#undef matchAliasPatterns
 
 static void printRegName(SStream *OS, MCRegister Reg)
 {
