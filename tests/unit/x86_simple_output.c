@@ -518,6 +518,19 @@ static bool check_vex_indexed(csh handles[2])
 
 static bool check_plain_evex_registers(csh handles[2])
 {
+	const uint8_t rip[] = { 0x62, 0xf1, 0x65, 0x48, 0xfe,
+				0x1d, 0x73, 0x70, 0x33, 0x00 };
+	uint8_t specimen[sizeof(rip)];
+	for (unsigned k = 0; k < 8; ++k) {
+		memcpy(specimen, rip, sizeof(rip));
+		specimen[1] ^= (uint8_t)((k & 3) << 5);
+		if (k & 4)
+			specimen[9] = 0x80;
+		for (size_t n = 1; n <= sizeof(specimen); ++n)
+			if (!compare(handles, specimen, n, k))
+				return false;
+	}
+
 	static const uint8_t flags[] = { 0,    8,    0x28, 0x48,
 					 0x68, 0x18, 0x49, 0xc9 };
 	for (unsigned map = 1; map <= 3; ++map)
@@ -545,6 +558,27 @@ static bool check_plain_evex_registers(csh handles[2])
 				}
 	return true;
 }
+static bool check_legacy_map38_registers(csh handles[2])
+{
+	static const uint8_t opcodes[] = { 0x00, 0x17, 0x40, 0xdc, 0xde, 0xff };
+	for (unsigned p = 0; p <= 16; ++p)
+		for (unsigned n = 0; n < sizeof(opcodes); ++n)
+			for (unsigned mr = 0xc0; mr <= 0xff; ++mr) {
+				uint8_t bytes[] = {
+					0x66, (uint8_t)(0x3f + p), 0x0f,
+					0x38, opcodes[n],	   (uint8_t)mr
+				};
+				if (!p)
+					bytes[1] = 0x66;
+				const uint8_t *start = bytes + !p;
+				const size_t length = sizeof(bytes) - !p;
+				if (!compare(handles, start, length, mr) ||
+				    !compare(handles, start, length - 1, mr))
+					return false;
+			}
+	return true;
+}
+
 static bool check_legacy_register_immediates(csh handles[2])
 {
 	static const uint8_t values[] = { 0, 9, 10, 15, 16, 127, 128, 255 };
@@ -1571,6 +1605,7 @@ static bool check_mode(cs_mode mode)
 			!check_vex_clear(handles) ||
 			!check_sse_base_memory(handles) ||
 			!check_legacy_register_immediates(handles) ||
+			!check_legacy_map38_registers(handles) ||
 			!check_legacy_memory(handles, 0x66) ||
 			!check_legacy_memory(handles, 0xf2) ||
 			!check_legacy_memory(handles, 0xf3) ||

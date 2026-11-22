@@ -86,6 +86,11 @@ CAPSTONE_INTERNAL bool X86_writePlainEvexRegisters(cs_struct *handle,
 						   const uint8_t *code,
 						   cs_insn *insn,
 						   uint16_t *insn_size);
+/* The iterator checked the ten-byte RIP-relative encoding and 64-bit mode. */
+CAPSTONE_INTERNAL bool X86_writeEvexRipMemory(cs_struct *handle,
+					      const uint8_t *code,
+					      cs_insn *insn,
+					      uint16_t *insn_size);
 /* Externalizing the broadcast reader preserves Clang's surrounding code.
  * Other compilers retain the established static reader. */
 #if defined(__clang__)

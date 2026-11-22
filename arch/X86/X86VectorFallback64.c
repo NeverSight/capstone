@@ -33,6 +33,38 @@
 #include "X86GenLegacyPackedMemory.inc"
 
 #include "X86GenLegacyRegisterImmediates.inc"
+#include "X86GenLegacyMap38Registers.inc"
+
+static void setLegacyRegisterOpcode(cs_insn *insn, const uint8_t *opcode,
+				    unsigned count)
+{
+	if (insn->detail) {
+		cs_x86 *x = &insn->detail->x86;
+		x->prefix[2] = 0x66;
+		memset(x->opcode, 0, sizeof(x->opcode));
+		memcpy(x->opcode, opcode, count);
+	}
+}
+
+/* The caller has checked the escape and the entire register encoding. */
+static bool writeLegacyMap38Registers(const uint8_t *code, cs_insn *insn,
+				      uint16_t *insn_size, unsigned offset,
+				      uint8_t rex)
+{
+	const unsigned plan = legacy_map38_plans[code[offset - 1]];
+	if (!plan)
+		return false;
+	const unsigned mr = code[offset];
+	const unsigned reg = ((mr >> 3) & 7) | ((rex & 4) << 1);
+	const unsigned rm = (mr & 7) | ((rex & 1) << 3);
+	const unsigned regs[] = { plan & 128 ? rm : reg,
+				  plan & 128 ? reg : rm };
+	writeVectorRegisters(code, insn, insn_size,
+			     &legacy_map38_rows[plan & 127], offset - 1, 0, rex,
+			     0, regs, 2);
+	setLegacyRegisterOpcode(insn, code + offset - 3, 3);
+	return true;
+}
 
 /* The caller checked a complete 66 [REX] 0F 70..73 /r ib register form. */
 static bool writeLegacyRegisterImmediate(const uint8_t *code, cs_insn *insn,
@@ -50,14 +82,7 @@ static bool writeLegacyRegisterImmediate(const uint8_t *code, cs_insn *insn,
 	writeVectorRegisters(code, insn, insn_size,
 			     &legacy_immediate_rows[plan - 1], offset - 2, 0,
 			     rex, 0, regs, shuffle ? 2 : 1);
-	if (insn->detail) {
-		/* Legacy prefix and escaped opcode have separate public fields. */
-		cs_x86 *x = &insn->detail->x86;
-		x->prefix[2] = 0x66;
-		x->opcode[0] = 0x0f;
-		x->opcode[1] = (uint8_t)opcode;
-		x->opcode[2] = 0;
-	}
+	setLegacyRegisterOpcode(insn, code + offset - 3, 2);
 	return true;
 }
 
@@ -96,6 +121,9 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
 	if (size >= 6 && code[0] == 0x62 && code[5] >= 0xc0 &&
 	    X86_writePlainEvexRegisters(handle, code, insn, insn_size))
 		return true;
+	if (size >= 10 && code[0] == 0x62 && (code[5] & 0xc7) == 5 &&
+	    X86_writeEvexRipMemory(handle, code, insn, insn_size))
+		return true;
 	if (code[0] == 0xc4 &&
 	    X86_writeVexRegisterImmediate(handle, code, size, insn, insn_size,
 					  x86_simple_registers, true))
@@ -105,7 +133,13 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
 		const unsigned offset = 4 + (rex != 0);
 		if (size >= offset && code[offset - 3] == 0x0f) {
 			const unsigned opcode = code[offset - 2];
-			if (code[offset - 1] < 0xc0) {
+			if (opcode == 0x38 && code[0] == 0x66) {
+				if (size > offset && code[offset] >= 0xc0 &&
+				    !X86_OUTPUT_UNSUPPORTED(handle, false) &&
+				    writeLegacyMap38Registers(
+					    code, insn, insn_size, offset, rex))
+					return true;
+			} else if (code[offset - 1] < 0xc0) {
 				const unsigned bank =
 					code[0] == 0x66 ? 0 : 1 + (code[0] & 1);
 				const unsigned row =
