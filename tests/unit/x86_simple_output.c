@@ -1291,6 +1291,12 @@ static bool check_primary_batches(csh handle)
 		0x0f, 0x10, 0x44, 0x24, 0x08, /* MOVUPS */
 		0x66, 0x44, 0x0f, 0x58, 0xc1, /* ADDPD */
 		0xf3, 0x0f, 0x6f, 0x44, 0x24, 0x10, /* MOVDQU */
+		0x62, 0xf1, 0x6d, 0x48, 0x73, 0xdb, 0x11, /* VPSRLDQ */
+		0x62, 0xf1, 0x6d, 0x48, 0x73, 0xfb, 0xff, /* VPSLLDQ */
+		0x62, 0xf1, 0x6d, 0x49, 0x73, 0xfb, 0xff, /* masked group */
+		0x62, 0xf2, 0xed, 0x18, 0xa8, 0xd9, /* VFMADD213PD {rn-sae} */
+		0x62, 0xf2, 0xed, 0x78, 0xa8, 0xd9, /* VFMADD213PD {rz-sae} */
+		0x62, 0xf2, 0xed, 0x19, 0xa8, 0xd9, /* masked register */
 		0xf2, 0x44, 0x0f, 0x10, 0xc1, /* MOVSD */
 		0xf3, 0x4c, 0x0f, 0x2a, 0xc2, /* CVTSI2SS */
 		0x48, 0xf2, 0x0f, 0x11, 0x08, /* REX before repeat prefix */
@@ -1326,6 +1332,94 @@ static bool check_primary_batches(csh handle)
 	return true;
 }
 
+static bool check_evex_immediate_shifts(csh handles[2])
+{
+	for (unsigned opcode = 0x71; opcode <= 0x73; ++opcode)
+		for (unsigned group = 0; group < 8; ++group)
+			for (unsigned wl = 0; wl < 8; ++wl)
+				for (unsigned pair = 0; pair < 1024; ++pair) {
+					const unsigned dst = pair & 31,
+						       src = pair >> 5;
+					uint8_t code[] = {
+						0x62,
+						(uint8_t)(0xf1 ^
+							  ((src & 24) << 2)),
+						(uint8_t)((wl >> 2) << 7 |
+							  ((~dst & 15) << 3) |
+							  5),
+						(uint8_t)((wl & 3) << 5 |
+							  ((~dst & 16) >> 1)),
+						(uint8_t)opcode,
+						(uint8_t)(0xc0 | group << 3 |
+							  (src & 7)),
+						(uint8_t)(pair * 37)
+					};
+					if (!compare(handles, code,
+						     sizeof(code), pair))
+						return false;
+					if (pair < 32) {
+						// Include opmask, zeroing, broadcast and extended group encodings.
+						code[3] |=
+							(uint8_t)((pair & 7) |
+								  ((pair & 8)
+								   << 4) |
+								  (pair & 16));
+						code[1] ^= (uint8_t)(((pair & 1)
+								      << 7) |
+								     ((pair & 2)
+								      << 3));
+						if (!compare(handles, code,
+							     sizeof(code),
+							     pair) ||
+						    !compare(handles, code,
+							     pair % sizeof(code),
+							     pair))
+							return false;
+					}
+				}
+	return true;
+}
+
+
+static bool check_legacy_memory(csh handles[2], uint8_t mandatory)
+{
+	const uint8_t opcodes[] = { 0x10, 0x11, 0x12, 0x16,
+				    0x28, 0x29, 0x58, 0x6f, 0x7f };
+	const uint8_t sibs[] = { 0x24, 0x25, 0x64, 0xdc };
+	for (unsigned i = 0; i < sizeof(opcodes); ++i) {
+		for (unsigned prefix = 0; prefix <= 16; ++prefix) {
+			const unsigned skip = !prefix;
+			for (unsigned mr = 0; mr < 0xc0; ++mr) {
+				const bool sib = (mr & 7) == 4;
+				for (unsigned j = 0;
+				     j < (sib ? sizeof(sibs) : 1); ++j) {
+					uint8_t code[] = { mandatory, (uint8_t)(0x3f +
+								     prefix),
+							   0x0f,
+							   opcodes[i],
+							   (uint8_t)mr,
+							   0xff,
+							   0xff,
+							   0xff,
+							   0x80,
+							   0x80 };
+					if (sib)
+						code[5] = sibs[j];
+					if (skip)
+						code[1] = mandatory;
+					for (unsigned len = 1;
+					     len <= sizeof(code) - skip; ++len)
+						if (!compare(handles,
+							     code + skip, len,
+							     mr + j + len))
+							return false;
+				}
+			}
+		}
+	}
+	return true;
+}
+
 static bool check_mode(cs_mode mode)
 {
 	csh handles[2] = { 0 };
@@ -1355,8 +1449,12 @@ static bool check_mode(cs_mode mode)
 		     (!check_vex_rip_loads(handles) ||
 		      !check_sse_rip_memory(handles) ||
 		      (private_iter == X86_disasmIterText &&
-		       (!check_vex_clear(handles) ||
+		       (!check_evex_immediate_shifts(handles) ||
+			!check_vex_clear(handles) ||
 			!check_sse_base_memory(handles) ||
+			!check_legacy_memory(handles, 0x66) ||
+			!check_legacy_memory(handles, 0xf2) ||
+			!check_legacy_memory(handles, 0xf3) ||
 			!check_vex_packed_memory(handles))))) ||
 		    !check_rex_stack(handles) ||
 		    (mode == CS_MODE_64 && !check_broadcast(handles)) ||

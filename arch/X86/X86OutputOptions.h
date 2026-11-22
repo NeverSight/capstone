@@ -16,6 +16,11 @@ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
 X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
 			cs_insn *insn, uint16_t *insn_size, bool batch);
 
+/* Called by the static AMD64 iterator with at least one input byte. */
+CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
+			cs_insn *insn, uint16_t *insn_size, bool batch);
+
 /* Keep the mode, option and callback checks in a single short-circuit chain
  * in both instantiations of the scalar writer. */
 #define X86_OUTPUT_UNSUPPORTED(handle, mode_mismatch) \

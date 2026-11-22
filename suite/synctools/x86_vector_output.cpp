@@ -3,6 +3,7 @@
 
 // Build against full x86 Capstone and redirect stdout to X86GenVectorOutput.inc.
 #include <capstone/capstone.h>
+#include "../../arch/X86/X86EvexAdmission.h"
 #include <algorithm>
 #include <array>
 #include <cstdio>
@@ -94,13 +95,14 @@ std::string fields(const Bytes4 &array)
 	       ", " + std::to_string(array[3]) + " }";
 }
 
-// EVEX extracts have a narrower r/m destination, a full-width reg source,
-// and a reserved vvvv field. Reconstruct the entire public record before
-// admitting a width, including the ignored or effective W bit in REX.
-std::string extract_record(Decoder &decoder, const Form &form, unsigned w,
-			   unsigned ll)
+// Reconstruct both explicit registers and the immediate from the canonical
+// decoder. Extracts take their destination from r/m. Immediate shifts take
+// it from vvvv/V' and use the ModR/M reg field as an opcode extension.
+std::string pair_immediate_record(Decoder &decoder, const Form &form,
+				  unsigned w, unsigned ll, unsigned group = 0)
 {
-	const unsigned dst_width = (form.opcode & 2) ? 1 : 0;
+	const unsigned dst_width = form.extract ? ((form.opcode & 2) ? 1 : 0) :
+						  ll;
 	const char *names[] = { "xmm", "ymm", "zmm" };
 	const x86_reg bases[] = { X86_REG_XMM0, X86_REG_YMM0, X86_REG_ZMM0 };
 	std::string row;
@@ -115,6 +117,13 @@ std::string extract_record(Decoder &decoder, const Form &form, unsigned w,
 				    uint8_t(form.opcode),
 				    uint8_t(0xc0 | (src & 7) << 3 | (dst & 7)),
 				    uint8_t(value) };
+		if (!form.extract) {
+			ext = (src & 24) << 2;
+			bytes[1] = uint8_t((0xf0 ^ ext) | form.map);
+			bytes[2] = uint8_t(w << 7 | ((~dst & 15) << 3) | 5);
+			bytes[3] = uint8_t(ll << 5 | ((~dst & 16) >> 1));
+			bytes[5] = uint8_t(0xc0 | (group << 3) | (src & 7));
+		}
 		unsigned id = decoder.decode(bytes, sizeof(bytes));
 		if (!id)
 			return {};
@@ -171,7 +180,7 @@ std::string output_record(Decoder &decoder, const Form &form, unsigned w,
 			  unsigned ll)
 {
 	if (form.extract)
-		return extract_record(decoder, form, w, ll);
+		return pair_immediate_record(decoder, form, w, ll);
 	uint8_t bytes[] = { 0x62,
 			    uint8_t(0xf0 | form.map),
 			    uint8_t(w << 7 | 0x6d),
@@ -930,29 +939,44 @@ void emit_vex_registers(Decoder &decoder)
 }
 void emit_evex_transfer_scan(Decoder &decoder)
 {
-	std::puts("static const uint16_t evex_transfer_scan_ids[4][2][3]\n\t__attribute__((section(\".cs_x86_evex_transfer_rodata\"))) = {");
-	for (unsigned kind = 0; kind < 4; ++kind) {
+	// The pair of directions must have the same public ID for every
+	// admitted register, ModR/M and SIB combination.
+	struct TransferForm {
+		uint8_t map, pp, load, store;
+	};
+	constexpr TransferForm transfers[] = {
+		{ 2, 1, 0x1a, 0 },       // Broadcast from memory only
+		{ 1, 1, 0x6f, 0x7f }, { 1, 2, 0x6f, 0x7f },
+		{ 1, 3, 0x6f, 0x7f },
+		{ 1, 0, 0x10, 0x11 }, { 1, 1, 0x10, 0x11 },
+		{ 1, 0, 0x28, 0x29 }, { 1, 1, 0x28, 0x29 },
+	};
+	std::puts("static const uint16_t evex_transfer_scan_ids[][2][3]\n\tX86_EVEX_SECTION(X86_EVEX_TRANSFER_RODATA) = {");
+	for (const auto &form : transfers) {
+		if (form.load == 0x10 && !form.pp)
+			std::puts("#ifdef X86_EVEX_BATCH_PACKED");
 		std::puts("\t{");
 		for (unsigned w = 0; w < 2; ++w) {
 			std::printf("\t\t{ ");
 			for (unsigned ll = 0; ll < 3; ++ll) {
-				const unsigned pp = kind ? kind : 1;
-				const unsigned map = kind ? 1 : 2;
+				const unsigned pp = form.pp, map = form.map;
 				uint8_t bytes[11] = {
 					0x62, uint8_t(0xf0 | map),
 					uint8_t(0x7c | pp | w << 7),
 					uint8_t(8 | ll << 5),
-					uint8_t(kind ? 0x6f : 0x1a), 0x58, 0x80
+					form.load, 0x58, 0x80
 				};
 				unsigned id = decoder.decode(bytes, 7);
 				if (id > UINT16_MAX)
 					throw std::runtime_error("EVEX transfer ID exceeds uint16_t");
 				if (id) {
-					for (unsigned store = 0; store < (kind ? 2u : 1u); ++store) {
-						bytes[4] = uint8_t(kind ? 0x6f | store << 4 : 0x1a);
+					for (auto opcode : { form.load, form.store }) {
+						if (!opcode)
+							continue;
+						bytes[4] = opcode;
 						for (unsigned ext = 0; ext < 16; ++ext) {
 							bytes[1] = uint8_t(ext << 4 | map);
-							for (unsigned modrm = 0; modrm < (kind ? 256u : 192u); ++modrm) {
+							for (unsigned modrm = 0; modrm < (form.store ? 256u : 192u); ++modrm) {
 								bytes[5] = uint8_t(modrm);
 								const unsigned mod = modrm >> 6, rm = modrm & 7;
 								const bool sib = mod < 3 && rm == 4;
@@ -980,7 +1004,7 @@ void emit_evex_transfer_scan(Decoder &decoder)
 		}
 		std::puts("\t},");
 	}
-	std::puts("};");
+	std::puts("#endif\n};");
 	std::fprintf(stderr, "%llu canonical EVEX transfer probes\n", static_cast<unsigned long long>(decoder.probes));
 }
 
@@ -991,7 +1015,7 @@ void emit_evex_scan(Decoder &decoder, const std::map<unsigned, WidthRows> &ids)
 	for (const auto &form : forms) {
 		const unsigned key = form.map << 8 | form.opcode;
 		if (form.map < 1 || form.map > 3 ||
-		    form.extract != ((key & ~0x22u) == 0x319))
+		    form.extract != X86_EVEX_REGISTER_EXTRACT(key))
 			throw std::runtime_error("unsupported EVEX scan form");
 		descriptions.emplace(key, form);
 	}
@@ -1002,16 +1026,19 @@ void emit_evex_scan(Decoder &decoder, const std::map<unsigned, WidthRows> &ids)
 			throw std::runtime_error("EVEX scan opcode plan collision");
 		index[key & 255] = plan;
 	}
-	if (index[0x6f] || index[0x7f] || index[0x1a] || plan >= 128)
+	if (index[0x6f] || index[0x7f] || index[0x1a] || index[0x10] ||
+	    index[0x11] || index[0x28] || index[0x29] || plan >= 128)
 		throw std::runtime_error("EVEX transfer opcode plan collision");
 	index[0x6f] = index[0x7f] = 128;
 	index[0x1a] = 129;
-	std::puts("enum { EVEX_SCAN_MOVE = 128, EVEX_SCAN_BROADCAST = 129 };");
-	std::puts("struct EvexScanPlan {\n\tuint8_t map, length;\n\tuint16_t ids[2][3];\n};");
-	std::puts("static const struct EvexScanPlan evex_scan_plans[]\n\t__attribute__((section(\".cs_x86_evex_scan_rodata\"))) = {\n\t{ 0 },");
+	index[0x10] = index[0x11] = 130;
+	index[0x28] = index[0x29] = 131;
+	std::puts("enum { EVEX_SCAN_RESERVED_SOURCE = 128 };\nenum { EVEX_SCAN_MOVE = 128, EVEX_SCAN_BROADCAST = 129 };\n#ifdef X86_EVEX_BATCH_PACKED\nenum { EVEX_SCAN_PACKED = 130, EVEX_SCAN_ALIGNED = 131 };\n#else\nenum { EVEX_SCAN_PACKED = 0, EVEX_SCAN_ALIGNED = 0 };\n#endif");
+	std::puts("struct EvexScanPlan {\n\tuint8_t map, length_flags;\n\tuint16_t ids[2][3];\n};");
+	std::puts("static const struct EvexScanPlan evex_scan_plans[]\n\tX86_EVEX_SECTION(X86_EVEX_SCAN_RODATA) = {\n\t{ 0 },");
 	for (const auto &[key, widths] : ids) {
 		const auto &form = descriptions.at(key);
-		std::printf("\t{ %u, %u, { ", form.map, 6 + form.immediate);
+		std::printf("\t{ %u, %u%s, { ", form.map, 6 + form.immediate, form.extract ? " | EVEX_SCAN_RESERVED_SOURCE" : "");
 		for (unsigned w = 0; w < 2; ++w) {
 			std::printf("%s{ ", w ? ", " : "");
 			for (unsigned ll = 0; ll < 3; ++ll) {
@@ -1024,16 +1051,19 @@ void emit_evex_scan(Decoder &decoder, const std::map<unsigned, WidthRows> &ids)
 		}
 		std::puts(" } },");
 	}
-	std::puts("};\nstatic const uint8_t evex_scan_index[256]\n\t__attribute__((section(\".cs_x86_evex_scan_rodata\"))) = {");
+	std::puts("};\nstatic const uint8_t evex_scan_index[256]\n\tX86_EVEX_SECTION(X86_EVEX_SCAN_RODATA) = {");
 	for (unsigned i = 0; i < index.size(); i += 16) {
 		std::printf("\t");
 		for (unsigned j = 0; j < 16; ++j)
-			std::printf("%s%u,", j ? " " : "", index[i + j]);
+			if (index[i+j] == 130 || index[i+j] == 131)
+				std::printf("%s%s,", j ? " " : "", index[i+j] == 130 ? "EVEX_SCAN_PACKED" : "EVEX_SCAN_ALIGNED");
+			else
+				std::printf("%s%u,", j ? " " : "", index[i + j]);
 		std::putchar('\n');
 	}
 	std::puts("};");
 	emit_evex_transfer_scan(decoder);
-	std::puts("static const uint8_t evex_transfer_lengths[32]\n\t__attribute__((section(\".cs_x86_evex_transfer_rodata\"))) = {\n\t6, 6, 6, 6, 0, 10, 6, 6,\n\t7, 7, 7, 7, 8, 7, 7, 7,\n\t10, 10, 10, 10, 11, 10, 10, 10,\n\t6, 6, 6, 6, 6, 6, 6, 6,\n};");
+	std::puts("static const uint8_t evex_transfer_lengths[32]\n\tX86_EVEX_SECTION(X86_EVEX_TRANSFER_RODATA) = {\n\t6, 6, 6, 6, 0, 10, 6, 6,\n\t7, 7, 7, 7, 8, 7, 7, 7,\n\t10, 10, 10, 10, 11, 10, 10, 10,\n\t6, 6, 6, 6, 6, 6, 6, 6,\n};");
 }
 
 // Derive the metadata and verify the complete operand record for the
@@ -1506,6 +1536,7 @@ void emit_rounded_vectors(Decoder &decoder)
 	std::array<std::array<unsigned, 256>, 3> plans{};
 	std::vector<PrefixRow> prefixes(1);
 	std::vector<std::string> rows;
+	std::vector<unsigned> public_ids;
 	for (unsigned map = 1; map <= plans.size(); ++map) {
 		for (unsigned opcode = 0; opcode < 256; ++opcode) {
 			PrefixRow prefix{};
@@ -1540,8 +1571,10 @@ void emit_rounded_vectors(Decoder &decoder)
 							 rows.end(), value);
 				const unsigned idx =
 					unsigned(i - rows.begin()) + 1;
-				if (i == rows.end())
+				if (i == rows.end()) {
 					rows.push_back(value);
+					public_ids.push_back(row.id);
+				}
 				prefix[key] = idx;
 			}
 			const auto i = std::find(prefixes.begin(),
@@ -1555,11 +1588,18 @@ void emit_rounded_vectors(Decoder &decoder)
 	if (!plans[0][0x58] || !plans[1][0xa8] || prefixes.size() > 256 ||
 	    rows.size() > UINT8_MAX)
 		throw std::runtime_error("invalid rounded EVEX register plans");
+	std::puts("#ifdef X86_ROUNDED_SCAN_IDS\nstatic const uint16_t evex_rounded_ids[] = {\n\t0,");
+	for (unsigned id : public_ids) {
+		if (id > UINT16_MAX)
+			throw std::runtime_error("rounded register public ID exceeds uint16_t");
+		std::printf("\t%s,\n", decoder.symbol(id).c_str());
+	}
+	std::puts("};\n#else");
 	std::puts(
 		"static const struct VectorOutputRow evex_rounded_rows[] = {\n\t{ 0 },");
 	for (const auto &row : rows)
 		std::printf("\t%s,\n", row.c_str());
-	std::puts("};\nstatic const uint8_t evex_rounded_prefixes[][8] = {");
+	std::puts("};\n#endif\nstatic const uint8_t evex_rounded_prefixes[][8] = {");
 	for (const auto &p : prefixes) {
 		std::printf("\t{");
 		for (const auto v : p)
@@ -1581,6 +1621,57 @@ void emit_rounded_vectors(Decoder &decoder)
 	std::fprintf(stderr,
 		     "%zu rounded EVEX register rows, %zu prefix plans\n",
 		     rows.size(), prefixes.size() - 1);
+}
+
+void emit_evex_shifts(Decoder &decoder)
+{
+	std::vector<std::string> records;
+	std::vector<unsigned> ids;
+	unsigned plans[3][8][6] = {};
+	for (unsigned op = 0; op < 3; ++op) {
+		const Form form{ 1, 0x71 + op, true };
+		for (unsigned group = 0; group < 8; ++group) {
+			for (unsigned wl = 0; wl < 6; ++wl) {
+				const auto row = pair_immediate_record(
+					decoder, form, wl / 3, wl % 3, group);
+				if (row.empty())
+					continue;
+				const auto it = std::find(records.begin(),
+							  records.end(), row);
+				plans[op][group][wl] =
+					unsigned(it - records.begin()) + 1;
+				if (it == records.end()) {
+					records.push_back(row);
+					ids.push_back(decoder.insn->id);
+				}
+			}
+		}
+	}
+	if (records.size() > UINT8_MAX || !plans[2][3][2] || !plans[2][7][2])
+		throw std::runtime_error(
+			"missing EVEX byte shift or too many shift records");
+	std::puts("#ifdef X86_SHIFT_SCAN_IDS\nstatic const uint16_t evex_shift_ids[] = {\n\t0,");
+	for (unsigned id : ids) {
+		if (id > UINT16_MAX)
+			throw std::runtime_error("EVEX shift ID exceeds uint16_t");
+		std::printf("\t%s,\n", decoder.symbol(id).c_str());
+	}
+	std::puts("};\n#else");
+	std::puts(
+		"static const struct VectorOutputRow evex_shift_rows[] = {");
+	for (const auto &row : records)
+		std::printf("\t%s,\n", row.c_str());
+	std::puts(
+		"};\n#endif\nstatic const uint8_t evex_shift_plans[3][8][6] = {");
+	for (const auto &op : plans) {
+		std::puts("\t{");
+		for (const auto &group : op)
+			std::printf("\t\t{ %u, %u, %u, %u, %u, %u },\n",
+				    group[0], group[1], group[2], group[3],
+				    group[4], group[5]);
+		std::puts("\t},");
+	}
+	std::puts("};");
 }
 
 void emit_output(Decoder &decoder, bool scan_only)
@@ -1646,6 +1737,14 @@ void emit_output(Decoder &decoder, bool scan_only)
 
 int main(int argc, char **argv)
 {
+	if (argc == 2 && !std::strcmp(argv[1], "--evex-shifts")) {
+		Decoder decoder;
+		std::puts("/* Generated by suite/synctools/x86_vector_output.cpp --evex-shifts. */");
+		emit_evex_shifts(decoder);
+		std::fprintf(stderr, "%llu canonical EVEX shift probes\n",
+			     static_cast<unsigned long long>(decoder.probes));
+		return 0;
+	}
 	if (argc == 2 && !std::strcmp(argv[1], "--rounded-registers64")) {
 		Decoder decoder;
 		std::puts(
@@ -1669,7 +1768,7 @@ int main(int argc, char **argv)
 	const bool scan_only = argc == 2 && !std::strcmp(argv[1], "--evex-scan");
 	if (argc > 1 && !scan_only)
 		throw std::runtime_error(
-			"usage: x86_vector_output [--evex-scan|--evex-memory|--vex32-memory|--rounded-registers64]");
+			"usage: x86_vector_output [--evex-scan|--evex-memory|--vex32-memory|--rounded-registers64|--evex-shifts]");
 	Decoder decoder;
 	std::puts("/* Generated by suite/synctools/x86_vector_output.cpp. */");
 	emit_output(decoder, scan_only);

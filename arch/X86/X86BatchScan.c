@@ -19,6 +19,22 @@
 #undef X86_DEFINE_VEX3_PUBLIC_PLANS
 #include "X86GenBatchPrimary.inc"
 #include "X86FeatureExtension.h"
+#if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
+	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
+	!defined(_WIN32_WCE)
+#define X86_BATCH_EVEX_PLANS
+#define X86_EVEX_SCAN_RODATA ".cs_x86_native_batch_rodata"
+#define X86_EVEX_TRANSFER_RODATA X86_EVEX_SCAN_RODATA
+#define X86_EVEX_BATCH_PACKED
+#include "X86EvexScanPlan.h"
+#define X86_ROUNDED_SCAN_IDS
+#include "X86RoundedRegisterPlan.h"
+#undef X86_ROUNDED_SCAN_IDS
+#include "X86EvexAdmission.h"
+#define X86_SHIFT_SCAN_IDS
+#include "X86GenEvexShiftOutput.inc"
+#undef X86_SHIFT_SCAN_IDS
+#endif
 
 /* Number of bytes following the ModR/M byte in 32- and 64-bit addressing. */
 static bool addressBytes(const uint8_t *code, size_t size, unsigned offset,
@@ -206,6 +222,29 @@ static uint32_t readFirst64(const uint8_t *code, size_t size)
 		return readVex2Plan(code, size);
 	if (byte == 0xc4)
 		return readVex3Plan(code, size);
+#ifdef X86_BATCH_EVEX_PLANS
+	if (byte == 0x62 && size >= 6) {
+		if ((code[3] & 0x10) && code[5] >= 0xc0) {
+			const unsigned row = X86_roundedRegisterRow(code);
+			return row ? ((uint32_t)evex_rounded_ids[row] << 8) | 6 : 0;
+		}
+		/* Register/immediate group opcodes use the ModR/M reg field as
+		 * the operation selector. All 32 source and destination registers
+		 * have been checked by the canonical output generator. */
+		if (code[4] >= 0x71 && code[4] <= 0x73 && size >= 7 &&
+		    code[5] >= 0xc0 && (code[1] & 0x9f) == 0x91 &&
+		    !X86_EVEX_REGISTER_PREFIX_REJECTS(code, size)) {
+			const unsigned row =
+				evex_shift_plans[code[4] - 0x71][(code[5] >> 3) & 7]
+					       [(code[2] >> 7) * 3 + (code[3] >> 5)];
+			if (row)
+				return ((uint32_t)evex_shift_ids[row] << 8) | 7;
+		}
+		unsigned id, length;
+		if (X86_readEvexScanPlan(code, size, &id, &length))
+			return (id << 8) | length;
+	}
+#endif
 	if ((byte & 0xfe) == 0xf2 && size >= 3) {
 		const bool rex = (code[1] & 0xf0) == 0x40;
 		const unsigned offset = 2 + rex;

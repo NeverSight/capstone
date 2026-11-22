@@ -122,7 +122,7 @@ std::string describe(const cs_insn &insn, uint8_t opcode, uint8_t rex,
 		     uint8_t modrm, const X86SimpleRegister *first,
 		     const X86SimpleRegister *second, bool branch = false,
 		     bool lea = false, bool escaped_pair = false,
-		     uint8_t vex_flags = 0)
+		     uint8_t vex_flags = 0, uint8_t mandatory = 0)
 {
 	const auto &d = *insn.detail;
 	const auto &x = d.x86;
@@ -179,7 +179,9 @@ std::string describe(const cs_insn &insn, uint8_t opcode, uint8_t rex,
 	if (escaped_pair) {
 		rebuilt.x86.opcode[0] = vex_flags ? 0xc5 : 0x0f;
 		rebuilt.x86.opcode[1] = vex_flags ? vex_flags : opcode;
-		rebuilt.x86.encoding.modrm_offset = uint8_t(2 + (rex != 0));
+		rebuilt.x86.encoding.modrm_offset = uint8_t(2 + (rex != 0) + (mandatory != 0));
+		if (mandatory == 0x66)
+			rebuilt.x86.prefix[2] = mandatory;
 	}
 	if (lea) {
 		if (x.op_count != 2 || x.operands[0].type != X86_OP_REG)
@@ -602,7 +604,9 @@ std::string describe_sse_pair(Decoder &decoder, const X86SimpleRegister *regs,
 
 // The ordinary MOV decoder supplies the address for the same ModR/M and SIB.
 bool supports_packed_memory(Decoder &decoder, unsigned opcode, bool reverse,
-			    int selector = -1, std::string *vex_row = nullptr)
+			    int selector = -1,
+			    std::string *memory_row = nullptr,
+			    uint8_t mandatory = 0)
 {
 	const bool vex = selector >= 0;
 	const unsigned width_bytes = vex && (selector & 4) ? 32 : 16;
@@ -625,7 +629,15 @@ bool supports_packed_memory(Decoder &decoder, unsigned opcode, bool reverse,
 						  selector);
 			}
 			const unsigned start = !rex, header = 4 - start;
-			if (!decode_sse(decoder, code + start, header))
+			auto decode_packed = [&](unsigned length) {
+				if (!mandatory)
+					return decode_sse(decoder, code + start,
+							  length);
+				uint8_t encoded[1 + sizeof(code)] = { mandatory };
+				std::memcpy(encoded + 1, code + start, length);
+				return decode_sse(decoder, encoded, length + 1);
+			};
+			if (!decode_packed(header))
 				return false;
 			const cs_insn &insn = *decoder.insn;
 			const auto id = insn.id;
@@ -640,13 +652,14 @@ bool supports_packed_memory(Decoder &decoder, unsigned opcode, bool reverse,
 			    rm_op.size != width_bytes ||
 			    reg_op.type != X86_OP_REG)
 				return false;
-			if (vex) {
+			if (memory_row) {
 				const unsigned first = width_bytes == 32 ?
 							       X86_REG_YMM0 :
 							       X86_REG_XMM0;
 				if (unsigned(reg_op.reg) !=
-					    first + (prefix << 3) + field ||
-				    unsigned(rm_op.reg) != first ||
+					    first + ((rex & 4) << 1) + field ||
+				    unsigned(rm_op.reg) !=
+					    first + ((rex & 1) << 3) ||
 				    reg_op.size != width_bytes)
 					return false;
 			}
@@ -684,23 +697,28 @@ bool supports_packed_memory(Decoder &decoder, unsigned opcode, bool reverse,
 					if (!bracket ||
 					    addr.operands[1].type != X86_OP_MEM)
 						return false;
-					const std::string mem =
-						std::string(
-							width_bytes == 32 ?
-								"ymmword ptr " :
-								"xmmword ptr ") +
-						bracket;
-					const std::string text =
-						reverse ? mem + ", " + reg :
-							  reg + ", " + mem;
-					if (!decode_sse(decoder, code + start,
-							length) ||
-					    insn.id != id ||
-					    mnemonic != insn.mnemonic ||
-					    text != insn.op_str)
+					const std::string address(bracket);
+					if (!decode_packed(length) || insn.id != id ||
+					    mnemonic != insn.mnemonic)
+						return false;
+					const auto &memory = insn.detail->x86.operands[reverse ? 0 : 1];
+					const unsigned width_bytes_mem = mandatory ? memory.size : width_bytes;
+					const char *size_name =
+						width_bytes_mem == 4 ? "dword ptr " :
+						width_bytes_mem == 8 ? "qword ptr " :
+						width_bytes_mem == 16 ? "xmmword ptr " :
+						width_bytes_mem == 32 ? "ymmword ptr " : nullptr;
+					if (memory.type != X86_OP_MEM || !size_name ||
+					    (mandatory && width_bytes_mem > 16))
+						return false;
+					const std::string mem = size_name + address;
+					if ((reverse ? mem + ", " + reg : reg + ", " + mem) != insn.op_str)
 						return false;
 					cs_detail expected = reg_detail;
-					if (vex) {
+					if (memory_row) {
+						if (mandatory)
+							expected.x86.operands[reverse ? 0 : 1].size =
+								uint8_t(width_bytes_mem);
 						/* The memory encoding can have different group membership and
 						 * operand access from the same opcode's register encoding. */
 						std::memcpy(&expected,
@@ -737,12 +755,13 @@ bool supports_packed_memory(Decoder &decoder, unsigned opcode, bool reverse,
 							reg_detail.x86.modrm,
 							&regs[0], &regs[1],
 							false, false, true,
-							code[1]);
+							vex ? code[1] : 0,
+							mandatory);
 						if (fields.empty() ||
-						    (!vex_row->empty() &&
-						     *vex_row != fields))
+						    (!memory_row->empty() &&
+						     *memory_row != fields))
 							return false;
-						*vex_row = fields;
+						*memory_row = fields;
 					}
 					auto &x = expected.x86;
 					auto &op = x.operands[reverse ? 0 : 1];
@@ -758,7 +777,7 @@ bool supports_packed_memory(Decoder &decoder, unsigned opcode, bool reverse,
 						addr.encoding.disp_size;
 					x.encoding.disp_offset =
 						width ? addr.encoding.disp_offset +
-								1 :
+								1 + (mandatory != 0) :
 							0;
 					if (std::memcmp(&expected, insn.detail,
 							offsetof(cs_detail,
@@ -772,17 +791,19 @@ bool supports_packed_memory(Decoder &decoder, unsigned opcode, bool reverse,
 	return true;
 }
 
-void emit_vex64_packed(Decoder &decoder)
+void emit_packed_memory(Decoder &decoder, bool legacy)
 {
 	std::vector<std::string> rows{ "{ { 0 }, false, false }" };
 	unsigned plans[8][256]{};
-	for (unsigned flags = 0; flags < 8; ++flags) {
+	const uint8_t prefixes[] = { 0x66, 0xf2, 0xf3 };
+	const unsigned blocks = legacy ? 3 : 8;
+	for (unsigned flags = 0; flags < blocks; ++flags) {
 		for (unsigned opcode = 0; opcode < 256; ++opcode) {
 			for (bool reverse : { false, true }) {
 				std::string row;
-				if (!supports_packed_memory(decoder, opcode,
-							    reverse, int(flags),
-							    &row))
+				if (!supports_packed_memory(
+					    decoder, opcode, reverse,
+					    legacy ? -1 : int(flags), &row, legacy ? prefixes[flags] : 0))
 					continue;
 				row = "{ " + row +
 				      (reverse ? ", true, true }" :
@@ -797,17 +818,21 @@ void emit_vex64_packed(Decoder &decoder)
 			}
 		}
 	}
-	if (rows.size() > 256 || !plans[0][0x10] || !plans[4][0x29] ||
-	    !plans[5][0x6f])
-		throw std::runtime_error("unexpected packed VEX memory rows");
-	std::cout
-		<< "/* Generated by x86_simple_output.cpp --vex64-packed-memory. */\n"
-		<< "static const struct X86SseRegisterOutput vex64_packed_rows[] = {\n";
+	if (rows.size() > 256 ||
+	    (legacy ? !plans[0][0x58] || !plans[0][0x6f] || !plans[2][0x6f] :
+		    !plans[0][0x10] || !plans[4][0x29] || !plans[5][0x6f]))
+		throw std::runtime_error("unexpected packed memory rows");
+	const char *name = legacy ? "legacy" : "vex64";
+	std::cout << "/* Generated by x86_simple_output.cpp --" << name
+		  << "-packed-memory. */\n"
+		  << "static const struct X86SseRegisterOutput " << name
+		  << "_packed_rows[] = {\n";
 	for (const auto &row : rows)
 		std::cout << '\t' << row << ",\n";
-	std::cout
-		<< "};\nstatic const uint8_t vex64_packed_plans[8][256] = {\n";
-	for (const auto &block : plans) {
+	std::cout << "};\nstatic const uint8_t " << name << "_packed_plans["
+		  << blocks << "][256] = {\n";
+	for (unsigned f = 0; f < blocks; ++f) {
+		const auto &block = plans[f];
 		std::cout << "\t{\n";
 		for (unsigned i = 0; i < 256; i += 16) {
 			std::cout << "\t\t";
@@ -819,7 +844,8 @@ void emit_vex64_packed(Decoder &decoder)
 		std::cout << "\t},\n";
 	}
 	std::cout << "};\n";
-	std::cerr << rows.size() - 1 << " packed 64-bit VEX memory rows\n";
+	std::cerr << rows.size() - 1 << " packed 64-bit " << name
+		  << " memory rows\n";
 }
 
 void emit_sse64_registers(Decoder &decoder)
@@ -1110,7 +1136,7 @@ int main(int argc, char **argv)
 {
 	if (argc == 2 && std::strcmp(argv[1], "--vex64-packed-memory") == 0) {
 		Decoder decoder(CS_MODE_64);
-		emit_vex64_packed(decoder);
+		emit_packed_memory(decoder, false);
 		return 0;
 	}
 	if (argc == 2 && std::strcmp(argv[1], "--indirect64") == 0) {
@@ -1118,6 +1144,11 @@ int main(int argc, char **argv)
 		RegisterTable regs{};
 		describe_registers(decoder, regs);
 		emit_indirect64(decoder, regs);
+		return 0;
+	}
+	if (argc == 2 && std::strcmp(argv[1], "--legacy-packed-memory") == 0) {
+		Decoder decoder(CS_MODE_64);
+		emit_packed_memory(decoder, true);
 		return 0;
 	}
 	if (argc == 2 && std::strcmp(argv[1], "--sse64-registers") == 0) {
@@ -1138,7 +1169,7 @@ int main(int argc, char **argv)
 			    std::strcmp(argv[1], "--extend32") == 0;
 	if (argc != 1 && !indirect && !extend)
 		throw std::runtime_error(
-			"expected no arguments, --sse64-registers, --vex64-packed-memory, --indirect-memory, --indirect64, --extend32 or --extend64");
+			"expected no arguments, --sse64-registers, --vex64-packed-memory, --legacy-packed-memory, --indirect-memory, --indirect64, --extend32 or --extend64");
 	Decoder x86(CS_MODE_32), x64(CS_MODE_64);
 	RegisterTable regs{};
 	describe_registers(x64, regs);
