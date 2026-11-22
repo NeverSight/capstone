@@ -64,6 +64,10 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
 				   x86_simple_registers[3]))
 		return true;
 #endif
+	if (code[0] == 0xc4 &&
+	    X86_writeVexRegisterImmediate(handle, code, size, insn, insn_size,
+					   x86_simple_registers, true))
+		return true;
 	if (size >= 4 && (code[0] == 0x66 || (code[0] & 0xfe) == 0xf2)) {
 		const uint8_t rex = (code[1] & 0xf0) == 0x40 ? code[1] : 0;
 		const unsigned offset = 4 + (rex != 0);

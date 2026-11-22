@@ -969,6 +969,28 @@ static bool check_absolute_addresses32(csh handles[2])
 
 /* Segment, ModR/M, SIB and truncation are compared against the ordinary
  * decoder, including the complete public detail and reused output record. */
+static bool check_vex_register_immediates(csh handles[2], cs_mode mode)
+{
+	const uint8_t opcodes[] = { 0x00, 0x01, 0x14, 0x15, 0x16, 0x17,
+				    0x18, 0x19, 0x38, 0x39, 0xf0 };
+	for (unsigned i = 0; i < sizeof(opcodes); ++i) {
+		for (unsigned bits = 0; bits < 256; ++bits) {
+			const unsigned ext =
+				mode == CS_MODE_32 ? 7 : (bits >> 1) & 7;
+			uint8_t code[] = { 0xc4,
+					   (uint8_t)(ext << 5 | 3),
+					   (uint8_t)bits,
+					   opcodes[i],
+					   (uint8_t)(0xc0 | ((bits ^ i) & 63)),
+					   (uint8_t)(bits * 37) };
+			if (!compare(handles, code, sizeof(code), bits) ||
+			    !compare(handles, code, sizeof(code) - 1, i))
+				return false;
+		}
+	}
+	return true;
+}
+
 static bool check_vex32_register_moves(csh handles[2])
 {
 	for (unsigned flags = 0; flags < 256; ++flags)
@@ -1502,6 +1524,7 @@ static bool check_mode(cs_mode mode)
 		      !check_vex32_register_moves(handles) ||
 		      !check_memory_compares(handles, mode))) ||
 		    !check_alu_memory(handles, mode) ||
+		    !check_vex_register_immediates(handles, mode) ||
 		    (mode == CS_MODE_32 && private_iter != X86_disasmIter &&
 		     (!check_absolute_addresses32(handles) ||
 		      !check_extend32(handles))) ||

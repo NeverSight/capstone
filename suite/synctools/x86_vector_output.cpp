@@ -673,11 +673,17 @@ void emit_vex_rip_loads(Decoder &decoder)
 	std::puts("};");
 }
 
+struct VexRegisterOperand {
+	x86_reg reg;
+	uint8_t size;
+};
+
 std::string checked_vex_registers(Decoder &decoder, const uint8_t *bytes,
 				  unsigned prefix, bool mode32,
 				  unsigned rex_bits, unsigned ll,
 				  const unsigned *numbers, unsigned reg_count,
-				  bool immediate)
+				  bool immediate,
+				  const VexRegisterOperand *selected = nullptr)
 {
 	unsigned id = decoder.decode(bytes, prefix + 2 + immediate);
 	if (!id)
@@ -703,15 +709,24 @@ std::string checked_vex_registers(Decoder &decoder, const uint8_t *bytes,
 	for (unsigned i = 0; i < reg_count; ++i) {
 		auto &op = expected.operands[i];
 		op.type = X86_OP_REG;
-		op.reg = x86_reg((ll ? X86_REG_YMM0 : X86_REG_XMM0) +
-				 numbers[i]);
-		op.size = uint8_t(16 << ll);
+		if (selected) {
+			op.reg = selected[i].reg;
+			op.size = selected[i].size;
+		} else {
+			op.reg = x86_reg((ll ? X86_REG_YMM0 : X86_REG_XMM0) +
+					 numbers[i]);
+			op.size = uint8_t(16 << ll);
+		}
 		op.access = x.operands[i].access;
 		access[i] = unsigned(op.access);
 		if (i)
 			text += ", ";
-		text += ll ? "ymm" : "xmm";
-		text += std::to_string(numbers[i]);
+		if (selected) {
+			text += cs_reg_name(decoder.handle, op.reg);
+		} else {
+			text += ll ? "ymm" : "xmm";
+			text += std::to_string(numbers[i]);
+		}
 	}
 	if (immediate) {
 		const unsigned value = bytes[prefix + 2];
@@ -734,6 +749,193 @@ std::string checked_vex_registers(Decoder &decoder, const uint8_t *bytes,
 	return "{ " + decoder.symbol(id) + ", \"" + insn.mnemonic + "\", " +
 	       std::to_string(detail.groups_count) + ", " + fields(groups) +
 	       ", " + fields(access) + ", " + std::to_string(immediate) + " }";
+}
+
+using VexRegisterBanks = std::array<std::array<x86_reg, 16>, 4>;
+
+VexRegisterBanks vex_register_banks(Decoder &decoder)
+{
+	VexRegisterBanks banks{};
+	for (unsigned reg = 0; reg < 16; ++reg) {
+		banks[0][reg] = x86_reg(X86_REG_XMM0 + reg);
+		banks[1][reg] = x86_reg(X86_REG_YMM0 + reg);
+		for (unsigned wide = 0; wide < 2; ++wide) {
+			uint8_t mov[10] = { uint8_t(0x40 | (wide << 3) |
+						    (reg >> 3)),
+					    uint8_t(0xb8 | (reg & 7)) };
+			if (!decoder.decode(mov, wide ? 10 : 6) ||
+			    decoder.insn->detail->x86.operands[0].type !=
+				    X86_OP_REG)
+				throw std::runtime_error(
+					"missing immediate MOV register");
+			banks[2 + wide][reg] =
+				decoder.insn->detail->x86.operands[0].reg;
+		}
+	}
+	return banks;
+}
+
+using VexImmediateBytes = std::array<uint8_t, 6>;
+
+VexImmediateBytes vex_immediate_bytes(unsigned opcode, unsigned wlpp,
+				      unsigned reg, unsigned src, unsigned rm,
+				      unsigned x, unsigned imm)
+{
+	const unsigned rxb = ((reg >> 3) << 2) | x | (rm >> 3);
+	return { 0xc4,
+		 uint8_t(((7 ^ rxb) << 5) | 3),
+		 uint8_t(((wlpp & 8) << 4) | ((15 ^ src) << 3) | (wlpp & 7)),
+		 uint8_t(opcode),
+		 uint8_t(0xc0 | ((reg & 7) << 3) | (rm & 7)),
+		 uint8_t(imm) };
+}
+
+// A row describes two or three registers plus an unsigned imm8. The source
+// fields (ModR/M.reg, vvvv, ModR/M.r/m) and register classes are independent.
+std::string vex_mixed_immediate_row(Decoder &decoder,
+				    const VexRegisterBanks &banks, bool mode32,
+				    unsigned opcode, unsigned wlpp)
+{
+	constexpr unsigned widths[] = { 16, 32, 4, 8 };
+	unsigned sample_src = 2;
+	auto sample =
+		vex_immediate_bytes(opcode, wlpp, 3, sample_src, 1, 0, 0x80);
+	if (!decoder.decode(sample.data(), sample.size())) {
+		sample_src = 0;
+		sample = vex_immediate_bytes(opcode, wlpp, 3, 0, 1, 0, 0x80);
+		if (!decoder.decode(sample.data(), sample.size()))
+			return {};
+	}
+	const cs_x86 &x = decoder.insn->detail->x86;
+	if (x.op_count < 3 || x.op_count > 4 ||
+	    x.operands[x.op_count - 1].type != X86_OP_IMM)
+		return {};
+	const unsigned reg_count = x.op_count - 1;
+	const std::array<unsigned, 3> numbers = { 3, sample_src, 1 };
+	std::array<unsigned, 3> operands{};
+	bool uses_vvvv = false;
+	for (unsigned i = 0; i < reg_count; ++i) {
+		const cs_x86_op &op = x.operands[i];
+		if (op.type != X86_OP_REG)
+			return {};
+		bool found = false;
+		for (unsigned source = 0; source < numbers.size(); ++source) {
+			for (unsigned bank = 0; bank < banks.size(); ++bank) {
+				if (banks[bank][numbers[source]] == op.reg &&
+				    widths[bank] == op.size) {
+					operands[i] = source * 4 + bank;
+					uses_vvvv |= source == 1;
+					found = true;
+				}
+			}
+		}
+		if (!found)
+			return {};
+	}
+	const auto probe = [&](unsigned reg, unsigned src, unsigned rm,
+			       unsigned xbit, unsigned imm) {
+		const auto bytes = vex_immediate_bytes(opcode, wlpp, reg, src,
+						       rm, xbit, imm);
+		const unsigned rxb = ((reg >> 3) << 2) | xbit | (rm >> 3);
+		const unsigned ids[] = { reg, src, rm };
+		VexRegisterOperand selected[3]{};
+		for (unsigned i = 0; i < reg_count; ++i) {
+			const unsigned bank = operands[i] & 3;
+			selected[i] = { banks[bank][ids[operands[i] >> 2]],
+					uint8_t(widths[bank]) };
+		}
+		return checked_vex_registers(decoder, bytes.data(), 3, mode32,
+					     (wlpp & 8) | rxb, 0, nullptr,
+					     reg_count, true, selected);
+	};
+	const auto row = probe(3, uses_vvvv ? 2 : 0, 1, 0, 0x80);
+	if (row.empty())
+		return {};
+	const unsigned limit = mode32 ? 8 : 16;
+	for (unsigned value = 0; value < 256; ++value)
+		if (probe(limit - 1, uses_vvvv ? limit - 2 : 0, 0, 0, value) !=
+		    row)
+			return {};
+	for (unsigned reg = 0; reg < limit; ++reg)
+		for (unsigned src = 0; src < (uses_vvvv ? limit : 1); ++src)
+			for (unsigned rm = 0; rm < limit; ++rm)
+				for (unsigned xb = 0; xb < (mode32 ? 1 : 3);
+				     xb += 2)
+					if (probe(reg, src, rm, xb,
+						  (31 * reg + 13 * src + rm) &
+							  255) != row)
+						return {};
+	return "{ " + row + ", { " + std::to_string(operands[0]) + ", " +
+	       std::to_string(operands[1]) + ", " +
+	       std::to_string(operands[2]) + " }, " +
+	       std::to_string(reg_count) + ", " +
+	       (uses_vvvv ? "true" : "false") + " }";
+}
+
+void emit_vex_mixed_immediates(Decoder &decoder64)
+{
+	Decoder decoder32(CS_MODE_32);
+	const auto banks = vex_register_banks(decoder64);
+	constexpr unsigned opcodes[] = { 0x00, 0x01, 0x14, 0x15, 0x16, 0x17,
+					 0x18, 0x19, 0x38, 0x39, 0xf0 };
+	using PrefixRows = std::array<unsigned, 16>;
+	std::vector<std::string> rows;
+	std::vector<PrefixRows> prefixes(1);
+	std::array<std::array<unsigned, 256>, 2> plans{};
+	for (unsigned wide = 0; wide < 2; ++wide) {
+		for (auto opcode : opcodes) {
+			PrefixRows p{};
+			for (unsigned key = 0; key < p.size(); ++key) {
+				const auto row = vex_mixed_immediate_row(
+					wide ? decoder64 : decoder32, banks,
+					!wide, opcode, key);
+				if (row.empty())
+					continue;
+				const auto it = std::find(rows.begin(),
+							  rows.end(), row);
+				p[key] = unsigned(it - rows.begin()) + 1;
+				if (it == rows.end())
+					rows.push_back(row);
+			}
+			const auto it =
+				std::find(prefixes.begin(), prefixes.end(), p);
+			plans[wide][opcode] = unsigned(it - prefixes.begin());
+			if (it == prefixes.end())
+				prefixes.push_back(p);
+		}
+	}
+	if (!plans[0][0x38] || !plans[1][0x18] || !plans[1][0xf0] ||
+	    rows.size() > UINT8_MAX || prefixes.size() > UINT8_MAX + 1u)
+		throw std::runtime_error(
+			"unrepresentable VEX register-immediate plans");
+	std::puts(
+		"/* Generated by x86_vector_output.cpp --vex-register-immediates. */");
+	std::puts(
+		"static const struct VexRegisterImmediateRow vex_immediate_rows[] = {");
+	for (const auto &row : rows)
+		std::printf("\t%s,\n", row.c_str());
+	std::puts("};\nstatic const uint8_t vex_immediate_prefixes[][16] = {");
+	for (const auto &p : prefixes) {
+		std::printf("\t{");
+		for (auto x : p)
+			std::printf(" %u,", x);
+		std::puts(" },");
+	}
+	std::puts("};\nstatic const uint8_t vex_immediate_opcodes[2][256] = {");
+	for (const auto &map : plans) {
+		std::puts("\t{");
+		for (unsigned i = 0; i < map.size(); i += 16) {
+			std::printf("\t\t");
+			for (unsigned j = 0; j < 16; ++j)
+				std::printf("%s%u,", j ? " " : "", map[i + j]);
+			std::putchar('\n');
+		}
+		std::puts("\t},");
+	}
+	std::puts("};");
+	std::fprintf(stderr,
+		     "%zu VEX register-immediate rows, %zu prefix plans\n",
+		     rows.size(), prefixes.size() - 1);
 }
 
 // Match ordinary NDS register operands against the complete canonical record.
@@ -1758,6 +1960,11 @@ int main(int argc, char **argv)
 		emit_vex32_memory();
 		return 0;
 	}
+	if (argc == 2 && !std::strcmp(argv[1], "--vex-register-immediates")) {
+		Decoder decoder;
+		emit_vex_mixed_immediates(decoder);
+		return 0;
+	}
 	if (argc == 2 && !std::strcmp(argv[1], "--evex-memory")) {
 		Decoder decoder;
 		std::puts(
@@ -1768,7 +1975,7 @@ int main(int argc, char **argv)
 	const bool scan_only = argc == 2 && !std::strcmp(argv[1], "--evex-scan");
 	if (argc > 1 && !scan_only)
 		throw std::runtime_error(
-			"usage: x86_vector_output [--evex-scan|--evex-memory|--vex32-memory|--rounded-registers64|--evex-shifts]");
+			"usage: x86_vector_output [--evex-scan|--evex-memory|--vex-register-immediates|--vex32-memory|--rounded-registers64|--evex-shifts]");
 	Decoder decoder;
 	std::puts("/* Generated by suite/synctools/x86_vector_output.cpp. */");
 	emit_output(decoder, scan_only);

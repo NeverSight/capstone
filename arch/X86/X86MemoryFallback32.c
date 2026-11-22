@@ -40,6 +40,11 @@ X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
 {
 	const unsigned opcode = code[0];
 	switch (opcode) {
+	case 0xc4:
+		if (X86_writeVexRegisterImmediate(handle, code, size, insn,
+						  insn_size, x86_simple_registers, false))
+			return true;
+		break;
 	case 0xc5:
 		if (size >= 4 && (code[1] & 0xf8) == 0xf8 && code[3] >= 0xc0 &&
 		    (code[2] == 0x6f || code[2] == 0x7f) &&
