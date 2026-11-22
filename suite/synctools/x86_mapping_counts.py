@@ -122,7 +122,16 @@ def generate(directory, suffix):
         "Mapping counts exceed packed widths",
     )
     previous = -1
-    for row in entries(source):
+    rows = entries(source)
+    for index, row in enumerate(rows):
+        if row[2] == "X86_INS_VPCMP":
+            family = re.fullmatch(r"X86_(VPCMPU?[BWDQ])Z\w+", row[1])
+            require(
+                family and index + 1 < len(rows)
+                and rows[index + 1][1] == row[1] + "_alt"
+                and rows[index + 1][2] == "X86_INS_" + family[1],
+                "DIET integer compares require the adjacent typed alternate mapping",
+            )
         name = row[1]
         require(
             name in enum and enum[name] > previous,

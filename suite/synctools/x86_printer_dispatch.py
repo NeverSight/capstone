@@ -240,6 +240,38 @@ def prechecked_writer(text, names, values, paths, quick, indices, sized):
     return result
 
 
+def diet_broadcasts(paths, values, string_mask, strings):
+    """Recover static memory broadcast counts from the canonical printer actions."""
+    kinds = {None: 0, "2": 1, "4": 2, "8": 3, "16": 4}
+    broadcasts = []
+    for path, value in zip(paths, values):
+        offset = (value & string_mask) - 1
+        prefix = strings[offset:strings.index(b"\0", offset)].decode("ascii") if offset >= 0 else ""
+        counts = set(re.findall(r"\{1to(\d+)\}", prefix + "".join(path)))
+        require(len(counts) <= 1 and counts <= kinds.keys(), "Unexpected broadcast decorator")
+        broadcasts.append(kinds[next(iter(counts), None)])
+
+    # A page shared by instructions without broadcast needs just one index.
+    width = 32
+    broadcasts.extend([0] * (-len(broadcasts) % width))
+    pages = {}
+    indices = []
+    for start in range(0, len(broadcasts), width):
+        page = tuple(broadcasts[start:start + width])
+        indices.append(pages.setdefault(page, len(pages)))
+    require(len(pages) <= 256, "DIET broadcast page index overflow")
+    lines = ["static const uint8_t x86_diet_broadcast_pages[][32] = {"]
+    lines.extend("\t{ " + ", ".join(map(str, page)) + " }," for page in pages)
+    lines += ["};", "static const uint8_t x86_diet_broadcast_index[] = {"]
+    lines.extend("\t" + ", ".join(map(str, indices[i:i + 16])) + ","
+                 for i in range(0, len(indices), 16))
+    # Encode the output explicitly, independently of enum numeric values.
+    lines += ["};", "static const x86_avx_bcast x86_diet_broadcast_kinds[] = {",
+              "\tX86_AVX_BCAST_INVALID, X86_AVX_BCAST_2, X86_AVX_BCAST_4,",
+              "\tX86_AVX_BCAST_8, X86_AVX_BCAST_16,", "};", ""]
+    return "\n".join(lines)
+
+
 def generate(text, enum_text):
     # Reuse the original table owner's enum, bounds and packed-bit validation.
     import x86_mnemonic_sizes as mnemonic
@@ -323,6 +355,8 @@ def generate(text, enum_text):
         + f"enum {{ X86_PRINTER_MAX_LENGTH = {maximum} }};\n"
         + "typedef char X86PrinterExtentFits[\n"
         + "    X86_PRINTER_MAX_LENGTH < SSTREAM_BUF_LEN ? 1 : -1];\n"
+        + "#elif defined(CAPSTONE_X86_DIET_BROADCAST)\n"
+        + diet_broadcasts(paths, values, int(sized[1]), mnemonic.string_bytes(text))
         + "#elif defined(CAPSTONE_X86_QUICK_PRINTER_TABLE)\n"
         + table
         + "#elif defined(CAPSTONE_X86_PRECHECKED_PRINT)\n"

@@ -66,6 +66,12 @@ static bool test_broadcast(csh handle)
 		size_t count = cs_disasm(handle, test->code, sizeof(test->code),
 					 0x1000, 1, &insn);
 
+		if (cs_support(CS_SUPPORT_X86_REDUCE)) {
+			success &= check(count == 0,
+					 "reduced table omits EVEX broadcast");
+			cs_free(insn, count);
+			continue;
+		}
 		if (count != 1) {
 			fprintf(stderr,
 				"EVEX public detail check failed (%s): instruction does not decode\n",
@@ -75,8 +81,10 @@ static bool test_broadcast(csh handle)
 		}
 		success &= check(insn[0].id == test->id,
 				 "broadcast instruction ID is exact");
-		success &= check(strstr(insn[0].op_str, test->text) != NULL,
-				 "broadcast is present in operand text");
+		if (!cs_support(CS_SUPPORT_DIET))
+			success &= check(
+				strstr(insn[0].op_str, test->text) != NULL,
+				"broadcast is present in operand text");
 		success &= check(insn[0].detail != NULL,
 				 "broadcast detail is available");
 		if (insn[0].detail != NULL) {
@@ -122,14 +130,21 @@ static bool test_mask_width(csh handle, const uint8_t *code, size_t code_size,
 	bool success = true;
 	size_t count = cs_disasm(handle, code, code_size, 0x1000, 1, &insn);
 
+	if (cs_support(CS_SUPPORT_X86_REDUCE)) {
+		cs_free(insn, count);
+		return check(count == 0, "reduced table omits masked VMOVDQU");
+	}
 	if (!check(count == 1, "masked VMOVDQU decodes"))
 		return false;
 	success &= check(insn[0].id == expected_id,
 			 "masked instruction ID matches its element width");
-	success &= check(strstr(insn[0].op_str, "{k3}") != NULL,
-			 "mask is present in operand text");
-	success &= check((strstr(insn[0].op_str, "{z}") != NULL) == zeroing,
-			 "zeroing text matches EVEX.z");
+	if (!cs_support(CS_SUPPORT_DIET)) {
+		success &= check(strstr(insn[0].op_str, "{k3}") != NULL,
+				 "mask is present in operand text");
+		success &= check((strstr(insn[0].op_str, "{z}") != NULL) ==
+					 zeroing,
+				 "zeroing text matches EVEX.z");
+	}
 	success &= check(insn[0].detail != NULL, "mask detail is available");
 	if (insn[0].detail != NULL) {
 		const cs_x86 *x86 = &insn[0].detail->x86;
@@ -151,16 +166,25 @@ static bool test_mask_width(csh handle, const uint8_t *code, size_t code_size,
 			success &=
 				check(mask->size == expected_width,
 				      "writemask size matches the lane count");
-			success &= check(mask->access == CS_AC_READ,
-					 "writemask is read-only");
+			if (!cs_support(CS_SUPPORT_DIET))
+				success &= check(mask->access == CS_AC_READ,
+						 "writemask is read-only");
 		}
-		success &= check(cs_regs_access(handle, &insn[0], regs_read,
-						&regs_read_count, regs_write,
-						&regs_write_count) == CS_ERR_OK,
-				 "cs_regs_access succeeds for writemask");
-		success &= check(has_register(regs_read, regs_read_count,
-					      X86_REG_K3),
-				 "K3 appears in the read set");
+		const cs_err err = cs_regs_access(handle, &insn[0], regs_read,
+						  &regs_read_count, regs_write,
+						  &regs_write_count);
+		if (cs_support(CS_SUPPORT_DIET)) {
+			success &= check(err == CS_ERR_DIET,
+					 "DIET register-access status");
+		} else {
+			success &=
+				check(err == CS_ERR_OK,
+				      "cs_regs_access succeeds for writemask");
+			success &=
+				check(has_register(regs_read, regs_read_count,
+						   X86_REG_K3),
+				      "K3 appears in the read set");
+		}
 	}
 	cs_free(insn, count);
 	return success;
@@ -207,10 +231,12 @@ int main(void)
 
 	success &= test_broadcast(handle);
 #ifndef CAPSTONE_X86_ATT_DISABLE
-	success &= check(cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
-				 CS_ERR_OK,
-			 "select AT&T syntax");
-	success &= test_broadcast(handle);
+	if (!cs_support(CS_SUPPORT_DIET)) {
+		success &= check(cs_option(handle, CS_OPT_SYNTAX,
+					   CS_OPT_SYNTAX_ATT) == CS_ERR_OK,
+				 "select AT&T syntax");
+		success &= test_broadcast(handle);
+	}
 #endif
 	success &= check(cs_option(handle, CS_OPT_SYNTAX,
 				   CS_OPT_SYNTAX_INTEL) == CS_ERR_OK,

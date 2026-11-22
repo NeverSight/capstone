@@ -12455,6 +12455,23 @@ static void repair_vector_mask_sizes(cs_x86 *x86, const SStream *assembly,
 	if (element_size == 0)
 		element_size =
 			vector_scalar_broadcast_element_size(instruction_id);
+#if defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE)
+	/* DIET has no mnemonic suffix. VMOVDQU uses one mask bit per element. */
+	switch (instruction_id) {
+	case X86_INS_VMOVDQU8:
+		element_size = 1;
+		break;
+	case X86_INS_VMOVDQU16:
+		element_size = 2;
+		break;
+	case X86_INS_VMOVDQU32:
+		element_size = 4;
+		break;
+	case X86_INS_VMOVDQU64:
+		element_size = 8;
+		break;
+	}
+#endif
 	if (element_size == 0)
 		element_size = vector_element_size(mnemonic, &scalar);
 	if (element_size == 0)
@@ -12524,6 +12541,21 @@ static void repair_vfpclass_mask_access(cs_insn *insn)
 	detail->regs_write[detail->regs_write_count++] = destination_reg;
 }
 
+#if defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE)
+#define CAPSTONE_X86_DIET_BROADCAST
+#include "X86GenPrinterQuick.inc"
+#undef CAPSTONE_X86_DIET_BROADCAST
+
+static x86_avx_bcast diet_broadcast(unsigned int opcode)
+{
+	const unsigned int page = opcode / 32;
+	if (page >= ARR_SIZE(x86_diet_broadcast_index))
+		return X86_AVX_BCAST_INVALID;
+	const unsigned int index = x86_diet_broadcast_index[page];
+	return x86_diet_broadcast_kinds[x86_diet_broadcast_pages[index][opcode % 32]];
+}
+#endif
+
 static void repair_avx_broadcast(cs_x86_op *memory, const SStream *assembly)
 {
 	x86_avx_bcast broadcast = X86_AVX_BCAST_INVALID;
@@ -12545,6 +12577,15 @@ static void repair_avx_broadcast(cs_x86_op *memory, const SStream *assembly)
 
 static void repair_vpcmp_id(cs_insn *insn, const SStream *assembly, MCInst *mci)
 {
+#if defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE)
+	/* The alternate mapping for this internal opcode names the integer
+	 * compare family even when the predicate spelling has been omitted. */
+	if (insn->id != X86_INS_VPCMP)
+		return;
+	unsigned int index = find_insn_h(mci->csh, mci->Opcode);
+	insn->id = insns[index + 1].mapid;
+	mci->popcode_adjust = 0;
+#else
 	char mnemonic[CS_MNEMONIC_SIZE] = { 0 };
 	char operands[2] = { 0 };
 	size_t length;
@@ -12588,6 +12629,7 @@ static void repair_vpcmp_id(cs_insn *insn, const SStream *assembly, MCInst *mci)
 			break;
 		}
 	}
+#endif
 }
 
 static void repair_vector_mask_conversion_access(cs_x86 *x86,
@@ -12785,8 +12827,15 @@ void X86_postprinter(csh handle, cs_insn *insn, SStream *mnem, MCInst *mci)
 		if (memory && has_mask)
 			break;
 	}
-	if (memory)
-		repair_avx_broadcast(memory, mnem);
+	if (memory) {
+#if defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE)
+		const x86_avx_bcast broadcast = diet_broadcast(mci->Opcode);
+		if (broadcast != X86_AVX_BCAST_INVALID)
+			memory->avx_bcast = broadcast;
+		else
+#endif
+			repair_avx_broadcast(memory, mnem);
+	}
 	if (has_mask) {
 		uint8_t mask_operand_size =
 			mask_instruction_operand_size(insn->id, x86);

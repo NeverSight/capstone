@@ -24,15 +24,21 @@ static bool test_vpcmp(csh handle, bool expect_detail)
 	size_t count = cs_disasm(handle, code, sizeof(code), 0x1000, 1, &insn);
 	const char *name;
 
+	if (cs_support(CS_SUPPORT_X86_REDUCE)) {
+		cs_free(insn, count);
+		return check(count == 0, "reduced table omits the EVEX compare");
+	}
 	if (!check(count == 1, "instruction decodes"))
 		return false;
-	success &= check(strcmp(insn[0].mnemonic, "vpcmpnled") == 0,
-			 "condition-specific mnemonic is preserved");
+	if (!cs_support(CS_SUPPORT_DIET))
+		success &= check(strcmp(insn[0].mnemonic, "vpcmpnled") == 0,
+				 "condition-specific mnemonic is preserved");
 	success &= check(insn[0].id == X86_INS_VPCMPD,
 			 "public ID identifies the packed dword compare family");
 	name = cs_insn_name(handle, insn[0].id);
-	success &= check(name != NULL && strcmp(name, "vpcmpd") == 0,
-			 "public instruction name is vpcmpd");
+	if (!cs_support(CS_SUPPORT_DIET))
+		success &= check(name != NULL && strcmp(name, "vpcmpd") == 0,
+				 "public instruction name is vpcmpd");
 	success &= check((insn[0].detail != NULL) == expect_detail,
 			 "detail availability matches the option");
 	if (expect_detail && insn[0].detail != NULL) {
@@ -66,10 +72,13 @@ int main(void)
 	}
 	success &= test_vpcmp(handle, true);
 #ifndef CAPSTONE_X86_ATT_DISABLE
-	success &= check(cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
-				 CS_ERR_OK,
-			 "select AT&T syntax");
-	success &= test_vpcmp(handle, true);
+	cs_err err = cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
+	if (cs_support(CS_SUPPORT_DIET))
+		success &= check(err == CS_ERR_DIET, "DIET omits AT&T syntax");
+	else {
+		success &= check(err == CS_ERR_OK, "select AT&T syntax");
+		success &= test_vpcmp(handle, true);
+	}
 #endif
 	cs_close(&handle);
 	return success ? 0 : 1;
