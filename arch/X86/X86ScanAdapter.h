@@ -25,6 +25,12 @@ X86ScanBatchResult X86_scanBatch(csh handle, const uint8_t *code, size_t size,
 				 uint64_t address, uint32_t *output,
 				 size_t capacity);
 
+/* Static batch reader with the X86_scanBatch contract. The handle selects
+ * the 32- or 64-bit primary tables once for each batch. */
+X86ScanBatchResult X86_scanNativeBatch(csh handle, const uint8_t *code,
+				      size_t size, uint64_t address,
+				      uint32_t *output, size_t capacity);
+
 /* Decode a direct near CALL and write its absolute target using the same
  * operand-size and wrapping rules as full operand detail. Returns its length,
  * or zero with target untouched for invalid input or any other instruction.

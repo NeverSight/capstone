@@ -1212,6 +1212,39 @@ static bool check_mov_memory_immediates(csh handles[2], cs_mode mode)
 	return true;
 }
 
+static bool check_primary_batches(csh handle)
+{
+	static const uint8_t code[] = {
+		0xb8, 0xc5, 0xfd, 0x6f, 0xc1, /* VEX-looking bytes in a MOV immediate */
+		0xc5, 0xfd, 0x6f, 0xc1,
+		0xc5, 0xfd, 0x6f, 0x84, 0x25, 0, 0, 0, 0,
+		0x83, 0x6c, 0x24, 0x08, 0xff, /* SUB dword ptr [esp+8],-1 */
+		0x8b, 0x04, 0x2d, 0xc5, 0, 0, 0, /* base-less SIB */
+		0x81, 0xf9, 0xc5, 0xfd, 0x77, 0, /* CMP ECX,imm32 */
+		0xc5, 0xf8, 0x77, 0x90, 0xc5, 0xf0, 0x77
+	};
+	if (cs_option(handle, CS_OPT_DETAIL, CS_OPT_OFF) ||
+	    cs_option(handle, CS_OPT_TEXT, CS_OPT_OFF))
+		return false;
+	for (size_t start = 0; start < sizeof(code); ++start) {
+		for (size_t n = 0; n <= sizeof(code) - start; ++n) {
+			for (size_t cap = 0; cap <= 16; ++cap) {
+				uint32_t a[16], b[16];
+				memset(a, 0xa5, sizeof(a));
+				memcpy(b, a, sizeof(a));
+				X86ScanBatchResult x = X86_scanBatch(
+					handle, code + start, n, UINT64_MAX - 5, a, cap);
+				X86ScanBatchResult y = X86_scanNativeBatch(
+					handle, code + start, n, UINT64_MAX - 5, b, cap);
+				if (x.bytes != y.bytes || x.count != y.count ||
+				    memcmp(a, b, sizeof(a)))
+					return false;
+			}
+		}
+	}
+	return true;
+}
+
 static bool check_mode(cs_mode mode)
 {
 	csh handles[2] = { 0 };
@@ -1289,7 +1322,7 @@ static bool check_mode(cs_mode mode)
 			}
 		}
 	}
-	ok = check_callbacks(handles);
+	ok = check_callbacks(handles) && check_primary_batches(handles[0]);
 done:
 	for (unsigned i = 0; i < 2; ++i)
 		if (handles[i])
