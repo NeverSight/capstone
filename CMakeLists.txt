@@ -478,6 +478,14 @@ if(CAPSTONE_X86_SUPPORT)
     set(CSTOOL_SRC
         ${CSTOOL_SRC}
         cstool/cstool_x86.c)
+    # Only mixed ELF shared-library builds use the scalar post-printer.
+    if(CAPSTONE_BUILD_SHARED_LIBS AND NOT CAPSTONE_BUILD_DIET
+       AND NOT CAPSTONE_X86_REDUCE AND NOT capstone_enabled_architectures STREQUAL "X86"
+       AND CMAKE_EXECUTABLE_FORMAT STREQUAL "ELF" AND CMAKE_C_COMPILER_ID MATCHES "^(Clang|GNU)$")
+        set(capstone_x86_postprinter arch/X86/X86PostPrinter.c)
+        set_property(SOURCE arch/X86/X86Mapping.c ${capstone_x86_postprinter} APPEND
+                     PROPERTY COMPILE_DEFINITIONS CAPSTONE_X86_SHARED_POSTPRINTER)
+    endif()
     set(SOURCES_X86
         arch/X86/X86Disassembler.c
         arch/X86/X86DisassemblerDecoder.c
@@ -485,6 +493,7 @@ if(CAPSTONE_X86_SUPPORT)
         arch/X86/X86IntelInstPrinterPrechecked.c
         arch/X86/X86InstPrinterCommon.c
         arch/X86/X86Mapping.c
+        ${capstone_x86_postprinter}
         arch/X86/X86Module.c
         arch/X86/X86ImmediateOutput.c
         arch/X86/X86MemoryOutput.c

@@ -122,6 +122,17 @@ void X86_build_lookup_tables(cs_struct *h);
 
 void X86_postprinter(csh handle, cs_insn *insn, SStream *mnem, MCInst *mci);
 
+#if defined(CAPSTONE_X86_SHARED_POSTPRINTER) && defined(__ELF__) && defined(__GNUC__)
+#define X86_SEPARATE_POSTPRINTER
+CAPSTONE_INTERNAL void X86_postprinter_full(csh handle, cs_insn *insn,
+					    SStream *mnem, MCInst *mci);
+#endif
+
+/* These opcodes can only need the printed broadcast decorator repaired.
+ * VEX/EVEX, x87 environment and rotate forms take the full repair path. */
+#define X86_ONLY_REPAIRS_BROADCAST(opcode) \
+	(((opcode) & 0xe0) != 0xc0 && (opcode) != 0x62)
+
 static inline bool x86_has_feature(cs_mode mode, int flag)
 {
 	return (mode & flag) == flag;

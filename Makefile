@@ -271,6 +271,14 @@ ifeq (,$(findstring yes,$(CAPSTONE_X86_ATT_DISABLE)))
 endif
 endif
 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86Mapping.o
+ifneq ($(sort $(CAPSTONE_ARCHS)),x86)
+ifeq ($(CAPSTONE_SHARED):$(CAPSTONE_DIET):$(CAPSTONE_X86_REDUCE),yes:no:no)
+ifneq (,$(shell $(CC) $(CPPFLAGS) $(CFLAGS) -dM -E -x c /dev/null 2>/dev/null | grep -w __ELF__))
+	CFLAGS += -DCAPSTONE_X86_SHARED_POSTPRINTER
+	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86PostPrinter.o
+endif
+endif
+endif
 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86Module.o
 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86ImmediateOutput.o
 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86MemoryOutput.o

@@ -12788,7 +12788,11 @@ static void repair_x87_environment_detail(csh handle, cs_insn *insn)
 
 /// The post-printer function. Used to fixup flaws in the disassembly information
 /// of certain instructions.
+#ifdef X86_SEPARATE_POSTPRINTER
+void X86_postprinter_full(csh handle, cs_insn *insn, SStream *mnem, MCInst *mci)
+#else
 void X86_postprinter(csh handle, cs_insn *insn, SStream *mnem, MCInst *mci)
+#endif
 {
 	cs_x86_op *memory = NULL;
 	bool has_mask = false;
@@ -12805,7 +12809,7 @@ void X86_postprinter(csh handle, cs_insn *insn, SStream *mnem, MCInst *mci)
 	/* VEX/EVEX, x87 environments and RCL retain all operand repairs.
 	 * Other encodings can only need the first memory operand's broadcast
 	 * repair, including decorators introduced by a custom formatter. */
-	if ((x86->opcode[0] & 0xe0) != 0xc0 && x86->opcode[0] != 0x62) {
+	if (X86_ONLY_REPAIRS_BROADCAST(x86->opcode[0])) {
 		for (i = 0; i < x86->op_count; ++i) {
 			cs_x86_op *operand = &x86->operands[i];
 			if (operand->type == X86_OP_MEM) {
