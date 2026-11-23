@@ -20,6 +20,13 @@
 #define RISCV_USE_STACK_OPERAND_POSITIONS
 #endif
 
+/* The combined compressed dispatch is profitable in the native AArch64
+ * Clang decoder. Keep the ordinary tables in mixed and DIET builds. */
+#if defined(CAPSTONE_RISCV_ONLY) && !defined(CAPSTONE_DIET) && \
+	defined(__linux__) && defined(__clang__) && defined(__aarch64__)
+#define RISCV_USE_COMPRESSED_DISPATCH
+#endif
+
 void RISCV_init(MCRegisterInfo *MRI);
 
 DecodeStatus RISCV_getInstruction(MCInst *MI, uint16_t *Size,

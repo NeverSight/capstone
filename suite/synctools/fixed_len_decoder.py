@@ -211,7 +211,44 @@ def primary_opcode_mask(nodes):
     return mask
 
 
-def emit(name, nodes, width, w):
+def riscv_compressed_entry(nodes, groups):
+    """Combine the funct3 and quadrant filters when every miss reaches Fail."""
+    root = nodes[0]
+    if root.op != "ExtractField" or root.args != (13, 3):
+        return []
+    majors = groups.get(root.end, [])
+    if {nodes[p].args[0] for p in majors} != set(range(8)):
+        return []
+    fail = nodes[majors[-1]].target
+    if nodes[fail].op != "Fail":
+        return []
+    cases = []
+    for major in majors:
+        quadrant = nodes[nodes[major].end]
+        if quadrant.op != "ExtractField" or quadrant.args != (0, 2):
+            return []
+        filters = groups.get(quadrant.end, [])
+        if not filters or nodes[filters[-1]].target != fail:
+            return []
+        for position in filters:
+            value = nodes[position].args[0]
+            if value >= 4:
+                return []
+            key = (nodes[major].args[0] << 2) | value
+            cases.append(f"\tcase {key}: goto L{nodes[position].end};")
+    # Targets see the same last extracted value as in the two original filters.
+    return [
+        "#ifdef RISCV_USE_COMPRESSED_DISPATCH",
+        "\tCurFieldValue = fieldFromInstruction_2(insn, 0, 2);",
+        "\tswitch ((fieldFromInstruction_2(insn, 13, 3) << 2) | CurFieldValue) {",
+        *cases,
+        f"\tdefault: goto L{fail};",
+        "\t}",
+        "#endif",
+    ]
+
+
+def emit(name, nodes, width, w, compressed=False):
     incoming = {p: set() for p in nodes}
     for p, n in nodes.items():
         for dst in successors(n):
@@ -246,6 +283,7 @@ def emit(name, nodes, width, w):
         "\tunsigned Opc, DecodeIdx;",
         "\tbool DecodeComplete;",
         "\t(void)CurFieldValue;",
+        *(riscv_compressed_entry(nodes, groups) if compressed else []),
         "\tgoto L0;",
     ]
 
@@ -360,7 +398,7 @@ def main():
             ):
                 mask = primary_opcode_mask(nodes)
                 output.append(f"#define {name}_MAJOR_MASK UINT64_C(0x{mask:016x})")
-            output.append(emit(name, nodes, width, w))
+            output.append(emit(name, nodes, width, w, arch == "RISCV" and name == "DecoderTable16"))
             counts.append((name, len(nodes)))
         if arch == "RISCV":
             output.append(

@@ -22,6 +22,36 @@ static DecodeStatus direct_DecoderTable16(MCInst *MI, uint16_t insn, uint64_t Ad
 	unsigned Opc, DecodeIdx;
 	bool DecodeComplete;
 	(void)CurFieldValue;
+#ifdef RISCV_USE_COMPRESSED_DISPATCH
+	CurFieldValue = fieldFromInstruction_2(insn, 0, 2);
+	switch ((fieldFromInstruction_2(insn, 13, 3) << 2) | CurFieldValue) {
+	case 0: goto L16;
+	case 1: goto L46;
+	case 2: goto L115;
+	case 4: goto L176;
+	case 5: goto L190;
+	case 6: goto L204;
+	case 8: goto L226;
+	case 9: goto L240;
+	case 10: goto L270;
+	case 12: goto L292;
+	case 13: goto L306;
+	case 14: goto L472;
+	case 16: goto L494;
+	case 17: goto L587;
+	case 18: goto L913;
+	case 20: goto L1037;
+	case 21: goto L1051;
+	case 22: goto L1065;
+	case 24: goto L1087;
+	case 25: goto L1101;
+	case 26: goto L1115;
+	case 28: goto L1137;
+	case 29: goto L1151;
+	case 30: goto L1165;
+	default: goto L1174;
+	}
+#endif
 	goto L0;
 L0:;
 	CurFieldValue = fieldFromInstruction_2(insn, 13, 3);

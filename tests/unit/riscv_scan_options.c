@@ -3,6 +3,44 @@
 #include <capstone/capstone.h>
 #include <string.h>
 
+/* Disable the scan specialization on the reference handle by requesting
+ * detail. Compare instruction identity and boundaries for every halfword. */
+static bool checkCompressed(cs_mode mode)
+{
+	csh scan, reference;
+	if (cs_open(CS_ARCH_RISCV, mode, &scan) != CS_ERR_OK)
+		return false;
+	if (cs_open(CS_ARCH_RISCV, mode, &reference) != CS_ERR_OK) {
+		cs_close(&scan);
+		return false;
+	}
+	cs_option(scan, CS_OPT_TEXT, CS_OPT_OFF);
+	cs_option(reference, CS_OPT_TEXT, CS_OPT_OFF);
+	cs_option(reference, CS_OPT_DETAIL, CS_OPT_ON);
+	cs_insn *a = cs_malloc(scan), *b = cs_malloc(reference);
+	bool ok = a && b;
+	for (unsigned bits = 0; ok && bits <= UINT16_MAX; ++bits) {
+		if ((bits & 3) == 3)
+			continue;
+		const uint8_t raw[] = { (uint8_t)bits, (uint8_t)(bits >> 8) };
+		const uint8_t *p = raw, *q = raw;
+		size_t n = 2, m = 2;
+		uint64_t pc = 0xfffe, ip = pc;
+		const bool x = cs_disasm_iter(scan, &p, &n, &pc, a);
+		const bool y = cs_disasm_iter(reference, &q, &m, &ip, b);
+		ok = x == y && n == m && p == q && pc == ip &&
+		     (!x || (a->id == b->id && a->size == b->size &&
+			     memcmp(a->bytes, b->bytes, 2) == 0));
+	}
+	if (a)
+		cs_free(a, 1);
+	if (b)
+		cs_free(b, 1);
+	cs_close(&scan);
+	cs_close(&reference);
+	return ok;
+}
+
 int main(void)
 {
 	static const unsigned ids[] = {
@@ -50,6 +88,10 @@ int main(void)
 			}
 		}
 	}
+	const unsigned extensions = CS_MODE_RISCV_C | CS_MODE_RISCV_FD |
+				    CS_MODE_RISCV_ZICFISS | CS_MODE_RISCV_ZCMP_ZCMT_ZCE;
+	ok &= checkCompressed((cs_mode)(CS_MODE_RISCV32 | extensions));
+	ok &= checkCompressed((cs_mode)(CS_MODE_RISCV64 | extensions));
 	cs_free(insn, 1);
 	cs_close(&h);
 	return ok ? 0 : 1;
