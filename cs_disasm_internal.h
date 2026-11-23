@@ -18,6 +18,11 @@
  * the compiler can combine scan and output state without an extra boundary.
  * Otherwise cs.c instantiates the same iterator. Input validation, option
  * selection and callbacks keep their original order. */
+#ifdef CAPSTONE_X86_PUBLIC_OUTPUT
+CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+X86_decodePublicRecord(cs_struct *handle, const uint8_t *code, size_t size,
+		       cs_insn *insn, uint16_t *insn_size, bool batch);
+#endif
 CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
 cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
 		    cs_insn *insn, uint16_t *insn_size, bool batch);

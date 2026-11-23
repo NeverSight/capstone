@@ -373,6 +373,77 @@ static bool test_x86_scan_option_transition(void)
 	return success;
 }
 
+static bool test_x86_iter_changes_mode(void)
+{
+	/* In 64-bit mode 48 is REX.W. In 16/32-bit modes it decrements AX/EAX. */
+	static const uint8_t code[] = { 0x48, 0x89, 0xc1 };
+	static const struct {
+		cs_mode mode;
+		cs_err option_result;
+		bool text;
+		unsigned size;
+		x86_reg destination;
+	} steps[] = {
+		{ CS_MODE_32, CS_ERR_OK, true, 1, X86_REG_EAX },
+		{ CS_MODE_64, CS_ERR_OK, true, 3, X86_REG_RCX },
+		{ CS_MODE_32 | CS_MODE_X86_INTEL | CS_MODE_X86_AMD,
+		  CS_ERR_OPTION, true, 3, X86_REG_RCX },
+		{ CS_MODE_16, CS_ERR_OK, true, 1, X86_REG_AX },
+		{ CS_MODE_64 | CS_MODE_X86_AMD, CS_ERR_OK, false, 3, X86_REG_RCX },
+		{ CS_MODE_64 | CS_MODE_X86_INTEL, CS_ERR_OK, true, 3, X86_REG_RCX },
+		{ CS_MODE_32, CS_ERR_OK, false, 1, X86_REG_EAX },
+		{ CS_MODE_32, CS_ERR_OK, true, 1, X86_REG_EAX },
+	};
+	csh handle;
+	if (!check(cs_open(CS_ARCH_X86, CS_MODE_16, &handle) == CS_ERR_OK,
+		   "open mode-transition decoder"))
+		return false;
+	cs_option(handle, CS_OPT_DETAIL, CS_OPT_ON);
+	cs_insn *insn = cs_malloc(handle);
+	if (!check(insn != NULL, "allocate mode-transition instruction")) {
+		cs_close(&handle);
+		return false;
+	}
+	const bool diet = cs_support(CS_SUPPORT_DIET);
+	bool success = true;
+	for (size_t i = 0; i < sizeof(steps) / sizeof(steps[0]); ++i) {
+		const uint8_t *cursor = code;
+		size_t left = sizeof(code);
+		uint64_t address = 0x1000;
+		success &= check(cs_option(handle, CS_OPT_TEXT,
+					   steps[i].text ? CS_OPT_ON : CS_OPT_OFF) ==
+					 CS_ERR_OK,
+				 "change text on the retained handle");
+		success &= check(cs_option(handle, CS_OPT_MODE, steps[i].mode) ==
+					 steps[i].option_result,
+				 "accept a mode or retain the previous mode");
+		if (!check(cs_disasm_iter(handle, &cursor, &left, &address, insn),
+			   "decode after option changes")) {
+			success = false;
+			break;
+		}
+		const bool mov = steps[i].size == 3;
+		success &= check(insn->id == (mov ? X86_INS_MOV : X86_INS_DEC) &&
+					 insn->size == steps[i].size &&
+					 cursor == code + steps[i].size &&
+					 left == sizeof(code) - steps[i].size &&
+					 address == 0x1000 + steps[i].size,
+				 "use the current mode and advance by its length");
+		success &= check(strcmp(insn->mnemonic, steps[i].text && !diet ?
+							      (mov ? "mov" : "dec") : "") == 0,
+				 "use the current text option");
+		const cs_x86 *x86 = &insn->detail->x86;
+		success &= check(steps[i].text ?
+					 (x86->op_count == (mov ? 2 : 1) &&
+					  x86->operands[0].reg == steps[i].destination) :
+					 x86->op_count == 0,
+				 "use the current operand width and detail policy");
+	}
+	cs_free(insn, 1);
+	cs_close(&handle);
+	return success;
+}
+
 static bool test_x86_scan_mode_priority(void)
 {
 	/* Feature routing uses the 64-bit flag; decoding preserves the existing
@@ -556,6 +627,7 @@ int main(void)
 		success &= test_x86();
 	success &= test_x86_scan_validation();
 	success &= test_x86_scan_option_transition();
+	success &= test_x86_iter_changes_mode();
 	success &= test_x86_scan_mode_priority();
 	success &= test_x86_scan_size_prefixes();
 	success &= test_aarch64();

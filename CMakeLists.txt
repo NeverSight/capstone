@@ -1038,27 +1038,36 @@ set(ALL_HEADERS
 set_property(GLOBAL PROPERTY VERSION ${PROJECT_VERSION})
 
 ## targets
+add_library(capstone_build_settings INTERFACE)
 add_library(capstone OBJECT ${ALL_SOURCES} ${ALL_HEADERS})
+target_link_libraries(capstone PUBLIC capstone_build_settings)
 set_property(TARGET capstone PROPERTY C_STANDARD 99)
-target_include_directories(capstone PUBLIC
+target_include_directories(capstone_build_settings INTERFACE
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
 )
 set_property(TARGET capstone PROPERTY POSITION_INDEPENDENT_CODE ON)
 
-# The i386 iterator is an internal static-link entry used by NeverD.
-if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST))
+# The x86-only public iterator uses the fixed-mode readers in both library forms.
+if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST OR capstone_enabled_architectures STREQUAL "X86"))
     add_library(capstone_x86_iter32 OBJECT arch/X86/X86Vex32Output.c)
-    target_link_libraries(capstone_x86_iter32 PRIVATE capstone)
+    target_link_libraries(capstone_x86_iter32 PRIVATE capstone_build_settings)
     set_target_properties(capstone_x86_iter32 PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
     add_library(capstone_x86_iter64 OBJECT arch/X86/X86Sse64Output.c)
-    target_link_libraries(capstone_x86_iter64 PRIVATE capstone)
+    target_link_libraries(capstone_x86_iter64 PRIVATE capstone_build_settings)
     if(CAPSTONE_X86_NEAR_INDIRECT_OUTPUT)
         target_compile_definitions(capstone_x86_iter64 PRIVATE CAPSTONE_X86_NEAR_INDIRECT_OUTPUT)
     endif()
     set_target_properties(capstone_x86_iter64 PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
     add_library(capstone_x86_native OBJECT arch/X86/X86MemoryFallback32.c arch/X86/X86BatchScan.c arch/X86/X86VectorFallback64.c arch/X86/X86VexRegisterImmediate.c arch/X86/X86PlainEvexOutput.c arch/X86/X86RegisterFallback32.c)
-    target_link_libraries(capstone_x86_native PRIVATE capstone)
+    target_link_libraries(capstone_x86_native PRIVATE capstone_build_settings)
     set_target_properties(capstone_x86_native PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
+    if(capstone_enabled_architectures STREQUAL "X86")
+        target_sources(capstone_x86_native PRIVATE arch/X86/X86PublicOutput.c)
+        set(capstone_x86_objects
+            $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>
+            $<TARGET_OBJECTS:capstone_x86_native>)
+        target_sources(capstone INTERFACE ${capstone_x86_objects})
+    endif()
 endif()
 
 if(CAPSTONE_BUILD_STATIC_LIBS)
@@ -1094,7 +1103,7 @@ if(CAPSTONE_BUILD_STATIC_LIBS)
 endif()
 
 if(CAPSTONE_BUILD_SHARED_LIBS)
-    add_library(capstone_shared SHARED $<TARGET_OBJECTS:capstone>)
+    add_library(capstone_shared SHARED $<TARGET_OBJECTS:capstone> ${capstone_x86_objects})
     # Use normal capstone name. Otherwise we get libcapstone_shared.so
     set_target_properties(capstone_shared PROPERTIES OUTPUT_NAME "capstone")
     set_target_properties(capstone_shared PROPERTIES
@@ -1104,7 +1113,7 @@ if(CAPSTONE_BUILD_SHARED_LIBS)
     target_include_directories(capstone_shared PUBLIC
         $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
     )
-    target_compile_definitions(capstone PUBLIC CAPSTONE_SHARED)
+    target_compile_definitions(capstone_build_settings INTERFACE CAPSTONE_SHARED)
     # Build pdb file for dll on Windows
     if(MSVC)
         message("Enabling PDB for Windows")

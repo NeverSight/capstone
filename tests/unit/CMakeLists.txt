@@ -208,7 +208,7 @@ foreach(TSRC ${UNIT_TEST_SOURCES})
     add_test(NAME "unit_${TBIN}" COMMAND ${TBIN})
 endforeach()
 
-if(TARGET x86_simple_output)
+if(TARGET x86_simple_output AND NOT capstone_enabled_architectures STREQUAL "X86")
     target_sources(x86_simple_output PRIVATE $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64> $<TARGET_OBJECTS:capstone_x86_native>)
 endif()
 

@@ -3753,9 +3753,15 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
 					  cs_insn *insn, uint16_t *insn_size,
 					  bool batch);
 
+#ifdef CAPSTONE_X86_PUBLIC_OUTPUT
+#define CS_DECODE_OUTPUT_MISS X86_decodePublicRecord
+#endif
 #define CS_DECODE_SCAN_IMPL decodeIteratorScan
 #include "../../cs_disasm_internal.h"
 #undef CS_DECODE_SCAN_IMPL
+#ifdef CS_DECODE_OUTPUT_MISS
+#undef CS_DECODE_OUTPUT_MISS
+#endif
 
 /* Keep the admitted terminal's public ID and zero alias adjustment visible
  * through output completion. Cold helpers can take the fallback result's
