@@ -93,6 +93,14 @@
 #define CS_PRIVATE_DECODER LoongArch_getInstruction
 #define CS_PRIVATE_PRINTER LoongArch_printer
 #define CS_KNOWN_PRINTER_EXTENT
+#elif defined(CAPSTONE_SPARC_ONLY) && !defined(CAPSTONE_DIET) && \
+	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
+	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
+#include "arch/Sparc/SparcMapping.h"
+#define CS_PRIVATE_ARCH CS_ARCH_SPARC
+#define CS_PRIVATE_DECODER Sparc_getInstruction
+#define CS_PRIVATE_PRINTER Sparc_printer
+#define CS_KNOWN_PRINTER_EXTENT
 #endif
 #include "arch/TMS320C64x/TMS320C64xModule.h"
 #include "arch/TriCore/TriCoreModule.h"

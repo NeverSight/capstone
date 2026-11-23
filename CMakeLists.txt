@@ -174,6 +174,10 @@ if(capstone_enabled_architectures STREQUAL "SYSTEMZ")
     add_compile_definitions(CAPSTONE_SYSTEMZ_DEDICATED_MAPPING)
 endif()
 
+if(capstone_enabled_architectures STREQUAL "SPARC")
+    add_compile_definitions(CAPSTONE_SPARC_ONLY)
+endif()
+
 if(capstone_enabled_architectures STREQUAL "LOONGARCH")
     add_compile_definitions(CAPSTONE_LOONGARCH_DEDICATED_MAPPING)
 endif()
