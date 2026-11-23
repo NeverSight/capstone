@@ -803,3 +803,7 @@ bool RISCV_LLVM_getInstruction(csh handle, const uint8_t *Bytes, size_t ByteLen,
 
 	return ret != MCDisassembler_Fail;
 }
+
+#ifdef CAPSTONE_RISCV_ONLY
+#include "RISCVScan.h"
+#endif

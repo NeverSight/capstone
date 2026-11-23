@@ -42,6 +42,9 @@ cs_err RISCV_option(cs_struct *handle, cs_opt_type type, size_t value)
 		handle->syntax |= (int)value;
 	} else if (type == CS_OPT_MODE) {
 		handle->mode = (cs_mode)value;
+#ifdef CAPSTONE_RISCV_ONLY
+		RISCV_selectScanDecoder(handle);
+#endif
 	}
 
 	return CS_ERR_OK;

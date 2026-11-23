@@ -187,7 +187,7 @@ if(capstone_enabled_architectures STREQUAL "PPC")
 endif()
 
 if(capstone_enabled_architectures STREQUAL "RISCV")
-    add_compile_definitions(CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS)
+    add_compile_definitions(CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS CAPSTONE_RISCV_ONLY)
     # Fixed-width implicit counts improve detailed decoding in this configuration.
     if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_C_COMPILER_ID STREQUAL "Clang"
        AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")

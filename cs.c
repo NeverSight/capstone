@@ -1375,6 +1375,9 @@ cs_err CAPSTONE_API cs_option(csh ud, cs_opt_type type, uintptr_t value)
 #ifdef CAPSTONE_MIPS_SCAN_BY_OPTION
 		Mips_selectScanDecoder(handle);
 #endif
+#ifdef CAPSTONE_RISCV_ONLY
+		RISCV_selectScanDecoder(handle);
+#endif
 		return CS_ERR_OK;
 
 	case CS_OPT_DETAIL:
@@ -1386,6 +1389,9 @@ cs_err CAPSTONE_API cs_option(csh ud, cs_opt_type type, uintptr_t value)
 			handle->detail_opt |= (cs_opt_value)value;
 #ifdef CAPSTONE_MIPS_SCAN_BY_OPTION
 		Mips_selectScanDecoder(handle);
+#endif
+#ifdef CAPSTONE_RISCV_ONLY
+		RISCV_selectScanDecoder(handle);
 #endif
 		return CS_ERR_OK;
 

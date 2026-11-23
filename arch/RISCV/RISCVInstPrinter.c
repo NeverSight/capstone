@@ -407,6 +407,22 @@ void printVMaskReg(MCInst *MI, unsigned OpNo, SStream *O)
 	SStream_concat0(O, ".t");
 }
 
+#ifdef CAPSTONE_RISCV_ONLY
+#include "RISCVGenExpandedAlias.inc"
+#endif
+
+static inline bool printOriginalAlias(MCInst *MI, bool expanded, SStream *O)
+{
+#ifdef CAPSTONE_RISCV_ONLY
+	/* An expanded instruction can still have its own higher-priority alias. */
+	if (expanded && !expandedOpcodeHasOwnAlias(MCInst_getOpcode(MI)))
+		return false;
+#else
+	(void)expanded;
+#endif
+	return printAliasInstr(MI, MI->address, O);
+}
+
 void RISCV_LLVM_printInstruction(MCInst *MI, SStream *O,
 				 void * /* MCRegisterInfo* */ info)
 {
@@ -418,14 +434,21 @@ void RISCV_LLVM_printInstruction(MCInst *MI, SStream *O,
 	MI->flat_insn->usesAliasDetails = usesAliasDetails;
 
 	MCInst Uncompressed;
-	MCInst_InitStorage(&Uncompressed, MI->csh->arch, false);
+#ifdef CAPSTONE_RISCV_ONLY
+	/* Only the 16-bit decoder can produce an opcode with an expansion. */
+	const bool can_expand = MI->flat_insn->size == 2;
+#else
+	const bool can_expand = true;
+#endif
+	if (can_expand)
+		MCInst_InitStorage(&Uncompressed, MI->csh->arch, false);
 	MCInst *MIUncompressed = MI;
 	bool is_uncompressed = false;
 
 	bool textReal = isRealSyntax(MI);
 	bool detailReal = isRealDetail(MI);
 
-	if (!textReal || (detail_is_set(MI) && !detailReal)) {
+	if (can_expand && (!textReal || (detail_is_set(MI) && !detailReal))) {
 		// Side-effectful check for compressed instructions that also creates the equivalent
 		// uncompressed instruction in case of returning true
 		// False means no side effect happened
@@ -449,7 +472,7 @@ void RISCV_LLVM_printInstruction(MCInst *MI, SStream *O,
 		} else {
 			// Side-effectful check for alias instructions that prints to the SStream if it returns true
 			// False means no printing to stream happened
-			if (printAliasInstr(MI, MI->address, O)) {
+			if (printOriginalAlias(MI, is_uncompressed, O)) {
 				MCInst_setIsAlias(MI, true);
 			} else { // the instruction is not an alias
 				if (!is_uncompressed) {
@@ -487,7 +510,7 @@ void RISCV_LLVM_printInstruction(MCInst *MI, SStream *O,
 		} else if (isUncompressedRealDetail(MI)) {
 			printInstruction(MIUncompressed,
 					 MIUncompressed->address, O);
-		} else if (!printAliasInstr(MI, MI->address, O)) {
+		} else if (!printOriginalAlias(MI, is_uncompressed, O)) {
 			if (!is_uncompressed) {
 				printInstruction(MI, MI->address, O);
 			} else if (!printAliasInstr(MIUncompressed,
