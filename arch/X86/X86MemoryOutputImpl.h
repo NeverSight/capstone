@@ -70,7 +70,8 @@ bool X86_writeMemoryOutput(
 		const unsigned index_reg = ((rex & 2) << 2) |
 					   ((encoding >> 3) & 7);
 		base_reg = encoding & 7;
-#ifdef X86_SEGMENT_LEA32
+#if defined(X86_SEGMENT_LEA32) || \
+	(defined(X86_MEMORY32_OUTPUT) && defined(CAPSTONE_X86_ONLY))
 		/* A scale-one SIB without an index names only its base. */
 		if ((!mod && base_reg == 5) ||
 		    (index_reg == 4 && (encoding >> 6) != 0))
