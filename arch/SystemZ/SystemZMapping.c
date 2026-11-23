@@ -39,8 +39,12 @@ const insn_map systemz_insns[] = {
 #include "SystemZGenCSMappingInsn.inc"
 };
 
+#if defined(CAPSTONE_SYSTEMZ_DEDICATED_MAPPING) && !defined(CAPSTONE_DIET)
+static inline void mapSystemZInstruction(MCInst *MI, bool initialize_detail)
+#else
 void SystemZ_set_instr_map_data(MCInst *MI, const uint8_t *Bytes,
 				size_t BytesLen)
+#endif
 {
 #ifdef CAPSTONE_SYSTEMZ_DEDICATED_MAPPING
 	/* The generated opcode row also owns the implicit effects and format. */
@@ -48,6 +52,10 @@ void SystemZ_set_instr_map_data(MCInst *MI, const uint8_t *Bytes,
 	MI->flat_insn->id = row->mapid;
 	if (!MI->flat_insn->detail)
 		return;
+#ifndef CAPSTONE_DIET
+	if (initialize_detail)
+		SystemZ_init_cs_detail(MI);
+#endif
 #else
 	map_cs_id(MI, systemz_insns, ARR_SIZE(systemz_insns));
 #endif
@@ -64,6 +72,14 @@ void SystemZ_set_instr_map_data(MCInst *MI, const uint8_t *Bytes,
 	}
 #endif
 }
+
+#if defined(CAPSTONE_SYSTEMZ_DEDICATED_MAPPING) && !defined(CAPSTONE_DIET)
+void SystemZ_set_instr_map_data(MCInst *MI, const uint8_t *Bytes,
+				size_t BytesLen)
+{
+	mapSystemZInstruction(MI, false);
+}
+#endif
 
 void SystemZ_init_mri(MCRegisterInfo *MRI)
 {
@@ -105,11 +121,18 @@ bool SystemZ_getInstruction(csh handle, const uint8_t *bytes, size_t bytes_len,
 			    MCInst *MI, uint16_t *size, uint64_t address,
 			    void *info)
 {
+#if !defined(CAPSTONE_SYSTEMZ_DEDICATED_MAPPING) || defined(CAPSTONE_DIET)
 	SystemZ_init_cs_detail(MI);
+#endif
 	MI->MRI = (MCRegisterInfo *)info;
 	DecodeStatus Result = SystemZ_LLVM_getInstruction(
 		handle, bytes, bytes_len, MI, size, address, info);
+#if defined(CAPSTONE_SYSTEMZ_DEDICATED_MAPPING) && !defined(CAPSTONE_DIET)
+	/* The decoder writes MCInst. Initialize public details with the mapping. */
+	mapSystemZInstruction(MI, true);
+#else
 	SystemZ_set_instr_map_data(MI, bytes, bytes_len);
+#endif
 	if (Result == MCDisassembler_SoftFail) {
 		MCInst_setSoftFail(MI);
 	}
