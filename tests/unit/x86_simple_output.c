@@ -705,6 +705,21 @@ static bool check_push_memory(csh handles[2], cs_mode mode)
 	return true;
 }
 
+static bool check_masked_byte_moves(csh handles[2])
+{
+	static const uint8_t forms[][11] = {
+		{ 0x62, 0xf1, 0x7f, 0xc9, 0x6f, 0xc0 },
+		{ 0x62, 0xd1, 0x7f, 0x49, 0x6f, 0x57, 1 },
+		{ 0x62, 0xa1, 0x7f, 0xa9, 0x6f, 0x5c, 0x19, 2 },
+		{ 0x62, 0x91, 0x7f, 0x0f, 0x7f, 0x5c, 0x1a, 4 },
+	};
+	for (unsigned i = 0; i < sizeof(forms) / sizeof(forms[0]); ++i)
+		for (size_t n = 0; n <= sizeof(forms[i]); ++n)
+			if (!compare(handles, forms[i], n, i))
+				return false;
+	return true;
+}
+
 static bool check_vex_clear(csh handles[2])
 {
 	for (unsigned flags = 0; flags < 256; ++flags) {
@@ -1610,6 +1625,7 @@ static bool check_mode(cs_mode mode)
 		      (private_iter == X86_disasmIterText &&
 		       (!check_plain_evex_registers(handles) ||
 			!check_evex_immediate_shifts(handles) ||
+			!check_masked_byte_moves(handles) ||
 			!check_vex_clear(handles) ||
 			!check_sse_base_memory(handles) ||
 			!check_legacy_register_immediates(handles) ||

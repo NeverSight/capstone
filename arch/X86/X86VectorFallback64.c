@@ -86,6 +86,69 @@ static bool writeLegacyRegisterImmediate(const uint8_t *code, cs_insn *insn,
 	return true;
 }
 
+/* This writer belongs to the private mixed-library reader. In dedicated
+ * builds the public iterator shares the same fallback object. */
+#ifndef CAPSTONE_X86_PUBLIC_OUTPUT
+/* VMOVDQU8 keeps the unmasked transfer's address, length and operands.
+ * Insert the writemask after its destination. Only a register destination
+ * can request zeroing or read through the mask. */
+static bool writeMaskedByteMove(cs_struct *handle, const uint8_t *code,
+				size_t size, cs_insn *insn, uint16_t *insn_size)
+{
+	const unsigned mask = code[3] & 7, ll = (code[3] >> 5) & 3;
+	const bool zero = (code[3] & 0x80) != 0;
+	const bool memory = code[5] < 0xc0, store = code[4] == 0x7f;
+	if (!mask || ll == 3 || (code[1] & 15) != 1 || code[2] != 0x7f ||
+	    (code[3] & 0x18) != 8 || (store && (!memory || zero)) ||
+	    X86_OUTPUT_UNSUPPORTED(handle, false))
+		return false;
+	/* The longest transfer uses a SIB and a four-byte displacement. */
+	uint8_t plain[11];
+	const size_t available = memory ? MIN(size, sizeof(plain)) : 6;
+	memcpy(plain, code, available);
+	plain[3] &= 0x78;
+	if (memory) {
+#ifdef CAPSTONE_X86_EVEX_MEMORY_OUTPUT
+		if (!X86_writeEvexMemoryOutput(plain, available, insn, insn_size,
+					       x86_simple_registers[3]) &&
+		    !writeIndexedEvexMemory(plain, available, insn, insn_size,
+					    x86_simple_registers[3]))
+			return false;
+#else
+		return false;
+#endif
+	} else if (!X86_writePlainEvexRegisters(handle, plain, available, insn,
+						insn_size)) {
+		return false;
+	}
+	insn->bytes[3] = code[3];
+	/* The underlying writer emitted exactly two operands. Their longest
+	 * address and vector name leave room for both decorators. */
+	char *comma = strchr(insn->op_str, ',');
+	memmove(comma + (zero ? 9 : 5), comma, strlen(comma) + 1);
+	memcpy(comma, " {k0}", 5);
+	comma[3] = (char)('0' + mask);
+	if (zero)
+		memcpy(comma + 5, " {z}", 4);
+	if (insn->detail) {
+		cs_x86 *x = &insn->detail->x86;
+		x->opcode[3] = code[3];
+		x->operands[2] = x->operands[1];
+		cs_x86_op *k = &x->operands[1];
+		memset(k, 0, sizeof(*k));
+		k->type = X86_OP_REG;
+		k->reg = (x86_reg)(X86_REG_K0 + mask);
+		k->size = (uint8_t)(2u << ll);
+		k->access = CS_AC_READ;
+		k->avx_zero_opmask = zero;
+		x->op_count = 3;
+		if (!store && !zero)
+			x->operands[0].access = (cs_ac_type)(CS_AC_READ | CS_AC_WRITE);
+	}
+	return true;
+}
+#endif
+
 /* The fixed-width AMD64 iterator has already tried its common records. */
 CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
 X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
@@ -121,6 +184,12 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
 	if (size >= 6 && code[0] == 0x62 && code[5] >= 0xc0 &&
 	    X86_writePlainEvexRegisters(handle, code, size, insn, insn_size))
 		return true;
+#ifndef CAPSTONE_X86_PUBLIC_OUTPUT
+	if (size >= 6 && code[0] == 0x62 && (code[3] & 7) &&
+	    (code[4] | 0x10) == 0x7f &&
+	    writeMaskedByteMove(handle, code, size, insn, insn_size))
+		return true;
+#endif
 	if (size >= 10 && code[0] == 0x62 && (code[5] & 0xc7) == 5 &&
 	    X86_writeEvexRipMemory(handle, code, insn, insn_size))
 		return true;
