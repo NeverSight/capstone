@@ -476,6 +476,16 @@ static bool check_evex(csh handles[2])
 
 static bool check_vex_indexed(csh handles[2])
 {
+	const uint8_t base_shapes[][9] = {
+		{ 0xc5, 0xdd, 0xfe, 0x22 },
+		{ 0xc4, 0x42, 0xed, 0xa8, 0x45, 0xf6 },
+		{ 0xc4, 0x42, 0xed, 0xa8, 0x85, 0x00, 0x00, 0x00, 0x80 },
+	};
+	const unsigned lengths[] = { 4, 6, 9 };
+	for (unsigned i = 0; i < ARR_SIZE(base_shapes); ++i)
+		for (unsigned n = 1; n <= lengths[i]; ++n)
+			if (!compare(handles, base_shapes[i], n, n))
+				return false;
 	for (unsigned fma = 0; fma < 2; ++fma)
 		for (unsigned p = 0; p < (fma ? 128u : 4u); ++p)
 			for (unsigned m = 0; m < 16; ++m)

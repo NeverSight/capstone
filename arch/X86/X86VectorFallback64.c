@@ -27,6 +27,9 @@
 #endif
 
 #include "X86GenSimpleOutput.inc"
+#ifdef CAPSTONE_X86_ONLY
+#include "X86VexBaseMemory.h"
+#endif
 #define X86_LEGACY_PACKED_MEMORY
 #include "X86PackedMemoryOutput.h"
 #undef X86_LEGACY_PACKED_MEMORY
@@ -227,6 +230,16 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
 				return true;
 		}
 	}
+#ifdef CAPSTONE_X86_ONLY
+	if ((code[0] & 0xfe) == 0xc4) {
+		const unsigned prefix = code[0] == 0xc5 ? 2 : 3;
+		if (size >= prefix + 2 && code[prefix + 1] < 0xc0 &&
+		    !X86_OUTPUT_UNSUPPORTED(handle, false) &&
+		    writeVexBaseMemory(code, size, prefix, insn, insn_size,
+				       x86_simple_registers[3]))
+			return true;
+	}
+#endif
 fallback:
 #if defined(CAPSTONE_X86_DEDICATED_OUTPUT) && defined(__clang__) && \
 	defined(__x86_64__)
