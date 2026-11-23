@@ -307,6 +307,57 @@ static bool finishInstruction(MCInst *instr, DecodeStatus result)
 	return true;
 }
 
+/* Shared primary opcodes, including the instructions restricted to MIPS64. */
+#define MIPS_COMMON_SCAN_OPS(OP, OP64) \
+	OP(9, Mips_ADDiu) \
+	OP(12, Mips_ANDi) \
+	OP(13, Mips_ORi) \
+	OP(14, Mips_XORi) \
+	OP64(25, Mips_DADDiu) \
+	OP(35, Mips_LW) \
+	OP(43, Mips_SW) \
+	OP64(55, Mips_LD) \
+	OP64(63, Mips_SD)
+
+#ifdef CAPSTONE_MIPS_SCAN_BY_OPTION
+/* These standard forms use every bit below the primary opcode for operands. */
+static inline unsigned standardScanOpcode(unsigned major, cs_mode mode)
+{
+	switch (major) {
+	case 4:
+		return Mips_BEQ;
+	case 5:
+		return Mips_BNE;
+	case 10:
+		return Mips_SLTi;
+	case 11:
+		return Mips_SLTiu;
+	case 32:
+		return Mips_LB;
+	case 33:
+		return Mips_LH;
+	case 36:
+		return Mips_LBu;
+	case 37:
+		return Mips_LHu;
+	case 40:
+		return Mips_SB;
+	case 41:
+		return Mips_SH;
+#define MIPS_SCAN_OP(n, id) \
+	case n: \
+		return id;
+#define MIPS_SCAN_OP64(n, id) \
+	case n: \
+		return mode == CS_MODE_MIPS64 ? id : 0;
+		MIPS_COMMON_SCAN_OPS(MIPS_SCAN_OP, MIPS_SCAN_OP64)
+#undef MIPS_SCAN_OP64
+#undef MIPS_SCAN_OP
+	}
+	return 0;
+}
+#endif
+
 bool Mips_getInstruction(csh handle, const uint8_t *code, size_t code_len,
 			 MCInst *instr, uint16_t *size, uint64_t address,
 			 void *info)
@@ -314,46 +365,26 @@ bool Mips_getInstruction(csh handle, const uint8_t *code, size_t code_len,
 	uint64_t size64;
 	Mips_init_cs_detail(instr);
 /* These standard encodings have no extra operands to validate in a scan. */
-#ifdef MIPS_DIRECT_MAPPING
+#if defined(MIPS_DIRECT_MAPPING) && !defined(CAPSTONE_MIPS_SCAN_BY_OPTION)
 	const cs_mode mode = instr->csh->mode & ~CS_MODE_BIG_ENDIAN;
 	if (code_len >= 4 && instr->csh->no_text && !instr->flat_insn->detail &&
 	    instr->csh->disasm == Mips_getInstruction &&
 	    (mode == CS_MODE_MIPS32 || mode == CS_MODE_MIPS64)) {
-		/* For these standard immediate and load/store encodings all
-		 * register and immediate bits are operands. */
 		const unsigned major = readBytes32(instr, code) >> 26;
 		unsigned opcode = 0;
 		switch (major) {
-		case 9:
-			opcode = Mips_ADDiu;
-			break;
-		case 12:
-			opcode = Mips_ANDi;
-			break;
-		case 13:
-			opcode = Mips_ORi;
-			break;
-		case 14:
-			opcode = Mips_XORi;
-			break;
-		case 25:
-			if (mode == CS_MODE_MIPS64)
-				opcode = Mips_DADDiu;
-			break;
-		case 35:
-			opcode = Mips_LW;
-			break;
-		case 43:
-			opcode = Mips_SW;
-			break;
-		case 55:
-			if (mode == CS_MODE_MIPS64)
-				opcode = Mips_LD;
-			break;
-		case 63:
-			if (mode == CS_MODE_MIPS64)
-				opcode = Mips_SD;
-			break;
+#define MIPS_SCAN_OP(n, id) \
+	case n: \
+		opcode = id; \
+		break;
+#define MIPS_SCAN_OP64(n, id) \
+	case n: \
+		if (mode == CS_MODE_MIPS64) \
+			opcode = id; \
+		break;
+			MIPS_COMMON_SCAN_OPS(MIPS_SCAN_OP, MIPS_SCAN_OP64)
+#undef MIPS_SCAN_OP64
+#undef MIPS_SCAN_OP
 		}
 		if (opcode) {
 			MCInst_setOpcode(instr, opcode);
@@ -868,5 +899,38 @@ void Mips_set_mem_access(MCInst *MI, bool status)
 		Mips_inc_op_count(MI);
 	}
 }
+
+#ifdef CAPSTONE_MIPS_SCAN_BY_OPTION
+static bool getScanInstruction(csh handle, const uint8_t *code, size_t length,
+			       MCInst *instr, uint16_t *size, uint64_t address,
+			       void *info)
+{
+	const cs_struct *h = instr->csh;
+	const cs_mode mode = h->mode & ~CS_MODE_BIG_ENDIAN;
+	if (length >= 4 && (mode == CS_MODE_MIPS32 || mode == CS_MODE_MIPS64) &&
+	    h->disasm == getScanInstruction && h->insn_id == Mips_get_insn_id &&
+	    h->no_text && !instr->flat_insn->detail) {
+		const unsigned opcode =
+			standardScanOpcode(readBytes32(instr, code) >> 26, mode);
+		if (opcode) {
+			Mips_init_cs_detail(instr);
+			MCInst_setOpcode(instr, opcode);
+			instr->flat_insn->id = mips_insns[opcode].mapid;
+			*size = 4;
+			return true;
+		}
+	}
+	return Mips_getInstruction(handle, code, length, instr, size, address, info);
+}
+
+void Mips_selectScanDecoder(cs_struct *handle)
+{
+	/* An installed callback owns its MC operands and its dispatch. */
+	if (handle->disasm == Mips_getInstruction ||
+	    handle->disasm == getScanInstruction)
+		handle->disasm = handle->no_text && !handle->detail_opt ?
+					 getScanInstruction : Mips_getInstruction;
+}
+#endif
 
 #endif

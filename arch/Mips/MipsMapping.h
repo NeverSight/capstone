@@ -15,6 +15,11 @@ typedef enum {
 bool Mips_disasm16NoText(cs_struct *handle, const uint8_t *code, size_t length,
 			 cs_insn *insn);
 
+#if defined(CAPSTONE_MIPS_ONLY) && !defined(CAPSTONE_DIET)
+#define CAPSTONE_MIPS_SCAN_BY_OPTION
+void Mips_selectScanDecoder(cs_struct *handle);
+#endif
+
 void Mips_init_mri(MCRegisterInfo *MRI);
 
 // return name of register in friendly string

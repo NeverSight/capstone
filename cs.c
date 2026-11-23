@@ -93,6 +93,12 @@
 #define CS_PRIVATE_DECODER LoongArch_getInstruction
 #define CS_PRIVATE_PRINTER LoongArch_printer
 #define CS_KNOWN_PRINTER_EXTENT
+#elif defined(CAPSTONE_MIPS_ONLY) && !defined(CAPSTONE_DIET) && \
+	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
+	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
+#include "arch/Mips/MipsMapping.h"
+#define CS_PRIVATE_PRINTER Mips_printer
+#define CS_MIPS_VISIBLE_OPERANDS
 #elif defined(CAPSTONE_SPARC_ONLY) && !defined(CAPSTONE_DIET) && \
 	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
 	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
@@ -1005,9 +1011,14 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
 		off++;
 	const char *operands = OS->buffer + off;
 	if (stream_length_valid) {
-		/* The private x86 stream's index is its terminating NUL. */
-		const size_t length =
-			MIN(OS->index - off, sizeof(insn->op_str) - 1);
+#ifdef CS_MIPS_VISIBLE_OPERANDS
+		/* MIPS can remove the MIPS16 comment or a '$' after printing.
+		 * Both edits shorten the visible string without moving the cursor. */
+		const size_t extent = strlen(operands);
+#else
+		const size_t extent = OS->index - off;
+#endif
+		const size_t length = MIN(extent, sizeof(insn->op_str) - 1);
 		if (length > 32) {
 			memcpy(insn->op_str, operands, length);
 		} else if (length >= 16) {
@@ -1169,8 +1180,8 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
 		} else
 #endif
 		{
-#ifdef CS_KNOWN_PRINTER_EXTENT
-			/* The built-in printer only appends to this stream. A custom
+#if defined(CS_KNOWN_PRINTER_EXTENT) || defined(CS_MIPS_VISIBLE_OPERANDS)
+			/* The built-in printer owns this stream. A custom
 			 * formatter may return a count beyond its first NUL. */
 			const bool known_length = handle->printer == CS_PRIVATE_PRINTER &&
 						  !handle->post_printer &&
@@ -1178,7 +1189,7 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
 #else
 			const bool known_length = false;
 #endif
-#ifdef CS_KNOWN_PRINTER_EXTENT
+#if defined(CS_KNOWN_PRINTER_EXTENT) || defined(CS_MIPS_VISIBLE_OPERANDS)
 			if (known_length) {
 				ss.buffer[0] = '\0';
 				ss.index = 0;
@@ -1361,6 +1372,9 @@ cs_err CAPSTONE_API cs_option(csh ud, cs_opt_type type, uintptr_t value)
 
 	case CS_OPT_TEXT:
 		handle->no_text = value == CS_OPT_OFF;
+#ifdef CAPSTONE_MIPS_SCAN_BY_OPTION
+		Mips_selectScanDecoder(handle);
+#endif
 		return CS_ERR_OK;
 
 	case CS_OPT_DETAIL:
@@ -1370,6 +1384,9 @@ cs_err CAPSTONE_API cs_option(csh ud, cs_opt_type type, uintptr_t value)
 			handle->detail_opt = CS_OPT_OFF;
 		else
 			handle->detail_opt |= (cs_opt_value)value;
+#ifdef CAPSTONE_MIPS_SCAN_BY_OPTION
+		Mips_selectScanDecoder(handle);
+#endif
 		return CS_ERR_OK;
 
 	case CS_OPT_SKIPDATA:

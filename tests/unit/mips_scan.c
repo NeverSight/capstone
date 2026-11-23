@@ -55,11 +55,33 @@ static bool compare(csh handles[2], uint32_t word, bool big_endian,
 	return false;
 }
 
+/* Switch a single live handle between each output form. An installed
+ * inspection callback must keep receiving the ordinary operands. */
+static bool check_option_changes(csh handles[2], bool big_endian)
+{
+	const cs_opt_type option[] = { CS_OPT_TEXT, CS_OPT_DETAIL, CS_OPT_TEXT,
+				       CS_OPT_DETAIL, CS_OPT_TEXT };
+	const cs_opt_value value[] = { CS_OPT_ON, CS_OPT_ON, CS_OPT_OFF,
+				       CS_OPT_OFF, CS_OPT_ON };
+	for (unsigned i = 0; i < sizeof(option) / sizeof(*option); ++i) {
+		for (unsigned h = 0; h < 2; ++h)
+			if (cs_option(handles[h], option[i], value[i]) != CS_ERR_OK)
+				return false;
+		if (((cs_struct *)(uintptr_t)handles[1])->disasm != inspect_operands ||
+		    !compare(handles, 0x24080001, big_endian, 4, true))
+			return false;
+	}
+	return true;
+}
+
 static bool check_mode(cs_mode mode)
 {
 	static const uint32_t words[] = {
 		0x24080001, 0x3128ffff, 0x35080000,
 		0x3928ffff, 0x8fa80000, 0xafa8fffc,
+		0x10000000, 0x1109ffff, 0x15000004, 0x29080000,
+		0x2d28ffff, 0x81a88000, 0x85a87fff, 0x91a80001,
+		0x95a8ffff, 0xa1a80000, 0xa5a8ffff,
 	};
 	static const uint32_t others[] = {
 		0x6508ffff, 0xdfa80000, 0xffa8fffc, 0x10000002,
@@ -90,7 +112,7 @@ static bool check_mode(cs_mode mode)
 			if (!compare(handles, others[i], big_endian, 4, false))
 				goto done;
 	}
-	success = true;
+	success = check_option_changes(handles, big_endian);
 done:
 	for (unsigned i = 0; i < 2; ++i)
 		if (handles[i])
