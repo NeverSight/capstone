@@ -81,7 +81,18 @@
 	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
 	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
 #include "arch/SystemZ/SystemZMapping.h"
-#define CAPSTONE_SYSTEMZ_PRIVATE_TEXT
+#define CS_PRIVATE_ARCH CS_ARCH_SYSTEMZ
+#define CS_PRIVATE_DECODER SystemZ_getInstruction
+#define CS_PRIVATE_PRINTER SystemZ_printer
+#define CS_KNOWN_PRINTER_EXTENT
+#elif defined(CAPSTONE_LOONGARCH_DEDICATED_MAPPING) && !defined(CAPSTONE_DIET) && \
+	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
+	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
+#include "arch/LoongArch/LoongArchMapping.h"
+#define CS_PRIVATE_ARCH CS_ARCH_LOONGARCH
+#define CS_PRIVATE_DECODER LoongArch_getInstruction
+#define CS_PRIVATE_PRINTER LoongArch_printer
+#define CS_KNOWN_PRINTER_EXTENT
 #endif
 #include "arch/TMS320C64x/TMS320C64xModule.h"
 #include "arch/TriCore/TriCoreModule.h"
@@ -1097,12 +1108,12 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
 #elif defined(CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS)
 	/* The RISC-V decoder constructs each operand before reading it. */
 	MCInst_InitStorage(&mci, CS_ARCH_RISCV, false);
-#elif defined(CAPSTONE_SYSTEMZ_PRIVATE_TEXT)
-	/* The SystemZ decoder constructs each operand before the built-in
+#elif defined(CS_PRIVATE_DECODER)
+	/* These decoders construct each operand before their built-in
 	 * printer reads it. Other callbacks retain the full initialization. */
-	if (handle->disasm == SystemZ_getInstruction &&
-	    handle->printer == SystemZ_printer && !handle->post_printer)
-		MCInst_InitStorage(&mci, CS_ARCH_SYSTEMZ, false);
+	if (handle->disasm == CS_PRIVATE_DECODER &&
+	    handle->printer == CS_PRIVATE_PRINTER && !handle->post_printer)
+		MCInst_InitStorage(&mci, CS_PRIVATE_ARCH, false);
 	else
 		MCInst_Init(&mci, handle->arch);
 #elif defined(CAPSTONE_AARCH64_INIT_CONSTRUCTED_OPERANDS) && \
@@ -1150,16 +1161,16 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
 		} else
 #endif
 		{
-#ifdef CAPSTONE_SYSTEMZ_PRIVATE_TEXT
+#ifdef CS_KNOWN_PRINTER_EXTENT
 			/* The built-in printer only appends to this stream. A custom
 			 * formatter may return a count beyond its first NUL. */
-			const bool known_length = handle->printer == SystemZ_printer &&
+			const bool known_length = handle->printer == CS_PRIVATE_PRINTER &&
 						  !handle->post_printer &&
 						  cs_vsnprintf == cs_default_vsnprintf;
 #else
 			const bool known_length = false;
 #endif
-#ifdef CAPSTONE_SYSTEMZ_PRIVATE_TEXT
+#ifdef CS_KNOWN_PRINTER_EXTENT
 			if (known_length) {
 				ss.buffer[0] = '\0';
 				ss.index = 0;
