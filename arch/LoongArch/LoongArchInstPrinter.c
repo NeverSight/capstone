@@ -85,9 +85,24 @@ const char *LoongArch_LLVM_getRegisterName(unsigned RegNo, unsigned AltIdx)
 	return getRegisterName(RegNo, AltIdx);
 }
 
+#if defined(CAPSTONE_LOONGARCH_DEDICATED_MAPPING) && !defined(CAPSTONE_DIET)
+#include "LoongArchGenRegisterSpellings.inc"
+#endif
+
 static void printRegName(MCInst *MI, SStream *O, MCRegister Reg)
 {
 	int syntax_opt = MI->csh->syntax;
+#if defined(CAPSTONE_LOONGARCH_DEDICATED_MAPPING) && !defined(CAPSTONE_DIET)
+	/* Keep the two original appends for an open markup token. */
+	if (Reg && Reg <= ARR_SIZE(loongarch_register_spellings) &&
+	    !(O->markup_stream && O->prefixed_by_markup)) {
+		const unsigned skip = (syntax_opt & CS_OPT_SYNTAX_NO_DOLLAR) != 0;
+		const unsigned index = Reg - 1;
+		SStream_concat0_n(O, loongarch_register_spellings[index].text + skip,
+				 loongarch_register_spellings[index].length - skip);
+		return;
+	}
+#endif
 	if (!(syntax_opt & CS_OPT_SYNTAX_NO_DOLLAR)) {
 		SStream_concat1(O, '$');
 	}
