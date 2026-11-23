@@ -99,6 +99,12 @@
 #include "arch/Mips/MipsMapping.h"
 #define CS_PRIVATE_PRINTER Mips_printer
 #define CS_MIPS_VISIBLE_OPERANDS
+#elif defined(CAPSTONE_XCORE_ONLY)
+#include "arch/XCore/XCoreDisassembler.h"
+#include "arch/XCore/XCoreInstPrinter.h"
+#define CS_PRIVATE_ARCH CS_ARCH_XCORE
+#define CS_PRIVATE_DECODER XCore_getInstruction
+#define CS_PRIVATE_PRINTER XCore_printInst
 #elif defined(CAPSTONE_SPARC_ONLY) && !defined(CAPSTONE_DIET) && \
 	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
 	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)

@@ -162,6 +162,10 @@ elseif(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;X86")
     add_compile_definitions(CAPSTONE_ARM_AARCH64_MIPS_X86)
 endif()
 
+if(capstone_enabled_architectures STREQUAL "XCORE")
+    add_compile_definitions(CAPSTONE_XCORE_ONLY)
+endif()
+
 if(capstone_enabled_architectures STREQUAL "ARM")
     add_compile_definitions(CAPSTONE_ARM_COPY_OPERAND_DEFAULTS CAPSTONE_ARM_INIT_CONSTRUCTED_OPERANDS)
 endif()
