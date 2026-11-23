@@ -77,6 +77,12 @@
 #include "arch/SH/SHModule.h"
 #include "arch/Sparc/SparcModule.h"
 #include "arch/SystemZ/SystemZModule.h"
+#if defined(CAPSTONE_SYSTEMZ_DEDICATED_MAPPING) && !defined(CAPSTONE_DIET) && \
+	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
+	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
+#include "arch/SystemZ/SystemZMapping.h"
+#define CAPSTONE_SYSTEMZ_PRIVATE_TEXT
+#endif
 #include "arch/TMS320C64x/TMS320C64xModule.h"
 #include "arch/TriCore/TriCoreModule.h"
 #include "arch/WASM/WASMModule.h"
@@ -1091,6 +1097,14 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
 #elif defined(CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS)
 	/* The RISC-V decoder constructs each operand before reading it. */
 	MCInst_InitStorage(&mci, CS_ARCH_RISCV, false);
+#elif defined(CAPSTONE_SYSTEMZ_PRIVATE_TEXT)
+	/* The SystemZ decoder constructs each operand before the built-in
+	 * printer reads it. Other callbacks retain the full initialization. */
+	if (handle->disasm == SystemZ_getInstruction &&
+	    handle->printer == SystemZ_printer && !handle->post_printer)
+		MCInst_InitStorage(&mci, CS_ARCH_SYSTEMZ, false);
+	else
+		MCInst_Init(&mci, handle->arch);
 #elif defined(CAPSTONE_AARCH64_INIT_CONSTRUCTED_OPERANDS) && \
 	(defined(__clang__) || (defined(__GNUC__) && defined(__aarch64__)))
 	/* AArch64 constructs its operands as it decodes. On x86 hosts GCC
@@ -1136,11 +1150,29 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
 		} else
 #endif
 		{
-			SStream_Init(&ss);
+#ifdef CAPSTONE_SYSTEMZ_PRIVATE_TEXT
+			/* The built-in printer only appends to this stream. A custom
+			 * formatter may return a count beyond its first NUL. */
+			const bool known_length = handle->printer == SystemZ_printer &&
+						  !handle->post_printer &&
+						  cs_vsnprintf == cs_default_vsnprintf;
+#else
+			const bool known_length = false;
+#endif
+#ifdef CAPSTONE_SYSTEMZ_PRIVATE_TEXT
+			if (known_length) {
+				ss.buffer[0] = '\0';
+				ss.index = 0;
+				ss.is_closed = false;
+				ss.markup_stream = false;
+				ss.prefixed_by_markup = false;
+			} else
+#endif
+				SStream_Init(&ss);
 			SStream_opt_unum(&ss, handle->imm_unsigned);
 			handle->printer(&mci, &ss, handle->printer_info);
 			fill_insn(handle, insn, &ss, &mci, handle->post_printer,
-				  code, false);
+				  code, known_length);
 		}
 	}
 	if (handle->arch == CS_ARCH_X86 && (!batch || insn->id != X86_INS_VCMP))
