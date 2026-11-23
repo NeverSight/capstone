@@ -36,6 +36,9 @@ test_cases:
           xcore:
             operands:
               -
+                type: XCORE_OP_MEM
+                mem_base: r3
+              -
                 type: XCORE_OP_REG
                 reg: r4
       -
@@ -72,6 +75,11 @@ test_cases:
               -
                 type: XCORE_OP_REG
                 reg: r9
+              -
+                type: XCORE_OP_MEM
+                mem_base: r3
+                mem_index: r11
+                mem_direct: -1
       -
         asm_text: "ldw dp, dp[0x81c5]"
         details:
@@ -80,6 +88,10 @@ test_cases:
               -
                 type: XCORE_OP_REG
                 reg: dp
+              -
+                type: XCORE_OP_MEM
+                mem_base: dp
+                mem_disp: 0x81c5
       -
         asm_text: "lmul r11, r0, r2, r5, r8, r10"
         details:
@@ -125,4 +137,49 @@ test_cases:
               -
                 type: XCORE_OP_REG
                 reg: r8
-
+              -
+                type: XCORE_OP_MEM
+                mem_base: r2
+                mem_disp: 9
+                mem_direct: -1
+  -
+    input:
+      bytes: [ 0x00, 0x00 ]
+      arch: "xcore"
+      options: [ CS_OPT_DETAIL_REAL ]
+      address: 0x0
+    expected:
+      insns:
+      -
+        asm_text: "stw r0, r0[0]"
+        details:
+          xcore:
+            operands:
+              -
+                type: XCORE_OP_REG
+                reg: r0
+              -
+                type: XCORE_OP_MEM
+                mem_base: r0
+                mem_direct: 1
+  -
+    input:
+      bytes: [ 0x00, 0xf0, 0x49, 0x7f ]
+      arch: "xcore"
+      options: [ CS_OPT_DETAIL ]
+      address: 0x4016c
+    expected:
+      insns:
+      -
+        asm_text: "ldaw r11, cp[9]"
+        details:
+          xcore:
+            operands:
+              -
+                type: XCORE_OP_REG
+                reg: r11
+              -
+                type: XCORE_OP_MEM
+                mem_base: cp
+                mem_disp: 9
+                mem_direct: 1

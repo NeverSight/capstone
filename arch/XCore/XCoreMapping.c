@@ -14,6 +14,7 @@
 #define GET_INSTRINFO_ENUM
 #include "XCoreGenInstrInfo.inc"
 
+#ifndef CAPSTONE_DIET
 static const name_map reg_name_maps[] = {
 	{ XCORE_REG_INVALID, NULL },
 
@@ -37,7 +38,7 @@ static const name_map reg_name_maps[] = {
 	// pseudo registers
 	{ XCORE_REG_PC, "pc" },
 
-	{ XCORE_REG_SCP, "scp" },
+	{ XCORE_REG_SCP, "spc" },
 	{ XCORE_REG_SSR, "ssr" },
 	{ XCORE_REG_ET, "et" },
 	{ XCORE_REG_ED, "ed" },
@@ -46,6 +47,8 @@ static const name_map reg_name_maps[] = {
 	{ XCORE_REG_KSP, "ksp" },
 	{ XCORE_REG_ID, "id" },
 };
+
+#endif
 
 const char *XCore_reg_name(csh handle, unsigned int reg)
 {
@@ -57,19 +60,6 @@ const char *XCore_reg_name(csh handle, unsigned int reg)
 #else
 	return NULL;
 #endif
-}
-
-xcore_reg XCore_reg_id(char *name)
-{
-	int i;
-
-	for (i = 1; i < ARR_SIZE(reg_name_maps); i++) {
-		if (!strcmp(name, reg_name_maps[i].name))
-			return reg_name_maps[i].id;
-	}
-
-	// not found
-	return 0;
 }
 
 static const insn_map insns[] = {

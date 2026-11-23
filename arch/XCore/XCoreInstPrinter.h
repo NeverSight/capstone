@@ -12,7 +12,4 @@ void XCore_printInst(MCInst *MI, SStream *O, void *Info);
 
 void XCore_post_printer(csh ud, cs_insn *insn, SStream *insn_asm, MCInst *mci);
 
-// extract details from assembly code @code
-void XCore_insn_extract(MCInst *MI, const char *code);
-
 #endif

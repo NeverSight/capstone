@@ -17,7 +17,6 @@
 #ifdef CAPSTONE_HAS_XCORE
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <capstone/platform.h>
 
@@ -39,278 +38,81 @@ void XCore_post_printer(csh ud, cs_insn *insn, SStream *insn_asm, MCInst *mci)
 	 */
 }
 
-// stw sed, sp[3]
-void XCore_insn_extract(MCInst *MI, const char *code)
-{
-	int id;
-	char *p, *p2;
-	char tmp[128];
-
-	strncpy(tmp, code,
-		sizeof(tmp) -
-			1); // safe because code is way shorter than 128 bytes
-
-	// find the first space
-	p = strchr(tmp, ' ');
-	if (p) {
-		p++;
-		// find the next ','
-		p2 = strchr(p, ',');
-		if (p2) {
-			*p2 = '\0';
-			id = XCore_reg_id(p);
-			if (id) {
-				// register
-				if (MI->csh->detail_opt) {
-					MI->flat_insn->detail->xcore
-						.operands[MI->flat_insn->detail
-								  ->xcore
-								  .op_count]
-						.type = XCORE_OP_REG;
-					MI->flat_insn->detail->xcore
-						.operands[MI->flat_insn->detail
-								  ->xcore
-								  .op_count]
-						.reg = id;
-					MI->flat_insn->detail->xcore.op_count++;
-				}
-			}
-			// next should be register, or memory?
-			// skip space
-			p2++;
-			while (*p2 && *p2 == ' ')
-				p2++;
-			if (*p2) {
-				// find '['
-				p = p2;
-				while (*p && *p != '[')
-					p++;
-				if (*p) {
-					// this is '['
-					*p = '\0';
-					id = XCore_reg_id(p2);
-					if (id) {
-						// base register
-						if (MI->csh->detail_opt) {
-							MI->flat_insn->detail
-								->xcore
-								.operands
-									[MI->flat_insn
-										 ->detail
-										 ->xcore
-										 .op_count]
-								.type =
-								XCORE_OP_MEM;
-							MI->flat_insn->detail
-								->xcore
-								.operands
-									[MI->flat_insn
-										 ->detail
-										 ->xcore
-										 .op_count]
-								.mem.base =
-								(uint8_t)id;
-							MI->flat_insn->detail
-								->xcore
-								.operands
-									[MI->flat_insn
-										 ->detail
-										 ->xcore
-										 .op_count]
-								.mem.index =
-								XCORE_REG_INVALID;
-							MI->flat_insn->detail
-								->xcore
-								.operands
-									[MI->flat_insn
-										 ->detail
-										 ->xcore
-										 .op_count]
-								.mem.disp = 0;
-							MI->flat_insn->detail
-								->xcore
-								.operands
-									[MI->flat_insn
-										 ->detail
-										 ->xcore
-										 .op_count]
-								.mem.direct = 1;
-						}
-
-						p++;
-						p2 = p;
-						// until ']'
-						while (*p && *p != ']')
-							p++;
-						if (*p) {
-							*p = '\0';
-							// p2 is either index, or disp
-							id = XCore_reg_id(p2);
-							if (id) {
-								// index register
-								if (MI->csh->detail_opt) {
-									MI->flat_insn
-										->detail
-										->xcore
-										.operands
-											[MI->flat_insn
-												 ->detail
-												 ->xcore
-												 .op_count]
-										.mem
-										.index =
-										(uint8_t)
-											id;
-								}
-							} else {
-								// a number means disp
-								if (MI->csh->detail_opt) {
-									MI->flat_insn
-										->detail
-										->xcore
-										.operands
-											[MI->flat_insn
-												 ->detail
-												 ->xcore
-												 .op_count]
-										.mem
-										.disp =
-										atoi(p2);
-								}
-							}
-						}
-
-						if (MI->csh->detail_opt) {
-							MI->flat_insn->detail
-								->xcore
-								.op_count++;
-						}
-					}
-				} else {
-					// a register?
-					id = XCore_reg_id(p2);
-					if (id) {
-						// register
-						if (MI->csh->detail_opt) {
-							MI->flat_insn->detail
-								->xcore
-								.operands
-									[MI->flat_insn
-										 ->detail
-										 ->xcore
-										 .op_count]
-								.type =
-								XCORE_OP_REG;
-							MI->flat_insn->detail
-								->xcore
-								.operands
-									[MI->flat_insn
-										 ->detail
-										 ->xcore
-										 .op_count]
-								.reg = id;
-							MI->flat_insn->detail
-								->xcore
-								.op_count++;
-						}
-					}
-				}
-			}
-		} else {
-			id = XCore_reg_id(p);
-			if (id) {
-				// register
-				if (MI->csh->detail_opt) {
-					MI->flat_insn->detail->xcore
-						.operands[MI->flat_insn->detail
-								  ->xcore
-								  .op_count]
-						.type = XCORE_OP_REG;
-					MI->flat_insn->detail->xcore
-						.operands[MI->flat_insn->detail
-								  ->xcore
-								  .op_count]
-						.reg = id;
-					MI->flat_insn->detail->xcore.op_count++;
-				}
-			}
-		}
-	}
-}
-
 static void set_mem_access(MCInst *MI, bool status, int reg)
 {
-	if (MI->csh->detail_opt != CS_OPT_ON)
+	if (!MI->csh->detail_opt)
 		return;
 
-	MI->csh->doing_mem = status;
-	if (status) {
-		if (reg != 0xffff && reg != -0xffff) {
-			MI->flat_insn->detail->xcore
-				.operands[MI->flat_insn->detail->xcore.op_count]
-				.type = XCORE_OP_MEM;
-			if (reg) {
-				MI->flat_insn->detail->xcore
-					.operands[MI->flat_insn->detail->xcore
-							  .op_count]
-					.mem.base = (uint8_t)reg;
-			} else {
-				MI->flat_insn->detail->xcore
-					.operands[MI->flat_insn->detail->xcore
-							  .op_count]
-					.mem.base = XCORE_REG_INVALID;
-			}
-			MI->flat_insn->detail->xcore
-				.operands[MI->flat_insn->detail->xcore.op_count]
-				.mem.index = XCORE_REG_INVALID;
-			MI->flat_insn->detail->xcore
-				.operands[MI->flat_insn->detail->xcore.op_count]
-				.mem.disp = 0;
-			MI->flat_insn->detail->xcore
-				.operands[MI->flat_insn->detail->xcore.op_count]
-				.mem.direct = 1;
-		} else {
-			// the last op should be the memory base
-			MI->flat_insn->detail->xcore.op_count--;
-			uint8_t base =
-				MI->flat_insn->detail->xcore
-					.operands[MI->flat_insn->detail->xcore
-							  .op_count]
-					.reg;
-			memset(&MI->flat_insn->detail->xcore.operands
-					[MI->flat_insn->detail->xcore.op_count],
-			       0, sizeof(cs_xcore_op));
-			MI->flat_insn->detail->xcore
-				.operands[MI->flat_insn->detail->xcore.op_count]
-				.type = XCORE_OP_MEM;
-			MI->flat_insn->detail->xcore
-				.operands[MI->flat_insn->detail->xcore.op_count]
-				.mem.base = base;
-			MI->flat_insn->detail->xcore
-				.operands[MI->flat_insn->detail->xcore.op_count]
-				.mem.index = XCORE_REG_INVALID;
-			MI->flat_insn->detail->xcore
-				.operands[MI->flat_insn->detail->xcore.op_count]
-				.mem.disp = 0;
-			if (reg > 0)
-				MI->flat_insn->detail->xcore
-					.operands[MI->flat_insn->detail->xcore
-							  .op_count]
-					.mem.direct = 1;
-			else
-				MI->flat_insn->detail->xcore
-					.operands[MI->flat_insn->detail->xcore
-							  .op_count]
-					.mem.direct = -1;
+	cs_xcore *detail = &MI->flat_insn->detail->xcore;
+	if (!status) {
+		if (MI->csh->doing_mem) {
+			if (reg)
+				detail->operands[detail->op_count].mem.index = (uint8_t)reg;
+			++detail->op_count;
+			MI->csh->doing_mem = false;
 		}
-	} else {
-		if (reg) {
-			MI->flat_insn->detail->xcore
-				.operands[MI->flat_insn->detail->xcore.op_count]
-				.mem.index = (uint8_t)reg;
-			// done, create the next operand slot
-			MI->flat_insn->detail->xcore.op_count++;
-		}
+		return;
+	}
+
+	int direction = 1;
+	if (reg == 0xffff || reg == -0xffff) {
+		/* A register printed before '[' becomes the base of this operand. */
+		cs_xcore_op *previous = &detail->operands[--detail->op_count];
+		direction = reg > 0 ? 1 : -1;
+		reg = previous->reg;
+		memset(previous, 0, sizeof(*previous));
+	}
+	cs_xcore_op *op = &detail->operands[detail->op_count];
+	op->type = XCORE_OP_MEM;
+	op->mem.base = (uint8_t)reg;
+	op->mem.index = XCORE_REG_INVALID;
+	op->mem.disp = 0;
+	op->mem.direct = direction;
+	MI->csh->doing_mem = true;
+}
+
+static void add_literal_register(MCInst *MI, xcore_reg reg)
+{
+	cs_xcore *detail = &MI->flat_insn->detail->xcore;
+	cs_xcore_op *op = &detail->operands[detail->op_count++];
+	op->type = XCORE_OP_REG;
+	op->reg = reg;
+}
+
+enum XCoreLiteralKind {
+	XCORE_LITERAL_REGISTERS,
+	XCORE_LITERAL_OPEN_MEMORY,
+	XCORE_LITERAL_FIXED_MEMORY,
+};
+
+struct XCoreLiteralOperands {
+	uint8_t kind;
+	uint8_t first;
+	uint8_t second;
+	uint8_t displacement;
+};
+
+#include "XCoreGenLiteralOperands.inc"
+
+/* An open memory operand receives its remaining fields from printOperand. */
+static void add_literal_operands(MCInst *MI, unsigned int opcode)
+{
+	const uint8_t index = xcore_literal_index[opcode];
+	if (!index)
+		return;
+	const struct XCoreLiteralOperands *literal = &xcore_literal_operands[index];
+	if (literal->first)
+		add_literal_register(MI, literal->first);
+	if (literal->kind == XCORE_LITERAL_REGISTERS) {
+		if (literal->second)
+			add_literal_register(MI, literal->second);
+		return;
+	}
+	set_mem_access(MI, true, literal->second);
+	if (literal->kind == XCORE_LITERAL_FIXED_MEMORY) {
+		cs_xcore *detail = &MI->flat_insn->detail->xcore;
+		detail->operands[detail->op_count].mem.disp = literal->displacement;
+		set_mem_access(MI, false, 0);
 	}
 }
 
@@ -327,7 +129,7 @@ static void _printOperand(MCInst *MI, MCOperand *MO, SStream *O)
 				if (MI->flat_insn->detail->xcore
 					    .operands[MI->flat_insn->detail
 							      ->xcore.op_count]
-					    .mem.base == ARM_REG_INVALID)
+					    .mem.base == XCORE_REG_INVALID)
 					MI->flat_insn->detail->xcore
 						.operands[MI->flat_insn->detail
 								  ->xcore
@@ -399,7 +201,8 @@ static void printInlineJT32(MCInst *MI, int OpNum, SStream *O)
 void XCore_printInst(MCInst *MI, SStream *O, void *Info)
 {
 	printInstruction(MI, O, Info);
-	set_mem_access(MI, false, 0);
+	/* Literal instructions already supplied their complete operand list. */
+	MI->csh->doing_mem = false;
 }
 
 #endif

@@ -268,6 +268,7 @@ static void printInstruction(MCInst *MI, SStream *O, MCRegisterInfo *MRI)
     0U
   };
 
+#ifndef CAPSTONE_DIET
   static const char AsmStrs[] = {
   /* 0 */ 'l', 'd', 'a', 'p', 32, 'r', '1', '1', ',', 32, 0,
   /* 11 */ 'g', 'e', 't', 's', 'r', 32, 'r', '1', '1', ',', 32, 0,
@@ -416,17 +417,18 @@ static void printInstruction(MCInst *MI, SStream *O, MCRegisterInfo *MRI)
   /* 1251 */ 'w', 'a', 'i', 't', 'e', 'u', 0,
   };
 
+#endif
+
   // Emit the opcode for the instruction.
-  uint32_t Bits = OpInfo[MCInst_getOpcode(MI)];
+  const unsigned int opcode = MCInst_getOpcode(MI);
+  uint32_t Bits = OpInfo[opcode];
   CS_ASSERT_RET(Bits != 0 && "Cannot print this instruction.");
 #ifndef CAPSTONE_DIET
   SStream_concat0(O, AsmStrs+(Bits & 2047)-1);
 #endif
 
-
-  if (strchr((const char *)AsmStrs+(Bits & 2047)-1, '[')) {
-    set_mem_access(MI, true, 0);
-  }
+  if (MI->csh->detail_opt)
+    add_literal_operands(MI, opcode);
 
   // Fragment 0 encoded into 2 bits for 4 unique commands.
   //printf(">>%s\n", AsmStrs+(Bits & 2047)-1);
@@ -435,8 +437,6 @@ static void printInstruction(MCInst *MI, SStream *O, MCRegisterInfo *MRI)
   default:   // unreachable.
   case 0:
     // DBG_VALUE, BUNDLE, LIFETIME_START, LIFETIME_END, CLRE_0R, DCALL_0R, DE...
-    // already done. this means we have to extract details out ourself.
-    XCore_insn_extract(MI, (const char *)AsmStrs+(Bits & 2047)-1);
     return;
     break;
   case 1:
@@ -561,6 +561,8 @@ static void printInstruction(MCInst *MI, SStream *O, MCRegisterInfo *MRI)
     // SETEV_1r, SETV_1r
     SStream_concat0(O, "], r11"); 
     set_mem_access(MI, false, 0);
+    if (MI->csh->detail_opt)
+      add_literal_register(MI, XCORE_REG_R11);
     return;
     break;
   case 16:
