@@ -131,6 +131,27 @@ static bool check_scan(csh handle, bool wide)
 	return ok;
 }
 
+static bool check_extrq_selector(csh handle)
+{
+	uint8_t code[] = { 0x66, 0x0f, 0x78, 0xc0, 0x04, 0x02 };
+	for (unsigned mr = 0xc0; mr <= 0xff; ++mr) {
+		code[3] = (uint8_t)mr;
+		cs_insn *insn;
+		size_t count = cs_disasm(handle, code, sizeof(code), 0, 1, &insn);
+		if (!count) {
+			if (mr < 0xc8)
+				return false;
+			continue;
+		}
+		bool ok = mr < 0xc8 && insn->id == X86_INS_EXTRQ &&
+			  insn->size == sizeof(code);
+		cs_free(insn, count);
+		if (!ok)
+			return false;
+	}
+	return true;
+}
+
 int main(void)
 {
 	const cs_mode modes[] = { CS_MODE_32, CS_MODE_64 };
@@ -150,6 +171,8 @@ int main(void)
 			     check_moves(handle, i != 0, att != 0);
 		}
 		ok = ok && check_scan(handle, modes[i] == CS_MODE_64);
+		if (modes[i] != CS_MODE_16)
+			ok = ok && check_extrq_selector(handle);
 		cs_close(&handle);
 		if (!ok)
 			return 1;

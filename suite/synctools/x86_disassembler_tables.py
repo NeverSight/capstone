@@ -179,13 +179,16 @@ def numeric_values(body, label):
     return tuple(integer_value(token, label) for token in comma_values(body, label))
 
 
-def parse_ids(text, context_names):
+def parse_uid_storage(text, context_names):
     clean = uncomment(text)
     arrays = list(
         re.finditer(r"static const InstrUID modRMTable\[\] = \{(.*?)\};", clean, re.S)
     )
     require(len(arrays) == 1, "Expected exactly one modRMTable")
-    ids = numeric_values(arrays[0][1], "modRMTable")
+    resident = numeric_values(arrays[0][1], "modRMTable")
+    direct = re.findall(r"static const InstrUID modRMTableDirect\[\] = \{(.*?)\};", clean, re.S)
+    require(len(direct) <= 1, "Multiple direct-only UID tables")
+    ids = resident + numeric_values(direct[0], "modRMTableDirect") if direct else resident
     require(ids[0] == 0, "The empty ModR/M table entry must reject")
     require(
         all(value <= 0xFFFF for value in ids), "Instruction ID exceeds InstrUID storage"
@@ -213,7 +216,11 @@ def parse_ids(text, context_names):
         "Attribute-context array length mismatch",
     )
     require(set(context_values) <= set(context_names), "Unknown instruction context")
-    return ids
+    return ids, resident
+
+
+def parse_ids(text, context_names):
+    return parse_uid_storage(text, context_names)[0]
 
 
 def parse_maps(text, expected_names, context_count):
@@ -396,7 +403,7 @@ def format_header(suffix):
 
 
 def render(source_dir, suffix, context_names, types, map_names, deduplicate):
-    ids = parse_ids(
+    ids, resident = parse_uid_storage(
         (source_dir / f"X86GenDisassemblerTables{suffix}.inc").read_text(),
         context_names,
     )
@@ -416,7 +423,7 @@ def render(source_dir, suffix, context_names, types, map_names, deduplicate):
     @lru_cache(None)
     def new_results(word):
         return tuple(
-            packed_id(ids, reverse_types, word, modrm) for modrm in range(MODRM_COUNT)
+            packed_id(resident, reverse_types, word, modrm) for modrm in range(MODRM_COUNT)
         )
 
     lines = format_header(suffix)

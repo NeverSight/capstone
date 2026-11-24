@@ -84977,86 +84977,57 @@ static const uint8_t x86DisassemblerContexts[16384] = {
 static const InstrUID modRMTable[] = {
 /* EmptyTable */
   0x0,
-/* Table1 */
-  0xe0, /* ADD8mr */
-  0xe4, /* ADD8rr */
-/* Table3 */
-  0xce, /* ADD32mr */
-  0xd2, /* ADD32rr */
-/* Table5 */
-  0xe3, /* ADD8rm */
-  0xe5, /* ADD8rr_REV */
-/* Table7 */
-  0xd1, /* ADD32rm */
-  0xd3, /* ADD32rr_REV */
-/* Table9 */
-  0xdd, /* ADD8i8 */
-/* Table10 */
-  0xcb, /* ADD32i32 */
-/* Table11 */
-  0x8cb, /* PUSHES32 */
-/* Table12 */
-  0x850, /* POPES32 */
-/* Table13 */
-  0x749, /* OR8mr */
-  0x74d, /* OR8rr */
-/* Table15 */
-  0x737, /* OR32mr */
-  0x73b, /* OR32rr */
-/* Table17 */
-  0x74c, /* OR8rm */
-  0x74e, /* OR8rr_REV */
-/* Table19 */
-  0x73a, /* OR32rm */
-  0x73c, /* OR32rr_REV */
-/* Table21 */
-  0x746, /* OR8i8 */
-/* Table22 */
-  0x734, /* OR32i32 */
-/* Table23 */
-  0x8c7, /* PUSHCS32 */
-/* Table24 */
-  0xb8, /* ADC8mr */
-  0xbc, /* ADC8rr */
-/* Table26 */
-  0xa6, /* ADC32mr */
-  0xaa, /* ADC32rr */
-/* Table28 */
-  0xbb, /* ADC8rm */
-  0xbd, /* ADC8rr_REV */
-/* Table30 */
-  0xa9, /* ADC32rm */
-  0xab, /* ADC32rr_REV */
-/* Table32 */
-  0xb5, /* ADC8i8 */
-/* Table33 */
-  0xa3, /* ADC32i32 */
-/* Table34 */
-  0x8d6, /* PUSHSS32 */
-/* Table35 */
-  0x85b, /* POPSS32 */
-/* Table36 */
-  0x9ca, /* SBB8mr */
-  0x9ce, /* SBB8rr */
-/* Table38 */
-  0x9b8, /* SBB32mr */
-  0x9bc, /* SBB32rr */
-/* Table40 */
-  0x9cd, /* SBB8rm */
-  0x9cf, /* SBB8rr_REV */
-/* Table42 */
-  0x9bb, /* SBB32rm */
-  0x9bd, /* SBB32rr_REV */
-/* Table44 */
-  0x9c7, /* SBB8i8 */
-/* Table45 */
-  0x9b5, /* SBB32i32 */
-/* Table46 */
-  0x8c9, /* PUSHDS32 */
-/* Table47 */
-  0x84e, /* POPDS32 */
-/* Table48 */
-  0x139, /* AND8mr */
+/* Table1: immediate EXTRQ requires a register and /0. */
+  0x0, /*  */
+  0x0, /*  */
+  0x0, /*  */
+  0x0, /*  */
+  0x0, /*  */
+  0x0, /*  */
+  0x0, /*  */
+  0x0, /*  */
+  0x37c, /* EXTRQI */
+  0x0, /*  */
+  0x0, /*  */
+  0x0, /*  */
+  0x0, /*  */
+  0x0, /*  */
+  0x0, /*  */
+  0x0, /*  */
+/* Table17: immediate EXTRQ requires a register and /0. */
+  0x1f78, /* VMREAD32mr */
+  0x1f78, /* VMREAD32mr */
+  0x1f78, /* VMREAD32mr */
+  0x1f78, /* VMREAD32mr */
+  0x1f78, /* VMREAD32mr */
+  0x1f78, /* VMREAD32mr */
+  0x1f78, /* VMREAD32mr */
+  0x1f78, /* VMREAD32mr */
+  0x37c, /* EXTRQI */
+  0x0, /*  */
+  0x0, /*  */
+  0x0, /*  */
+  0x0, /*  */
+  0x0, /*  */
+  0x0, /*  */
+  0x0, /*  */
+/* Table33: immediate EXTRQ requires a register and /0. */
+  0x1f7a, /* VMREAD64mr */
+  0x1f7a, /* VMREAD64mr */
+  0x1f7a, /* VMREAD64mr */
+  0x1f7a, /* VMREAD64mr */
+  0x1f7a, /* VMREAD64mr */
+  0x1f7a, /* VMREAD64mr */
+  0x1f7a, /* VMREAD64mr */
+  0x1f7a, /* VMREAD64mr */
+  0x37c, /* EXTRQI */
+  0x0, /*  */
+  0x0, /*  */
+  0x0, /*  */
+  0x0, /*  */
+  0x0, /*  */
+  0x0, /*  */
+  0x0, /*  */
   0x13d, /* AND8rr */
 /* Table50 */
   0x127, /* AND32mr */
@@ -112989,3 +112960,90 @@ static const InstrUID modRMTable[] = {
   0x0
 };
 
+/* Generation input for decisions whose UIDs are embedded in the packed word.
+ * These virtual offsets follow modRMTable and require no runtime storage. */
+#ifdef CAPSTONE_X86_CANONICAL_DIRECT_UIDS
+static const InstrUID modRMTableDirect[] = {
+/* Table19984 */
+  0xe0, /* ADD8mr */
+  0xe4, /* ADD8rr */
+/* Table19986 */
+  0xce, /* ADD32mr */
+  0xd2, /* ADD32rr */
+/* Table19988 */
+  0xe3, /* ADD8rm */
+  0xe5, /* ADD8rr_REV */
+/* Table19990 */
+  0xd1, /* ADD32rm */
+  0xd3, /* ADD32rr_REV */
+/* Table19992 */
+  0xdd, /* ADD8i8 */
+/* Table19993 */
+  0xcb, /* ADD32i32 */
+/* Table19994 */
+  0x8cb, /* PUSHES32 */
+/* Table19995 */
+  0x850, /* POPES32 */
+/* Table19996 */
+  0x749, /* OR8mr */
+  0x74d, /* OR8rr */
+/* Table19998 */
+  0x737, /* OR32mr */
+  0x73b, /* OR32rr */
+/* Table20000 */
+  0x74c, /* OR8rm */
+  0x74e, /* OR8rr_REV */
+/* Table20002 */
+  0x73a, /* OR32rm */
+  0x73c, /* OR32rr_REV */
+/* Table20004 */
+  0x746, /* OR8i8 */
+/* Table20005 */
+  0x734, /* OR32i32 */
+/* Table20006 */
+  0x8c7, /* PUSHCS32 */
+/* Table20007 */
+  0xb8, /* ADC8mr */
+  0xbc, /* ADC8rr */
+/* Table20009 */
+  0xa6, /* ADC32mr */
+  0xaa, /* ADC32rr */
+/* Table20011 */
+  0xbb, /* ADC8rm */
+  0xbd, /* ADC8rr_REV */
+/* Table20013 */
+  0xa9, /* ADC32rm */
+  0xab, /* ADC32rr_REV */
+/* Table20015 */
+  0xb5, /* ADC8i8 */
+/* Table20016 */
+  0xa3, /* ADC32i32 */
+/* Table20017 */
+  0x8d6, /* PUSHSS32 */
+/* Table20018 */
+  0x85b, /* POPSS32 */
+/* Table20019 */
+  0x9ca, /* SBB8mr */
+  0x9ce, /* SBB8rr */
+/* Table20021 */
+  0x9b8, /* SBB32mr */
+  0x9bc, /* SBB32rr */
+/* Table20023 */
+  0x9cd, /* SBB8rm */
+  0x9cf, /* SBB8rr_REV */
+/* Table20025 */
+  0x9bb, /* SBB32rm */
+  0x9bd, /* SBB32rr_REV */
+/* Table20027 */
+  0x9c7, /* SBB8i8 */
+/* Table20028 */
+  0x9b5, /* SBB32i32 */
+/* Table20029 */
+  0x8c9, /* PUSHDS32 */
+/* Table20030 */
+  0x84e, /* POPDS32 */
+/* Table20031 */
+  0x139, /* AND8mr */
+  0x13d, /* AND8rr */
+};
+#endif
