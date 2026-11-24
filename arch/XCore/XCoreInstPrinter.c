@@ -28,6 +28,9 @@
 #include "../../MathExtras.h"
 #include "XCoreMapping.h"
 
+#define GET_INSTRINFO_ENUM
+#include "XCoreGenInstrInfo.inc"
+
 static const char *getRegisterName(unsigned RegNo);
 
 static void set_mem_access(MCInst *MI, bool status, int reg)
@@ -148,7 +151,25 @@ static void _printOperand(MCInst *MI, MCOperand *MO, SStream *O)
 	} else if (MCOperand_isImm(MO)) {
 		int32_t Imm = (int32_t)MCOperand_getImm(MO);
 
-		printInt32(O, Imm);
+		/* The selector is a register number in the other thread. */
+		unsigned int opcode = MCInst_getOpcode(MI);
+		if (opcode == XCore_TSETR_3r || opcode == XCore_TSETMR_2r) {
+			if (O->unsigned_num)
+				SStream_concat(O, "%" PRIu32, (uint32_t)Imm);
+			else
+				SStream_concat(O, "%" PRId32, Imm);
+		} else {
+#if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
+	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
+	!defined(_WIN32_WCE)
+			/* The stream's integer writer skips printf for the stock
+			 * formatter. Keep 32-bit printf formats for callbacks. */
+			if (cs_vsnprintf == cs_default_vsnprintf)
+				printInt64(O, O->unsigned_num ? (int64_t)(uint32_t)Imm : Imm);
+			else
+#endif
+				printInt32(O, Imm);
+		}
 
 		if (MI->csh->detail_opt) {
 			if (MI->csh->doing_mem) {

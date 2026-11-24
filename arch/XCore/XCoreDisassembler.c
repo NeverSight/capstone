@@ -767,6 +767,46 @@ static DecodeStatus DecodeL4RSrcDstSrcDstInstruction(MCInst *Inst,
 	return S;
 }
 
+#ifdef CAPSTONE_XCORE_ONLY
+/* Indexed by bits 15:9 of the little-endian instruction. Each nonzero
+ * entry has the same valid short opcode for all 512 operand encodings.
+ * The xcore_scan unit checks every halfword against the full decoder. */
+const uint16_t XCore_shortOpcodes[128] = {
+	XCore_STW_2rus, XCore_STW_2rus, XCore_STW_2rus, 0,
+	XCore_LDW_2rus, XCore_LDW_2rus, XCore_LDW_2rus, 0,
+	XCore_ADD_3r, XCore_ADD_3r, XCore_ADD_3r, 0,
+	XCore_SUB_3r, XCore_SUB_3r, XCore_SUB_3r, 0,
+	XCore_SHL_3r, XCore_SHL_3r, XCore_SHL_3r, 0,
+	XCore_SHR_3r, XCore_SHR_3r, XCore_SHR_3r, 0,
+	XCore_EQ_3r, XCore_EQ_3r, XCore_EQ_3r, 0,
+	XCore_AND_3r, XCore_AND_3r, XCore_AND_3r, 0,
+	XCore_OR_3r, XCore_OR_3r, XCore_OR_3r, 0,
+	XCore_LDW_3r, XCore_LDW_3r, XCore_LDW_3r, 0,
+	XCore_STWDP_ru6, XCore_STWDP_ru6, XCore_STWSP_ru6, XCore_STWSP_ru6,
+	XCore_LDWDP_ru6, XCore_LDWDP_ru6, XCore_LDWSP_ru6, XCore_LDWSP_ru6,
+	XCore_LDAWDP_ru6, XCore_LDAWDP_ru6, XCore_LDAWSP_ru6, XCore_LDAWSP_ru6,
+	XCore_LDC_ru6, XCore_LDC_ru6, XCore_LDWCP_ru6, XCore_LDWCP_ru6,
+	XCore_BRFT_ru6, 0, XCore_BRBT_ru6, 0,
+	XCore_BRFF_ru6, 0, XCore_BRBF_ru6, 0,
+	XCore_LD16S_3r, XCore_LD16S_3r, XCore_LD16S_3r, 0,
+	XCore_LD8U_3r, XCore_LD8U_3r, XCore_LD8U_3r, 0,
+	XCore_ADD_2rus, XCore_ADD_2rus, XCore_ADD_2rus, 0,
+	XCore_SUB_2rus, XCore_SUB_2rus, XCore_SUB_2rus, 0,
+	XCore_SHL_2rus, XCore_SHL_2rus, XCore_SHL_2rus, 0,
+	XCore_SHR_2rus, XCore_SHR_2rus, XCore_SHR_2rus, 0,
+	XCore_EQ_2rus, XCore_EQ_2rus, XCore_EQ_2rus, 0,
+	XCore_TSETR_3r, XCore_TSETR_3r, XCore_TSETR_3r, 0,
+	XCore_LSS_3r, XCore_LSS_3r, XCore_LSS_3r, 0,
+	XCore_LSU_3r, XCore_LSU_3r, XCore_LSU_3r, 0,
+	XCore_BLRF_u10, XCore_BLRF_u10, XCore_BLRB_u10, XCore_BLRB_u10,
+	XCore_LDAPF_u10, XCore_LDAPF_u10, XCore_LDAPB_u10, XCore_LDAPB_u10,
+	XCore_BLACP_u10, XCore_BLACP_u10, XCore_LDWCP_u10, XCore_LDWCP_u10,
+	XCore_SETC_ru6, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+};
+#endif
+
 #define GET_SUBTARGETINFO_ENUM
 #include "XCoreGenInstrInfo.inc"
 bool XCore_getInstruction(csh ud, const uint8_t *code, size_t code_len,
