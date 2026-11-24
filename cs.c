@@ -1643,8 +1643,18 @@ size_t CAPSTONE_API cs_disasm(csh ud, const uint8_t *buffer, size_t size,
 		insn_cache->op_str[0] = '\0';
 #endif
 
-		r = decode_insn(handle, buffer, size, insn_cache, &insn_size,
-				scan, true);
+#ifdef CAPSTONE_X86_BATCH_OUTPUT
+		/* A detail allocator can switch options after it supplies the
+		 * slot. The full decoder owns that transition. */
+		if (!scan && !handle->no_text &&
+		    (!insn_cache->detail || handle->detail_opt) &&
+		    X86_tryBatchOutput(handle, buffer, size, insn_cache,
+				       &insn_size))
+			r = true;
+		else
+#endif
+			r = decode_insn(handle, buffer, size, insn_cache,
+					&insn_size, scan, true);
 		if (CS_DECODE_LIKELY(r)) {
 			next_offset = insn_size;
 		} else {

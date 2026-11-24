@@ -15,6 +15,15 @@
 
 #include "X86SimpleOutputImpl.h"
 
+#ifdef CAPSTONE_X86_BATCH_OUTPUT
+CAPSTONE_INTERNAL bool X86_tryBatchOutput(cs_struct *handle, const uint8_t *code,
+					 size_t size, cs_insn *insn,
+					 uint16_t *insn_size)
+{
+	return X86_trySimpleOutput(handle, code, size, insn, insn_size);
+}
+#endif
+
 #ifndef CAPSTONE_X86_DEDICATED_OUTPUT
 #define CS_DECODE_TRY_OUTPUT X86_trySimpleOutput
 #endif

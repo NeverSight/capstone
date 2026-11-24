@@ -35,6 +35,14 @@ CAPSTONE_INTERNAL bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *cod
 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
 	!defined(_WIN32_WCE)
 #define CAPSTONE_X86_PUBLIC_OUTPUT
+/* Linux already selects the scalar writer in its full decode entry. */
+#ifndef CAPSTONE_X86_DEDICATED_OUTPUT
+#include "../../cs_priv.h"
+#define CAPSTONE_X86_BATCH_OUTPUT
+CAPSTONE_INTERNAL bool X86_tryBatchOutput(cs_struct *handle, const uint8_t *code,
+					 size_t size, cs_insn *insn,
+					 uint16_t *insn_size);
+#endif
 #endif
 
 bool X86_getInstruction(csh handle, const uint8_t *code, size_t code_len,
