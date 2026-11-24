@@ -121,6 +121,17 @@ else ifeq ($(sort $(CAPSTONE_ARCHS)),mips x86)
 CFLAGS += -DCAPSTONE_X86_MIPS_ONLY
 else ifeq ($(sort $(CAPSTONE_ARCHS)),aarch64 arm mips x86)
 CFLAGS += -DCAPSTONE_ARM_AARCH64_MIPS_X86
+else ifeq ($(sort $(CAPSTONE_ARCHS)),aarch64 arm mips powerpc riscv x86)
+# Use the compiler target, including cross builds.
+MIXED_STORAGE_TARGET := $(shell $(CC) $(CPPFLAGS) $(CFLAGS) -dM -E -x c - < /dev/null | \
+	awk '$$2 == "__clang__" { clang_cc=1 } $$2 == "__SIZEOF_POINTER__" { ptr=$$3 } \
+	     $$2 == "__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__" { macos=1 } \
+	     $$2 == "__linux__" { linux_target=1 } $$2 == "__aarch64__" { arm64=1 } \
+	     END { if (clang_cc && ptr==8 && (macos || (linux_target && arm64))) print "yes" }')
+ifeq ($(MIXED_STORAGE_TARGET),yes)
+CFLAGS += -DCAPSTONE_MIXED_CONSTRUCTED_OPERANDS
+MCINST_STORAGE_OBJ = $(OBJDIR)/MCInstStorage.o
+endif
 endif
 
 ifeq ($(sort $(CAPSTONE_ARCHS)),arm)
@@ -449,8 +460,8 @@ LIBOBJ += $(LIBOBJ_ARM) $(LIBOBJ_AARCH64) $(LIBOBJ_M68K) $(LIBOBJ_MIPS) $(LIBOBJ
 LIBOBJ += $(LIBOBJ_X86) $(LIBOBJ_XCORE) $(LIBOBJ_TMS320C64X) $(LIBOBJ_M680X) $(LIBOBJ_EVM) $(LIBOBJ_MOS65XX) $(LIBOBJ_WASM) $(LIBOBJ_BPF)
 LIBOBJ += $(LIBOBJ_TRICORE) $(LIBOBJ_ALPHA) $(LIBOBJ_HPPA) $(LIBOBJ_LOONGARCH) $(LIBOBJ_XTENSA) $(LIBOBJ_ARC)
 LIBOBJ += $(LIBOBJ_X86_NUMBERS)
-LIBOBJ_SHARED := $(LIBOBJ) $(OBJDIR)/AliasPatternLookup.o
-LIBOBJ += $(LIBOBJ_X86_STATIC_OUTPUT) $(OBJDIR)/AliasPatternLookup.o
+LIBOBJ_SHARED := $(LIBOBJ) $(OBJDIR)/AliasPatternLookup.o $(MCINST_STORAGE_OBJ)
+LIBOBJ += $(LIBOBJ_X86_STATIC_OUTPUT) $(OBJDIR)/AliasPatternLookup.o $(MCINST_STORAGE_OBJ)
 ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
 LIBOBJ_SHARED := $(LIBOBJ)
 endif

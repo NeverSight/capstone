@@ -160,6 +160,14 @@ elseif(capstone_enabled_architectures STREQUAL "MIPS;X86")
     add_compile_definitions(CAPSTONE_X86_MIPS_ONLY)
 elseif(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;X86")
     add_compile_definitions(CAPSTONE_ARM_AARCH64_MIPS_X86)
+elseif(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV")
+    # Linux x86-64 retains its inlined initialization for MIPS text throughput.
+    if(CMAKE_C_COMPILER_ID MATCHES "Clang" AND CMAKE_SIZEOF_VOID_P EQUAL 8
+       AND (CMAKE_SYSTEM_NAME STREQUAL "Darwin" OR
+            (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64|ARM64)$")))
+        add_compile_definitions(CAPSTONE_MIXED_CONSTRUCTED_OPERANDS)
+        set(capstone_storage_source MCInstStorage.c)
+    endif()
 endif()
 
 if(capstone_enabled_architectures STREQUAL "XCORE")
@@ -1056,7 +1064,7 @@ set_property(GLOBAL PROPERTY VERSION ${PROJECT_VERSION})
 
 ## targets
 add_library(capstone_build_settings INTERFACE)
-add_library(capstone OBJECT ${ALL_SOURCES} ${ALL_HEADERS})
+add_library(capstone OBJECT ${ALL_SOURCES} ${capstone_storage_source} ${ALL_HEADERS})
 target_link_libraries(capstone PUBLIC capstone_build_settings)
 set_property(TARGET capstone PROPERTY C_STANDARD 99)
 target_include_directories(capstone_build_settings INTERFACE
@@ -1089,23 +1097,23 @@ endif()
 
 if(CAPSTONE_BUILD_STATIC_LIBS)
     set(capstone_static_objects $<TARGET_OBJECTS:capstone>)
-    set(capstone_alias_patterns_tail)
+    set(capstone_static_tail)
     if(TARGET capstone_x86_iter32)
         if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_C_COMPILER_ID STREQUAL "Clang"
            AND (CAPSTONE_AARCH64_SUPPORT OR CAPSTONE_MIPS_SUPPORT))
             # Backends reference the alias parser indirectly. Keep its hot code
             # ahead of the optional native readers even when all are linked.
-            # Keep the opcode rows after the native scanner when both are linked.
-            set(capstone_alias_patterns_tail
-                "$<FILTER:$<TARGET_OBJECTS:capstone>,INCLUDE,/AliasPatternLookup[.]c[.]o$>")
+            # Keep alias rows and the mixed operand initializer after the native readers.
+            set(capstone_static_tail
+                "$<FILTER:$<TARGET_OBJECTS:capstone>,INCLUDE,/(AliasPatternLookup|MCInstStorage)[.]c[.]o$>")
             set(capstone_static_objects
-                "$<FILTER:$<TARGET_OBJECTS:capstone>,EXCLUDE,/(AliasMapping|AliasPatternLookup)[.]c[.]o$>"
+                "$<FILTER:$<TARGET_OBJECTS:capstone>,EXCLUDE,/(AliasMapping|AliasPatternLookup|MCInstStorage)[.]c[.]o$>"
                 $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>
                 "$<FILTER:$<TARGET_OBJECTS:capstone>,INCLUDE,/AliasMapping[.]c[.]o$>")
         else()
             list(APPEND capstone_static_objects $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>)
         endif()
-        list(APPEND capstone_static_objects $<TARGET_OBJECTS:capstone_x86_native> ${capstone_alias_patterns_tail})
+        list(APPEND capstone_static_objects $<TARGET_OBJECTS:capstone_x86_native> ${capstone_static_tail})
     endif()
     add_library(capstone_static STATIC ${capstone_static_objects})
     # Use normal capstone name. Otherwise we get libcapstone_static.a

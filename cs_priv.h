@@ -30,6 +30,10 @@
 
 #include "MCInst.h"
 #include "SStream.h"
+
+#if defined(CAPSTONE_MIXED_CONSTRUCTED_OPERANDS) && defined(__clang__)
+CAPSTONE_INTERNAL void MCInst_InitConstructedOperands(MCInst *inst, cs_arch arch);
+#endif
 #ifdef CAPSTONE_X86_SCAN_ADAPTER
 #include "arch/X86/X86ScanAdapter.h"
 #endif

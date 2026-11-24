@@ -1159,6 +1159,8 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
 	 * performs better on some full-detail workloads with the shared
 	 * initializer below. */
 	MCInst_InitStorage(&mci, CS_ARCH_AARCH64, false);
+#elif defined(CAPSTONE_MIXED_CONSTRUCTED_OPERANDS) && defined(__clang__)
+	MCInst_InitConstructedOperands(&mci, handle->arch);
 #else
 	MCInst_Init(&mci, handle->arch);
 #endif
