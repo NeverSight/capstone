@@ -1245,6 +1245,18 @@ static bool check_extend64(csh handles[2])
 	return true;
 }
 
+static bool check_group3_registers32(csh handles[2])
+{
+	for (unsigned op = 0xf6; op <= 0xf7; ++op) {
+		for (unsigned mr = 0xd0; mr <= 0xff; ++mr) {
+			const uint8_t bytes[] = { (uint8_t)op, (uint8_t)mr };
+			if (!compare(handles, bytes, sizeof(bytes), mr))
+				return false;
+		}
+	}
+	return true;
+}
+
 static bool check_extend32(csh handles[2])
 {
 	for (unsigned op = 0xb6; op <= 0xbf; ++op) {
@@ -1658,7 +1670,7 @@ static bool check_mode(cs_mode mode)
 		    !check_vex_register_immediates(handles, mode) ||
 		    (mode == CS_MODE_32 && private_iter != X86_disasmIter &&
 		     (!check_absolute_addresses32(handles) ||
-		      !check_extend32(handles))) ||
+		      !check_extend32(handles) || !check_group3_registers32(handles))) ||
 		    (mode == CS_MODE_64 && private_iter != X86_disasmIter &&
 		     !check_extend64(handles)) ||
 		    (private_iter != X86_disasmIter &&
