@@ -152,6 +152,10 @@ and run `unit_x86_scalar_vector_access`.
 The VEX `KMOVB/W/D/Q` memory-store rows are maintained by
 `suite/auto-sync/inc_patches/X86/05_kmov_store_access.patch` and covered by
 `unit_x86_kmask_access`.
+The MOVD/MOVQ and VMOVD/VMOVQ memory access rows and MMX MOVQ public IDs
+are maintained by `suite/auto-sync/inc_patches/X86/06_integer_vector_moves.patch` and covered by
+`unit_x86_integer_vector_access`. Regenerate the legacy packed memory output with
+`x86_simple_output --legacy-packed-memory` after updating these rows.
 
 After changing `X86ImmSize.inc` or either `X86GenInstrInfo*.inc` enum, run
 `python3 suite/synctools/x86_immediate_sizes.py`, then run it with `--check`.

@@ -8579,7 +8579,7 @@
 },
 
 {
-	X86_MMX_MOVD64from64rm, X86_INS_MOVD, 1,
+	X86_MMX_MOVD64from64rm, X86_INS_MOVQ, 1,
 #ifndef CAPSTONE_DIET
 	{ 0 }, { 0 }, { X86_GRP_MMX, 0 }, 0, 0
 #endif
@@ -8621,7 +8621,7 @@
 },
 
 {
-	X86_MMX_MOVD64to64rm, X86_INS_MOVD, 1,
+	X86_MMX_MOVD64to64rm, X86_INS_MOVQ, 1,
 #ifndef CAPSTONE_DIET
 	{ 0 }, { 0 }, { X86_GRP_MMX, 0 }, 0, 0
 #endif

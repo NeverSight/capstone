@@ -1,0 +1,129 @@
+diff --git a/arch/X86/X86MappingInsn.inc b/arch/X86/X86MappingInsn.inc
+--- a/arch/X86/X86MappingInsn.inc
++++ b/arch/X86/X86MappingInsn.inc
+@@ -8581,3 +8581,3 @@
+ {
+-	X86_MMX_MOVD64from64rm, X86_INS_MOVD, 1,
++	X86_MMX_MOVD64from64rm, X86_INS_MOVQ, 1,
+ #ifndef CAPSTONE_DIET
+@@ -8623,3 +8623,3 @@
+ {
+-	X86_MMX_MOVD64to64rm, X86_INS_MOVD, 1,
++	X86_MMX_MOVD64to64rm, X86_INS_MOVQ, 1,
+ #ifndef CAPSTONE_DIET
+diff --git a/arch/X86/X86MappingInsnOp.inc b/arch/X86/X86MappingInsnOp.inc
+--- a/arch/X86/X86MappingInsnOp.inc
++++ b/arch/X86/X86MappingInsnOp.inc
+@@ -6129,6 +6129,6 @@
+ },
+-
++
+-{	/* X86_MMX_MOVD64from64rm, X86_INS_MOVD: movd	$dst $src */
++{	/* X86_MMX_MOVD64from64rm, X86_INS_MOVQ: movq	$dst $src */
+-	0,
++	0,
+-	{ CS_AC_WRITE, CS_AC_READ, 0 }
++	{ CS_AC_WRITE, CS_AC_READ, 0 }
+ },
+@@ -6146,4 +6146,4 @@
+ {	/* X86_MMX_MOVD64mr, X86_INS_MOVD: movd */
+-	0,
++	0,
+-	{ CS_AC_READ, CS_AC_READ, 0 }
++	{ CS_AC_WRITE, CS_AC_READ, 0 }
+ },
+@@ -6159,6 +6159,6 @@
+ },
+-
++
+-{	/* X86_MMX_MOVD64to64rm, X86_INS_MOVD: movd	$dst $src */
++{	/* X86_MMX_MOVD64to64rm, X86_INS_MOVQ: movq	$dst $src */
+-	0,
++	0,
+-	{ CS_AC_WRITE, CS_AC_READ, 0 }
++	{ CS_AC_WRITE, CS_AC_READ, 0 }
+ },
+@@ -6196,4 +6196,4 @@
+ {	/* X86_MMX_MOVQ64mr, X86_INS_MOVQ: movq */
+-	0,
++	0,
+-	{ CS_AC_READ, CS_AC_READ, 0 }
++	{ CS_AC_WRITE, CS_AC_READ, 0 }
+ },
+@@ -7651,4 +7651,4 @@
+ {	/* X86_MOVPQI2QImr, X86_INS_MOVQ: movq */
+-	0,
++	0,
+-	{ CS_AC_READ, CS_AC_READ, 0 }
++	{ CS_AC_WRITE, CS_AC_READ, 0 }
+ },
+@@ -7701,4 +7701,4 @@
+ {	/* X86_MOVSDto64mr, X86_INS_MOVQ: movq	$dst $src */
+-	0,
++	0,
+-	{ CS_AC_READ, CS_AC_READ, 0 }
++	{ CS_AC_WRITE, CS_AC_READ, 0 }
+ },
+@@ -7741,4 +7741,4 @@
+ {	/* X86_MOVSS2DImr, X86_INS_MOVD: movd	$dst $src */
+-	0,
++	0,
+-	{ CS_AC_READ, CS_AC_READ, 0 }
++	{ CS_AC_WRITE, CS_AC_READ, 0 }
+ },
+@@ -38626,4 +38626,4 @@
+ {	/* X86_VMOVPDI2DIZmr, X86_INS_VMOVD: vmovd */
+-	0,
++	0,
+-	{ CS_AC_READ, CS_AC_READ, 0 }
++	{ CS_AC_WRITE, CS_AC_READ, 0 }
+ },
+@@ -38636,4 +38636,4 @@
+ {	/* X86_VMOVPDI2DImr, X86_INS_VMOVD: vmovd */
+-	0,
++	0,
+-	{ CS_AC_READ, CS_AC_READ, 0 }
++	{ CS_AC_WRITE, CS_AC_READ, 0 }
+ },
+@@ -38656,4 +38656,4 @@
+ {	/* X86_VMOVPQI2QImr, X86_INS_VMOVQ: vmovq */
+-	0,
++	0,
+-	{ CS_AC_READ, CS_AC_READ, 0 }
++	{ CS_AC_WRITE, CS_AC_READ, 0 }
+ },
+@@ -38666,4 +38666,4 @@
+ {	/* X86_VMOVPQIto64Zmr, X86_INS_VMOVQ: vmovq	$dst $src */
+-	0,
++	0,
+-	{ CS_AC_READ, CS_AC_READ, 0 }
++	{ CS_AC_WRITE, CS_AC_READ, 0 }
+ },
+@@ -38771,4 +38771,4 @@
+ {	/* X86_VMOVSDto64Zmr, X86_INS_VMOVQ: vmovq	$dst $src */
+-	0,
++	0,
+-	{ CS_AC_READ, CS_AC_READ, 0 }
++	{ CS_AC_WRITE, CS_AC_READ, 0 }
+ },
+@@ -38781,4 +38781,4 @@
+ {	/* X86_VMOVSDto64mr, X86_INS_VMOVQ: vmovq	$dst $src */
+-	0,
++	0,
+-	{ CS_AC_READ, CS_AC_READ, 0 }
++	{ CS_AC_WRITE, CS_AC_READ, 0 }
+ },
+@@ -39011,4 +39011,4 @@
+ {	/* X86_VMOVSS2DIZmr, X86_INS_VMOVD: vmovd	$dst $src */
+-	0,
++	0,
+-	{ CS_AC_READ, CS_AC_READ, 0 }
++	{ CS_AC_WRITE, CS_AC_READ, 0 }
+ },
+@@ -39021,4 +39021,4 @@
+ {	/* X86_VMOVSS2DImr, X86_INS_VMOVD: vmovd	$dst $src */
+-	0,
++	0,
+-	{ CS_AC_READ, CS_AC_READ, 0 }
++	{ CS_AC_WRITE, CS_AC_READ, 0 }
+ },
