@@ -77,6 +77,9 @@ static bool check_option_changes(csh handles[2], bool big_endian)
 static bool check_mode(cs_mode mode)
 {
 	static const uint32_t words[] = {
+		0x2128ffff, 0x012a4020, 0x012a4021, 0x012a4022,
+		0x012a4023, 0x012a4024, 0x012a4025, 0x012a4026,
+		0x012a4027, 0x012a402a, 0x012a402b,
 		0x24080001, 0x3128ffff, 0x35080000,
 		0x3928ffff, 0x8fa80000, 0xafa8fffc,
 		0x10000000, 0x1109ffff, 0x15000004, 0x29080000,
@@ -84,6 +87,7 @@ static bool check_mode(cs_mode mode)
 		0x95a8ffff, 0xa1a80000, 0xa5a8ffff,
 	};
 	static const uint32_t others[] = {
+		0x012a4060, 0x012a4067, 0x012a47eb,
 		0x6508ffff, 0xdfa80000, 0xffa8fffc, 0x10000002,
 		0,	    0x03e00008, 0xffffffff,
 	};

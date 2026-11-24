@@ -419,9 +419,8 @@ bool Mips_getInstruction(csh handle, const uint8_t *code, size_t code_len,
 }
 
 /* The classic three-register ALU forms reserve bits 10..6 as zero. */
-static inline unsigned classicDetailOpcode(MCInst *instr, const uint8_t *code)
+static inline unsigned classicMappedOpcode(MCInst *instr, uint32_t word)
 {
-	const uint32_t word = readBytes32(instr, code);
 	const unsigned major = word >> 26;
 	/* The DSP table precedes the base table for these two full primary
 	 * opcodes. Its mapping supplies the advertised DSP instruction groups. */
@@ -470,7 +469,7 @@ bool Mips_disasmClassicNoText(cs_struct *handle, const uint8_t *code,
 		Mips_init_cs_detail(&instr);
 		return false;
 	}
-	const unsigned opcode = classicDetailOpcode(&instr, code);
+	const unsigned opcode = classicMappedOpcode(&instr, readBytes32(&instr, code));
 	if (opcode) {
 		Mips_init_cs_detail(&instr);
 		MCInst_setOpcode(&instr, opcode);
@@ -997,8 +996,13 @@ static bool getScanInstruction(csh handle, const uint8_t *code, size_t length,
 	if (length >= 4 && (mode == CS_MODE_MIPS32 || mode == CS_MODE_MIPS64) &&
 	    h->disasm == getScanInstruction && h->insn_id == Mips_get_insn_id &&
 	    h->no_text && !instr->flat_insn->detail) {
-		const unsigned opcode =
-			standardScanOpcode(readBytes32(instr, code) >> 26, mode);
+		const uint32_t word = readBytes32(instr, code);
+		const unsigned major = word >> 26;
+		/* SPECIAL needs the function and reserved shift bits. ADDI
+		 * and the register forms share the classic detail mapping. */
+		const unsigned opcode = major == 0 || major == 8 ?
+						classicMappedOpcode(instr, word) :
+						standardScanOpcode(major, mode);
 		if (opcode) {
 			Mips_init_cs_detail(instr);
 			MCInst_setOpcode(instr, opcode);

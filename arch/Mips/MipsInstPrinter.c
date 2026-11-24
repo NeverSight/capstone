@@ -270,8 +270,16 @@ void Mips_LLVM_printInst(MCInst *MI, uint64_t Address, SStream *O)
 {
 	bool useAliasDetails = map_use_alias_details(MI);
 	if (!useAliasDetails) {
-		SStream_Close(O);
-		printInstruction(MI, Address, O);
+#ifdef CAPSTONE_MIPS_ONLY
+		/* The closed pass collects operands of the real instruction. */
+		const bool collectRealOperands = MI->csh->detail_opt & CS_OPT_ON;
+#else
+		const bool collectRealOperands = true;
+#endif
+		if (collectRealOperands) {
+			SStream_Close(O);
+			printInstruction(MI, Address, O);
+		}
 		SStream_Open(O);
 		map_set_fill_detail_ops(MI, false);
 	}
