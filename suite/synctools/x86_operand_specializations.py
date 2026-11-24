@@ -986,7 +986,11 @@ def emit_batch_primary(suffix):
                 fixed = 1 + int(reads_modrm) + tail
                 tables.require(fixed <= 15 and mapping[uid] < (group_bit >> 8), "Primary plan overflow")
                 values.append((mapping[uid] << 8) | (0x10 if reads_modrm else 0) | fixed)
-            if len(set(values)) == 1:
+            # MOVD/MOVQ have separate register and memory encodings. Keep the
+            # REX.W MMX pair in its existing group even when both public IDs
+            # are MOVQ, so unrelated batch groups retain their indices.
+            mmx_move = secondary and context == "X86_TERMINAL_64_REXW" and opcode in (0x6E, 0x7E)
+            if len(set(values)) == 1 and not mmx_move:
                 direct.append(values[0])
                 continue
             by_reg = []

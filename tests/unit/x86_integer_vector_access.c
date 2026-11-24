@@ -103,6 +103,34 @@ static bool check_moves(csh handle, bool wide, bool att)
 	return true;
 }
 
+static bool check_scan(csh handle, bool wide)
+{
+	if (cs_option(handle, CS_OPT_DETAIL, CS_OPT_OFF) != CS_ERR_OK ||
+	    cs_option(handle, CS_OPT_TEXT, CS_OPT_OFF) != CS_ERR_OK)
+		return false;
+	cs_insn *insn = cs_malloc(handle);
+	if (!insn)
+		return false;
+	bool ok = true;
+	for (size_t i = 0; i < sizeof(moves) / sizeof(moves[0]); ++i) {
+		const struct move *move = &moves[i];
+		if (move->wide_only && !wide)
+			continue;
+		const uint8_t *code = move->bytes;
+		size_t size = move->length;
+		uint64_t address = 0x1000;
+		if (!cs_disasm_iter(handle, &code, &size, &address, insn) ||
+		    insn->id != move->id || insn->size != move->length ||
+		    size != 0) {
+			fprintf(stderr, "scan case %zu\n", i);
+			ok = false;
+			break;
+		}
+	}
+	cs_free(insn, 1);
+	return ok;
+}
+
 int main(void)
 {
 	const cs_mode modes[] = { CS_MODE_32, CS_MODE_64 };
@@ -121,6 +149,7 @@ int main(void)
 			ok = err == CS_ERR_OK &&
 			     check_moves(handle, i != 0, att != 0);
 		}
+		ok = ok && check_scan(handle, modes[i] == CS_MODE_64);
 		cs_close(&handle);
 		if (!ok)
 			return 1;
