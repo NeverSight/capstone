@@ -22,7 +22,9 @@
 #include "X86MemoryOutputImpl.h"
 #undef X86_IMMEDIATE_WIDE
 #undef X86_MEMORY_IMMEDIATE
+#define X86_BASE_ONLY_SIB
 #include "X86MemoryOutputImpl.h"
+#undef X86_BASE_ONLY_SIB
 
 #define X86_EXTEND32_MEMORY writeExtendMemory32
 #include "X86MemoryOutputImpl.h"
