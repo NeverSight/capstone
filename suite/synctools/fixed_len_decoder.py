@@ -346,6 +346,75 @@ def emit(name, nodes, width, w, compressed=False):
     return "\n".join(out)
 
 
+def riscv_scan_decoders(text):
+    """Recognize operand readers that always succeed for a non-E hart."""
+    readers = text.split("#define DecodeToMCInst(", 1)[1].split("#define DecodeInstruction(", 1)[0]
+    cases = re.split(r"^\s*case (\d+):\s*\\$", readers, flags=re.M)
+    result = set()
+    for index, body in zip(cases[1::2], cases[2::2]):
+        bits = None
+        for source in body.splitlines():
+            line = source.rstrip("\\").strip()
+            if not line:
+                continue
+            if line == "return S;":
+                result.add(int(index))
+                break
+            if line == "tmp = 0x0;":
+                bits = 0
+                continue
+            field = re.fullmatch(r"tmp (=|\|=) fieldname\(insn, (\d+), (\d+)\)(?: << (\d+))?;", line)
+            if field:
+                op, start, width, shift = field.groups()
+                if int(start) + int(width) > 32 or (op == "|=" and bits is None):
+                    break
+                value = ((1 << int(width)) - 1) << int(shift or 0)
+                bits = value if op == "=" else bits | value
+                continue
+            reader = re.fullmatch(
+                r"if \(!Check\(&S, (DecodeGPRRegisterClass|decode[SU]ImmOperand(?:AndLsl1)?_(\d+))"
+                r"\(MI, tmp, Address, Decoder\)\)\) \{ return MCDisassembler_Fail; \}", line
+            )
+            if not reader or bits is None or bits.bit_length() > int(reader[2] or 5):
+                break
+    return result
+
+
+def riscv_scan_opcodes(nodes, decoders, extension_majors):
+    """Resolve the base row only if opcode and funct3 determine every decision."""
+    known = 0x707f
+    def resolve(major, funct3):
+        if extension_majors & (1 << major):
+            return 0
+        word = (major << 2) | 3 | (funct3 << 12)
+        pos, field = 0, 0
+        while True:
+            n = nodes[pos]
+            if n.op == "Decode":
+                return n.args[0] if n.args[1] in decoders else 0
+            if n.op in ("CheckField", "ExtractField"):
+                start, size = n.args[:2]
+                mask = (1 << size) - 1
+                if ((known >> start) & mask) != mask:
+                    return 0
+                value = (word >> start) & mask
+                if n.op == "CheckField":
+                    pos = n.end if value == n.args[2] else n.target
+                else:
+                    field, pos = value, n.end
+            elif n.op == "FilterValue":
+                pos = n.end if field == n.args[0] else n.target
+            else:
+                return 0
+
+    rows = [[resolve(major, f) for f in range(8)] for major in range(32)]
+    require(max(max(row) for row in rows) <= 0xffff, "RISC-V scan opcode exceeds table width")
+    return "\n".join(["#ifdef CAPSTONE_RISCV_ONLY",
+                      "static const uint16_t RISCVScanOpcodes[32][8] = {",
+                      *["\t{ " + ", ".join(map(str, row)) + " }," for row in rows],
+                      "};", "#endif"])
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true")
@@ -381,6 +450,8 @@ def main():
                 "Review changed decoder input width before regenerating",
             )
             nodes = parse(body)
+            if arch == "RISCV" and name == "DecoderTable32":
+                riscv_base = nodes
             if arch == "RISCV" and encoded_width == 32 and name != "DecoderTable32":
                 for opcode_prefix in observable_field_values(nodes, 0, 7):
                     extension_majors |= 1 << (opcode_prefix >> 2)
@@ -401,6 +472,7 @@ def main():
             output.append(emit(name, nodes, width, w, arch == "RISCV" and name == "DecoderTable16"))
             counts.append((name, len(nodes)))
         if arch == "RISCV":
+            output.append(riscv_scan_opcodes(riscv_base, riscv_scan_decoders(text), extension_majors))
             output.append(
                 f"#define RISCV_EXTENSION_MAJORS UINT32_C(0x{extension_majors:08x})"
             )

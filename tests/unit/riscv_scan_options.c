@@ -3,9 +3,23 @@
 #include <capstone/capstone.h>
 #include <string.h>
 
-/* Disable the scan specialization on the reference handle by requesting
- * detail. Compare instruction identity and boundaries for every halfword. */
-static bool checkCompressed(cs_mode mode)
+/* Compare the ID-only decoder with the complete decoder at the same address. */
+static bool checkScanWord(csh scan, cs_insn *a, csh reference, cs_insn *b,
+			  uint32_t word, size_t size)
+{
+	const uint8_t raw[] = { (uint8_t)word, (uint8_t)(word >> 8),
+				(uint8_t)(word >> 16), (uint8_t)(word >> 24) };
+	const uint8_t *p = raw, *q = raw;
+	size_t n = size, m = size;
+	uint64_t pc = 0xfffe, ip = pc;
+	const bool x = cs_disasm_iter(scan, &p, &n, &pc, a);
+	const bool y = cs_disasm_iter(reference, &q, &m, &ip, b);
+	return x == y && n == m && p == q && pc == ip &&
+	       (!x || (a->id == b->id && a->size == b->size &&
+		       memcmp(a->bytes, b->bytes, a->size) == 0));
+}
+
+static bool checkScan(cs_mode mode)
 {
 	csh scan, reference;
 	if (cs_open(CS_ARCH_RISCV, mode, &scan) != CS_ERR_OK)
@@ -22,15 +36,19 @@ static bool checkCompressed(cs_mode mode)
 	for (unsigned bits = 0; ok && bits <= UINT16_MAX; ++bits) {
 		if ((bits & 3) == 3)
 			continue;
-		const uint8_t raw[] = { (uint8_t)bits, (uint8_t)(bits >> 8) };
-		const uint8_t *p = raw, *q = raw;
-		size_t n = 2, m = 2;
-		uint64_t pc = 0xfffe, ip = pc;
-		const bool x = cs_disasm_iter(scan, &p, &n, &pc, a);
-		const bool y = cs_disasm_iter(reference, &q, &m, &ip, b);
-		ok = x == y && n == m && p == q && pc == ip &&
-		     (!x || (a->id == b->id && a->size == b->size &&
-			     memcmp(a->bytes, b->bytes, 2) == 0));
+		ok = checkScanWord(scan, a, reference, b, bits, 2);
+	}
+	/* Visit every major opcode and funct3 with different register,
+	 * immediate and reserved bits. */
+	for (unsigned major = 0; ok && major < 32; ++major) {
+		for (unsigned f = 0; ok && f < 8; ++f) {
+			for (unsigned i = 0; ok && i < 32; ++i) {
+				const uint32_t inputs = i * UINT32_C(0x9e3779b9);
+				const uint32_t word = (inputs & ~UINT32_C(0x707f)) |
+						      (major << 2) | 3 | (f << 12);
+				ok = checkScanWord(scan, a, reference, b, word, 4);
+			}
+		}
 	}
 	if (a)
 		cs_free(a, 1);
@@ -90,8 +108,8 @@ int main(void)
 	}
 	const unsigned extensions = CS_MODE_RISCV_C | CS_MODE_RISCV_FD |
 				    CS_MODE_RISCV_ZICFISS | CS_MODE_RISCV_ZCMP_ZCMT_ZCE;
-	ok &= checkCompressed((cs_mode)(CS_MODE_RISCV32 | extensions));
-	ok &= checkCompressed((cs_mode)(CS_MODE_RISCV64 | extensions));
+	ok &= checkScan((cs_mode)(CS_MODE_RISCV32 | extensions));
+	ok &= checkScan((cs_mode)(CS_MODE_RISCV64 | extensions));
 	cs_free(insn, 1);
 	cs_close(&h);
 	return ok ? 0 : 1;

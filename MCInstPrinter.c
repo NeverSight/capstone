@@ -142,6 +142,13 @@ const char *matchAliasPatterns(MCInst *MI, const AliasMatchingData *M)
 		count = handle->alias_opcode_count;
 	unsigned MIOpcode = MI->Opcode;
 	size_t i = 0;
+#if defined(CAPSTONE_RISCV_ONLY) && !defined(CAPSTONE_DIET)
+	/* The generated RISC-V index passes a suffix starting at the
+	 * selected opcode. Zero can also be the sentinel. */
+	if (MIOpcode && M->OpToPatterns[0].Opcode == MIOpcode)
+		count = 1;
+	else
+#endif
 	if (!count || M->OpToPatterns[count - 1].Opcode < MIOpcode) {
 		i = count;
 		while (validOpToPatter(&M->OpToPatterns[i]) &&

@@ -59,7 +59,7 @@ static unsigned scanCompressedOpcode(uint16_t word, cs_mode mode)
 #endif
 
 /* The scanner is selected for little-endian, non-E modes without output.
- * These major opcodes admit every destination register and immediate. */
+ * Its generated rows contain only instructions unaffected by the unread bits. */
 static bool getScanInstruction(csh handle, const uint8_t *code, size_t length,
 			       MCInst *inst, uint16_t *size, uint64_t address,
 			       void *info)
@@ -81,29 +81,18 @@ static bool getScanInstruction(csh handle, const uint8_t *code, size_t length,
 	}
 	if (length >= 4) {
 #else
-	if (length >= 4 && !inst->flat_insn->detail) {
+	if (length >= 4 && (code[0] & 3) == 3 && !inst->flat_insn->detail) {
 #endif
-		unsigned opcode;
-		const unsigned major = code[0] & 0x7f;
-		switch (major) {
-		case 0x17:
-			opcode = RISCV_AUIPC;
-			break;
-		case 0x37:
-			opcode = RISCV_LUI;
-			break;
-		case 0x6f:
-			opcode = RISCV_JAL;
-			break;
-		default:
+		/* Only base encodings with unconditional GPR and immediate
+		 * operands reach this row. Feature predicates, reserved fields
+		 * and overlapping extension tables keep the full decoder. */
+		const unsigned opcode =
+			RISCVScanOpcodes[(code[0] & 0x7f) >> 2][(code[1] >> 4) & 7];
+		if (!opcode)
 			goto full;
-		}
-		/* Give an overlapping extension its normal decoding priority. */
-		if (!(RISCV_EXTENSION_MAJORS & (UINT32_C(1) << (major >> 2)))) {
-			MCInst_setOpcode(inst, opcode);
-			*size = 4;
-			return true;
-		}
+		MCInst_setOpcode(inst, opcode);
+		*size = 4;
+		return true;
 	}
 full:
 	return RISCV_LLVM_getInstruction(handle, code, length, inst, size,
