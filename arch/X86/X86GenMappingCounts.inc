@@ -9298,14 +9298,14 @@ static const uint16_t x86_mapping_counts[] = {
 	1024, // X86_VMOVSDZmr
 	1024, // X86_VMOVSDZmrk
 	1024, // X86_VMOVSDZrm
-	0, // X86_VMOVSDZrmk
-	0, // X86_VMOVSDZrmkz
+	1024, // X86_VMOVSDZrmk
+	1024, // X86_VMOVSDZrmkz
 	1024, // X86_VMOVSDZrr
 	1024, // X86_VMOVSDZrr_REV
 	1024, // X86_VMOVSDZrrk
-	0, // X86_VMOVSDZrrk_REV
-	0, // X86_VMOVSDZrrkz
-	0, // X86_VMOVSDZrrkz_REV
+	1024, // X86_VMOVSDZrrk_REV
+	1024, // X86_VMOVSDZrrkz
+	1024, // X86_VMOVSDZrrkz_REV
 	1024, // X86_VMOVSDmr
 	1024, // X86_VMOVSDrm
 	1024, // X86_VMOVSDrr
@@ -9365,14 +9365,14 @@ static const uint16_t x86_mapping_counts[] = {
 	1024, // X86_VMOVSSZmr
 	1024, // X86_VMOVSSZmrk
 	1024, // X86_VMOVSSZrm
-	0, // X86_VMOVSSZrmk
-	0, // X86_VMOVSSZrmkz
+	1024, // X86_VMOVSSZrmk
+	1024, // X86_VMOVSSZrmkz
 	1024, // X86_VMOVSSZrr
 	1024, // X86_VMOVSSZrr_REV
 	1024, // X86_VMOVSSZrrk
-	0, // X86_VMOVSSZrrk_REV
-	0, // X86_VMOVSSZrrkz
-	0, // X86_VMOVSSZrrkz_REV
+	1024, // X86_VMOVSSZrrk_REV
+	1024, // X86_VMOVSSZrrkz
+	1024, // X86_VMOVSSZrrkz_REV
 	1024, // X86_VMOVSSmr
 	1024, // X86_VMOVSSrm
 	1024, // X86_VMOVSSrr

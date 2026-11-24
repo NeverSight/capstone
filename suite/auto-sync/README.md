@@ -145,6 +145,10 @@ Apply `suite/auto-sync/inc_patches/X86/03_vector_compare_flags.patch` if regener
 SSE `CMPPD`/`CMPPS`/`CMPSD`/`CMPSS` rows incorrectly modify arithmetic flags.
 `unit_x86_reg_access` checks predicate aliases and retains the flag effects of
 integer/string comparisons and `(U)COMISD`/`(U)COMISS`.
+If regenerated `VMOVSS` or `VMOVSD` metadata loses operand accesses or AVX512
+group membership, apply `suite/auto-sync/inc_patches/X86/04_scalar_vector_access.patch`,
+regenerate the mapping counts with `python3 suite/synctools/x86_mapping_counts.py`,
+and run `unit_x86_scalar_vector_access`.
 
 After changing `X86ImmSize.inc` or either `X86GenInstrInfo*.inc` enum, run
 `python3 suite/synctools/x86_immediate_sizes.py`, then run it with `--check`.

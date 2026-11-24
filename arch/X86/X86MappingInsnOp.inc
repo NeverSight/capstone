@@ -38695,12 +38695,12 @@
 
 {	/* X86_VMOVSDZmr, X86_INS_VMOVSD: vmovsd */
 	0,
-	{ CS_AC_READ, CS_AC_READ, 0 }
+	{ CS_AC_WRITE, CS_AC_READ, 0 }
 },
 
 {	/* X86_VMOVSDZmrk, X86_INS_VMOVSD: vmovsd */
 	0,
-	{ CS_AC_READ, CS_AC_READ, 0 }
+	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
 },
 
 {	/* X86_VMOVSDZrm, X86_INS_VMOVSD: vmovsd */
@@ -38710,12 +38710,12 @@
 
 {	/* X86_VMOVSDZrmk, X86_INS_VMOVSD: vmovsd */
 	0,
-	{ 0 }
+	{ CS_AC_READ_WRITE, CS_AC_READ, CS_AC_READ, 0 }
 },
 
 {	/* X86_VMOVSDZrmkz, X86_INS_VMOVSD: vmovsd */
 	0,
-	{ 0 }
+	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
 },
 
 {	/* X86_VMOVSDZrr, X86_INS_VMOVSD: vmovsd */
@@ -38730,27 +38730,27 @@
 
 {	/* X86_VMOVSDZrrk, X86_INS_VMOVSD: vmovsd */
 	0,
-	{ CS_AC_READ | CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+	{ CS_AC_READ_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_READ, 0 }
 },
 
 {	/* X86_VMOVSDZrrk_REV, X86_INS_VMOVSD: vmovsd */
 	0,
-	{ 0 }
+	{ CS_AC_READ_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_READ, 0 }
 },
 
 {	/* X86_VMOVSDZrrkz, X86_INS_VMOVSD: vmovsd */
 	0,
-	{ 0 }
+	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_READ, 0 }
 },
 
 {	/* X86_VMOVSDZrrkz_REV, X86_INS_VMOVSD: vmovsd */
 	0,
-	{ 0 }
+	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_READ, 0 }
 },
 
 {	/* X86_VMOVSDmr, X86_INS_VMOVSD: vmovsd */
 	0,
-	{ CS_AC_READ, CS_AC_READ, 0 }
+	{ CS_AC_WRITE, CS_AC_READ, 0 }
 },
 
 {	/* X86_VMOVSDrm, X86_INS_VMOVSD: vmovsd */
@@ -39030,12 +39030,12 @@
 
 {	/* X86_VMOVSSZmr, X86_INS_VMOVSS: vmovss */
 	0,
-	{ CS_AC_READ, CS_AC_READ, 0 }
+	{ CS_AC_WRITE, CS_AC_READ, 0 }
 },
 
 {	/* X86_VMOVSSZmrk, X86_INS_VMOVSS: vmovss */
 	0,
-	{ CS_AC_READ, CS_AC_READ, 0 }
+	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
 },
 
 {	/* X86_VMOVSSZrm, X86_INS_VMOVSS: vmovss */
@@ -39045,12 +39045,12 @@
 
 {	/* X86_VMOVSSZrmk, X86_INS_VMOVSS: vmovss */
 	0,
-	{ 0 }
+	{ CS_AC_READ_WRITE, CS_AC_READ, CS_AC_READ, 0 }
 },
 
 {	/* X86_VMOVSSZrmkz, X86_INS_VMOVSS: vmovss */
 	0,
-	{ 0 }
+	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
 },
 
 {	/* X86_VMOVSSZrr, X86_INS_VMOVSS: vmovss */
@@ -39065,27 +39065,27 @@
 
 {	/* X86_VMOVSSZrrk, X86_INS_VMOVSS: vmovss */
 	0,
-	{ CS_AC_READ | CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+	{ CS_AC_READ_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_READ, 0 }
 },
 
 {	/* X86_VMOVSSZrrk_REV, X86_INS_VMOVSS: vmovss */
 	0,
-	{ 0 }
+	{ CS_AC_READ_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_READ, 0 }
 },
 
 {	/* X86_VMOVSSZrrkz, X86_INS_VMOVSS: vmovss */
 	0,
-	{ 0 }
+	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_READ, 0 }
 },
 
 {	/* X86_VMOVSSZrrkz_REV, X86_INS_VMOVSS: vmovss */
 	0,
-	{ 0 }
+	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_READ, 0 }
 },
 
 {	/* X86_VMOVSSmr, X86_INS_VMOVSS: vmovss */
 	0,
-	{ CS_AC_READ, CS_AC_READ, 0 }
+	{ CS_AC_WRITE, CS_AC_READ, 0 }
 },
 
 {	/* X86_VMOVSSrm, X86_INS_VMOVSS: vmovss */

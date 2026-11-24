@@ -1,0 +1,222 @@
+diff --git a/arch/X86/X86MappingInsn.inc b/arch/X86/X86MappingInsn.inc
+--- a/arch/X86/X86MappingInsn.inc
++++ b/arch/X86/X86MappingInsn.inc
+@@ -54193,6 +54193,6 @@
+ {
+-	X86_VMOVSDZrmk, X86_INS_VMOVSD, 0,
++	X86_VMOVSDZrmk, X86_INS_VMOVSD, 0,
+ #ifndef CAPSTONE_DIET
+-	{ 0 }, { 0 }, { 0 }, 0, 0
++	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
+ #endif
+ },
+@@ -54200,6 +54200,6 @@
+ {
+-	X86_VMOVSDZrmkz, X86_INS_VMOVSD, 0,
++	X86_VMOVSDZrmkz, X86_INS_VMOVSD, 0,
+ #ifndef CAPSTONE_DIET
+-	{ 0 }, { 0 }, { 0 }, 0, 0
++	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
+ #endif
+ },
+@@ -54228,6 +54228,6 @@
+ {
+-	X86_VMOVSDZrrk_REV, X86_INS_VMOVSD, 0,
++	X86_VMOVSDZrrk_REV, X86_INS_VMOVSD, 0,
+ #ifndef CAPSTONE_DIET
+-	{ 0 }, { 0 }, { 0 }, 0, 0
++	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
+ #endif
+ },
+@@ -54235,6 +54235,6 @@
+ {
+-	X86_VMOVSDZrrkz, X86_INS_VMOVSD, 0,
++	X86_VMOVSDZrrkz, X86_INS_VMOVSD, 0,
+ #ifndef CAPSTONE_DIET
+-	{ 0 }, { 0 }, { 0 }, 0, 0
++	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
+ #endif
+ },
+@@ -54242,6 +54242,6 @@
+ {
+-	X86_VMOVSDZrrkz_REV, X86_INS_VMOVSD, 0,
++	X86_VMOVSDZrrkz_REV, X86_INS_VMOVSD, 0,
+ #ifndef CAPSTONE_DIET
+-	{ 0 }, { 0 }, { 0 }, 0, 0
++	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
+ #endif
+ },
+@@ -54662,6 +54662,6 @@
+ {
+-	X86_VMOVSSZrmk, X86_INS_VMOVSS, 0,
++	X86_VMOVSSZrmk, X86_INS_VMOVSS, 0,
+ #ifndef CAPSTONE_DIET
+-	{ 0 }, { 0 }, { 0 }, 0, 0
++	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
+ #endif
+ },
+@@ -54669,6 +54669,6 @@
+ {
+-	X86_VMOVSSZrmkz, X86_INS_VMOVSS, 0,
++	X86_VMOVSSZrmkz, X86_INS_VMOVSS, 0,
+ #ifndef CAPSTONE_DIET
+-	{ 0 }, { 0 }, { 0 }, 0, 0
++	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
+ #endif
+ },
+@@ -54697,6 +54697,6 @@
+ {
+-	X86_VMOVSSZrrk_REV, X86_INS_VMOVSS, 0,
++	X86_VMOVSSZrrk_REV, X86_INS_VMOVSS, 0,
+ #ifndef CAPSTONE_DIET
+-	{ 0 }, { 0 }, { 0 }, 0, 0
++	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
+ #endif
+ },
+@@ -54704,6 +54704,6 @@
+ {
+-	X86_VMOVSSZrrkz, X86_INS_VMOVSS, 0,
++	X86_VMOVSSZrrkz, X86_INS_VMOVSS, 0,
+ #ifndef CAPSTONE_DIET
+-	{ 0 }, { 0 }, { 0 }, 0, 0
++	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
+ #endif
+ },
+@@ -54711,6 +54711,6 @@
+ {
+-	X86_VMOVSSZrrkz_REV, X86_INS_VMOVSS, 0,
++	X86_VMOVSSZrrkz_REV, X86_INS_VMOVSS, 0,
+ #ifndef CAPSTONE_DIET
+-	{ 0 }, { 0 }, { 0 }, 0, 0
++	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
+ #endif
+ },
+diff --git a/arch/X86/X86MappingInsnOp.inc b/arch/X86/X86MappingInsnOp.inc
+--- a/arch/X86/X86MappingInsnOp.inc
++++ b/arch/X86/X86MappingInsnOp.inc
+@@ -38696,4 +38696,4 @@
+ {	/* X86_VMOVSDZmr, X86_INS_VMOVSD: vmovsd */
+-	0,
++	0,
+-	{ CS_AC_READ, CS_AC_READ, 0 }
++	{ CS_AC_WRITE, CS_AC_READ, 0 }
+ },
+@@ -38701,4 +38701,4 @@
+ {	/* X86_VMOVSDZmrk, X86_INS_VMOVSD: vmovsd */
+-	0,
++	0,
+-	{ CS_AC_READ, CS_AC_READ, 0 }
++	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -38711,4 +38711,4 @@
+ {	/* X86_VMOVSDZrmk, X86_INS_VMOVSD: vmovsd */
+-	0,
++	0,
+-	{ 0 }
++	{ CS_AC_READ_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -38716,4 +38716,4 @@
+ {	/* X86_VMOVSDZrmkz, X86_INS_VMOVSD: vmovsd */
+-	0,
++	0,
+-	{ 0 }
++	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -38731,4 +38731,4 @@
+ {	/* X86_VMOVSDZrrk, X86_INS_VMOVSD: vmovsd */
+-	0,
++	0,
+-	{ CS_AC_READ | CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
++	{ CS_AC_READ_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -38736,4 +38736,4 @@
+ {	/* X86_VMOVSDZrrk_REV, X86_INS_VMOVSD: vmovsd */
+-	0,
++	0,
+-	{ 0 }
++	{ CS_AC_READ_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -38741,4 +38741,4 @@
+ {	/* X86_VMOVSDZrrkz, X86_INS_VMOVSD: vmovsd */
+-	0,
++	0,
+-	{ 0 }
++	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -38746,4 +38746,4 @@
+ {	/* X86_VMOVSDZrrkz_REV, X86_INS_VMOVSD: vmovsd */
+-	0,
++	0,
+-	{ 0 }
++	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -38751,4 +38751,4 @@
+ {	/* X86_VMOVSDmr, X86_INS_VMOVSD: vmovsd */
+-	0,
++	0,
+-	{ CS_AC_READ, CS_AC_READ, 0 }
++	{ CS_AC_WRITE, CS_AC_READ, 0 }
+ },
+@@ -39031,4 +39031,4 @@
+ {	/* X86_VMOVSSZmr, X86_INS_VMOVSS: vmovss */
+-	0,
++	0,
+-	{ CS_AC_READ, CS_AC_READ, 0 }
++	{ CS_AC_WRITE, CS_AC_READ, 0 }
+ },
+@@ -39036,4 +39036,4 @@
+ {	/* X86_VMOVSSZmrk, X86_INS_VMOVSS: vmovss */
+-	0,
++	0,
+-	{ CS_AC_READ, CS_AC_READ, 0 }
++	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -39046,4 +39046,4 @@
+ {	/* X86_VMOVSSZrmk, X86_INS_VMOVSS: vmovss */
+-	0,
++	0,
+-	{ 0 }
++	{ CS_AC_READ_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -39051,4 +39051,4 @@
+ {	/* X86_VMOVSSZrmkz, X86_INS_VMOVSS: vmovss */
+-	0,
++	0,
+-	{ 0 }
++	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -39066,4 +39066,4 @@
+ {	/* X86_VMOVSSZrrk, X86_INS_VMOVSS: vmovss */
+-	0,
++	0,
+-	{ CS_AC_READ | CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
++	{ CS_AC_READ_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -39071,4 +39071,4 @@
+ {	/* X86_VMOVSSZrrk_REV, X86_INS_VMOVSS: vmovss */
+-	0,
++	0,
+-	{ 0 }
++	{ CS_AC_READ_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -39076,4 +39076,4 @@
+ {	/* X86_VMOVSSZrrkz, X86_INS_VMOVSS: vmovss */
+-	0,
++	0,
+-	{ 0 }
++	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -39081,4 +39081,4 @@
+ {	/* X86_VMOVSSZrrkz_REV, X86_INS_VMOVSS: vmovss */
+-	0,
++	0,
+-	{ 0 }
++	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -39086,4 +39086,4 @@
+ {	/* X86_VMOVSSmr, X86_INS_VMOVSS: vmovss */
+-	0,
++	0,
+-	{ CS_AC_READ, CS_AC_READ, 0 }
++	{ CS_AC_WRITE, CS_AC_READ, 0 }
+ },
