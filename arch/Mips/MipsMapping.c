@@ -423,6 +423,11 @@ static inline unsigned classicDetailOpcode(MCInst *instr, const uint8_t *code)
 {
 	const uint32_t word = readBytes32(instr, code);
 	const unsigned major = word >> 26;
+	/* The DSP table precedes the base table for these two full primary
+	 * opcodes. Its mapping supplies the advertised DSP instruction groups. */
+	if ((major == 35 || major == 43) &&
+	    Mips_getFeatureBits(instr->csh->mode, Mips_FeatureDSP))
+		return major == 35 ? Mips_LWDSP : Mips_SWDSP;
 	if (major)
 		return major == 8 ? Mips_ADDi : classicScalarOpcode(major);
 	switch (word & 0x7ff) {
@@ -451,9 +456,7 @@ static inline unsigned classicDetailOpcode(MCInst *instr, const uint8_t *code)
 	}
 }
 
-/* Called only for classic pre-R6 modes, with no text and the stock mapper.
- * LW/SW and other extension aliases still need the generated decoder's
- * feature-table precedence, even when their public instruction IDs agree. */
+/* Called only for classic pre-R6 modes, with no text and the stock mapper. */
 bool Mips_disasmClassicNoText(cs_struct *handle, const uint8_t *code,
 			      size_t length, cs_insn *insn)
 {
