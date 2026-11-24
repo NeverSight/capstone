@@ -183,3 +183,16 @@ test_cases:
                 mem_base: cp
                 mem_disp: 9
                 mem_direct: 1
+
+  -
+    input:
+      bytes: [ 0xf8, 0x1e, 0xfc, 0x1e, 0xa0, 0xb8, 0xb0, 0xb8 ]
+      arch: "xcore"
+      options: [ CS_OPT_DETAIL ]
+      address: 0x0
+    expected:
+      insns:
+        - asm_text: "tsetmr r10, r4"
+        - asm_text: "tsetmr r11, r4"
+        - asm_text: "set t[r0]:r10, r0"
+        - asm_text: "set t[r0]:r11, r0"

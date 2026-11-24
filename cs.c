@@ -1137,9 +1137,21 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
 	/* These decoders construct each operand before their built-in
 	 * printer reads it. Other callbacks retain the full initialization. */
 	if (handle->disasm == CS_PRIVATE_DECODER &&
-	    handle->printer == CS_PRIVATE_PRINTER && !handle->post_printer)
+	    handle->printer == CS_PRIVATE_PRINTER && !handle->post_printer) {
+#ifdef CAPSTONE_XCORE_ONLY
+		if (handle->no_text && !handle->detail_opt && !insn->detail &&
+		    size >= 2) {
+			const unsigned opcode = XCore_shortOpcodes[code[1] >> 1];
+			if (opcode) {
+				*insn_size = insn->size = 2;
+				map_insn_id(handle, insn, opcode);
+				fill_insn_without_text(insn, 0, code, true);
+				return true;
+			}
+		}
+#endif
 		MCInst_InitStorage(&mci, CS_PRIVATE_ARCH, false);
-	else
+	} else
 		MCInst_Init(&mci, handle->arch);
 #elif defined(CAPSTONE_AARCH64_INIT_CONSTRUCTED_OPERANDS) && \
 	(defined(__clang__) || (defined(__GNUC__) && defined(__aarch64__)))

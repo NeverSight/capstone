@@ -192,6 +192,10 @@ if(CAPSTONE_RISCV_SUPPORT AND Python3_Interpreter_FOUND)
     add_test(NAME unit_alias_pattern_rows_generator
         COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/suite/synctools/alias_pattern_rows.py" --check)
 endif()
+if(CAPSTONE_XCORE_SUPPORT)
+    list(APPEND UNIT_TEST_SOURCES xcore_scan.c)
+endif()
+
 if(CAPSTONE_RISCV_SUPPORT)
     list(APPEND UNIT_TEST_SOURCES riscv_mapping_index.c riscv_scan_options.c)
     list(APPEND UNIT_TEST_SOURCES riscv_instruction_groups.c)

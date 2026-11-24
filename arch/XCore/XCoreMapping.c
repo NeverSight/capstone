@@ -84,29 +84,31 @@ const unsigned int XCore_insn_count = ARR_SIZE(insns);
 // given internal insn id, return public instruction info
 void XCore_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
 {
-	insn_map const *insn_map = NULL;
+	const unsigned short opcode = (unsigned short)id;
 
-	if ((insn_map = lookup_insn_map(h, id))) {
-		insn->id = insn_map->mapid;
+	/* The handle's opcode index addresses this backend's immutable rows. */
+	if (opcode <= insns[ARR_SIZE(insns) - 1].id) {
+		const insn_map *row = &insns[h->insn_cache[opcode]];
+		insn->id = row->mapid;
 
 		if (h->detail_opt) {
 #ifndef CAPSTONE_DIET
-			memcpy(insn->detail->regs_read, insn_map->regs_use,
-			       sizeof(insn_map->regs_use));
+			memcpy(insn->detail->regs_read, row->regs_use,
+			       sizeof(row->regs_use));
 			insn->detail->regs_read_count =
-				(uint8_t)count_positive(insn_map->regs_use);
+				(uint8_t)count_positive(row->regs_use);
 
-			memcpy(insn->detail->regs_write, insn_map->regs_mod,
-			       sizeof(insn_map->regs_mod));
+			memcpy(insn->detail->regs_write, row->regs_mod,
+			       sizeof(row->regs_mod));
 			insn->detail->regs_write_count =
-				(uint8_t)count_positive(insn_map->regs_mod);
+				(uint8_t)count_positive(row->regs_mod);
 
-			memcpy(insn->detail->groups, insn_map->groups,
-			       sizeof(insn_map->groups));
+			memcpy(insn->detail->groups, row->groups,
+			       sizeof(row->groups));
 			insn->detail->groups_count =
-				(uint8_t)count_positive8(insn_map->groups);
+				(uint8_t)count_positive8(row->groups);
 
-			if (insn_map->branch || insn_map->indirect_branch) {
+			if (row->branch || row->indirect_branch) {
 				// this insn also belongs to JUMP group. add JUMP group
 				insn->detail
 					->groups[insn->detail->groups_count] =

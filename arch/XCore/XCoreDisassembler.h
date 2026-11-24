@@ -8,6 +8,11 @@
 #include "../../MCRegisterInfo.h"
 #include "../../MCInst.h"
 
+#ifdef CAPSTONE_XCORE_ONLY
+#include "../../cs_priv.h"
+extern CAPSTONE_INTERNAL const uint16_t XCore_shortOpcodes[128];
+#endif
+
 void XCore_init(MCRegisterInfo *MRI);
 
 bool XCore_getInstruction(csh ud, const uint8_t *code, size_t code_len,
