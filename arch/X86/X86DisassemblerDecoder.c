@@ -3755,6 +3755,8 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
 
 #ifdef CAPSTONE_X86_PUBLIC_OUTPUT
 #define CS_DECODE_OUTPUT_MISS X86_decodePublicRecord
+#elif defined(CAPSTONE_X86_PUBLIC_FIXED_RECORD)
+#define CS_PUBLIC_FIXED_RECORD
 #endif
 #define CS_DECODE_SCAN_IMPL decodeIteratorScan
 #include "../../cs_disasm_internal.h"

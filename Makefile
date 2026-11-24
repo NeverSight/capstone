@@ -127,8 +127,8 @@ MIXED_STORAGE_TARGET := $(shell $(CC) $(CPPFLAGS) $(CFLAGS) -dM -E -x c - < /dev
 	awk '$$2 == "__clang__" { clang_cc=1 } $$2 == "__SIZEOF_POINTER__" { ptr=$$3 } \
 	     $$2 == "__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__" { macos=1 } \
 	     $$2 == "__linux__" { linux_target=1 } $$2 == "__aarch64__" { arm64=1 } \
-	     END { if (clang_cc && ptr==8 && (macos || (linux_target && arm64))) print "yes" }')
-ifeq ($(MIXED_STORAGE_TARGET),yes)
+	     END { if (clang_cc && ptr==8 && (macos || (linux_target && arm64))) print macos ? "macos" : "linux-arm64" }')
+ifneq ($(MIXED_STORAGE_TARGET),)
 CFLAGS += -DCAPSTONE_MIXED_CONSTRUCTED_OPERANDS
 MCINST_STORAGE_OBJ = $(OBJDIR)/MCInstStorage.o
 endif
@@ -304,6 +304,8 @@ endif
 	LIBOBJ_X86_STATIC_OUTPUT = $(OBJDIR)/arch/X86/X86Vex32Output.o $(OBJDIR)/arch/X86/X86Sse64Output.o $(OBJDIR)/arch/X86/X86MemoryFallback32.o $(OBJDIR)/arch/X86/X86BatchScan.o $(OBJDIR)/arch/X86/X86VectorFallback64.o $(OBJDIR)/arch/X86/X86VexRegisterImmediate.o $(OBJDIR)/arch/X86/X86PlainEvexOutput.o $(OBJDIR)/arch/X86/X86RegisterFallback32.o
 ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
 	LIBOBJ_X86_STATIC_OUTPUT += $(OBJDIR)/arch/X86/X86PublicOutput.o
+else ifeq ($(MIXED_STORAGE_TARGET):$(CAPSTONE_STATIC):$(CAPSTONE_SHARED):$(CAPSTONE_DIET):$(CAPSTONE_X86_REDUCE),macos:yes:no:no:no)
+	CFLAGS += -DCAPSTONE_STATIC_X86_READERS
 endif
 	LIBOBJ_X86_NUMBERS += $(OBJDIR)/arch/X86/X86IntelInstPrinterNumbers.o
 endif

@@ -1086,8 +1086,16 @@ if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST
     add_library(capstone_x86_native OBJECT arch/X86/X86MemoryFallback32.c arch/X86/X86BatchScan.c arch/X86/X86VectorFallback64.c arch/X86/X86VexRegisterImmediate.c arch/X86/X86PlainEvexOutput.c arch/X86/X86RegisterFallback32.c)
     target_link_libraries(capstone_x86_native PRIVATE capstone_build_settings)
     set_target_properties(capstone_x86_native PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
-    if(capstone_enabled_architectures STREQUAL "X86")
-        target_sources(capstone_x86_native PRIVATE arch/X86/X86PublicOutput.c)
+    if(capstone_enabled_architectures STREQUAL "X86" OR
+       (capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
+        AND CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND CMAKE_C_COMPILER_ID MATCHES "Clang"
+        AND CMAKE_SIZEOF_VOID_P EQUAL 8 AND CAPSTONE_BUILD_STATIC_LIBS AND NOT CAPSTONE_BUILD_SHARED_LIBS
+        AND NOT CAPSTONE_BUILD_DIET AND NOT CAPSTONE_X86_REDUCE))
+        if(capstone_enabled_architectures STREQUAL "X86")
+            target_sources(capstone_x86_native PRIVATE arch/X86/X86PublicOutput.c)
+        else()
+            target_compile_definitions(capstone_build_settings INTERFACE CAPSTONE_STATIC_X86_READERS)
+        endif()
         set(capstone_x86_objects
             $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>
             $<TARGET_OBJECTS:capstone_x86_native>)

@@ -23,9 +23,21 @@ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
 X86_decodePublicRecord(cs_struct *handle, const uint8_t *code, size_t size,
 		       cs_insn *insn, uint16_t *insn_size, bool batch);
 #endif
+/* The public iterator can enter a fixed x86 reader once. Misses from that
+ * reader call the same full decoder with the ordinary iterator request. */
+#ifdef CAPSTONE_X86_PUBLIC_FIXED_RECORD
+typedef uint8_t cs_record_request;
+enum { CS_RECORD_PUBLIC_ITER = 2 };
+CAPSTONE_INTERNAL bool X86_decodeFixedRecord32(cs_struct *handle,
+		const uint8_t *code, size_t size, cs_insn *insn, uint16_t *length);
+CAPSTONE_INTERNAL bool X86_decodeFixedRecord64(cs_struct *handle,
+		const uint8_t *code, size_t size, cs_insn *insn, uint16_t *length);
+#else
+typedef bool cs_record_request;
+#endif
 CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
 cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
-		    cs_insn *insn, uint16_t *insn_size, bool batch);
+		    cs_insn *insn, uint16_t *insn_size, cs_record_request request);
 #if defined(CAPSTONE_X86_DEDICATED_OUTPUT) && defined(__clang__) && \
 	defined(__x86_64__)
 CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
@@ -176,6 +188,9 @@ CS_DECODE_INLINE bool decode_insn(cs_struct *handle, const uint8_t *code,
 #endif
 #ifdef CS_DECODE_OUTPUT_MISS
 	return CS_DECODE_OUTPUT_MISS(handle, code, size, insn, insn_size, batch);
+#elif defined(CS_PUBLIC_FIXED_RECORD)
+	return cs_decode_full_insn(handle, code, size, insn, insn_size,
+				   batch ? true : CS_RECORD_PUBLIC_ITER);
 #else
 	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
 #endif

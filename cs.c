@@ -1085,8 +1085,9 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
 #if defined(CAPSTONE_X86_DEDICATED_OUTPUT) && defined(__clang__) && defined(__x86_64__)
 CS_PRESERVE_MOST bool
 cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
-		    cs_insn *insn, uint16_t *insn_size, bool batch)
+		    cs_insn *insn, uint16_t *insn_size, cs_record_request request)
 {
+	const bool batch = request == true;
 	if (size && X86_trySimpleOutput(handle, code, size, insn, insn_size))
 		return true;
 	return cs_decode_full_insn_body(handle, code, size, insn, insn_size, batch);
@@ -1104,8 +1105,9 @@ __attribute__((noinline))
 #endif
 CS_PRESERVE_MOST bool
 cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
-		    cs_insn *insn, uint16_t *insn_size, bool batch)
+		    cs_insn *insn, uint16_t *insn_size, cs_record_request request)
 {
+	const bool batch = request == true;
 #ifdef CAPSTONE_X86_DEDICATED_OUTPUT
 	if (size && X86_trySimpleOutput(handle, code, size, insn, insn_size))
 		return true;
@@ -1113,9 +1115,19 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
 #endif
 	MCInst mci;
 #ifdef CAPSTONE_HAS_X86
-	if (handle->arch == CS_ARCH_X86)
+	if (handle->arch == CS_ARCH_X86) {
+#ifdef CAPSTONE_X86_PUBLIC_FIXED_RECORD
+		if (request == CS_RECORD_PUBLIC_ITER && !handle->no_text) {
+			if (handle->mode == CS_MODE_32)
+				return X86_decodeFixedRecord32(handle, code, size,
+							       insn, insn_size);
+			if (handle->mode == CS_MODE_64)
+				return X86_decodeFixedRecord64(handle, code, size,
+							       insn, insn_size);
+		}
+#endif
 		MCInst_InitX86(&mci);
-	else
+	} else
 #endif
 #ifdef CAPSTONE_HAS_MIPS
 	if (handle->arch == CS_ARCH_MIPS)

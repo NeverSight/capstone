@@ -201,6 +201,14 @@ static bool writeExtraOutput32(cs_struct *handle, const uint8_t *code,
 #define CS_DECODE_OUTPUT_MISS X86_decodeOutputMiss32
 #include "../../cs_disasm_internal.h"
 #undef CS_DECODE_OUTPUT_MISS
+
+#ifdef CAPSTONE_X86_PUBLIC_FIXED_RECORD
+bool X86_decodeFixedRecord32(cs_struct *handle, const uint8_t *code, size_t size,
+			     cs_insn *insn, uint16_t *length)
+{
+	return decode_insn(handle, code, size, insn, length, false, false);
+}
+#endif
 #endif
 
 CAPSTONE_INTERNAL bool X86_disasmIter32(csh ud, const uint8_t **code,
