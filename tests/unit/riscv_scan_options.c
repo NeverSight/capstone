@@ -108,6 +108,8 @@ int main(void)
 	}
 	const unsigned extensions = CS_MODE_RISCV_C | CS_MODE_RISCV_FD |
 				    CS_MODE_RISCV_ZICFISS | CS_MODE_RISCV_ZCMP_ZCMT_ZCE;
+	ok &= checkScan(CS_MODE_RISCV32);
+	ok &= checkScan(CS_MODE_RISCV64);
 	ok &= checkScan((cs_mode)(CS_MODE_RISCV32 | extensions));
 	ok &= checkScan((cs_mode)(CS_MODE_RISCV64 | extensions));
 	cs_free(insn, 1);

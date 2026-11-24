@@ -491,12 +491,28 @@ void RISCV_LLVM_printInstruction(MCInst *MI, SStream *O,
 		}
 	}
 
+#ifdef CAPSTONE_RISCV_ONLY
+	/* Group construction and operand compaction only consume detail. */
+	if (!detail_is_set(MI)) {
+		RISCV_set_alias_id(MI, O);
+		return;
+	}
+#endif
+
 	bool textAndDetailModesMatch = (isRealSyntax(MI) && isRealDetail(MI)) ||
 				       (isUncompressedRealSyntax(MI) &&
 					isUncompressedRealDetail(MI)) ||
 				       (isAliasSyntax(MI) && isAliasDetail(MI));
 
-	if (detail_is_set(MI) && !textAndDetailModesMatch) {
+	if (detail_is_set(MI) && !textAndDetailModesMatch
+#ifdef CAPSTONE_RISCV_ONLY
+	    /* Both passes select the same canonical instruction when neither
+	     * expansion nor aliasing occurred. A closed stream needs the
+	     * existing detail-only pass. */
+	    && (O->is_closed || is_uncompressed || MCInst_isAlias(MI) ||
+		isAliasDetail(MI))
+#endif
+	) {
 		SStream_Close(O);
 		// discard the text operands
 		memset(MI->flat_insn->detail->riscv.operands, 0,

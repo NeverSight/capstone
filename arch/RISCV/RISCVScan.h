@@ -5,7 +5,7 @@
 
 #include "RISCVModule.h"
 
-#ifdef RISCV_USE_COMPRESSED_DISPATCH
+#ifndef CAPSTONE_DIET
 /* The ordinary decoder retains reserved immediates, zero-register hints
  * and encodings whose operation differs between RV32 and RV64. */
 static unsigned scanCompressedOpcode(uint16_t word, cs_mode mode)
@@ -13,6 +13,8 @@ static unsigned scanCompressedOpcode(uint16_t word, cs_mode mode)
 	const unsigned encoding = ((word >> 13) << 2) | (word & 3);
 	const unsigned rd = (word >> 7) & 31;
 	switch (encoding) {
+	case 0: /* C.ADDI4SPN requires a nonzero stack offset. */
+		return word & 0x1fe0 ? RISCV_C_ADDI4SPN : 0;
 	case (5 << 2) | 1:
 		return RISCV_C_J;
 	case (6 << 2) | 1:
@@ -28,8 +30,10 @@ static unsigned scanCompressedOpcode(uint16_t word, cs_mode mode)
 	case (2 << 2) | 1:
 		return rd ? RISCV_C_LI : 0;
 	case (4 << 2) | 2:
-		if (!rd || !(word & 0x7c))
+		if (!rd)
 			return 0;
+		if (!(word & 0x7c))
+			return (word & 0x1000) ? RISCV_C_JALR : RISCV_C_JR;
 		return (word & 0x1000) ? RISCV_C_ADD : RISCV_C_MV;
 	case (0 << 2) | 1:
 		return rd && (word & 0x107c) ? RISCV_C_ADDI : 0;
@@ -64,7 +68,7 @@ static bool getScanInstruction(csh handle, const uint8_t *code, size_t length,
 			       MCInst *inst, uint16_t *size, uint64_t address,
 			       void *info)
 {
-#ifdef RISCV_USE_COMPRESSED_DISPATCH
+#ifndef CAPSTONE_DIET
 	if (length < 2 || inst->flat_insn->detail)
 		goto full;
 	if ((code[0] & 3) != 3) {

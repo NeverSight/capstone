@@ -141,9 +141,21 @@ void RISCV_add_cs_detail_0(MCInst *MI, riscv_op_group opgroup, unsigned OpNum)
 		return;
 	}
 	cs_riscv_op *op = RISCV_get_detail_op_at(MI, OpNum);
+#if defined(CAPSTONE_RISCV_ONLY) && !defined(CAPSTONE_DIET)
+	/* Type and access come from one generated operand. Only a tied
+	 * operand can change the access recorded in that entry. */
+	assert(MI->Opcode < ARR_SIZE(insn_operands));
+	assert(OpNum < ARR_SIZE(insn_operands[0].ops));
+	const mapping_op *mapped = &insn_operands[MI->Opcode].ops[OpNum];
+	const cs_op_type type = (cs_op_type)mapped->type;
+	op->type = (riscv_op_type)type;
+	op->access = MI->tied_op_idx_size ? map_get_op_access(MI, OpNum) :
+					    (cs_ac_type)mapped->access;
+#else
 	const cs_op_type type = map_get_op_type(MI, OpNum);
 	op->type = (riscv_op_type)type;
 	op->access = (cs_ac_type)map_get_op_access(MI, OpNum);
+#endif
 	switch (type) {
 	case CS_OP_REG:
 		op->reg = MCInst_getOperand(MI, OpNum)->RegVal;
