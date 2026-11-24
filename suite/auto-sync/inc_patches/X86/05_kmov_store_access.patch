@@ -1,0 +1,31 @@
+diff --git a/arch/X86/X86MappingInsnOp.inc b/arch/X86/X86MappingInsnOp.inc
+--- a/arch/X86/X86MappingInsnOp.inc
++++ b/arch/X86/X86MappingInsnOp.inc
+@@ -5106,4 +5106,4 @@
+ {	/* X86_KMOVBmk, X86_INS_KMOVB: kmovb */
+-	0,
++	0,
+-	{ CS_AC_READ, CS_AC_READ, 0 }
++	{ CS_AC_WRITE, CS_AC_READ, 0 }
+ },
+@@ -5131,4 +5131,4 @@
+ {	/* X86_KMOVDmk, X86_INS_KMOVD: kmovd */
+-	0,
++	0,
+-	{ CS_AC_READ, CS_AC_READ, 0 }
++	{ CS_AC_WRITE, CS_AC_READ, 0 }
+ },
+@@ -5156,4 +5156,4 @@
+ {	/* X86_KMOVQmk, X86_INS_KMOVQ: kmovq */
+-	0,
++	0,
+-	{ CS_AC_READ, CS_AC_READ, 0 }
++	{ CS_AC_WRITE, CS_AC_READ, 0 }
+ },
+@@ -5181,4 +5181,4 @@
+ {	/* X86_KMOVWmk, X86_INS_KMOVW: kmovw */
+-	0,
++	0,
+-	{ CS_AC_READ, CS_AC_READ, 0 }
++	{ CS_AC_WRITE, CS_AC_READ, 0 }
+ },

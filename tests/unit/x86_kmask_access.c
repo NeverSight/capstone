@@ -148,6 +148,51 @@ static bool test_case(csh handle, const kmask_case *test, size_t case_index,
 	return success;
 }
 
+static bool test_memory_moves(csh handle, cs_opt_value syntax)
+{
+	static const struct {
+		uint8_t vex;
+		uint8_t size;
+		x86_insn id;
+	} forms[] = { { 0x79, 1, X86_INS_KMOVB },
+		      { 0x78, 2, X86_INS_KMOVW },
+		      { 0xf9, 4, X86_INS_KMOVD },
+		      { 0xf8, 8, X86_INS_KMOVQ } };
+	for (size_t i = 0; i < sizeof(forms) / sizeof(forms[0]); ++i) {
+		for (unsigned store = 0; store < 2; ++store) {
+			/* Move between k2 and memory at [rbx]. */
+			const uint8_t code[] = { 0xc4, 0xe1, forms[i].vex,
+						 (uint8_t)(0x90 + store),
+						 0x13 };
+			cs_insn *insn = NULL;
+			if (!check(cs_disasm(handle, code, sizeof(code), 0, 1,
+					     &insn) == 1,
+				   "decode mask memory move", i, syntax))
+				return false;
+			const cs_x86 *x = &insn->detail->x86;
+			const unsigned mem_index =
+				syntax == CS_OPT_SYNTAX_ATT ? store : !store;
+			const cs_x86_op *mem = &x->operands[mem_index];
+			const cs_x86_op *reg = &x->operands[1 - mem_index];
+			bool ok = check(
+				insn->id == forms[i].id && x->op_count == 2 &&
+					mem->type == X86_OP_MEM &&
+					mem->size == forms[i].size &&
+					mem->access == (store ? CS_AC_WRITE :
+								CS_AC_READ) &&
+					reg->type == X86_OP_REG &&
+					reg->reg == X86_REG_K2 &&
+					reg->access == (store ? CS_AC_READ :
+								CS_AC_WRITE),
+				"mask memory move access", i, syntax);
+			cs_free(insn, 1);
+			if (!ok)
+				return false;
+		}
+	}
+	return true;
+}
+
 int main(void)
 {
 	static const kmask_case test_cases[] = {
@@ -267,6 +312,7 @@ int main(void)
 		for (size_t i = 0;
 		     i < sizeof(test_cases) / sizeof(test_cases[0]); ++i)
 			success &= test_case(handle, &test_cases[i], i, syntax);
+		success &= test_memory_moves(handle, syntax);
 	}
 
 	cs_close(&handle);

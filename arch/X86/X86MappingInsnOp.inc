@@ -5105,7 +5105,7 @@
 
 {	/* X86_KMOVBmk, X86_INS_KMOVB: kmovb */
 	0,
-	{ CS_AC_READ, CS_AC_READ, 0 }
+	{ CS_AC_WRITE, CS_AC_READ, 0 }
 },
 
 {	/* X86_KMOVBrk, X86_INS_KMOVB: kmovb */
@@ -5130,7 +5130,7 @@
 
 {	/* X86_KMOVDmk, X86_INS_KMOVD: kmovd */
 	0,
-	{ CS_AC_READ, CS_AC_READ, 0 }
+	{ CS_AC_WRITE, CS_AC_READ, 0 }
 },
 
 {	/* X86_KMOVDrk, X86_INS_KMOVD: kmovd */
@@ -5155,7 +5155,7 @@
 
 {	/* X86_KMOVQmk, X86_INS_KMOVQ: kmovq */
 	0,
-	{ CS_AC_READ, CS_AC_READ, 0 }
+	{ CS_AC_WRITE, CS_AC_READ, 0 }
 },
 
 {	/* X86_KMOVQrk, X86_INS_KMOVQ: kmovq */
@@ -5180,7 +5180,7 @@
 
 {	/* X86_KMOVWmk, X86_INS_KMOVW: kmovw */
 	0,
-	{ CS_AC_READ, CS_AC_READ, 0 }
+	{ CS_AC_WRITE, CS_AC_READ, 0 }
 },
 
 {	/* X86_KMOVWrk, X86_INS_KMOVW: kmovw */
