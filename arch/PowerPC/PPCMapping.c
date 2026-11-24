@@ -297,15 +297,23 @@ static void PPC_add_branch_predicates(MCInst *MI, const uint8_t *Bytes,
 void PPC_set_instr_map_data(MCInst *MI, const uint8_t *Bytes, size_t BytesLen)
 {
 	map_cs_id(MI, ppc_insns, ARR_SIZE(ppc_insns));
+#if defined(CAPSTONE_PPC_DEDICATED_MAPPING) && !defined(CAPSTONE_DIET)
+	if (!MI->flat_insn->detail)
+		return;
+#endif
 	map_implicit_reads(MI, ppc_insns);
 	map_implicit_writes(MI, ppc_insns);
 	map_groups(MI, ppc_insns);
 	PPC_add_branch_predicates(MI, Bytes, BytesLen);
 	PPC_check_updates_cr0(MI);
+#if defined(CAPSTONE_PPC_DEDICATED_MAPPING) && !defined(CAPSTONE_DIET)
+	PPC_get_detail(MI)->format = ppc_insns[MI->Opcode].suppl_info.ppc.form;
+#else
 	const ppc_suppl_info *suppl_info = map_get_suppl_info(MI, ppc_insns);
 	if (suppl_info) {
 		PPC_get_detail(MI)->format = suppl_info->form;
 	}
+#endif
 }
 
 /// Initialize PPCs detail.
@@ -343,7 +351,12 @@ bool PPC_getInstruction(csh handle, const uint8_t *bytes, size_t bytes_len,
 	PPC_init_cs_detail(instr);
 	DecodeStatus result = PPC_LLVM_getInstruction(
 		handle, bytes, bytes_len, instr, size, address, info);
+#if defined(CAPSTONE_PPC_DEDICATED_MAPPING) && defined(CAPSTONE_DIET)
+	/* A DIET mapping row contains only its internal and public IDs. */
+	map_cs_id(instr, ppc_insns, ARR_SIZE(ppc_insns));
+#else
 	PPC_set_instr_map_data(instr, bytes, bytes_len);
+#endif
 	return result != MCDisassembler_Fail;
 }
 
