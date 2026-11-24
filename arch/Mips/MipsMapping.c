@@ -307,21 +307,23 @@ static bool finishInstruction(MCInst *instr, DecodeStatus result)
 	return true;
 }
 
-/* Shared primary opcodes, including the instructions restricted to MIPS64. */
-#define MIPS_COMMON_SCAN_OPS(OP, OP64) \
+#define MIPS_IMMEDIATE_SCAN_OPS(OP) \
 	OP(9, Mips_ADDiu) \
 	OP(12, Mips_ANDi) \
 	OP(13, Mips_ORi) \
-	OP(14, Mips_XORi) \
+	OP(14, Mips_XORi)
+
+#define MIPS_COMMON_SCAN_OPS(OP, OP64) \
+	MIPS_IMMEDIATE_SCAN_OPS(OP) \
 	OP64(25, Mips_DADDiu) \
 	OP(35, Mips_LW) \
 	OP(43, Mips_SW) \
 	OP64(55, Mips_LD) \
 	OP64(63, Mips_SD)
 
-#ifdef CAPSTONE_MIPS_SCAN_BY_OPTION
-/* These standard forms use every bit below the primary opcode for operands. */
-static inline unsigned standardScanOpcode(unsigned major, cs_mode mode)
+/* All bits below these pre-R6 primary opcodes are operand fields. The
+ * no-text detail record obtains their implicit effects from the usual map. */
+static inline unsigned classicScalarOpcode(unsigned major)
 {
 	switch (major) {
 	case 4:
@@ -347,6 +349,19 @@ static inline unsigned standardScanOpcode(unsigned major, cs_mode mode)
 #define MIPS_SCAN_OP(n, id) \
 	case n: \
 		return id;
+		MIPS_IMMEDIATE_SCAN_OPS(MIPS_SCAN_OP)
+#undef MIPS_SCAN_OP
+	}
+	return 0;
+}
+
+#ifdef CAPSTONE_MIPS_SCAN_BY_OPTION
+static inline unsigned standardScanOpcode(unsigned major, cs_mode mode)
+{
+	switch (major) {
+#define MIPS_SCAN_OP(n, id) \
+	case n: \
+		return id;
 #define MIPS_SCAN_OP64(n, id) \
 	case n: \
 		return mode == CS_MODE_MIPS64 ? id : 0;
@@ -354,7 +369,7 @@ static inline unsigned standardScanOpcode(unsigned major, cs_mode mode)
 #undef MIPS_SCAN_OP64
 #undef MIPS_SCAN_OP
 	}
-	return 0;
+	return classicScalarOpcode(major);
 }
 #endif
 
@@ -401,6 +416,75 @@ bool Mips_getInstruction(csh handle, const uint8_t *code, size_t code_len,
 						       code_len, address, info);
 	*size = size64;
 	return finishInstruction(instr, Result);
+}
+
+/* The classic three-register ALU forms reserve bits 10..6 as zero. */
+static inline unsigned classicDetailOpcode(MCInst *instr, const uint8_t *code)
+{
+	const uint32_t word = readBytes32(instr, code);
+	const unsigned major = word >> 26;
+	if (major)
+		return major == 8 ? Mips_ADDi : classicScalarOpcode(major);
+	switch (word & 0x7ff) {
+	case 0x20:
+		return Mips_ADD;
+	case 0x21:
+		return Mips_ADDu;
+	case 0x22:
+		return Mips_SUB;
+	case 0x23:
+		return Mips_SUBu;
+	case 0x24:
+		return Mips_AND;
+	case 0x25:
+		return Mips_OR;
+	case 0x26:
+		return Mips_XOR;
+	case 0x27:
+		return Mips_NOR;
+	case 0x2a:
+		return Mips_SLT;
+	case 0x2b:
+		return Mips_SLTu;
+	default:
+		return 0;
+	}
+}
+
+/* Called only for classic pre-R6 modes, with no text and the stock mapper.
+ * LW/SW and other extension aliases still need the generated decoder's
+ * feature-table precedence, even when their public instruction IDs agree. */
+bool Mips_disasmClassicNoText(cs_struct *handle, const uint8_t *code,
+			      size_t length, cs_insn *insn)
+{
+	MCInst instr;
+	MCInst_InitStorage(&instr, CS_ARCH_MIPS, false);
+	instr.csh = handle;
+	instr.flat_insn = insn;
+	instr.address = insn->address;
+
+	if (length < 4) {
+		Mips_init_cs_detail(&instr);
+		return false;
+	}
+	const unsigned opcode = classicDetailOpcode(&instr, code);
+	if (opcode) {
+		Mips_init_cs_detail(&instr);
+		MCInst_setOpcode(&instr, opcode);
+		Mips_set_instr_map_data(&instr);
+	} else {
+		uint16_t size;
+		if (!Mips_getInstruction((csh)(uintptr_t)handle, code, length,
+					 &instr, &size, insn->address,
+					 handle->getinsn_info))
+			return false;
+	}
+	insn->size = 4;
+	memcpy(insn->bytes, code, 4);
+	insn->mnemonic[0] = insn->op_str[0] = 0;
+	if (MCInst_getOpcodePub(&instr))
+		insn->id = MCInst_getOpcodePub(&instr);
+	return true;
 }
 
 /* The fixed-address caller has selected MIPS16 and suppressed assembly text.
