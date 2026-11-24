@@ -12,6 +12,8 @@ typedef enum {
 #include "MipsGenCSOpGroup.inc"
 } mips_op_group;
 
+bool Mips_disasmClassicNoText(cs_struct *handle, const uint8_t *code,
+			      size_t length, cs_insn *insn);
 bool Mips_disasm16NoText(cs_struct *handle, const uint8_t *code, size_t length,
 			 cs_insn *insn);
 

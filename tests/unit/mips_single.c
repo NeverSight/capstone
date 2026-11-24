@@ -90,7 +90,14 @@ static bool profile(cs_mode mode, bool big)
 
 int main(void)
 {
-	const cs_mode modes[] = { CS_MODE_MIPS32R2,
+	const cs_mode modes[] = { CS_MODE_MIPS1,
+				  CS_MODE_MIPS2,
+				  CS_MODE_MIPS3,
+				  CS_MODE_MIPS4,
+				  CS_MODE_MIPS5,
+				  CS_MODE_MIPS32R5,
+				  CS_MODE_MIPS64R5,
+				  CS_MODE_MIPS32R2,
 				  CS_MODE_MIPS64R2,
 				  CS_MODE_MIPS32R6,
 				  CS_MODE_MIPS64R6,

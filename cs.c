@@ -1821,6 +1821,17 @@ bool CAPSTONE_API cs_disasm_iter(csh ud, const uint8_t **code, size_t *size,
 #endif
 
 #ifdef CAPSTONE_HAS_MIPS
+#ifndef CAPSTONE_DIET
+static bool mipsClassicDetailMode(unsigned isa)
+{
+	const unsigned classic = CS_MODE_MIPS1 | CS_MODE_MIPS2 | CS_MODE_MIPS3 |
+				 CS_MODE_MIPS4 | CS_MODE_MIPS5 |
+				 CS_MODE_MIPS32R2 | CS_MODE_MIPS64R2 |
+				 CS_MODE_MIPS32R5 | CS_MODE_MIPS64R5;
+	return (isa & classic) && !(isa & (isa - 1));
+}
+#endif
+
 CAPSTONE_INTERNAL bool Mips_disasmOne(csh ud, const uint8_t *code, size_t size,
 				      uint64_t address, cs_insn *insn)
 {
@@ -1836,13 +1847,20 @@ CAPSTONE_INTERNAL bool Mips_disasmOne(csh ud, const uint8_t *code, size_t size,
 			insn->detail = NULL;
 		insn->address = address;
 		handle->errnum = CS_ERR_OK;
-		const cs_mode mode = handle->mode &
-				     ~(CS_MODE_BIG_ENDIAN | CS_MODE_MIPS32R2);
-		bool decoded =
-			handle->no_text && mode == CS_MODE_MIPS16 ?
-				Mips_disasm16NoText(handle, code, size, insn) :
-				cs_decode_full_insn(handle, code, size, insn,
-						    &length, false);
+		const cs_mode mode = handle->mode & ~CS_MODE_BIG_ENDIAN;
+		bool decoded;
+		if (handle->no_text &&
+		    (mode & ~CS_MODE_MIPS32R2) == CS_MODE_MIPS16)
+			decoded = Mips_disasm16NoText(handle, code, size, insn);
+		else if (handle->no_text && insn->detail &&
+			 handle->disasm == Mips_getInstruction &&
+			 handle->insn_id == Mips_get_insn_id &&
+			 mipsClassicDetailMode(mode))
+			decoded = Mips_disasmClassicNoText(handle, code, size,
+							   insn);
+		else
+			decoded = cs_decode_full_insn(handle, code, size, insn,
+						      &length, false);
 		insn->detail = detail;
 		return decoded;
 	}
