@@ -2,6 +2,9 @@
 
 #include "../../Mapping.h"
 #include "../../utils.h"
+#ifdef CAPSTONE_HAS_POWERPC
+#include "../../arch/PowerPC/PPCMapping.h"
+#endif
 #include <limits.h>
 #include <stdio.h>
 #include <string.h>
@@ -226,6 +229,45 @@ static bool test_generated_alias_lookup(void)
 }
 #endif
 
+#ifdef PPC_INDEXED_ALIAS_NAMES
+static bool test_powerpc_alias_names(void)
+{
+	static const name_map original[] = {
+#include "../../arch/PowerPC/PPCGenCSAliasMnemMap.inc"
+		{ PPC_INS_ALIAS_SLWI, "slwi" },
+		{ PPC_INS_ALIAS_SRWI, "srwi" },
+		{ PPC_INS_ALIAS_SLDI, "sldi" },
+		{ PPC_INS_ALIAS_END, NULL },
+	};
+	static const ppc_alias_name indexed[] = {
+#include "../../arch/PowerPC/PPCGenAliasNameIndex.inc"
+	};
+	cs_struct handle = { 0 };
+	cs_insn insn = { 0 };
+	MCInst mi = { 0 };
+	SStream stream = { 0 };
+	handle.arch = CS_ARCH_PPC;
+	mi.csh = &handle;
+	mi.flat_insn = &insn;
+	mi.isAliasInstr = true;
+	if (ARR_SIZE(original) != ARR_SIZE(indexed))
+		return false;
+	for (size_t i = 0; original[i].name; ++i) {
+		if (indexed[i].id != original[i].id ||
+		    strcmp(indexed[i].name, original[i].name) != 0)
+			return false;
+		snprintf(stream.buffer, sizeof(stream.buffer), "\t%s r3", original[i].name);
+		map_set_alias_id(&mi, &stream, original, ARR_SIZE(original));
+		uint64_t expected = insn.alias_id;
+		insn.alias_id = UINT64_MAX;
+		PPC_setAliasId(&mi, &stream, indexed, PPC_ALIAS_BUCKET_MASK);
+		if (insn.alias_id != expected)
+			return false;
+	}
+	return true;
+}
+#endif
+
 static bool test_full_group_map(void)
 {
 #ifndef CAPSTONE_DIET
@@ -257,6 +299,10 @@ static bool test_full_group_map(void)
 
 int main(void)
 {
+#ifdef PPC_INDEXED_ALIAS_NAMES
+	if (!test_powerpc_alias_names())
+		return 1;
+#endif
 #ifdef CAPSTONE_USE_ALIAS_TRIE
 	if (!test_generated_alias_lookup())
 		return 1;

@@ -574,6 +574,8 @@ static inline void printTLSCall(MCInst *MI, unsigned OpNo, SStream *O)
 #ifndef CAPSTONE_DIET
 #include "../../AliasPatternLookup.h"
 #define matchAliasPatterns matchPPCAliasPatterns
+#include "PPCAliasNameLookup.h"
+
 #endif
 #include "PPCGenAsmWriter.inc"
 #undef matchAliasPatterns

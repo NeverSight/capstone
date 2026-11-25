@@ -12,6 +12,23 @@ typedef enum {
 #include "PPCGenCSOpGroup.inc"
 } ppc_op_group;
 
+#if defined(__linux__) && defined(__x86_64__) && \
+	defined(CAPSTONE_ISOLATED_ALIAS_LOOKUP) && !defined(CAPSTONE_USE_ALIAS_TRIE) && \
+	!defined(CAPSTONE_DIET) && UINTPTR_MAX == UINT64_MAX && \
+	(defined(CAPSTONE_HAS_AARCH64) || defined(CAPSTONE_HAS_MIPS))
+#define PPC_INDEXED_ALIAS_NAMES
+/* The two chain links fit between the ID and pointer of the 64-bit name map. */
+typedef struct {
+	unsigned int id;
+	uint16_t first;
+	uint16_t next;
+	const char *name;
+} ppc_alias_name;
+
+CAPSTONE_INTERNAL void PPC_setAliasId(MCInst *MI, const SStream *O,
+				     const ppc_alias_name *names, unsigned mask);
+#endif
+
 void PPC_init_mri(MCRegisterInfo *MRI);
 
 void PPC_init_cs_detail(MCInst *MI);
