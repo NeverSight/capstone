@@ -115,7 +115,19 @@ const char *doGetRegisterName(MCRegister Reg)
 
 static inline void printRegName(SStream *O, MCRegister Reg)
 {
+#if defined(CAPSTONE_RISCV_ONLY) && !defined(CAPSTONE_DIET)
+	if (O->markup_stream)
+		O = markup_OS(O, Markup_Register);
+	const char *name = doGetRegisterName(Reg);
+	if ((unsigned)Reg - RISCV_X0 <= (unsigned)(RISCV_X31 - RISCV_X0) &&
+	    name[2] == '\0') {
+		SStream_concat0_small(O, name, 2);
+		return;
+	}
+	SStream_concat0(O, name);
+#else
 	SStream_concat0(markup_OS(O, Markup_Register), doGetRegisterName(Reg));
+#endif
 }
 
 bool haveRequiredFeatures(const RISCV_SysReg *Reg, MCInst *MI)
