@@ -161,6 +161,12 @@ elseif(capstone_enabled_architectures STREQUAL "MIPS;X86")
 elseif(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;X86")
     add_compile_definitions(CAPSTONE_ARM_AARCH64_MIPS_X86)
 elseif(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV")
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_C_COMPILER_ID STREQUAL "Clang"
+       AND CMAKE_SIZEOF_VOID_P EQUAL 8 AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$"
+       AND NOT CAPSTONE_BUILD_DIET)
+        add_compile_definitions(CAPSTONE_ARM_FORMAT_PUNCTUATION_X64)
+        set(capstone_arm_char_source arch/ARM/ARMFormattedChar.c)
+    endif()
     # Linux x86-64 retains its inlined initialization for MIPS text throughput.
     if(CMAKE_C_COMPILER_ID MATCHES "Clang" AND CMAKE_SIZEOF_VOID_P EQUAL 8
        AND (CMAKE_SYSTEM_NAME STREQUAL "Darwin" OR
@@ -1064,7 +1070,7 @@ set_property(GLOBAL PROPERTY VERSION ${PROJECT_VERSION})
 
 ## targets
 add_library(capstone_build_settings INTERFACE)
-add_library(capstone OBJECT ${ALL_SOURCES} ${capstone_storage_source} ${ALL_HEADERS})
+add_library(capstone OBJECT ${ALL_SOURCES} ${capstone_storage_source} ${capstone_arm_char_source} ${ALL_HEADERS})
 target_link_libraries(capstone PUBLIC capstone_build_settings)
 set_property(TARGET capstone PROPERTY C_STANDARD 99)
 target_include_directories(capstone_build_settings INTERFACE
@@ -1113,9 +1119,10 @@ if(CAPSTONE_BUILD_STATIC_LIBS)
             # ahead of the optional native readers even when all are linked.
             # Keep alias rows and the mixed operand initializer after the native readers.
             set(capstone_static_tail
-                "$<FILTER:$<TARGET_OBJECTS:capstone>,INCLUDE,/(AliasPatternLookup|MCInstStorage)[.]c[.]o$>")
+                "$<FILTER:$<TARGET_OBJECTS:capstone>,INCLUDE,/(AliasPatternLookup|MCInstStorage)[.]c[.]o$>"
+                "$<FILTER:$<TARGET_OBJECTS:capstone>,INCLUDE,/ARMFormattedChar[.]c[.]o$>")
             set(capstone_static_objects
-                "$<FILTER:$<TARGET_OBJECTS:capstone>,EXCLUDE,/(AliasMapping|AliasPatternLookup|MCInstStorage)[.]c[.]o$>"
+                "$<FILTER:$<TARGET_OBJECTS:capstone>,EXCLUDE,/(AliasMapping|AliasPatternLookup|MCInstStorage|ARMFormattedChar)[.]c[.]o$>"
                 $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>
                 "$<FILTER:$<TARGET_OBJECTS:capstone>,INCLUDE,/AliasMapping[.]c[.]o$>")
         else()

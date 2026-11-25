@@ -127,10 +127,15 @@ MIXED_STORAGE_TARGET := $(shell $(CC) $(CPPFLAGS) $(CFLAGS) -dM -E -x c - < /dev
 	awk '$$2 == "__clang__" { clang_cc=1 } $$2 == "__SIZEOF_POINTER__" { ptr=$$3 } \
 	     $$2 == "__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__" { macos=1 } \
 	     $$2 == "__linux__" { linux_target=1 } $$2 == "__aarch64__" { arm64=1 } \
-	     END { if (clang_cc && ptr==8 && (macos || (linux_target && arm64))) print macos ? "macos" : "linux-arm64" }')
-ifneq ($(MIXED_STORAGE_TARGET),)
+	     $$2 == "__x86_64__" { amd64=1 } \
+	     END { if (clang_cc && ptr==8) { if (macos) print "macos"; else if (linux_target && arm64) print "linux-arm64"; else if (linux_target && amd64) print "linux-amd64" } }')
+ifneq ($(filter macos linux-arm64,$(MIXED_STORAGE_TARGET)),)
 CFLAGS += -DCAPSTONE_MIXED_CONSTRUCTED_OPERANDS
 MCINST_STORAGE_OBJ = $(OBJDIR)/MCInstStorage.o
+endif
+ifeq ($(MIXED_STORAGE_TARGET):$(CAPSTONE_DIET),linux-amd64:no)
+CFLAGS += -DCAPSTONE_ARM_FORMAT_PUNCTUATION_X64
+ARM_FORMAT_CHAR_OBJ = $(OBJDIR)/arch/ARM/ARMFormattedChar.o
 endif
 endif
 
@@ -180,7 +185,7 @@ DEP_ARM += $(wildcard arch/ARM/ARM*.inc)
 LIBOBJ_ARM =
 ifneq (,$(filter arm,$(CAPSTONE_ARCHS)))
 	CFLAGS += -DCAPSTONE_HAS_ARM
-	LIBSRC_ARM += $(wildcard arch/ARM/ARM*.c)
+	LIBSRC_ARM += $(filter-out arch/ARM/ARMFormattedChar.c,$(wildcard arch/ARM/ARM*.c))
 	LIBOBJ_ARM += $(LIBSRC_ARM:%.c=$(OBJDIR)/%.o)
 endif
 
@@ -462,8 +467,8 @@ LIBOBJ += $(LIBOBJ_ARM) $(LIBOBJ_AARCH64) $(LIBOBJ_M68K) $(LIBOBJ_MIPS) $(LIBOBJ
 LIBOBJ += $(LIBOBJ_X86) $(LIBOBJ_XCORE) $(LIBOBJ_TMS320C64X) $(LIBOBJ_M680X) $(LIBOBJ_EVM) $(LIBOBJ_MOS65XX) $(LIBOBJ_WASM) $(LIBOBJ_BPF)
 LIBOBJ += $(LIBOBJ_TRICORE) $(LIBOBJ_ALPHA) $(LIBOBJ_HPPA) $(LIBOBJ_LOONGARCH) $(LIBOBJ_XTENSA) $(LIBOBJ_ARC)
 LIBOBJ += $(LIBOBJ_X86_NUMBERS)
-LIBOBJ_SHARED := $(LIBOBJ) $(OBJDIR)/AliasPatternLookup.o $(MCINST_STORAGE_OBJ)
-LIBOBJ += $(LIBOBJ_X86_STATIC_OUTPUT) $(OBJDIR)/AliasPatternLookup.o $(MCINST_STORAGE_OBJ)
+LIBOBJ_SHARED := $(LIBOBJ) $(OBJDIR)/AliasPatternLookup.o $(MCINST_STORAGE_OBJ) $(ARM_FORMAT_CHAR_OBJ)
+LIBOBJ += $(LIBOBJ_X86_STATIC_OUTPUT) $(OBJDIR)/AliasPatternLookup.o $(MCINST_STORAGE_OBJ) $(ARM_FORMAT_CHAR_OBJ)
 ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
 LIBOBJ_SHARED := $(LIBOBJ)
 endif

@@ -36,6 +36,13 @@ static inline void ARM_printFormattedChar(SStream *O, const char *literal)
 	}
 	SStream_concat(O, "%s", literal);
 }
+#elif defined(CAPSTONE_ARM_FORMAT_PUNCTUATION_X64) && !defined(CAPSTONE_DIET) && \
+	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
+	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE) && defined(__linux__) && \
+	defined(__clang__) && defined(__x86_64__)
+#define ARM_FORMATTED_CHAR_CALL
+CAPSTONE_INTERNAL void ARM_formatChar(SStream *O, const char *fmt, ...);
+#define ARM_printFormattedChar(O, literal) ARM_formatChar((O), "%s", (const char *)(literal))
 #else
 #define ARM_printFormattedChar(O, literal) SStream_concat((O), "%s", (literal))
 #endif
