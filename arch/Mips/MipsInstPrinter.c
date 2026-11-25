@@ -510,15 +510,46 @@ static void printFCCOperand(MCInst *MI, int opNum, SStream *O)
 			MipsFCCToString((Mips_CondCode)MCOperand_getImm(MO)));
 }
 
+#if defined(CAPSTONE_MIPS_ONLY) && !defined(CAPSTONE_DIET) && \
+	defined(__linux__) && defined(__clang__) && \
+	(defined(__x86_64__) || defined(__aarch64__)) && \
+	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(__KERNEL__) && \
+	!defined(_KERNEL_MODE)
+#define MIPS_WRITE_ALIAS_MNEMONIC
+static void printAliasMnemonic(SStream *OS, const char *name)
+{
+	/* Ordinary output writes the tab, alias and operand separator together.
+	 * Markup and user formatters observe their original append boundaries. */
+	if (cs_vsnprintf == cs_default_vsnprintf && !OS->is_closed &&
+	    !OS->markup_stream && OS->index < SSTREAM_BUF_LEN - 2) {
+		const size_t NameLen = strlen(name);
+		if (NameLen < SSTREAM_BUF_LEN - 2 - OS->index) {
+			char *out = OS->buffer + OS->index;
+			*out++ = '\t';
+			memcpy(out, name, NameLen);
+			memcpy(out + NameLen, "\t", 2);
+			OS->index += NameLen + 2;
+			return;
+		}
+	}
+	SStream_concat2(OS, "\t", name);
+	SStream_concat0(OS, "\t");
+}
+#endif
+
 static bool printAlias(const char *Str, const MCInst *MI, uint64_t Address,
 		       unsigned OpNo, SStream *OS, bool IsBranch)
 {
+#ifdef MIPS_WRITE_ALIAS_MNEMONIC
+	printAliasMnemonic(OS, Str);
+#else
 #if defined(CAPSTONE_MIPS_ONLY) && !defined(CAPSTONE_DIET)
 	SStream_concat2(OS, "\t", Str);
 #else
 	SStream_concat(OS, "%s%s", "\t", Str);
 #endif
 	SStream_concat0(OS, "\t");
+#endif
 	if (IsBranch)
 		printBranchOperand((MCInst *)MI, Address, OpNo, OS);
 	else
