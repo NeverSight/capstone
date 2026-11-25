@@ -117,7 +117,13 @@ static const char *MipsFCCToString(Mips_CondCode CC)
 
 const char *Mips_LLVM_getRegisterName(unsigned RegNo, bool noRegName);
 
-#if defined(__linux__) && defined(__x86_64__) && defined(__GNUC__) && \
+/* Use the numeric and ABI register tables in the dedicated Linux arm64 printer. */
+#if defined(__linux__) && defined(__aarch64__) && defined(__clang__) && \
+    defined(CAPSTONE_MIPS_ONLY)
+#define MIPS_REGISTER_NAME_BANKS
+#endif
+#if ((defined(__linux__) && defined(__x86_64__) && defined(__GNUC__)) || \
+     defined(MIPS_REGISTER_NAME_BANKS)) && \
     !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
     !defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
     !defined(_WIN32_WCE)
@@ -128,10 +134,17 @@ static void printRegName(MCInst *MI, SStream *OS, MCRegister Reg)
 {
 	int syntax_opt = MI->csh->syntax;
 #ifdef MIPS_SHORT_REGISTER_NAMES
+#ifdef MIPS_REGISTER_NAME_BANKS
+#include "MipsGenRegisterNameBanks.inc"
+	if (Reg && Reg <= ARR_SIZE(mips_short_name_indices[0])) {
+		const unsigned numeric = !!(syntax_opt & CS_OPT_SYNTAX_NOREGNAME);
+		const unsigned index = mips_short_name_indices[numeric][Reg - 1];
+#else
 #include "MipsGenShortRegisterNames.inc"
 	if (!(syntax_opt & CS_OPT_SYNTAX_NOREGNAME) && Reg &&
 	    Reg <= ARR_SIZE(mips_short_name_indices)) {
 		const unsigned index = mips_short_name_indices[Reg - 1];
+#endif
 		const unsigned length = mips_short_names[index].length;
 		if (length && cs_vsnprintf == cs_default_vsnprintf &&
 		    !OS->markup_stream && !OS->prefixed_by_markup &&
