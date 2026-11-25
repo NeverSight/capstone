@@ -175,7 +175,7 @@ if(capstone_enabled_architectures STREQUAL "XCORE")
 endif()
 
 if(capstone_enabled_architectures STREQUAL "ARM")
-    add_compile_definitions(CAPSTONE_ARM_COPY_OPERAND_DEFAULTS CAPSTONE_ARM_INIT_CONSTRUCTED_OPERANDS)
+    add_compile_definitions(CAPSTONE_ARM_ONLY CAPSTONE_ARM_COPY_OPERAND_DEFAULTS CAPSTONE_ARM_INIT_CONSTRUCTED_OPERANDS)
 endif()
 
 if(capstone_enabled_architectures STREQUAL "MIPS")

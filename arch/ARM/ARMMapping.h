@@ -22,6 +22,24 @@ ARMSysReg_lookupMClassSysRegByEncoding(uint16_t Encoding);
 // return name of register in friendly string
 const char *ARM_reg_name(csh handle, unsigned int reg);
 
+/* Formatted single-character literals preserve the original %s call for
+ * applications that install a formatter through CS_OPT_MEM. */
+#if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
+	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
+	!defined(_WIN32_WCE) && defined(__linux__) && defined(__clang__) && \
+	(defined(CAPSTONE_ARM_ONLY) && (defined(__x86_64__) || defined(__aarch64__)))
+static inline void ARM_printFormattedChar(SStream *O, const char *literal)
+{
+	if (cs_vsnprintf == cs_default_vsnprintf) {
+		SStream_concat1(O, literal[0]);
+		return;
+	}
+	SStream_concat(O, "%s", literal);
+}
+#else
+#define ARM_printFormattedChar(O, literal) SStream_concat((O), "%s", (literal))
+#endif
+
 /* A disabled markup tag contributes no text. A callback can observe
  * even an empty argument, and a markup stream can close a pending tag. */
 #if defined(CAPSTONE_ARM_AARCH64_MIPS_X86) && defined(__linux__) && \

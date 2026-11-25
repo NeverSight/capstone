@@ -32,6 +32,10 @@ class StreamOperations(Patch):
         return "stream"
 
     def _concat_strings(self, s_name: bytes, ops: list[Node], src: bytes) -> bytes:
+        if self.arch == "ARM" and len(ops) == 1 and ops[0].type == "string_literal":
+            literal = get_text_from_node(src, ops[0])
+            if len(literal) == 3 and literal[:1] == b'"' and 0x20 <= literal[1] < 0x7F:
+                return b"ARM_printFormattedChar(" + s_name + b", " + literal + b");\n"
         if self.arch == "ARM" and len(ops) == 1 and ops[0].type == "call_expression":
             function = ops[0].child_by_field_name("function")
             arguments = ops[0].child_by_field_name("arguments")

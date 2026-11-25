@@ -633,6 +633,20 @@ public:
         syntax = b"{ int y = 1; int x = 1; OS << x; }"
         self.check_patching_result(patch, syntax, b"printInt32(OS, x);")
 
+    def test_arm_formatted_literal(self):
+        suffix = b'SStream_concat0(O, markup(">"));'
+        self.check_patching_result(
+            StreamOperations(0, "ARM"),
+            b'{ O << "]" << markup(">"); }',
+            b'ARM_printFormattedChar(O, "]");\n' + suffix,
+        )
+        for arch, literal in (("AArch64", b'"]"'), ("ARM", b'", "'), ("ARM", b'""')):
+            self.check_patching_result(
+                StreamOperations(0, arch),
+                b'{ O << ' + literal + b' << markup(">"); }',
+                b'SStream_concat(O, "%s", ' + literal + b');\n' + suffix,
+            )
+
     def test_arm_single_markup_before_operand(self):
         source = b"""{ O << markup("<imm:") << '#' << amount; }"""
         suffix = b"SStream_concat1(O, '#');\nSStream_concat0(O, amount);"
