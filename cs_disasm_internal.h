@@ -28,12 +28,14 @@ X86_decodePublicRecord(cs_struct *handle, const uint8_t *code, size_t size,
 #ifdef CAPSTONE_X86_PUBLIC_FIXED_RECORD
 typedef uint8_t cs_record_request;
 enum { CS_RECORD_PUBLIC_ITER = 2 };
+#else
+typedef bool cs_record_request;
+#endif
+#if defined(CAPSTONE_X86_PUBLIC_FIXED_RECORD) || defined(CAPSTONE_X86_DIRECT_PUBLIC_RECORD)
 CAPSTONE_INTERNAL bool X86_decodeFixedRecord32(cs_struct *handle,
 		const uint8_t *code, size_t size, cs_insn *insn, uint16_t *length);
 CAPSTONE_INTERNAL bool X86_decodeFixedRecord64(cs_struct *handle,
 		const uint8_t *code, size_t size, cs_insn *insn, uint16_t *length);
-#else
-typedef bool cs_record_request;
 #endif
 CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
 cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,

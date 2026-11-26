@@ -13,6 +13,18 @@ CS_PRESERVE_MOST bool X86_decodePublicRecord(cs_struct *handle,
 					    cs_insn *insn, uint16_t *length,
 					    bool batch)
 {
+#ifdef CAPSTONE_X86_DIRECT_PUBLIC_RECORD
+	/* The outer iterator owns detail visibility, skipdata and cursor updates.
+	 * Its fixed text path only needs the decoded record and its length. */
+	if (!batch && !handle->skipdata && !handle->no_text) {
+		if (handle->mode == CS_MODE_32)
+			return X86_decodeFixedRecord32(handle, code, size, insn,
+						       length);
+		if (handle->mode == CS_MODE_64)
+			return X86_decodeFixedRecord64(handle, code, size, insn,
+						       length);
+	}
+#else
 	/* The caller owns skipdata callbacks, bulk boundaries and the public
 	 * cursors. A fixed iterator can fill this one record using local cursors. */
 	if (!batch && !handle->skipdata && !handle->no_text &&
@@ -24,6 +36,7 @@ CS_PRESERVE_MOST bool X86_decodePublicRecord(cs_struct *handle,
 			*length = insn->size;
 		return ok;
 	}
+#endif
 	return cs_decode_full_insn(handle, code, size, insn, length, batch);
 }
 #endif

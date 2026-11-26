@@ -35,6 +35,14 @@ CAPSTONE_INTERNAL bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *cod
 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
 	!defined(_WIN32_WCE)
 #define CAPSTONE_X86_PUBLIC_OUTPUT
+/* Direct record dispatch in these standalone builds avoids a second
+ * iterator frame. Other code generators retain the existing iterator. */
+#if (defined(__x86_64__) || defined(__aarch64__)) && \
+	((defined(__linux__) && defined(__clang__) && __clang_major__ == 18) || \
+	 (defined(__APPLE__) && defined(__apple_build_version__) && \
+	  defined(__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__)))
+#define CAPSTONE_X86_DIRECT_PUBLIC_RECORD
+#endif
 /* Linux already selects the scalar writer in its full decode entry. */
 #ifndef CAPSTONE_X86_DEDICATED_OUTPUT
 #include "../../cs_priv.h"

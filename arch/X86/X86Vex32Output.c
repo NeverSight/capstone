@@ -202,7 +202,7 @@ static bool writeExtraOutput32(cs_struct *handle, const uint8_t *code,
 #include "../../cs_disasm_internal.h"
 #undef CS_DECODE_OUTPUT_MISS
 
-#ifdef CAPSTONE_X86_PUBLIC_FIXED_RECORD
+#if defined(CAPSTONE_X86_PUBLIC_FIXED_RECORD) || defined(CAPSTONE_X86_DIRECT_PUBLIC_RECORD)
 bool X86_decodeFixedRecord32(cs_struct *handle, const uint8_t *code, size_t size,
 			     cs_insn *insn, uint16_t *length)
 {
