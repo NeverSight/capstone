@@ -1027,7 +1027,13 @@ void printSVCROp(MCInst *MI, unsigned OpNum, SStream *O)
 
 void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
 {
-	AArch64_add_cs_detail_0(MI, AArch64_OP_GROUP_Operand, OpNo);
+#ifdef CAPSTONE_AARCH64_SKIP_UNUSED_OPERAND_DETAIL
+	const bool add_detail = detail_is_set(MI);
+#else
+	const bool add_detail = true;
+#endif
+	if (add_detail)
+		AArch64_add_cs_detail_0(MI, AArch64_OP_GROUP_Operand, OpNo);
 	MCOperand *Op = MCInst_getOperand(MI, (OpNo));
 	if (MCOperand_isReg(Op)) {
 		unsigned Reg = MCOperand_getReg(Op);
