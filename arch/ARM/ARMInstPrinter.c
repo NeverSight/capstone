@@ -129,7 +129,13 @@ static void printRegName(SStream *OS, unsigned RegNo)
 
 static inline void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
 {
-	ARM_add_cs_detail_0(MI, ARM_OP_GROUP_Operand, OpNo);
+#ifdef CAPSTONE_ARM_ONLY
+	const bool add_detail = detail_is_set(MI);
+#else
+	const bool add_detail = true;
+#endif
+	if (add_detail)
+		ARM_add_cs_detail_0(MI, ARM_OP_GROUP_Operand, OpNo);
 	MCOperand *Op = MCInst_getOperand(MI, (OpNo));
 	if (MCOperand_isReg(Op)) {
 		unsigned Reg = MCOperand_getReg(Op);
