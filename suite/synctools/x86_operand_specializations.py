@@ -1545,7 +1545,9 @@ def emit_vex_scan_rows(suffix, metadata, patterns, public_plans=False):
 def emit_vex_scan(suffix, public_plans=False):
     # MODE_64BIT ordinary VEX registers are at most 15. Admitted classes have
     # no gather, mask, register-limit or predicate-dependent opcode checks.
-    reads = dict(read_specializations(suffix))
+    # The scan result needs the immediate extent, not a materialized operand.
+    # REG, RM and imm8 (for example RORX) are validated by vex_scan_form.
+    reads = dict(read_specializations(suffix, scalar_limit=3))
     translations = dict(translation_specializations(suffix))
     source = (X86 / f"X86GenDisassemblerTables{suffix}.inc").read_text()
     specifiers = instruction_specifiers(source)
