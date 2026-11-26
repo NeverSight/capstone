@@ -5,6 +5,7 @@
 #include <capstone/capstone.h>
 #include "cstool.h"
 
+#ifdef CAPSTONE_HAS_RISCV
 #include "../arch/RISCV/RISCVInstPrinter.h"
 
 void print_insn_detail_riscv(csh handle, cs_insn *ins)
@@ -47,10 +48,16 @@ void print_insn_detail_riscv(csh handle, cs_insn *ins)
 			printf("\t\toperands[%u].type: FP_IMM %f \n", i,
 			       op->dimm);
 			break;
-		case RISCV_OP_CSR:
-			printf("\t\toperands[%u].type: CSR = %s\n", i,
-			       getSysRegName(op->csr));
+		case RISCV_OP_CSR: {
+			const RISCV_SysReg *reg = RISCV_lookupSysRegByEncoding(op->csr);
+			if (reg)
+				printf("\t\toperands[%u].type: CSR = %s\n", i,
+				       reg->Name);
+			else
+				printf("\t\toperands[%u].type: CSR = 0x%x\n", i,
+				       (unsigned)op->csr);
 			break;
+		}
 		}
 
 		switch (op->access) {
@@ -79,3 +86,5 @@ void print_insn_detail_riscv(csh handle, cs_insn *ins)
 
 	printf("\n");
 }
+
+#endif // CAPSTONE_HAS_RISCV

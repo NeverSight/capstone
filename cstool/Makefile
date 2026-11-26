@@ -4,11 +4,9 @@ include ../functions.mk
 
 .PHONY: clean all
 
-LIBNAME = capstone
-
-CFLAGS += -I../include -I.
+CFLAGS += -I../include -I. $(CSTOOL_ARCH_FLAGS)
 CFLAGS += -std=gnu99
-LDFLAGS += -O3 -Wall -L.. -l$(LIBNAME)
+LDFLAGS += -O3 -Wall
 
 TARGET = cstool
 SOURCES := $(wildcard *.c)
@@ -26,14 +24,16 @@ LIBCAPSTONE = capstone.lib
 endif
 endif
 
+CSTOOL_LIBRARY ?= ../$(LIBCAPSTONE)
+
 all: $(TARGET)
 
-$(TARGET): ../$(LIBCAPSTONE) $(OBJECTS)
+$(TARGET): $(CSTOOL_LIBRARY) $(OBJECTS)
 ifeq ($(V), 0)
 	$(call log,LINK,$@)
-	@${CC} $(OBJECTS) $(LDFLAGS) -o $@
+	@${CC} $(OBJECTS) "$(CSTOOL_LIBRARY)" $(LDFLAGS) -o $@
 else
-	${CC} $(OBJECTS) $(LDFLAGS) -o $@
+	${CC} $(OBJECTS) "$(CSTOOL_LIBRARY)" $(LDFLAGS) -o $@
 endif
 
 clean:

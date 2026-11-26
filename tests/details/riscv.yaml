@@ -6925,3 +6925,22 @@ test_cases:
                   reg: v4
                   access: CS_AC_READ
 
+  - input:
+      bytes: [0x73, 0x95, 0xb5, 0x7c]
+      arch: "CS_ARCH_RISCV"
+      options: [CS_MODE_RISCV64, CS_OPT_DETAIL]
+    expected:
+      insns:
+        - asm_text: "csrrw a0, 0x7cb, a1"
+          details:
+            riscv:
+              operands:
+                - type: RISCV_OP_REG
+                  reg: a0
+                  access: CS_AC_WRITE
+                - type: RISCV_OP_CSR
+                  csr: "0x7cb"
+                  access: CS_AC_READ_WRITE
+                - type: RISCV_OP_REG
+                  reg: a1
+                  access: CS_AC_READ

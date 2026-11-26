@@ -365,6 +365,7 @@ endif
 
 DEP_RISCV =
 DEP_RISCV += $(wildcard arch/RISCV/RISCV*.inc)
+DEP_RISCV += $(wildcard arch/RISCV/RISCV*.h)
 
 LIBOBJ_RISCV =
 ifneq (,$(filter riscv,$(CAPSTONE_ARCHS)))
@@ -572,7 +573,9 @@ PKGCFGF = $(BLDIR)/$(LIBNAME).pc
 
 all: $(LIBRARY) $(ARCHIVE) $(PKGCFGF)
 ifeq (,$(findstring yes,$(CAPSTONE_BUILD_CORE_ONLY)))
-	@V=$(V) CC=$(CC) $(MAKE) -C cstool
+	@V=$(V) CC=$(CC) $(MAKE) -C cstool \
+		CSTOOL_ARCH_FLAGS="$(filter -DCAPSTONE_HAS_%,$(CFLAGS))" \
+		CSTOOL_LIBRARY="$(abspath $(or $(ARCHIVE),$(LIBRARY)))"
 endif
 
 ifeq ($(CAPSTONE_SHARED),yes)

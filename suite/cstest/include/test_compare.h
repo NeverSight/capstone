@@ -232,15 +232,4 @@ typedef int32_t tbool;
 		} \
 	}
 
-#define compare_string_from_int_ret(actual, expected, converter, ret_val) \
-	if (expected) { \
-		const char *actual_str = converter(actual); \
-		if (!strings_match(actual_str, expected)) { \
-			fprintf(stderr, \
-				#actual " != " #expected ": '%s' != '%s'\n", \
-				actual_str, expected); \
-			return ret_val; \
-		} \
-	}
-
 #endif // TEST_COMPARE_H

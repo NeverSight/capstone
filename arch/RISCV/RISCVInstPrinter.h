@@ -57,6 +57,11 @@ void printRegReg(MCInst *MI, unsigned OpNo, SStream *O);
 
 const char *RISCV_LLVM_getRegisterName(unsigned RegNo, unsigned AltIdx);
 
+CAPSTONE_EXPORT
+const RISCV_SysReg *RISCV_lookupSysRegByEncoding(uint16_t encoding);
+
+/* Legacy name accessor for a known CSR. Use the table lookup for an encoding
+ * from an instruction, which may have no registered name. */
 const char *getSysRegName(unsigned reg);
 
 bool isCompressed(MCInst *MI);

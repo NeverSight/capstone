@@ -110,7 +110,21 @@ bool test_expected_riscv(csh *handle, const cs_riscv *actual,
       break;
     case RISCV_OP_CSR:
 #ifdef CAPSTONE_HAS_RISCV
-      compare_string_from_int_ret(op->csr, eop->csr, getSysRegName, false);
+      if (eop->csr) {
+        const RISCV_SysReg *reg = RISCV_lookupSysRegByEncoding(op->csr);
+        const char *name;
+        char number[sizeof("0xffff")];
+        if (reg) {
+          name = reg->Name;
+        } else {
+          snprintf(number, sizeof(number), "0x%x", (unsigned)op->csr);
+          name = number;
+        }
+        if (!strings_match(name, eop->csr)) {
+          fprintf(stderr, "CSR mismatch: '%s' != '%s'\n", name, eop->csr);
+          return false;
+        }
+      }
       break;
 #else
       return false;

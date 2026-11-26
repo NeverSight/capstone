@@ -4,11 +4,11 @@
 #include "getopt.h"
 #include <ctype.h>
 #include <errno.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <capstone/capstone.h>
 #include "cstool.h"
-#include "../cs_priv.h"
 
 #ifdef CAPSTONE_AARCH64_COMPAT_HEADER
 #define CS_ARCH_AARCH64 CS_ARCH_ARM64
@@ -611,7 +611,7 @@ static uint8_t *preprocess(char *code, size_t *size)
 	if (strlen(code) == 0)
 		return NULL;
 
-	result = (uint8_t *)cs_mem_malloc(strlen(code));
+	result = (uint8_t *)malloc(strlen(code));
 	if (result != NULL) {
 		while (code[i] != '\0') {
 			if (isxdigit(code[i]) && isxdigit(code[i + 1])) {
@@ -1087,11 +1087,6 @@ int main(int argc, char **argv)
 	}
 
 	choosen_arch = argv[optind];
-	if (!cs_mem_is_setup()) {
-		fprintf(stderr,
-			"ERROR: Cannot allocate memory: allocators are not defined.\n");
-		return -3;
-	};
 	assembly = preprocess(argv[optind + 1], &size);
 	if (!assembly) {
 		usage(argv[0]);
@@ -1104,7 +1099,7 @@ int main(int argc, char **argv)
 		if (temp == src || *temp != '\0' || errno == ERANGE) {
 			fprintf(stderr,
 				"ERROR: invalid address argument, quit!\n");
-			cs_mem_free(assembly);
+			free(assembly);
 			return -2;
 		}
 	}
@@ -1124,6 +1119,12 @@ int main(int argc, char **argv)
 			mode |= find_additional_modes(plus, arch);
 
 			err = cs_open(all_archs[i].arch, mode, &handle);
+			if (err == CS_ERR_MEMSETUP) {
+				fprintf(stderr,
+					"ERROR: Cannot allocate memory: allocators are not defined.\n");
+				free(assembly);
+				return -3;
+			}
 			if (err == CS_ERR_OK) {
 				enable_additional_options(handle, plus, arch);
 
