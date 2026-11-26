@@ -102,6 +102,24 @@ static int check_copy_sizes(csh handle)
 	return 0;
 }
 
+/* The ULEB/SLEB representations agree for this positive i64 constant. */
+static int check_i64_constant(csh handle)
+{
+	const uint8_t code[] = { 0x42, 0x81, 0x80, 0x80, 0x80, 0x10 };
+	cs_insn *insn = NULL;
+	if (cs_option(handle, CS_OPT_DETAIL, CS_OPT_ON) != CS_ERR_OK)
+		return 1;
+	size_t count = cs_disasm(handle, code, sizeof(code), 0, 1, &insn);
+	bool ok = count == 1 && insn[0].id == WASM_INS_I64_CONST &&
+		  insn[0].detail->wasm.operands[0].varuint64 == UINT64_C(0x100000001);
+	if (ok && !cs_support(CS_SUPPORT_DIET))
+		ok = strcmp(insn[0].op_str, "0x100000001") == 0;
+	cs_free(insn, count);
+	if (!ok)
+		fprintf(stderr, "WASM i64.const lost high bits\n");
+	return !ok;
+}
+
 int main(void)
 {
 	csh h;
@@ -109,7 +127,7 @@ int main(void)
 		return 1;
 
 	if (check_copy_sizes(h) || run_count_case(h, 10, 5) ||
-	    run_count_case(h, 65531, 5)) {
+	    run_count_case(h, 65531, 5) || check_i64_constant(h)) {
 		cs_close(&h);
 		return 1;
 	}
