@@ -18,14 +18,24 @@ struct X86SimpleOperand {
 	uint8_t access;
 };
 
+/* All generated operand spellings, including their terminator, fit here. */
+enum { X86_SIMPLE_OPERAND_CAPACITY = 12 };
+
 struct X86SimpleOutput {
 	unsigned int id;
 	char mnemonic[12];
+#ifdef CAPSTONE_X86_COMPACT_SCALAR_ROWS
+	char operands[X86_SIMPLE_OPERAND_CAPACITY];
+	uint8_t groups[4];
+#else
 	char operands[20];
+#endif
 	uint64_t flags;
 	uint16_t reads[4];
 	uint16_t writes[4];
+#ifndef CAPSTONE_X86_COMPACT_SCALAR_ROWS
 	uint8_t groups[4];
+#endif
 	uint8_t read_count, write_count, group_count, operand_count;
 	uint8_t address_size, modrm_offset, imm_offset, imm_size;
 	struct X86SimpleOperand ops[2];

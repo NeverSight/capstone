@@ -97,15 +97,16 @@ std::string initializer(const X86SimpleOutput &row)
 {
 	std::ostringstream out;
 	out << "{ " << row.id << ", \"" << row.mnemonic << "\", \""
-	    << row.operands << "\", UINT64_C(" << row.flags << "), ";
+	    << row.operands << "\", .flags = UINT64_C(" << row.flags << "), .reads = ";
 	emit_array(out, row.reads);
-	out << ", ";
+	out << ", .writes = ";
 	emit_array(out, row.writes);
-	out << ", ";
+	out << ", .groups = ";
 	emit_array(out, row.groups);
-	for (unsigned v : { row.read_count, row.write_count, row.group_count,
-			    row.operand_count, row.address_size,
-			    row.modrm_offset, row.imm_offset, row.imm_size })
+	out << ", .read_count = " << unsigned(row.read_count);
+	for (unsigned v : { row.write_count, row.group_count, row.operand_count,
+			    row.address_size, row.modrm_offset, row.imm_offset,
+			    row.imm_size })
 		out << ", " << v;
 	out << ", { ";
 	for (unsigned i = 0; i < 2; ++i) {
@@ -129,7 +130,7 @@ std::string describe(const cs_insn &insn, uint8_t opcode, uint8_t rex,
 	X86SimpleOutput row{};
 	if (strlen(insn.mnemonic) >= sizeof(row.mnemonic) ||
 	    (!first && !branch && !lea &&
-	     strlen(insn.op_str) >= sizeof(row.operands)) ||
+	     strlen(insn.op_str) >= X86_SIMPLE_OPERAND_CAPACITY) ||
 	    strpbrk(insn.mnemonic, "\n\r\t\\\"") ||
 	    strpbrk(insn.op_str, "\n\r\t\\\"") || d.regs_read_count > 4 ||
 	    d.regs_write_count > 4 || d.groups_count > 4 || x.op_count > 2)

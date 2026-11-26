@@ -1079,6 +1079,16 @@ set_property(GLOBAL PROPERTY VERSION ${PROJECT_VERSION})
 
 ## targets
 add_library(capstone_build_settings INTERFACE)
+# The compact x86 records improve 32-bit detail in the six-backend static build.
+if(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
+   AND CAPSTONE_BUILD_STATIC_LIBS AND NOT CAPSTONE_BUILD_SHARED_LIBS
+   AND NOT CAPSTONE_BUILD_DIET AND NOT CAPSTONE_X86_REDUCE
+   AND CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_C_COMPILER_ID STREQUAL "Clang"
+   AND CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL 18 AND CMAKE_C_COMPILER_VERSION VERSION_LESS 19
+   AND CMAKE_SIZEOF_VOID_P EQUAL 8 AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64|aarch64|arm64|ARM64)$")
+    target_compile_definitions(capstone_build_settings INTERFACE
+        "$<$<CONFIG:Release>:CAPSTONE_X86_COMPACT_SCALAR_ROWS>")
+endif()
 add_library(capstone OBJECT ${ALL_SOURCES} ${capstone_storage_source} ${capstone_arm_char_source} ${ALL_HEADERS})
 target_link_libraries(capstone PUBLIC capstone_build_settings)
 set_property(TARGET capstone PROPERTY C_STANDARD 99)
