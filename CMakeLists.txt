@@ -213,6 +213,10 @@ if(capstone_enabled_architectures STREQUAL "RISCV")
     endif()
 endif()
 
+if(capstone_enabled_architectures STREQUAL "WASM")
+    add_compile_definitions(CAPSTONE_WASM_LITERAL_MNEMONICS)
+endif()
+
 if(capstone_enabled_architectures STREQUAL "SPARC")
     add_compile_definitions(CAPSTONE_SPARC_SHORT_STATE_REGISTER_NAMES)
 endif()

@@ -6,7 +6,20 @@
 
 void WASM_printInst(MCInst *MI, struct SStream *O, void *PrinterInfo)
 {
+#if defined(CAPSTONE_WASM_LITERAL_MNEMONICS) && \
+	!defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
+	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
+	!defined(_WIN32_WCE)
+	const char *name = WASM_insn_name((csh)MI->csh, MI->Opcode);
+	/* Mnemonics contain no format conversions. A custom formatter still
+	 * receives the original mnemonic as its format string. */
+	if (cs_vsnprintf == cs_default_vsnprintf && O->index < SSTREAM_BUF_LEN - 1)
+		SStream_concat0(O, name);
+	else
+		SStream_concat(O, name);
+#else
 	SStream_concat(O, WASM_insn_name((csh)MI->csh, MI->Opcode));
+#endif
 
 	switch (MI->wasm_data.type) {
 	default:
