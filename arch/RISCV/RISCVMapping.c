@@ -348,10 +348,7 @@ void RISCV_init_cs_detail(MCInst *MI)
 		       offsetof(cs_detail, riscv) + sizeof(cs_riscv));
 }
 
-// for weird reasons some instructions end up with valid operands that are
-// interspersed with invalid operands, i.e. the operands array is an "island"
-// of valid operands with invalid gaps between them, this function will compactify
-// all the valid operands and pad the rest of the array to invalid
+/* Keep the order of valid operands and zero every vacated record. */
 void RISCV_compact_operands(MCInst *MI)
 {
 	if (!detail_is_set(MI))
@@ -359,6 +356,23 @@ void RISCV_compact_operands(MCInst *MI)
 	cs_riscv_op *ops = RISCV_get_detail(MI)->operands;
 	unsigned int write_pos = 0;
 
+#if defined(CAPSTONE_RISCV_ONLY) && !defined(CAPSTONE_DIET) && \
+	defined(__linux__) && defined(__x86_64__) && \
+	defined(__GNUC__) && !defined(__clang__) && \
+	(__GNUC__ == 13 || __GNUC__ == 14)
+	/* On these GCC builds the first-gap loop speeds up RV64GC detail
+	 * across compressed and real-operand output modes. */
+	while (write_pos < NUM_RISCV_OPS &&
+	       ops[write_pos].type != RISCV_OP_INVALID)
+		++write_pos;
+	if (write_pos == NUM_RISCV_OPS)
+		return;
+	for (unsigned int read_pos = write_pos + 1; read_pos < NUM_RISCV_OPS;
+	     ++read_pos) {
+		if (ops[read_pos].type != RISCV_OP_INVALID)
+			ops[write_pos++] = ops[read_pos];
+	}
+#else
 	// Move valid elements to front
 	for (unsigned int read_pos = 0; read_pos < NUM_RISCV_OPS; read_pos++) {
 		if (ops[read_pos].type != (riscv_op_type)CS_OP_INVALID) {
@@ -368,6 +382,7 @@ void RISCV_compact_operands(MCInst *MI)
 			write_pos++;
 		}
 	}
+#endif
 	// fill the rest, if any, with invalid
 	memset((void *)(&ops[write_pos]), CS_OP_INVALID,
 	       (NUM_RISCV_OPS - write_pos) * sizeof(cs_riscv_op));
