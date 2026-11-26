@@ -1265,6 +1265,10 @@ def vex_scan_form(operands, register_form):
     immediates = {"TYPE_REL", "TYPE_RELv", "TYPE_IMM", "TYPE_UIMM8"}
     for encoding, operand_type in operands:
         if encoding == "ENCODING_RM":
+            # ModR/M.r/m selects K0..K7 and ignores extension bits.
+            # Opmasks in ModR/M.reg or vvvv still require validation.
+            if register_form and operand_type == "TYPE_VK":
+                continue
             if operand_type not in registers | {"TYPE_M"}:
                 return False
             if (operand_type == "TYPE_M") == register_form:
