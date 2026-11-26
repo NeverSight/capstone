@@ -87,6 +87,15 @@ void WASM_printInst(MCInst *MI, struct SStream *O, void *PrinterInfo)
 		break;
 
 	case WASM_OP_INT7:
+#ifdef WASM_LITERAL_NAMES
+		/* Empty block types have the decoder's established -1 spelling. */
+		if (MI->wasm_data.int7 == -1 &&
+		    cs_vsnprintf == cs_default_vsnprintf &&
+		    O->index < SSTREAM_BUF_LEN - 1) {
+			SStream_concat0_n(O, "\t-1", sizeof("\t-1") - 1);
+			break;
+		}
+#endif
 		SStream_concat(O, "\t%d", MI->wasm_data.int7);
 		break;
 
