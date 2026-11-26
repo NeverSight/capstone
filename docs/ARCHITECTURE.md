@@ -198,6 +198,13 @@ CMPXCHG8B/16B read both comparison and replacement register pairs and may
 write the comparison pair and EFLAGS. These rules live in `X86_get_insn_id`
 and `X86_get_op_access`, so regenerating the imported tables cannot remove them.
 
+Full AArch64, ARM, Mips, PPC and RISC-V builds share identical operand rows.
+Each opcode indexes a complete `map_insn_ops` record. Sharing accounts for
+every operand's type, access flags and ordered data types, including the
+terminator. Tied-operand access is resolved on the decoded instruction.
+Regenerate the row pools and opcode indices from the original mapping tables
+with `python3 suite/synctools/mapping_diet_types.py`.
+
 For AArch64, ARM, Alpha, ARC, Mips, PPC, Sparc, LoongArch, and RISC-V, DIET retains
 the operand type classifications used to construct architectural operands,
 including memory components and AArch64 bound operands. Its compact

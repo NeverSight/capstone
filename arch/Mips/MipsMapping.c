@@ -3,6 +3,7 @@
 
 #ifdef CAPSTONE_HAS_MIPS
 
+#define CAPSTONE_INDEXED_OPERANDS
 #include <stdio.h>
 #include <string.h>
 
@@ -642,9 +643,7 @@ void Mips_init_cs_detail(MCInst *MI)
 }
 
 #ifndef CAPSTONE_DIET
-static const map_insn_ops insn_operands[] = {
-#include "MipsGenCSMappingInsnOp.inc"
-};
+#include "MipsGenCSMappingInsnOpRows.inc"
 #endif
 
 static unsigned Mips_map_op_index(const MCInst *MI, unsigned OpNum)

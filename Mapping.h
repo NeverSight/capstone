@@ -11,6 +11,7 @@
 #include "include/capstone/capstone.h"
 #include <stddef.h>
 #endif
+#include "MCInst.h"
 #include "cs_priv.h"
 #include <assert.h>
 #include <string.h>
@@ -62,7 +63,23 @@ const cs_ac_type mapping_get_op_access(MCInst *MI, unsigned OpNum,
 /// Macro for easier access of operand types from the map.
 /// Assumes the istruction operands map is called "insn_operands"
 /// Only usable by `auto-sync` archs!
-#ifndef CAPSTONE_DIET
+#if defined(CAPSTONE_INDEXED_OPERANDS) && !defined(CAPSTONE_DIET)
+static inline const mapping_op *
+mapping_indexed_operand(const MCInst *MI, unsigned OpNum,
+			const map_insn_ops *rows, const uint16_t *indices,
+			size_t opcode_count)
+{
+	assert(MI && MI->Opcode < opcode_count);
+	assert(OpNum < MAX_NO_INSN_MAP_OPS);
+	return &rows[indices[MI->Opcode]].ops[OpNum];
+}
+
+#define map_indexed_operand(MI, OpNum) \
+	mapping_indexed_operand(MI, OpNum, insn_operands, insn_operand_rows, \
+				ARR_SIZE(insn_operand_rows))
+#define map_get_op_type(MI, OpNum) \
+	((cs_op_type)map_indexed_operand(MI, OpNum)->type)
+#elif !defined(CAPSTONE_DIET)
 #define map_get_op_type(MI, OpNum) \
 	mapping_get_op_type(MI, OpNum, (const map_insn_ops *)insn_operands, \
 			    sizeof(insn_operands) / sizeof(insn_operands[0]))
@@ -88,7 +105,33 @@ mapping_get_op_type_diet(MCInst *MI, unsigned OpNum,
 /// Macro for easier access of operand access flags from the map.
 /// Assumes the istruction operands map is called "insn_operands"
 /// Only usable by `auto-sync` archs!
-#ifndef CAPSTONE_DIET
+static inline cs_ac_type
+mapping_operand_access(const MCInst *MI, unsigned OpNum, cs_ac_type access)
+{
+	if (MCInst_opIsTied(MI, OpNum) || MCInst_opIsTying(MI, OpNum)) {
+		const cs_ac_type other = access == CS_AC_READ ? CS_AC_WRITE :
+								CS_AC_READ;
+		return (cs_ac_type)(access | other);
+	}
+	return access;
+}
+
+#if defined(CAPSTONE_INDEXED_OPERANDS) && !defined(CAPSTONE_DIET)
+static inline cs_ac_type mapping_indexed_access(const MCInst *MI,
+						unsigned OpNum,
+						const map_insn_ops *rows,
+						const uint16_t *indices,
+						size_t opcode_count)
+{
+	const mapping_op *operand =
+		mapping_indexed_operand(MI, OpNum, rows, indices, opcode_count);
+	return mapping_operand_access(MI, OpNum, (cs_ac_type)operand->access);
+}
+
+#define map_get_op_access(MI, OpNum) \
+	mapping_indexed_access(MI, OpNum, insn_operands, insn_operand_rows, \
+			       ARR_SIZE(insn_operand_rows))
+#elif !defined(CAPSTONE_DIET)
 #define map_get_op_access(MI, OpNum) \
 	mapping_get_op_access(MI, OpNum, (const map_insn_ops *)insn_operands, \
 			      sizeof(insn_operands) / \

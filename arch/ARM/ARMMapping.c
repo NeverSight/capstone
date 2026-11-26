@@ -4,6 +4,7 @@
 
 #ifdef CAPSTONE_HAS_ARM
 
+#define CAPSTONE_INDEXED_OPERANDS
 #include <stdio.h>
 #include <string.h>
 
@@ -923,9 +924,7 @@ void ARM_init_mri(MCRegisterInfo *MRI)
 }
 
 #ifndef CAPSTONE_DIET
-static const map_insn_ops insn_operands[] = {
-#include "ARMGenCSMappingInsnOp.inc"
-};
+#include "ARMGenCSMappingInsnOpRows.inc"
 
 void ARM_reg_access(const cs_insn *insn, cs_regs regs_read,
 		    uint8_t *regs_read_count, cs_regs regs_write,

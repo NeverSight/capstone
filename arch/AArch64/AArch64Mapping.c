@@ -3,6 +3,7 @@
 
 #ifdef CAPSTONE_HAS_AARCH64
 
+#define CAPSTONE_INDEXED_OPERANDS
 #include <stdio.h> // debug
 #include <string.h>
 
@@ -1175,9 +1176,7 @@ aarch64_insn AArch64_map_insn(const char *name)
 
 #ifndef CAPSTONE_DIET
 
-static const map_insn_ops insn_operands[] = {
-#include "AArch64GenCSMappingInsnOp.inc"
-};
+#include "AArch64GenCSMappingInsnOpRows.inc"
 
 void AArch64_reg_access(const cs_insn *insn, cs_regs regs_read,
 			uint8_t *regs_read_count, cs_regs regs_write,

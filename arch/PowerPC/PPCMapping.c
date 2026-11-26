@@ -1,6 +1,7 @@
 /* Capstone Disassembly Engine */
 /* By Nguyen Anh Quynh <aquynh@gmail.com>, 2013-2015 */
 
+#define CAPSTONE_INDEXED_OPERANDS
 #include "capstone/capstone.h"
 #ifdef CAPSTONE_HAS_POWERPC
 
@@ -418,9 +419,7 @@ bool PPC_getFeatureBits(unsigned int mode, unsigned int feature)
 }
 
 #ifndef CAPSTONE_DIET
-static const map_insn_ops insn_operands[] = {
-#include "PPCGenCSMappingInsnOp.inc"
-};
+#include "PPCGenCSMappingInsnOpRows.inc"
 #endif
 
 /// @brief Handles memory operands.

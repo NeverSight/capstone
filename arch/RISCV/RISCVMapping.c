@@ -1,3 +1,4 @@
+#define CAPSTONE_INDEXED_OPERANDS
 #include "capstone/cs_operand.h"
 #include "capstone/riscv.h"
 #include <stdint.h>
@@ -48,9 +49,7 @@ const insn_map *RISCV_insns = insns;
 const unsigned int RISCV_insn_count = ARR_SIZE(insns);
 
 #ifndef CAPSTONE_DIET
-static const map_insn_ops insn_operands[] = {
-#include "RISCVGenCSMappingInsnOp.inc"
-};
+#include "RISCVGenCSMappingInsnOpRows.inc"
 
 static const name_map insn_alias_mnem_map[] = {
 #include "RISCVGenCSAliasMnemMap.inc"
@@ -144,9 +143,7 @@ void RISCV_add_cs_detail_0(MCInst *MI, riscv_op_group opgroup, unsigned OpNum)
 #if defined(CAPSTONE_RISCV_ONLY) && !defined(CAPSTONE_DIET)
 	/* Type and access come from one generated operand. Only a tied
 	 * operand can change the access recorded in that entry. */
-	assert(MI->Opcode < ARR_SIZE(insn_operands));
-	assert(OpNum < ARR_SIZE(insn_operands[0].ops));
-	const mapping_op *mapped = &insn_operands[MI->Opcode].ops[OpNum];
+	const mapping_op *mapped = map_indexed_operand(MI, OpNum);
 	const cs_op_type type = (cs_op_type)mapped->type;
 	op->type = (riscv_op_type)type;
 	op->access = MI->tied_op_idx_size ? map_get_op_access(MI, OpNum) :

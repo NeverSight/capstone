@@ -387,6 +387,7 @@ if(CAPSTONE_ARM_SUPPORT)
         arch/ARM/ARMGenCSMappingInsn.inc
         arch/ARM/ARMGenCSMappingInsnOp.inc
         arch/ARM/ARMGenCSMappingInsnOpDiet.inc
+        arch/ARM/ARMGenCSMappingInsnOpRows.inc
         arch/ARM/ARMGenCSMappingInsnName.inc
         arch/ARM/ARMGenSystemRegister.inc
     )
@@ -422,6 +423,7 @@ if(CAPSTONE_AARCH64_SUPPORT)
         arch/AArch64/AArch64GenCSMappingInsnName.inc
         arch/AArch64/AArch64GenCSMappingInsnOp.inc
         arch/AArch64/AArch64GenCSMappingInsnOpDiet.inc
+        arch/AArch64/AArch64GenCSMappingInsnOpRows.inc
     )
 endif()
 
@@ -464,6 +466,7 @@ if(CAPSTONE_MIPS_SUPPORT)
         arch/Mips/MipsGenSubtargetInfo.inc
         arch/Mips/MipsInstPrinter.h
         arch/Mips/MipsMapping.h
+        arch/Mips/MipsGenCSMappingInsnOpRows.inc
     )
 endif()
 
@@ -490,6 +493,7 @@ if(CAPSTONE_PPC_SUPPORT)
         arch/PowerPC/PPCGenCSMappingInsn.inc
         arch/PowerPC/PPCGenCSMappingInsnOp.inc
         arch/PowerPC/PPCGenCSMappingInsnOpDiet.inc
+        arch/PowerPC/PPCGenCSMappingInsnOpRows.inc
         arch/PowerPC/PPCGenCSMappingInsnName.inc
         arch/PowerPC/PPCGenCSOpGroup.inc
         arch/PowerPC/PPCGenDisassemblerTables.inc
@@ -843,6 +847,7 @@ if(CAPSTONE_RISCV_SUPPORT)
         arch/RISCV/RISCVGenCSMappingInsnName.inc
         arch/RISCV/RISCVGenCSMappingInsnOp.inc
         arch/RISCV/RISCVGenCSMappingInsnOpDiet.inc
+        arch/RISCV/RISCVGenCSMappingInsnOpRows.inc
         arch/RISCV/RISCVGenCSOpGroup.inc
         arch/RISCV/RISCVGenCSSystemOperandsEnum.inc
         arch/RISCV/RISCVGenDisassemblerTables.inc

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: BSD-3-Clause
-"""Regression fixtures for the strict type-only mapping projection."""
+"""Regression fixtures for full and DIET operand mapping tables."""
 
 import importlib.util
 from pathlib import Path
@@ -47,10 +47,28 @@ SOURCE = """/* Fixture intentionally includes pseudo, bound, memory, and trailin
 
 def parse(source=SOURCE, enumeration=ENUM, types=TYPES, capacity=16):
     names = GEN.instruction_enum(enumeration, "Demo")
-    return GEN.read_mapping(source, names, "Demo", types, ACCESS, capacity, 32)
+    records = GEN.read_mapping(source, names, "Demo", types, ACCESS, capacity, 32)
+    return GEN.type_rows(records, capacity)
 
 
 class MappingDietTypes(unittest.TestCase):
+    def test_full_rows_share_only_when_all_operand_fields_agree(self):
+        names = GEN.instruction_enum(ENUM, "Demo")
+        for change, index in (
+            (None, 1),
+            (("CS_AC_WRITE", "CS_AC_READ"), 2),
+            (("CS_DATA_TYPE_i64", "CS_DATA_TYPE_i32"), 2),
+        ):
+            with self.subTest(change=change):
+                source = SOURCE.replace(*change, 1) if change else SOURCE
+                records = GEN.read_mapping(source, names, "Demo", TYPES, ACCESS, 16, 32)
+                pool, indices = GEN.index_rows(records, ())
+                self.assertEqual(indices, [0, 1, index])
+                self.assertEqual([pool[i] for i in indices], records)
+                self.assertEqual(
+                    records[2][0], (65, 2, ("CS_DATA_TYPE_i64", "CS_DATA_TYPE_LAST"))
+                )
+
     def test_projection_preserves_flags_and_zero_padding(self):
         rows = parse()
         self.assertEqual(

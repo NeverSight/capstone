@@ -370,9 +370,7 @@ const cs_ac_type mapping_get_op_access(MCInst *MI, unsigned OpNum,
 			       sizeof(insn_ops_map[MI->Opcode].ops[0]));
 
 	cs_ac_type access = insn_ops_map[MI->Opcode].ops[OpNum].access;
-	if (MCInst_opIsTied(MI, OpNum) || MCInst_opIsTying(MI, OpNum))
-		access |= (access == CS_AC_READ) ? CS_AC_WRITE : CS_AC_READ;
-	return access;
+	return mapping_operand_access(MI, OpNum, access);
 }
 
 /// Returns the operand at detail->arch.operands[op_count + offset]
