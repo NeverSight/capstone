@@ -1034,6 +1034,28 @@ static void printRegName(SStream *OS, unsigned RegNo)
 			X86_featureExtensionMCRegisterName(RegNo) :
 			NULL;
 
+#if defined(CAPSTONE_X86_ONLY) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
+	!defined(CAPSTONE_X86_REDUCE) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
+	!defined(_KERNEL_MODE) && defined(__apple_build_version__) && \
+	defined(__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__) && \
+	(defined(__x86_64__) || defined(__aarch64__))
+	/* Custom formatters and truncated writes keep the original format
+	 * string and capacity through SStream_concat. */
+	if (cs_vsnprintf == cs_default_vsnprintf && !OS->is_closed &&
+	    !(OS->markup_stream && OS->prefixed_by_markup)) {
+		const char *name = extension_name ? extension_name :
+						    getRegisterName(RegNo);
+		size_t len = strlen(name);
+		if (len < sizeof(OS->buffer) - 1 &&
+		    OS->index < sizeof(OS->buffer) - len - 1) {
+			char *out = OS->buffer + OS->index;
+			out[0] = '%';
+			memcpy(out + 1, name, len + 1);
+			OS->index += len + 1;
+			return;
+		}
+	}
+#endif
 	SStream_concat(OS, "%%%s",
 		       extension_name ? extension_name :
 					getRegisterName(RegNo));
