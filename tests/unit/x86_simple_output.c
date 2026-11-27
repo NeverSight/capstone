@@ -928,6 +928,36 @@ static bool check_padding(csh handles[2])
 	return true;
 }
 
+/* Exercise loads, stores, R/X/B extension, no base, pseudo indices and
+ * truncated displacements against the full callback-configured decoder. */
+static bool check_vex_sib_transfers(csh handles[2])
+{
+	static const uint8_t forms[][3] = {
+		{ 0x90, 0x78, 0x24 }, { 0x91, 0xf9, 0xfc },
+		{ 0x10, 0x7a, 0x25 }, { 0x11, 0x7b, 0xa4 },
+		{ 0x6e, 0x79, 0x53 }, { 0x7e, 0x79, 0x4d },
+	};
+	for (unsigned i = 0; i < sizeof(forms) / sizeof(forms[0]); ++i) {
+		for (unsigned prefix = 2; prefix <= 3; ++prefix) {
+			for (unsigned mod = 0; mod < 3; ++mod) {
+				uint8_t bytes[10] = { 0xc4, 0xc1, forms[i][1] };
+				if (prefix == 2) {
+					bytes[0] = 0xc5;
+					bytes[1] = 0x80 | forms[i][1];
+				}
+				bytes[prefix] = forms[i][0];
+				bytes[prefix + 1] = (uint8_t)((mod << 6) | 0x1c);
+				bytes[prefix + 2] = forms[i][2];
+				memset(bytes + prefix + 3, 0x81, 4);
+				for (size_t n = 1; n <= prefix + 7; ++n)
+					if (!compare(handles, bytes, n, i + mod))
+						return false;
+			}
+		}
+	}
+	return true;
+}
+
 static bool check_vex2_base_memory(csh handles[2])
 {
 	const uint32_t disps[] = { 0,	       1,	  9,	10,
@@ -1663,6 +1693,7 @@ static bool check_mode(cs_mode mode)
 			!check_legacy_memory(handles, 0x66) ||
 			!check_legacy_memory(handles, 0xf2) ||
 			!check_legacy_memory(handles, 0xf3) ||
+			!check_vex_sib_transfers(handles) ||
 			!check_vex_packed_memory(handles))))) ||
 		    !check_rex_stack(handles) ||
 		    (mode == CS_MODE_64 && !check_broadcast(handles)) ||

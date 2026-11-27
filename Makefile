@@ -722,6 +722,13 @@ ifeq ($(sort $(CAPSTONE_ARCHS)),tricore)
 $(OBJDIR)/arch/TriCore/TriCoreDisassembler.o: CFLAGS += -DCAPSTONE_TRICORE_DIRECT_DECODER
 endif
 
+# Indexed AMD64 moves use the static-only x86 reader in optimized builds.
+ifeq ($(sort $(CAPSTONE_ARCHS)):$(CAPSTONE_STATIC):$(CAPSTONE_SHARED),x86:yes:no)
+ifeq ($(lastword $(filter -O%,$(CFLAGS))),-O3)
+$(OBJDIR)/arch/X86/X86VectorFallback64.o: CFLAGS += -DX86_STATIC_INDEXED_MOVES
+endif
+endif
+
 # Match the Release x86 formatter tuning for the compiler's target.
 ifneq (,$(filter -DCAPSTONE_X86_ONLY -DCAPSTONE_X86_MIPS_ONLY -DCAPSTONE_ARM_AARCH64_MIPS_X86,$(CFLAGS)))
 ifneq (,$(filter -O2 -O3,$(CFLAGS)))

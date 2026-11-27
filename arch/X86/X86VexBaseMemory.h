@@ -5,6 +5,11 @@
 #include "X86SimpleOutput.h"
 #include "X86VectorRegisterWriter.h"
 #include "X86GenVexBaseMemory.inc"
+#if defined(X86_STATIC_INDEXED_MOVES) && \
+	defined(CAPSTONE_X86_DIRECT_PUBLIC_RECORD) && defined(__linux__) && \
+	defined(__x86_64__)
+#include "X86VexSibTransfer.h"
+#endif
 
 static const struct X86SimpleRegister vector_rip = { X86_REG_RIP, 3, "rip" };
 
@@ -78,15 +83,30 @@ static bool writeVexBaseMemory(const uint8_t *code, size_t size, unsigned prefix
 	const bool short_prefix = prefix == 2;
 	const unsigned flags = code[prefix - 1];
 	const unsigned map = short_prefix ? 1 : code[1] & 31;
+#ifdef CS_X86_VEX_SIB_TRANSFER_H
+	if (map < 1 || map > 3)
+#else
 	if (map < 1 || map > 3 || (flags & 3) != 1)
+#endif
 		return false;
 	const unsigned w = short_prefix ? 0 : flags >> 7;
 	const unsigned ll = (flags >> 2) & 1, wl = w * 2 + ll,
 		       opcode = code[prefix];
 	const unsigned plan = vex_base_plans[map - 1][opcode];
+#ifdef CS_X86_VEX_SIB_TRANSFER_H
+	/* Transfer opcodes lack the three-operand base-memory row. Keep
+	 * admitted arithmetic on its original writer. */
+	const unsigned index = (flags & 3) == 1 ? vex_base_widths[plan][wl] : 0;
+	if (!index) {
+		return map == 1 && (code[prefix + 1] & 7) == 4 &&
+		       size >= prefix + 3 &&
+		       writeVexSibTransfer(code, size, prefix, insn, insn_size, regs);
+	}
+#else
 	const unsigned index = vex_base_widths[plan][wl];
 	if (!index)
 		return false;
+#endif
 	const unsigned rxb = (~(unsigned)code[1] >> 5) & (short_prefix ? 4 : 7);
 	const unsigned dst = ((code[prefix + 1] >> 3) & 7) | ((rxb & 4) << 1);
 	const unsigned mod = code[prefix + 1] >> 6;
