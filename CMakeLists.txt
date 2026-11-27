@@ -214,7 +214,7 @@ if(capstone_enabled_architectures STREQUAL "RISCV")
 endif()
 
 if(capstone_enabled_architectures STREQUAL "WASM")
-    add_compile_definitions(CAPSTONE_WASM_LITERAL_MNEMONICS)
+    add_compile_definitions(CAPSTONE_WASM_LITERAL_MNEMONICS CAPSTONE_WASM_DEDICATED_DECODER)
 endif()
 
 if(capstone_enabled_architectures STREQUAL "SPARC")

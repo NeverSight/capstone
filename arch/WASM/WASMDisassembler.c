@@ -544,6 +544,13 @@ static bool read_uint64(const uint8_t *code, size_t code_len,
 	return true;
 }
 
+/* Grouped target reads improve branch tables with Clang on Linux x86-64.
+ * Other targets keep the scalar reader used for full modules. */
+#if defined(CAPSTONE_WASM_DEDICATED_DECODER) && defined(__linux__) && \
+	defined(__x86_64__) && defined(__clang__)
+#define WASM_GROUPED_TARGETS
+#endif
+
 // input 	| code : code pointer start from brtable
 // 			| code_len : start from the code pointer to the end, how long is it
 // 			| param_size : pointer of the param size (sum of all param)
@@ -553,7 +560,12 @@ static bool read_brtable(const uint8_t *code, size_t code_len,
 			 uint16_t *param_size, MCInst *MI)
 {
 	uint32_t length, default_target;
+#ifdef WASM_GROUPED_TARGETS
+	size_t tmp_len = 0;
+	uint32_t i;
+#else
 	int tmp_len = 0, i;
+#endif
 	size_t var_len;
 
 	// read length
@@ -584,7 +596,19 @@ static bool read_brtable(const uint8_t *code, size_t code_len,
 			MI->wasm_data.brtable.address;
 	}
 
-	// read data
+#ifdef WASM_GROUPED_TARGETS
+	/* The length check above guarantees room for one byte per target.
+	 * Eight bytes with no continuation bits encode eight complete depths. */
+	while (length >= sizeof(uint64_t)) {
+		uint64_t targets;
+		memcpy(&targets, code + tmp_len, sizeof(targets));
+		if (targets & UINT64_C(0x8080808080808080))
+			break;
+		tmp_len += sizeof(targets);
+		length -= sizeof(targets);
+	}
+#endif
+	// read the remaining targets
 	for (i = 0; i < length; i++) {
 		if (code_len < tmp_len) {
 			return false;

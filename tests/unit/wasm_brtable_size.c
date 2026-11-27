@@ -120,6 +120,36 @@ static int check_i64_constant(csh handle)
 	return !ok;
 }
 
+static int check_mixed_targets(csh handle)
+{
+	/* Start in the middle of an eight-target group, and immediately
+	 * after one. A two-byte depth must move the default target by one. */
+	uint8_t code[2 + 16 + 2] = { 0x0e, 16 };
+	if (cs_option(handle, CS_OPT_DETAIL, CS_OPT_ON) != CS_ERR_OK)
+		return 1;
+	for (unsigned pos = 0; pos <= 16; ++pos) {
+		memset(code + 2, 0, sizeof(code) - 2);
+		code[2 + pos] = 0x81;
+		code[3 + pos] = 1;
+		if (pos < 16)
+			code[sizeof(code) - 1] = 7;
+		cs_insn *insn = NULL;
+		size_t count = cs_disasm(handle, code, sizeof(code), 0, 1, &insn);
+		bool valid = count == 1 && insn->id == WASM_INS_BR_TABLE &&
+			     insn->size == sizeof(code) &&
+			     insn->detail->wasm.operands[0].brtable.default_target ==
+				     (pos == 16 ? 129 : 7);
+		cs_free(insn, count);
+		if (!valid)
+			return 1;
+		count = cs_disasm(handle, code, sizeof(code) - 1, 0, 1, &insn);
+		cs_free(insn, count);
+		if (count)
+			return 1;
+	}
+	return 0;
+}
+
 int main(void)
 {
 	csh h;
@@ -127,7 +157,8 @@ int main(void)
 		return 1;
 
 	if (check_copy_sizes(h) || run_count_case(h, 10, 5) ||
-	    run_count_case(h, 65531, 5) || check_i64_constant(h)) {
+	    run_count_case(h, 65531, 5) || check_i64_constant(h) ||
+	    check_mixed_targets(h)) {
 		cs_close(&h);
 		return 1;
 	}
