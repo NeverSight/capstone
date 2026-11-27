@@ -749,7 +749,17 @@ static void printInst(MCInst *MI, uint64_t Address, const char *Annot,
 		map_set_fill_detail_ops(MI, true);
 		if (isAlias)
 			SStream_Close(O);
-		printInstruction(MI, Address, O);
+#if defined(CAPSTONE_PPC_DEDICATED_MAPPING) && !defined(CAPSTONE_DIET) && \
+	defined(__clang__) && \
+	((defined(__linux__) && defined(__x86_64__)) || \
+	 (defined(__apple_build_version__) && \
+	  defined(__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__) && \
+	  (defined(__x86_64__) || defined(__aarch64__))))
+		/* A closed stream cannot emit the canonical spelling. Only
+		 * a requested real-instruction detail record needs its operands. */
+		if (!isAlias || map_fill_detail_ops(MI))
+#endif
+			printInstruction(MI, Address, O);
 		if (isAlias)
 			SStream_Open(O);
 	}
