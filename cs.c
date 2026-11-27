@@ -1413,12 +1413,10 @@ cs_err CAPSTONE_API cs_option(csh ud, cs_opt_type type, uintptr_t value)
 		return CS_ERR_OK;
 
 	case CS_OPT_DETAIL:
-		// CS_OPT_OFF turns detail off.  Any other value adds its flags
-		// (CS_OPT_ON, CS_OPT_DETAIL_REAL) to those already set.
-		if (value == CS_OPT_OFF)
-			handle->detail_opt = CS_OPT_OFF;
-		else
-			handle->detail_opt |= (cs_opt_value)value;
+		/* A requested view enables detail and preserves earlier view flags. */
+		if (value != CS_OPT_OFF)
+			value |= handle->detail_opt | CS_OPT_ON;
+		handle->detail_opt = (cs_opt_value)value;
 #ifdef CAPSTONE_MIPS_SCAN_BY_OPTION
 		Mips_selectScanDecoder(handle);
 #endif
