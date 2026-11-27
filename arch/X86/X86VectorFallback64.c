@@ -125,10 +125,26 @@ static bool writeMaskedByteMove(cs_struct *handle, const uint8_t *code,
 		return false;
 	}
 	insn->bytes[3] = code[3];
+#ifdef X86_FIXED_MASKED_SUFFIX
+	/* The writers clear op_str before emitting two operands. A vector
+	 * destination is four or five characters. Only stores put the
+	 * variable-length address before the comma. */
+	char *comma = store ? strchr(insn->op_str, ',') :
+		insn->op_str + 4 + (insn->op_str[4] != ',');
+	const unsigned gap = zero ? 9 : 5;
+	if (memory && !store) {
+		/* The widest source has a base, a scaled index and a disp32. */
+		memmove(comma + gap, comma,
+			sizeof(", zmmword ptr [r15 + r15*8 - 0x80000000]"));
+	} else {
+		memmove(comma + gap, comma, sizeof(", zmm31"));
+	}
+#else
 	/* The underlying writer emitted exactly two operands. Their longest
 	 * address and vector name leave room for both decorators. */
 	char *comma = strchr(insn->op_str, ',');
 	memmove(comma + (zero ? 9 : 5), comma, strlen(comma) + 1);
+#endif
 	memcpy(comma, " {k0}", 5);
 	comma[3] = (char)('0' + mask);
 	if (zero)
