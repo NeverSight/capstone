@@ -20,11 +20,11 @@
 #include "X86GenSimpleOutput.inc"
 #include "../../cs_disasm_internal.h"
 #define X86_MEMORY32_OUTPUT
-#define X86_MEMORY_IMMEDIATE writeCompare32
+#define X86_MEMORY_IMMEDIATE writeGroup1Memory32
 #define X86_IMMEDIATE_WIDE 0
-#define X86_COMPARE_IMMEDIATE
+#define X86_GROUP1_IMMEDIATE
 #include "X86MemoryOutputImpl.h"
-#undef X86_COMPARE_IMMEDIATE
+#undef X86_GROUP1_IMMEDIATE
 #undef X86_MEMORY_IMMEDIATE
 #undef X86_IMMEDIATE_WIDE
 
@@ -68,12 +68,13 @@ X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
 	case 0x80:
 	case 0x81:
 	case 0x83:
-		if (size >= 2 && code[1] < 0xc0 && (code[1] & 0x38) == 0x38 &&
+		if (size >= 2 && code[1] < 0xc0 &&
 		    !X86_OUTPUT_UNSUPPORTED(handle, false)) {
-			const unsigned row =
-				x86_simple_plans[0][0][0x38 | (opcode & 1)] >>
-				2;
-			if (writeCompare32(code, size, insn, insn_size,
+			/* The ModRM group selects the corresponding register ALU
+			 * opcode; its row owns operand access and flag effects. */
+			const unsigned reg_opcode = (code[1] & 0x38) | (opcode & 1);
+			const unsigned row = x86_simple_plans[0][0][reg_opcode] >> 2;
+			if (writeGroup1Memory32(code, size, insn, insn_size,
 					   &x86_simple_outputs[row],
 					   x86_simple_registers))
 				return true;

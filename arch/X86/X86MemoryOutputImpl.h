@@ -45,7 +45,7 @@ bool X86_writeMemoryOutput(
 	const unsigned offset = lead + 2 + sib;
 	const unsigned disp_size = mod == 2 || disp32_only ? 4 : mod;
 #ifdef X86_MEMORY_IMMEDIATE
-#ifdef X86_COMPARE_IMMEDIATE
+#ifdef X86_GROUP1_IMMEDIATE
 	const unsigned imm_size = opcode == 0x81 ? 4 : 1;
 #else
 	const unsigned imm_size = (opcode & 1) ? 4 : 1;
@@ -187,13 +187,15 @@ bool X86_writeMemoryOutput(
 	const uint32_t encoded =
 		imm_size == 1 ? code[imm_offset] :
 				(uint32_t)X86_readDisp32(code + imm_offset);
-#ifdef X86_COMPARE_IMMEDIATE
-	/* 83 /7 sign-extends imm8. REX.W 81 /7 sign-extends imm32. */
+#ifdef X86_GROUP1_IMMEDIATE
 	int64_t value = encoded;
-	if (opcode == 0x83)
+	if (opcode == 0x83) {
+		/* The Intel printer renders logical masks at destination width. */
+		const unsigned group = (modrm >> 3) & 7;
 		value = (int8_t)encoded;
-	else if (imm_size == 4 && row->ops[0].size == 8)
-		value = (int32_t)encoded;
+		if (group == 1 || group == 4 || group == 6)
+			value = (uint32_t)value;
+	}
 	memcpy(out, ", ", 2);
 	out += 2;
 	if (value < 0)

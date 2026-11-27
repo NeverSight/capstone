@@ -1654,6 +1654,21 @@ static bool check_legacy_memory(csh handles[2], uint8_t mandatory)
 	return true;
 }
 
+static bool check_group1_memory_immediates(csh handles[2])
+{
+	for (unsigned group = 0; group < 8; ++group) {
+		const uint8_t opcodes[] = { 0x80, 0x81, 0x83 };
+		for (unsigned i = 0; i < sizeof(opcodes); ++i) {
+			uint8_t code[] = { opcodes[i], (uint8_t)(0x44 | group << 3),
+					   0x8b, 0xf8, 0x80, 0xff, 0xff, 0xff };
+			for (size_t n = 1; n <= sizeof(code); ++n)
+				if (!compare(handles, code, n, 0x8000u + group))
+					return false;
+		}
+	}
+	return true;
+}
+
 static bool check_mode(cs_mode mode)
 {
 	csh handles[2] = { 0 };
@@ -1672,6 +1687,7 @@ static bool check_mode(cs_mode mode)
 		if (!check_branches(handles) || !check_memory(handles, mode) ||
 		    !check_lea(handles, mode) ||
 		    !check_mov_disp32(handles, mode) ||
+		    !check_group1_memory_immediates(handles) ||
 		    !check_group1(handles, mode) ||
 		    !check_push_immediates(handles) ||
 		    !check_shift_immediate(handles, mode) ||
