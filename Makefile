@@ -491,7 +491,8 @@ endif
 API_MAJOR=$(shell echo `grep -e CS_API_MAJOR include/capstone/capstone.h | grep -v = | awk '{print $$3}'` | awk '{print $$1}')
 VERSION_EXT =
 
-IS_APPLE := $(shell $(CC) -dM -E - < /dev/null 2> /dev/null | grep __APPLE__ | wc -l | tr -d " ")
+capstone_cc_macros := $(shell $(CC) -dM -E - < /dev/null 2>/dev/null)
+IS_APPLE := $(if $(filter __APPLE__,$(capstone_cc_macros)),1,0)
 ifeq ($(IS_APPLE),1)
 # on MacOS, do not build in Universal format by default
 MACOS_UNIVERSAL ?= no
@@ -588,7 +589,7 @@ else
 endif
 endif
 
-$(LIBOBJ): config.mk
+$(LIBOBJ): Makefile config.mk functions.mk
 
 $(LIBOBJ_ARM): $(DEP_ARM)
 $(LIBOBJ_AARCH64): $(DEP_AARCH64)
@@ -633,8 +634,22 @@ else
 	$(generate-pkgcfg)
 endif
 
-# create a list of auto dependencies
-AUTODEPS:= $(patsubst %.o,%.d, $(LIBOBJ))
+# Record headers during compilation. Each slice of a universal build can
+# include different target headers and needs its own dependency file.
+AUTODEPS := $(LIBOBJ:.o=.d)
+ifneq ($(filter __GNUC__ __clang__,$(capstone_cc_macros)),)
+ifeq ($(IS_APPLE):$(MACOS_UNIVERSAL),1:yes)
+capstone_dependency_archs := $(LIBARCHS)
+endif
+ifneq ($(strip $(capstone_dependency_archs)),)
+AUTODEPS := $(foreach arch,$(capstone_dependency_archs),$(LIBOBJ:.o=.$(arch).d))
+capstone_depflags = $(foreach arch,$(capstone_dependency_archs), \
+	-Xarch_$(arch) -MMD -Xarch_$(arch) -MP \
+	-Xarch_$(arch) -MF$(@:.o=.$(arch).d) -Xarch_$(arch) -MT$@)
+else
+capstone_depflags = -MMD -MP -MF $(@:.o=.d) -MT $@
+endif
+endif
 
 # include by auto dependencies
 -include $(AUTODEPS)
