@@ -182,6 +182,13 @@ endif()
 
 if(capstone_enabled_architectures STREQUAL "ARM")
     add_compile_definitions(CAPSTONE_ARM_ONLY CAPSTONE_ARM_COPY_OPERAND_DEFAULTS CAPSTONE_ARM_INIT_CONSTRUCTED_OPERANDS)
+    # These two callers select real or alias operands during each ARM print.
+    if(NOT CAPSTONE_BUILD_DIET AND CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_C_COMPILER_ID STREQUAL "Clang"
+       AND CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL 18 AND CMAKE_C_COMPILER_VERSION VERSION_LESS 19
+       AND CMAKE_SIZEOF_VOID_P EQUAL 8 AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64|aarch64|arm64|ARM64)$")
+        set_property(SOURCE arch/ARM/ARMInstPrinter.c arch/ARM/ARMMapping.c APPEND PROPERTY
+            COMPILE_DEFINITIONS "$<$<CONFIG:Release>:CAPSTONE_ARM_INLINE_ALIAS_DETAILS>")
+    endif()
 endif()
 
 if(capstone_enabled_architectures STREQUAL "MIPS")

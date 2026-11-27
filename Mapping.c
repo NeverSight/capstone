@@ -430,29 +430,9 @@ DEFINE_get_detail_op_at(bpf, BPF, BPF);
 DEFINE_get_detail_op_at(arc, ARC, ARC);
 DEFINE_get_detail_op_at(sparc, Sparc, SPARC);
 
-/// Returns true if for this architecture the
-/// alias operands should be filled.
-/// TODO: Replace this with a proper option.
-/// 			So it can be toggled between disas() calls.
-bool map_use_alias_details(const MCInst *MI)
-{
-	assert(MI);
-	return (MI->csh->detail_opt & CS_OPT_ON) &&
-	       !(MI->csh->detail_opt & CS_OPT_DETAIL_REAL);
-}
-
-/// Sets the setDetailOps flag to @p Val.
-/// If detail == NULLit refuses to set the flag to true.
-void map_set_fill_detail_ops(MCInst *MI, bool Val)
-{
-	CS_ASSERT_RET(MI);
-	if (!detail_is_set(MI)) {
-		MI->fillDetailOps = false;
-		return;
-	}
-
-	MI->fillDetailOps = Val;
-}
+#define CS_ALIAS_DETAIL_LINKAGE
+#include "MappingAliasDetails.inc"
+#undef CS_ALIAS_DETAIL_LINKAGE
 
 /// Sets the instruction alias flags and the given alias id.
 void map_set_is_alias_insn(MCInst *MI, bool Val, uint64_t Alias)

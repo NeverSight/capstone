@@ -324,7 +324,15 @@ static inline cs_detail *get_detail(const MCInst *MI)
 			return; \
 	} while (0)
 
+#ifdef CAPSTONE_ARM_INLINE_ALIAS_DETAILS
+/* The dedicated printer uses both decisions while selecting alias operands. */
+#define CS_ALIAS_DETAIL_LINKAGE static inline
+#include "MappingAliasDetails.inc"
+#undef CS_ALIAS_DETAIL_LINKAGE
+#else
+bool map_use_alias_details(const MCInst *MI);
 void map_set_fill_detail_ops(MCInst *MI, bool Val);
+#endif
 
 static inline bool map_fill_detail_ops(MCInst *MI)
 {
@@ -333,8 +341,6 @@ static inline bool map_fill_detail_ops(MCInst *MI)
 }
 
 void map_set_is_alias_insn(MCInst *MI, bool Val, uint64_t Alias);
-
-bool map_use_alias_details(const MCInst *MI);
 
 void map_set_alias_id(MCInst *MI, const SStream *O,
 		      const name_map *alias_mnem_id_map, int map_size);

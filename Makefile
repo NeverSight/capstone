@@ -590,6 +590,7 @@ endif
 endif
 
 $(LIBOBJ): Makefile config.mk functions.mk
+$(OBJDIR)/Mapping.o: MappingAliasDetails.inc
 
 $(LIBOBJ_ARM): $(DEP_ARM)
 $(LIBOBJ_AARCH64): $(DEP_AARCH64)
