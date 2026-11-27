@@ -1088,8 +1088,10 @@ if(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
    AND CMAKE_SIZEOF_VOID_P EQUAL 8 AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64|aarch64|arm64|ARM64)$")
     target_compile_definitions(capstone_build_settings INTERFACE
         "$<$<CONFIG:Release>:CAPSTONE_X86_COMPACT_SCALAR_ROWS>")
-    # Use the bounded masked-operand copies in the measured x86-64 static reader.
+    # Use cached access IDs and bounded masked-operand copies in the x86-64 static reader.
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
+        set_property(SOURCE arch/X86/X86Mapping.c APPEND PROPERTY
+            COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_CACHED_OPERAND_ACCESS>")
         set_property(SOURCE arch/X86/X86VectorFallback64.c APPEND PROPERTY
             COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_FIXED_MASKED_SUFFIX>")
     endif()

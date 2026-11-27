@@ -10286,10 +10286,20 @@ unsigned int find_insn(unsigned int id)
 	return -1;
 }
 
+static inline bool cached_insn_mapping(const cs_struct *h, unsigned int id,
+				       uint32_t *mapping)
+{
+	if (!h || !h->x86_insn_lut || id > h->x86_insn_lut_max)
+		return false;
+	*mapping = h->x86_insn_lut[id];
+	return true;
+}
+
 static inline unsigned int find_insn_h(cs_struct *h, unsigned int id)
 {
-	if (h && h->x86_insn_lut && id <= h->x86_insn_lut_max)
-		return (unsigned int)(int16_t)(uint16_t)h->x86_insn_lut[id];
+	uint32_t mapping;
+	if (cached_insn_mapping(h, id, &mapping))
+		return (unsigned int)(int16_t)(uint16_t)mapping;
 
 	return find_insn(id);
 }
@@ -11951,32 +11961,48 @@ const uint8_t *X86_get_op_access(cs_struct *h, unsigned int id,
 		*eflags = 0;
 		return ud1_access;
 	}
-	unsigned int i = find_insn_h(h, id);
-	if (i != -1) {
-		*eflags = insn_ops[i].flags;
-		/* Compare-exchange reads and conditionally replaces its destination;
-		 * memory destinations receive a write cycle even on mismatch. */
-		static const uint8_t compare_access[] = { CS_AC_READ_WRITE,
-							  CS_AC_READ, 0 };
-		static const uint8_t pair_access[] = { CS_AC_READ_WRITE, 0 };
-		static const uint8_t bound_access[] = { CS_AC_READ, CS_AC_READ, 0 };
-		switch (insns[i].mapid) {
-		case X86_INS_BOUND:
-			/* BOUND compares the index without modifying it or EFLAGS. */
-			*eflags = 0;
-			return bound_access;
-		case X86_INS_CMPXCHG:
-			return compare_access;
-		case X86_INS_CMPXCHG8B:
-		case X86_INS_CMPXCHG16B:
-			return pair_access;
-		default:
-			break;
-		}
-		return insn_ops[i].access;
+	unsigned int i, public_id;
+#ifdef X86_CACHED_OPERAND_ACCESS
+	uint32_t mapping;
+	if (cached_insn_mapping(h, id, &mapping)) {
+		if (mapping == UINT32_MAX)
+			return NULL;
+		/* The cache also contains the public ID used by access overrides. */
+		i = (uint16_t)mapping;
+		public_id = mapping >> 16;
+	} else {
+		i = find_insn(id);
+		if (i == (unsigned int)-1)
+			return NULL;
+		public_id = insns[i].mapid;
 	}
-
-	return NULL;
+#else
+	i = find_insn_h(h, id);
+	if (i == (unsigned int)-1)
+		return NULL;
+	public_id = insns[i].mapid;
+#endif
+	*eflags = insn_ops[i].flags;
+	/* Compare-exchange reads and conditionally replaces its destination;
+	 * memory destinations receive a write cycle even on mismatch. */
+	static const uint8_t compare_access[] = { CS_AC_READ_WRITE,
+						  CS_AC_READ, 0 };
+	static const uint8_t pair_access[] = { CS_AC_READ_WRITE, 0 };
+	static const uint8_t bound_access[] = { CS_AC_READ, CS_AC_READ, 0 };
+	switch (public_id) {
+	case X86_INS_BOUND:
+		/* BOUND compares the index without modifying it or EFLAGS. */
+		*eflags = 0;
+		return bound_access;
+	case X86_INS_CMPXCHG:
+		return compare_access;
+	case X86_INS_CMPXCHG8B:
+	case X86_INS_CMPXCHG16B:
+		return pair_access;
+	default:
+		break;
+	}
+	return insn_ops[i].access;
 }
 
 void X86_reg_access(const cs_insn *insn, cs_regs regs_read,

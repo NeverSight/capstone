@@ -14,6 +14,7 @@
 #include "../../arch/X86/X86DisassemblerDecoder.h"
 #include "../../arch/X86/X86Disassembler.h"
 #include "../../arch/X86/X86Mapping.h"
+#include "../../arch/X86/X86InstPrinterCommon.h"
 #define GET_INSTRINFO_ENUM
 #ifdef CAPSTONE_X86_REDUCE
 #include "../../arch/X86/X86GenInstrInfo_reduce.inc"
@@ -163,6 +164,26 @@ static bool check_internal_scan_mode(void)
 	return true;
 }
 
+#ifndef CAPSTONE_DIET
+static bool check_operand_access_cache(cs_struct *arch, unsigned int id)
+{
+	uint64_t cached_flags = UINT64_MAX, fallback_flags = UINT64_MAX;
+	const uint8_t *cached = X86_get_op_access(arch, id, &cached_flags);
+	const uint8_t *fallback = X86_get_op_access(NULL, id, &fallback_flags);
+	if (cached_flags != fallback_flags)
+		return false;
+	if (!cached || !fallback)
+		return cached == fallback && cached_flags == UINT64_MAX;
+	for (unsigned int i = 0; i < CS_X86_MAXIMUM_OPERAND_SIZE; ++i) {
+		if (cached[i] != fallback[i])
+			return false;
+		if (!cached[i])
+			break;
+	}
+	return true;
+}
+#endif
+
 /* Cache allocation is optional: every ID and hole must agree with the
  * original binary-search mapping when the cache is unavailable. */
 static bool check_id_cache(void)
@@ -174,6 +195,13 @@ static bool check_id_cache(void)
 	uint32_t *cache = arch->x86_insn_lut;
 	bool ok = cache != NULL;
 	for (unsigned id = 0; id <= arch->x86_insn_lut_max + 1; ++id) {
+#ifndef CAPSTONE_DIET
+		if (!check_operand_access_cache(arch, id)) {
+			fprintf(stderr, "Operand access cache differs at %u\n", id);
+			ok = false;
+			break;
+		}
+#endif
 		cs_insn cached = { 0 }, fallback = { 0 };
 		cached.id = fallback.id = UINT32_MAX;
 		X86_get_insn_id(arch, &cached, id);
