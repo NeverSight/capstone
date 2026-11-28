@@ -940,7 +940,7 @@
     },
     "printInst": {
       "apply_type": "OLD",
-      "old_hash": "8e9fea3b8e6b482af249093432a58476b128f910b1ea60c501ede3ffccbaf369",
+      "old_hash": "74ea810c1b5e42fa22d3fb0c5ab9fa69de39ae954aed87a9259b89a911a02a02",
       "new_hash": "a3d4481cb3205d752d78020f85e84241043b94817daf3e46a0a31b22d3a57821",
       "edit": ""
     },
@@ -952,7 +952,7 @@
     },
     "printRegName": {
       "apply_type": "OLD",
-      "old_hash": "20556696f9576066c8ef8a3e12d642d2aabf2cbc1c8d23615cf3ea66ec5cfa7a",
+      "old_hash": "48e4d4388dcc9912d4dbe3bf8e23f07cf1d07fe3f72e859f7f8575a5017fb5fd",
       "new_hash": "c909306f23247ee039798cfc651686956874a047f43099acfa46ed26dc0c1bae",
       "edit": ""
     }

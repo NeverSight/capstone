@@ -158,6 +158,10 @@ void LoongArch_reg_access(const cs_insn *insn, cs_regs regs_read,
 				regs_read[read_count] = (uint16_t)op->mem.base;
 				read_count++;
 			}
+			if (op->mem.index != LOONGARCH_REG_INVALID &&
+			    !arr_exist_inline(regs_read, read_count, op->mem.index)) {
+				regs_read[read_count++] = (uint16_t)op->mem.index;
+			}
 			if ((insn->detail->writeback) &&
 			    (op->mem.base != LOONGARCH_REG_INVALID) &&
 			    !arr_exist_inline(regs_write, write_count,
@@ -423,7 +427,6 @@ static void LoongArch_add_cs_groups(MCInst *MI)
 	if (!MI->flat_insn->detail)
 		return;
 	unsigned Opcode = MI->flat_insn->id;
-	cs_loongarch *loongarch = &(MI->flat_insn->detail->loongarch);
 	switch (Opcode) {
 	default:
 		return;
@@ -431,20 +434,15 @@ static void LoongArch_add_cs_groups(MCInst *MI)
 		add_group(MI, LOONGARCH_GRP_CALL);
 		break;
 	case LOONGARCH_INS_JIRL:
-		if (loongarch->op_count == 3 &&
-		    loongarch->operands[0].reg == LOONGARCH_REG_RA) {
-			// call: jirl ra, rj, offs16
+		/* The return and jump aliases omit operands from the printed view. */
+		if (MCInst_getOpVal(MI, 0) == LOONGARCH_REG_RA)
 			add_group(MI, LOONGARCH_GRP_CALL);
-		} else if (loongarch->op_count == 0) {
-			// ret
+		else if (MCInst_getOpVal(MI, 0) == LOONGARCH_REG_R0 &&
+			 MCInst_getOpVal(MI, 1) == LOONGARCH_REG_RA &&
+			 MCInst_getOpVal(MI, 2) == 0)
 			add_group(MI, LOONGARCH_GRP_RET);
-		} else if (loongarch->op_count == 1) {
-			// jr rj
+		else
 			add_group(MI, LOONGARCH_GRP_JUMP);
-		} else if (loongarch->op_count == 3) {
-			// none of the above, generic jirl
-			add_group(MI, LOONGARCH_GRP_JUMP);
-		}
 		break;
 	case LOONGARCH_INS_B:
 	case LOONGARCH_INS_BCEQZ:
@@ -563,7 +561,7 @@ void LoongArch_add_cs_detail_0(MCInst *MI,
 			       int /* loongarch_op_group */ op_group,
 			       size_t OpNum)
 {
-	if (!detail_is_set(MI))
+	if (!map_fill_detail_ops(MI))
 		return;
 
 	// Handle memory operands later

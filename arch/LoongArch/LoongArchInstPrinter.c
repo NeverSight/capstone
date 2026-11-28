@@ -65,10 +65,13 @@ static void printInst(MCInst *MI, uint64_t Address, const char *Annot,
 
 	MCInst_setIsAlias(MI, isAlias);
 	if (!isAlias || !useAliasDetails) {
-		map_set_fill_detail_ops(MI, !(isAlias && useAliasDetails));
+		map_set_fill_detail_ops(MI, true);
 		if (isAlias)
 			SStream_Close(O);
-		printInstruction(MI, Address, O);
+		/* An alias has already supplied the text. Only a request for
+		 * its real operands needs the canonical printer on a closed stream. */
+		if (!isAlias || map_fill_detail_ops(MI))
+			printInstruction(MI, Address, O);
 		if (isAlias)
 			SStream_Open(O);
 	}
@@ -94,7 +97,8 @@ static void printRegName(MCInst *MI, SStream *O, MCRegister Reg)
 	int syntax_opt = MI->csh->syntax;
 #if defined(CAPSTONE_LOONGARCH_DEDICATED_MAPPING) && !defined(CAPSTONE_DIET)
 	/* Keep the two original appends for an open markup token. */
-	if (Reg && Reg <= ARR_SIZE(loongarch_register_spellings) &&
+	if (!(syntax_opt & CS_OPT_SYNTAX_NOREGNAME) && Reg &&
+	    Reg <= ARR_SIZE(loongarch_register_spellings) &&
 	    !(O->markup_stream && O->prefixed_by_markup)) {
 		const unsigned skip = (syntax_opt & CS_OPT_SYNTAX_NO_DOLLAR) != 0;
 		const unsigned index = Reg - 1;
@@ -106,7 +110,7 @@ static void printRegName(MCInst *MI, SStream *O, MCRegister Reg)
 	if (!(syntax_opt & CS_OPT_SYNTAX_NO_DOLLAR)) {
 		SStream_concat1(O, '$');
 	}
-	SStream_concat0(O, getRegisterName(Reg, LoongArch_RegAliasName));
+	SStream_concat0(O, LoongArch_reg_name((csh)(uintptr_t)MI->csh, Reg));
 }
 
 static void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
