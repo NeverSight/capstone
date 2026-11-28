@@ -1099,6 +1099,8 @@ if(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
         set_property(SOURCE arch/X86/X86Mapping.c APPEND PROPERTY
             COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_CACHED_OPERAND_ACCESS>")
+        set_property(SOURCE arch/X86/X86Disassembler.c APPEND PROPERTY
+            COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_CHECK_EVEX_WRITEMASK>")
         set_property(SOURCE arch/X86/X86VectorFallback64.c APPEND PROPERTY
             COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_FIXED_MASKED_SUFFIX>")
     endif()

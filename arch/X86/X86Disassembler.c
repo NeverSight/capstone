@@ -626,6 +626,24 @@ bool X86_completeScan(MCInst *instr, InternalInstruction *insn, uint16_t *size)
 #define X86_BACKEND_INLINE static inline
 #endif
 
+X86_BACKEND_INLINE bool hasDecodedWritemask(const InternalInstruction *insn)
+{
+#if defined(CAPSTONE_X86_LTCG_WRITEMASK) && defined(_DLL)
+	return x86HasWritemaskOperand(insn->instructionID);
+#else
+#ifdef X86_CHECK_EVEX_WRITEMASK
+	/* readMaskRegister rejects writemask operands outside EVEX. */
+	if (insn->vectorExtensionType != TYPE_EVEX)
+		return false;
+#endif
+	for (int i = 0; i < X86_MAX_OPERANDS; ++i) {
+		if (insn->operands[i].encoding == ENCODING_WRITEMASK)
+			return true;
+	}
+	return false;
+#endif
+}
+
 X86_BACKEND_INLINE bool
 getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
 			      MCInst *instr, uint16_t *size,
@@ -702,18 +720,8 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
 			if (insn.hasLockPrefix)
 				Flags |= X86_IP_HAS_LOCK;
 
-#if defined(CAPSTONE_X86_LTCG_WRITEMASK) && defined(_DLL)
-			if (x86HasWritemaskOperand(insn.instructionID))
+			if (hasDecodedWritemask(&insn))
 				Flags |= X86_IP_HAS_EVEX_OPMASK;
-#else
-			for (int i = 0; i < X86_MAX_OPERANDS; ++i) {
-				if (insn.operands[i].encoding ==
-				    ENCODING_WRITEMASK) {
-					Flags |= X86_IP_HAS_EVEX_OPMASK;
-					break;
-				}
-			}
-#endif
 
 			instr->flags = Flags;
 		}
