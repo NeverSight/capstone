@@ -1106,6 +1106,10 @@ if(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
             COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_BATCH_FALLBACK_ADDRESS>")
         set_property(SOURCE arch/X86/X86VectorFallback64.c APPEND PROPERTY
             COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_FIXED_MASKED_SUFFIX>")
+    else()
+        # On AArch64 hosts, handle RIP-relative VEX3 sources in the vector fallback.
+        set_property(SOURCE arch/X86/X86VectorFallback64.c APPEND PROPERTY
+            COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_VEX3_RIP_MEMORY>")
     endif()
 endif()
 add_library(capstone OBJECT ${ALL_SOURCES} ${capstone_storage_source} ${capstone_arm_char_source} ${ALL_HEADERS})

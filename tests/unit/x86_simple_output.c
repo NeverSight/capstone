@@ -1310,6 +1310,27 @@ static bool check_extend32(csh handles[2])
 	return true;
 }
 
+static bool check_vex3_rip_arithmetic(csh handles[2])
+{
+	const uint8_t opcodes[] = { 0x98, 0xa8, 0xb8, 0xfe };
+	for (unsigned map = 1; map <= 3; ++map) {
+		for (size_t op = 0; op < sizeof(opcodes); ++op) {
+			for (unsigned flags = 0; flags < 256; ++flags) {
+				const uint8_t b[] = {
+					0xc4, (uint8_t)(((flags & 7) << 5) | map),
+					(uint8_t)flags, opcodes[op],
+					(uint8_t)(((flags & 7) << 3) | 5),
+					0xbc, 0x9a, 0x78, 0x80
+				};
+				if (!compare(handles, b, sizeof(b), flags) ||
+				    !compare(handles, b, flags % sizeof(b), map))
+					return false;
+			}
+		}
+	}
+	return true;
+}
+
 static bool check_vex_packed_memory(csh handles[2])
 {
 	const uint8_t opcodes[] = { 0x10, 0x11, 0x28, 0x29, 0x51, 0x6f, 0x7f };
@@ -1710,6 +1731,7 @@ static bool check_mode(cs_mode mode)
 			!check_legacy_memory(handles, 0xf2) ||
 			!check_legacy_memory(handles, 0xf3) ||
 			!check_vex_sib_transfers(handles) ||
+			!check_vex3_rip_arithmetic(handles) ||
 			!check_vex_packed_memory(handles))))) ||
 		    !check_rex_stack(handles) ||
 		    (mode == CS_MODE_64 && !check_broadcast(handles)) ||

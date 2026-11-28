@@ -27,7 +27,7 @@
 #endif
 
 #include "X86GenSimpleOutput.inc"
-#ifdef CAPSTONE_X86_ONLY
+#if defined(CAPSTONE_X86_ONLY) || defined(X86_VEX3_RIP_MEMORY)
 #include "X86VexBaseMemory.h"
 #endif
 #define X86_LEGACY_PACKED_MEMORY
@@ -212,6 +212,13 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
 	if (size >= 10 && code[0] == 0x62 && (code[5] & 0xc7) == 5 &&
 	    X86_writeEvexRipMemory(handle, code, insn, insn_size))
 		return true;
+#ifdef X86_VEX3_RIP_MEMORY
+	if (size >= 9 && code[0] == 0xc4 && (code[4] & 0xc7) == 5 &&
+	    !X86_OUTPUT_UNSUPPORTED(handle, false) &&
+	    writeVexBaseMemory(code, size, 3, insn, insn_size,
+			       x86_simple_registers[3]))
+		return true;
+#endif
 	if (code[0] == 0xc4 &&
 	    X86_writeVexRegisterImmediate(handle, code, size, insn, insn_size,
 					  x86_simple_registers, true))
