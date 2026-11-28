@@ -171,10 +171,20 @@ void Alpha_printInst(MCInst *MI, SStream *O, void *Info)
 
 void Alpha_set_instr_map_data(MCInst *MI)
 {
-	map_cs_id(MI, insns, ARR_SIZE(insns));
+	const unsigned opcode = MCInst_getOpcode(MI);
+	if (opcode >= ARR_SIZE(insns)) {
+		map_cs_id(MI, insns, ARR_SIZE(insns));
+		return;
+	}
+	/* TableGen emits the mapping rows in opcode order. */
+	MI->flat_insn->id = insns[opcode].mapid;
+#ifndef CAPSTONE_DIET
+	if (!MI->flat_insn->detail)
+		return;
 	map_implicit_reads(MI, insns);
 	map_implicit_writes(MI, insns);
 	map_groups(MI, insns);
+#endif
 }
 
 bool Alpha_getInstruction(csh handle, const uint8_t *code, size_t code_len,
