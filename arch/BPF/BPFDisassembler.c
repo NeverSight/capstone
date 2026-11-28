@@ -7,6 +7,11 @@
 
 #include <string.h>
 #include <stddef.h> // offsetof macro
+#if defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
+	!defined(_KERNEL_MODE)
+#include <stdlib.h>
+#define BPF_SYSTEM_ALLOCATOR
+#endif
 
 #include "BPFConstants.h"
 #include "BPFDisassembler.h"
@@ -15,67 +20,34 @@
 #include "../../cs_priv.h"
 #include "../../utils.h"
 
-///< Malloc bpf_internal, also checks if code_len is large enough.
-static bpf_internal *alloc_bpf_internal(const size_t code_len)
+/* The caller has verified that the first eight bytes are available. */
+static bool fetchInstruction(MCInst *instr, const uint8_t *code, size_t code_len,
+			     bpf_internal *bpf)
 {
-	bpf_internal *bpf;
-
-	if (code_len < 8)
-		return NULL;
-	bpf = cs_mem_malloc(sizeof(bpf_internal));
-	if (bpf == NULL)
-		return NULL;
-	/* default value */
 	bpf->insn_size = 8;
-	return bpf;
-}
+	if (!EBPF_MODE(instr->csh->mode)) {
+		bpf->op = readBytes16(instr, code);
+		bpf->jt = code[2];
+		bpf->jf = code[3];
+		bpf->offset = 0;
+		bpf->k = readBytes32(instr, code + 4);
+		return true;
+	}
 
-///< Fetch a cBPF structure from code
-static bpf_internal *fetch_cbpf(MCInst *instr, const uint8_t *code,
-				const size_t code_len)
-{
-	bpf_internal *bpf;
-
-	bpf = alloc_bpf_internal(code_len);
-	if (bpf == NULL)
-		return NULL;
-
-	bpf->op = readBytes16(instr, code);
-	bpf->jt = code[2];
-	bpf->jf = code[3];
-	bpf->k = readBytes32(instr, code + 4);
-	return bpf;
-}
-
-///< Fetch an eBPF structure from code
-static bpf_internal *fetch_ebpf(MCInst *instr, const uint8_t *code,
-				const size_t code_len)
-{
-	bpf_internal *bpf;
-
-	bpf = alloc_bpf_internal(code_len);
-	if (bpf == NULL)
-		return NULL;
-
-	bpf->op = (uint16_t)code[0];
+	bpf->op = code[0];
 	bpf->dst = code[1] & 0xf;
-	bpf->src = (code[1] & 0xf0) >> 4;
-
-	// eBPF has one 16-byte instruction: BPF_LD | BPF_DW | BPF_IMM,
-	// in this case imm is combined with the next block's imm.
+	bpf->src = code[1] >> 4;
 	if (bpf->op == (BPF_CLASS_LD | BPF_SIZE_DW | BPF_MODE_IMM)) {
-		if (code_len < 16) {
-			cs_mem_free(bpf);
-			return NULL;
-		}
+		if (code_len < 16)
+			return false;
 		bpf->k = readBytes32(instr, code + 4) |
-			 (((uint64_t)readBytes32(instr, code + 12)) << 32);
+			 ((uint64_t)readBytes32(instr, code + 12) << 32);
 		bpf->insn_size = 16;
 	} else {
 		bpf->offset = readBytes16(instr, code + 2);
 		bpf->k = readBytes32(instr, code + 4);
 	}
-	return bpf;
+	return true;
 }
 
 #define CHECK_READABLE_REG(ud, reg) \
@@ -840,28 +812,37 @@ static bool setFinalOpcode(MCInst *MI, const bpf_internal *bpf)
 	return true;
 }
 
+static bool decodeInstruction(MCInst *instr, const uint8_t *code, size_t code_len,
+			      bpf_internal *bpf, uint16_t *size)
+{
+	if (!fetchInstruction(instr, code, code_len, bpf) ||
+	    !getInstruction(instr, bpf) || !setFinalOpcode(instr, bpf))
+		return false;
+	MCInst_setOpcode(instr, bpf->op);
+	*size = bpf->insn_size;
+	return true;
+}
+
 bool BPF_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 			MCInst *instr, uint16_t *size, uint64_t address,
 			void *info)
 {
-	bpf_internal *bpf;
+	if (code_len < 8)
+		return false;
 
-	if (EBPF_MODE(instr->csh->mode))
-		bpf = fetch_ebpf(instr, code, code_len);
-	else
-		bpf = fetch_cbpf(instr, code, code_len);
-	if (bpf == NULL)
-		return false;
-	if (!getInstruction(instr, bpf) || !setFinalOpcode(instr, bpf)) {
-		cs_mem_free(bpf);
-		return false;
+#ifdef BPF_SYSTEM_ALLOCATOR
+	if (cs_mem_malloc == malloc && cs_mem_free == free) {
+		bpf_internal scratch;
+		return decodeInstruction(instr, code, code_len, &scratch, size);
 	}
-	MCInst_setOpcode(instr, bpf->op);
-
-	*size = bpf->insn_size;
-	cs_mem_free(bpf);
-
-	return true;
+#endif
+	/* Preserve the allocation and failure behavior of custom allocators. */
+	bpf_internal *scratch = cs_mem_malloc(sizeof(*scratch));
+	if (!scratch)
+		return false;
+	bool ok = decodeInstruction(instr, code, code_len, scratch, size);
+	cs_mem_free(scratch);
+	return ok;
 }
 
 #endif
