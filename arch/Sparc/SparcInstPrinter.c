@@ -86,6 +86,7 @@ static void printInst(MCInst *MI, uint64_t Address, SStream *O)
 {
 	bool isAlias = false;
 	bool useAliasDetails = map_use_alias_details(MI);
+	MI->flat_insn->usesAliasDetails = useAliasDetails;
 	map_set_fill_detail_ops(MI, useAliasDetails);
 
 	if (!printAliasInstr(MI, Address, O) && !printSparcAliasInstr(MI, O)) {

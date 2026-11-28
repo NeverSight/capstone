@@ -33,15 +33,22 @@ const insn_map sparc_insns[] = {
 
 void Sparc_set_instr_map_data(MCInst *MI)
 {
-	map_cs_id(MI, sparc_insns, ARR_SIZE(sparc_insns));
+	const unsigned opcode = MCInst_getOpcode(MI);
+	if (opcode >= ARR_SIZE(sparc_insns)) {
+		map_cs_id(MI, sparc_insns, ARR_SIZE(sparc_insns));
+		return;
+	}
+	/* TableGen emits one mapping row per opcode in enum order. */
+	const insn_map *row = &sparc_insns[opcode];
+	MI->flat_insn->id = row->mapid;
+#ifndef CAPSTONE_DIET
+	if (!MI->flat_insn->detail)
+		return;
 	map_implicit_reads(MI, sparc_insns);
 	map_implicit_writes(MI, sparc_insns);
 	map_groups(MI, sparc_insns);
-	const sparc_suppl_info *suppl_info =
-		map_get_suppl_info(MI, sparc_insns);
-	if (suppl_info) {
-		Sparc_get_detail(MI)->format = suppl_info->form;
-	}
+	Sparc_get_detail(MI)->format = row->suppl_info.sparc.form;
+#endif
 }
 
 /// Adds details which are not defined consistently as LLVM operands like
@@ -306,7 +313,6 @@ void Sparc_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
 {
 	MCRegisterInfo *MRI = (MCRegisterInfo *)info;
 	MI->MRI = MRI;
-	MI->flat_insn->usesAliasDetails = map_use_alias_details(MI);
 	Sparc_LLVM_printInst(MI, MI->address, "", O);
 
 #ifndef CAPSTONE_DIET
