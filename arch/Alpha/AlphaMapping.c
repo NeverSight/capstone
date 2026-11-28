@@ -219,7 +219,9 @@ void Alpha_reg_access(const cs_insn *insn, cs_regs regs_read,
 				regs_read[read_count] = (uint16_t)op->reg;
 				read_count++;
 			}
+			/* Integer and floating-point register 31 discard writes. */
 			if ((op->access & CS_AC_WRITE) &&
+			    op->reg != ALPHA_REG_R31 && op->reg != ALPHA_REG_F31 &&
 			    !arr_exist_inline(regs_write, write_count,
 					      op->reg)) {
 				regs_write[write_count] = (uint16_t)op->reg;

@@ -1,0 +1,103 @@
+# Alpha Architecture Handbook, sections 4.3.2 and 4.3.3. The physical
+# instructions write the encoded Ra and use an explicit target or Rb.
+# The calling convention describes additional compiler-level effects.
+diff --git a/arch/Alpha/AlphaGenCSMappingInsn.inc b/arch/Alpha/AlphaGenCSMappingInsn.inc
+index f6704ecf..347d11e1 100644
+--- a/arch/Alpha/AlphaGenCSMappingInsn.inc
++++ b/arch/Alpha/AlphaGenCSMappingInsn.inc
+@@ -2015,7 +2015,7 @@
+   #endif
+ },
+ {
+-  /* br $$31,$DISP */
++  /* br $RA,$DISP */
+   ALPHA_BR /* 283 */, ALPHA_INS_BR,
+   #ifndef CAPSTONE_DIET
+     { 0 }, { 0 }, { ALPHA_GRP_JUMP, ALPHA_GRP_BRANCH_RELATIVE, 0 }, 1, 0, {{ 0 }},
+@@ -2023,10 +2023,10 @@
+   #endif
+ },
+ {
+-  /* bsr $$26,$$$DISP ..ng */
++  /* bsr $RA,$DISP */
+   ALPHA_BSR /* 284 */, ALPHA_INS_BSR,
+   #ifndef CAPSTONE_DIET
+-    { ALPHA_REG_R29, 0 }, { ALPHA_REG_R0, ALPHA_REG_R1, ALPHA_REG_R2, ALPHA_REG_R3, ALPHA_REG_R4, ALPHA_REG_R5, ALPHA_REG_R6, ALPHA_REG_R7, ALPHA_REG_R8, ALPHA_REG_R16, ALPHA_REG_R17, ALPHA_REG_R18, ALPHA_REG_R19, ALPHA_REG_R20, ALPHA_REG_R21, ALPHA_REG_R22, ALPHA_REG_R23, ALPHA_REG_R24, ALPHA_REG_R25, ALPHA_REG_R26, ALPHA_REG_R27, ALPHA_REG_R28, ALPHA_REG_R29, ALPHA_REG_F0, ALPHA_REG_F1, ALPHA_REG_F10, ALPHA_REG_F11, ALPHA_REG_F12, ALPHA_REG_F13, ALPHA_REG_F14, ALPHA_REG_F15, ALPHA_REG_F16, ALPHA_REG_F17, ALPHA_REG_F18, ALPHA_REG_F19, ALPHA_REG_F20, ALPHA_REG_F21, ALPHA_REG_F22, ALPHA_REG_F23, ALPHA_REG_F24, ALPHA_REG_F25, ALPHA_REG_F26, ALPHA_REG_F27, ALPHA_REG_F28, ALPHA_REG_F29, ALPHA_REG_F30, 0 }, { ALPHA_GRP_CALL, ALPHA_GRP_BRANCH_RELATIVE, 0 }, 1, 0, {{ 0 }},
++    { 0 }, { 0 }, { ALPHA_GRP_CALL, ALPHA_GRP_BRANCH_RELATIVE, 0 }, 1, 0, {{ 0 }},
+
+   #endif
+ },
+@@ -2930,7 +2930,7 @@
+   /* jsr $$26,($$27),0 */
+   ALPHA_JSR /* 397 */, ALPHA_INS_JSR,
+   #ifndef CAPSTONE_DIET
+-    { ALPHA_REG_R27, ALPHA_REG_R29, 0 }, { ALPHA_REG_R0, ALPHA_REG_R1, ALPHA_REG_R2, ALPHA_REG_R3, ALPHA_REG_R4, ALPHA_REG_R5, ALPHA_REG_R6, ALPHA_REG_R7, ALPHA_REG_R8, ALPHA_REG_R16, ALPHA_REG_R17, ALPHA_REG_R18, ALPHA_REG_R19, ALPHA_REG_R20, ALPHA_REG_R21, ALPHA_REG_R22, ALPHA_REG_R23, ALPHA_REG_R24, ALPHA_REG_R25, ALPHA_REG_R26, ALPHA_REG_R27, ALPHA_REG_R28, ALPHA_REG_R29, ALPHA_REG_F0, ALPHA_REG_F1, ALPHA_REG_F10, ALPHA_REG_F11, ALPHA_REG_F12, ALPHA_REG_F13, ALPHA_REG_F14, ALPHA_REG_F15, ALPHA_REG_F16, ALPHA_REG_F17, ALPHA_REG_F18, ALPHA_REG_F19, ALPHA_REG_F20, ALPHA_REG_F21, ALPHA_REG_F22, ALPHA_REG_F23, ALPHA_REG_F24, ALPHA_REG_F25, ALPHA_REG_F26, ALPHA_REG_F27, ALPHA_REG_F28, ALPHA_REG_F29, ALPHA_REG_F30, 0 }, { ALPHA_GRP_CALL, 0 }, 0, 0, {{ 0 }},
++    { 0 }, { 0 }, { ALPHA_GRP_CALL, 0 }, 0, 0, {{ 0 }},
+
+   #endif
+ },
+@@ -3322,7 +3322,7 @@
+   /* ret $$31,($$26),1 */
+   ALPHA_RETDAG /* 446 */, ALPHA_INS_RET,
+   #ifndef CAPSTONE_DIET
+-    { ALPHA_REG_R26, 0 }, { 0 }, { 0 }, 0, 0, {{ 0 }},
++    { 0 }, { 0 }, { 0 }, 0, 0, {{ 0 }},
+
+   #endif
+ },
+diff --git a/arch/Alpha/AlphaGenCSMappingInsnOp.inc b/arch/Alpha/AlphaGenCSMappingInsnOp.inc
+index 602f68b2..09267eec 100644
+--- a/arch/Alpha/AlphaGenCSMappingInsnOp.inc
++++ b/arch/Alpha/AlphaGenCSMappingInsnOp.inc
+@@ -934,13 +934,15 @@
+   { CS_OP_IMM, CS_AC_READ, { CS_DATA_TYPE_Other, CS_DATA_TYPE_LAST },  }, /* dst */
+   { 0 }
+ }},
+-{ /* ALPHA_BR (283) - ALPHA_INS_BR - br $$31,$DISP */
++{ /* ALPHA_BR (283) - ALPHA_INS_BR - br $RA,$DISP */
+ {
++  { CS_OP_REG, CS_AC_WRITE, { CS_DATA_TYPE_i64, CS_DATA_TYPE_LAST },  }, /* RA */
+   { CS_OP_IMM, CS_AC_READ, { CS_DATA_TYPE_Other, CS_DATA_TYPE_LAST },  }, /* DISP */
+   { 0 }
+ }},
+-{ /* ALPHA_BSR (284) - ALPHA_INS_BSR - bsr $$26,$$$DISP ..ng */
++{ /* ALPHA_BSR (284) - ALPHA_INS_BSR - bsr $RA,$DISP */
+ {
++  { CS_OP_REG, CS_AC_WRITE, { CS_DATA_TYPE_i64, CS_DATA_TYPE_LAST },  }, /* RA */
+   { CS_OP_IMM, CS_AC_READ, { CS_DATA_TYPE_Other, CS_DATA_TYPE_LAST },  }, /* DISP */
+   { 0 }
+ }},
+@@ -1725,21 +1727,21 @@
+ }},
+ { /* ALPHA_JMP (396) - ALPHA_INS_JMP - jmp $RD,($RS),$DISP */
+ {
+-  { CS_OP_REG, CS_AC_READ, { CS_DATA_TYPE_i64, CS_DATA_TYPE_LAST },  }, /* RD */
++  { CS_OP_REG, CS_AC_WRITE, { CS_DATA_TYPE_i64, CS_DATA_TYPE_LAST },  }, /* RD */
+   { CS_OP_REG, CS_AC_READ, { CS_DATA_TYPE_i64, CS_DATA_TYPE_LAST },  }, /* RS */
+   { CS_OP_IMM, CS_AC_READ, { CS_DATA_TYPE_i64, CS_DATA_TYPE_LAST },  }, /* DISP */
+   { 0 }
+ }},
+ { /* ALPHA_JSR (397) - ALPHA_INS_JSR - jsr $RD,($RS),$DISP */
+ {
+-  { CS_OP_REG, CS_AC_READ, { CS_DATA_TYPE_i64, CS_DATA_TYPE_LAST },  }, /* RD */
++  { CS_OP_REG, CS_AC_WRITE, { CS_DATA_TYPE_i64, CS_DATA_TYPE_LAST },  }, /* RD */
+   { CS_OP_REG, CS_AC_READ, { CS_DATA_TYPE_i64, CS_DATA_TYPE_LAST },  }, /* RS */
+   { CS_OP_IMM, CS_AC_READ, { CS_DATA_TYPE_i64, CS_DATA_TYPE_LAST },  }, /* DISP */
+   { 0 }
+ }},
+ { /* ALPHA_JSR_COROUTINE (398) - ALPHA_INS_JSR_COROUTINE - jsr_coroutine $RD,($RS),$DISP */
+ {
+-  { CS_OP_REG, CS_AC_READ, { CS_DATA_TYPE_i64, CS_DATA_TYPE_LAST },  }, /* RD */
++  { CS_OP_REG, CS_AC_WRITE, { CS_DATA_TYPE_i64, CS_DATA_TYPE_LAST },  }, /* RD */
+   { CS_OP_REG, CS_AC_READ, { CS_DATA_TYPE_i64, CS_DATA_TYPE_LAST },  }, /* RS */
+   { CS_OP_IMM, CS_AC_READ, { CS_DATA_TYPE_i64, CS_DATA_TYPE_LAST },  }, /* DISP */
+   { 0 }
+@@ -2069,7 +2071,7 @@
+ }},
+ { /* ALPHA_RETDAG (446) - ALPHA_INS_RET - ret $RD,($RS),$DISP */
+ {
+-  { CS_OP_REG, CS_AC_READ, { CS_DATA_TYPE_i64, CS_DATA_TYPE_LAST },  }, /* RD */
++  { CS_OP_REG, CS_AC_WRITE, { CS_DATA_TYPE_i64, CS_DATA_TYPE_LAST },  }, /* RD */
+   { CS_OP_REG, CS_AC_READ, { CS_DATA_TYPE_i64, CS_DATA_TYPE_LAST },  }, /* RS */
+   { CS_OP_IMM, CS_AC_READ, { CS_DATA_TYPE_i64, CS_DATA_TYPE_LAST },  }, /* DISP */
+   { 0 }

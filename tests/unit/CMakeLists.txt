@@ -25,6 +25,9 @@ if(Python3_Interpreter_FOUND AND (CAPSTONE_AARCH64_SUPPORT OR CAPSTONE_MIPS_SUPP
     add_test(NAME unit_alias_mnemonic_trie_generator
         COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/suite/synctools/alias_mnemonic_trie.py" --check)
 endif()
+if(CAPSTONE_ALPHA_SUPPORT)
+    list(APPEND UNIT_TEST_SOURCES alpha_branch_detail.c)
+endif()
 if(CAPSTONE_SPARC_SUPPORT)
     list(APPEND UNIT_TEST_SOURCES sparc_mapping_index.c)
 endif()
