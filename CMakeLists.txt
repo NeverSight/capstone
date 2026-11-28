@@ -1101,6 +1101,9 @@ if(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
             COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_CACHED_OPERAND_ACCESS>")
         set_property(SOURCE arch/X86/X86Disassembler.c APPEND PROPERTY
             COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_CHECK_EVEX_WRITEMASK>")
+        # The x86-64 batch scanner needs the instruction address only on fallback.
+        set_property(SOURCE arch/X86/X86BatchScan.c APPEND PROPERTY
+            COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_BATCH_FALLBACK_ADDRESS>")
         set_property(SOURCE arch/X86/X86VectorFallback64.c APPEND PROPERTY
             COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_FIXED_MASKED_SUFFIX>")
     endif()

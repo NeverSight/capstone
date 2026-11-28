@@ -280,7 +280,11 @@ CS_DECODE_INLINE X86ScanBatchResult scanBatch(csh ud, const uint8_t *code,
 		uint32_t packed = wide ? readFirst64(code, size) :
 					 readFirst32(code, size);
 		if (!packed) {
+#ifdef X86_BATCH_FALLBACK_ADDRESS
+			insn.address = address + batch.bytes;
+#else
 			insn.address = address;
+#endif
 			X86ScanResult result;
 			if (!X86_getInstructionScanResult(ud, code, size, &insn,
 							  &result))
@@ -294,7 +298,9 @@ CS_DECODE_INLINE X86ScanBatchResult scanBatch(csh ud, const uint8_t *code,
 		batch.bytes += length;
 		code += length;
 		size -= length;
+#ifndef X86_BATCH_FALLBACK_ADDRESS
 		address += length;
+#endif
 	}
 	return batch;
 }
