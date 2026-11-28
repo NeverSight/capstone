@@ -390,6 +390,7 @@ static void sort_and_uniq(cs_regs arr, uint8_t n, uint8_t *new_n)
 		if (j != 0 && arr[iMin] == arr[j - 1]) { // duplicate ele found
 			arr[iMin] = arr[n - 1];
 			--n;
+			--j; // The replacement still belongs to the unsorted range.
 		} else {
 			tmp = arr[iMin];
 			arr[iMin] = arr[j];
@@ -404,9 +405,13 @@ void HPPA_reg_access(const cs_insn *insn, cs_regs regs_read,
 		     uint8_t *regs_read_count, cs_regs regs_write,
 		     uint8_t *regs_write_count)
 {
-	uint8_t read_count = 0;
-	uint8_t write_count = 0;
-	const cs_hppa *hppa = &(insn->detail->hppa);
+	const cs_detail *detail = insn->detail;
+	uint8_t read_count = detail->regs_read_count;
+	uint8_t write_count = detail->regs_write_count;
+	const cs_hppa *hppa = &detail->hppa;
+	memcpy(regs_read, detail->regs_read, read_count * sizeof(regs_read[0]));
+	memcpy(regs_write, detail->regs_write,
+	       write_count * sizeof(regs_write[0]));
 
 	for (unsigned i = 0; i < hppa->op_count; ++i) {
 		const cs_hppa_op *op = &(hppa->operands[i]);

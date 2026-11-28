@@ -808,7 +808,7 @@ static void update_regs_access(MCInst *MI, unsigned int opcode)
 
 void HPPA_printInst(MCInst *MI, SStream *O, void *Info)
 {
-	cs_hppa hppa;
+	cs_hppa hppa = { 0 };
 
 	/* set pubOpcode as instruction id */
 	MCInst_setOpcodePub(MI, MCInst_getOpcode(MI));
